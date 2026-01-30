@@ -1,3 +1,4 @@
+
 # Learning Agent - Claude Code Instructions
 
 ## Project Overview
@@ -6,6 +7,8 @@
 **Goal**: Learning system that helps Claude Code avoid repeating mistakes across sessions
 **Stack**: TypeScript + pnpm (deployable as dev dependency)
 **Status**: Spec finalized, ready to implement
+**Type**: shared-lib
+**Primary Language**: TypeScript
 
 ### Key Documentation
 
@@ -14,7 +17,7 @@
 | `doc/SPEC.md` | Complete specification |
 | `doc/CONTEXT.md` | Research and decisions |
 | `doc/PLAN.md` | Day-by-day implementation plan |
-| `docs/verification/` | Review workflow and criteria |
+| `doc/verification/` | Review workflow and criteria |
 
 ---
 
@@ -22,24 +25,43 @@
 
 **All decisions follow this hierarchy:**
 
-1. **Correctness** - Does it work? Does it meet requirements?
-2. **Consistency** - Does it follow established patterns?
-3. **Simplicity** - Is it the simplest solution that works?
+1. **Correctness** — Does it work? Does it meet requirements?
+2. **Consistency** — Does it follow established patterns?
+3. **Simplicity** — Is it the simplest solution that works?
 
-When in conflict, prioritize in this order.
+When in conflict, prioritize in this order. Never sacrifice correctness for simplicity.
 
 ---
 
-## Rule Categories
-
-Rules have different levels of mandatoriness:
+## Rule Categories (Tiered Mandatoriness)
 
 | Level | Meaning | Override |
 |-------|---------|----------|
 | **🔴 Inviolable** | Never break | Cannot override |
-| **🟠 Strong Default** | Break only with explicit justification | Document why |
+| **🟠 Strong Default** | Break only with explicit justification | Document why in PR |
 | **🟡 Soft Default** | Prefer unless context demands otherwise | Use judgment |
 | **🟢 Recommended** | Best practice, encouraged | Skip if simpler |
+
+---
+
+## Critical Constraints (DO NOT)
+
+### 🔴 Security (Inviolable)
+- **DO NOT** hardcode secrets or credentials
+- **DO NOT** use string interpolation for SQL queries
+- **DO NOT** log sensitive data (PII, tokens, passwords)
+- **DO NOT** change security configurations without human approval
+
+### 🔴 Code Quality (Inviolable)
+- **DO NOT** write tests after implementation (TDD only)
+- **DO NOT** mock business logic in tests
+- **DO NOT** use global variables
+- **DO NOT** skip type annotations on public APIs
+
+### 🟠 Process (Strong Default)
+- **DO NOT** commit without running tests
+- **DO NOT** push without `bd sync`
+- **DO NOT** mark work complete without `/implementation-reviewer` approval
 
 ---
 
@@ -84,16 +106,16 @@ Use `/invariant-designer` to document what must be true:
 ### Phase 3: Implement
 - Write minimal code to pass tests
 - One test at a time
-- NEVER modify tests to pass
+- **NEVER** modify tests to make them pass
 
 ### Phase 4: Verify
 - Use `/module-boundary-reviewer` for design validation
-- Use `/implementation-reviewer` for final approval (FINAL AUTHORITY)
+- Use `/implementation-reviewer` for final approval (**FINAL AUTHORITY**)
 
-### 🔴 Inviolable Rules
-- NO post-hoc tests - Tests must exist BEFORE implementation
-- NO mocked business logic - Real data, real execution
-- NO trivial assertions - Tests must verify meaningful properties
+### 🔴 Inviolable TDD Rules
+- Tests must exist BEFORE implementation
+- Real data, real execution (no mocked business logic)
+- Tests must verify meaningful properties
 - Work is NOT complete until `/implementation-reviewer` approves
 
 ---
@@ -120,53 +142,14 @@ pnpm lint      # Zero violations
 
 ---
 
-## Anti-Patterns (Avoid)
-
-### 🔴 Inviolable - Never Do
-- **Cargo-cult testing**: Tests that pass regardless of implementation
-- **Mocking business logic**: vi.mock() on the thing being tested
-- **Over-engineering**: Adding features/abstractions not requested
-
-### 🟠 Strong Default - Avoid Unless Justified
-- **Utils/helpers modules**: Indicate unclear responsibility
-- **Magic numbers**: Use named constants
-- **Commented-out code**: Delete it
-
-### 🟡 Soft Default - Generally Avoid
-- **Long functions**: Prefer < 50 lines
-- **Deep nesting**: Prefer early returns
-- **Implicit dependencies**: Pass dependencies explicitly
-
----
-
 ## Code Organization
 
-### Small Code Snippets Principle
+### 🟠 Small Code Principle (Strong Default)
 
-**🟠 Strong Default**: Keep code snippets small and focused.
-
-- Functions: < 50 lines
-- Files: < 300 lines
-- Modules: Single clear responsibility
-- Public API: Minimal exports via `index.ts`
-
-### Documentation Structure
-
-```
-doc/                    # High-level project docs
-├── SPEC.md            # Complete specification
-├── CONTEXT.md         # Research and decisions
-└── PLAN.md            # Implementation plan
-
-docs/                   # Supporting documentation
-└── verification/      # Review workflow
-    ├── README.md
-    └── closed-loop-review-process.md
-
-src/                    # Code with inline JSDoc
-└── module/
-    └── index.ts       # Public API only
-```
+- **Functions**: < 50 lines
+- **Files**: < 300 lines
+- **Modules**: Single clear responsibility
+- **Public API**: Minimal exports via `index.ts`
 
 ### Module Design (Parnas Principles)
 
@@ -178,11 +161,48 @@ export { rebuildIndex, searchKeyword } from './sqlite.js';
 // Internal files NOT exported through index.ts
 ```
 
+### Documentation Structure
+
+```
+doc/                        # All documentation (singular)
+├── SPEC.md                 # Complete specification
+├── CONTEXT.md              # Research and decisions
+├── PLAN.md                 # Implementation plan
+└── verification/           # Review workflow
+    ├── README.md
+    └── closed-loop-review-process.md
+
+src/                        # Code with inline JSDoc
+└── module/
+    └── index.ts            # Public API only
+```
+
+---
+
+## Anti-Patterns (Avoid)
+
+### 🔴 Inviolable — Never Do
+- **Cargo-cult testing**: Tests that pass regardless of implementation
+- **Mocking business logic**: `vi.mock()` on the thing being tested
+- **Over-engineering**: Adding features/abstractions not requested
+- **Post-hoc tests**: Writing tests after implementation
+
+### 🟠 Strong Default — Avoid Unless Justified
+- **Utils/helpers modules**: Indicate unclear responsibility
+- **Magic numbers**: Use named constants
+- **Commented-out code**: Delete it
+- **Deep nesting**: Prefer early returns
+
+### 🟡 Soft Default — Generally Avoid
+- **Long functions**: Prefer < 50 lines
+- **Implicit dependencies**: Pass dependencies explicitly
+- **Emojis in code/comments**: Keep code professional
+
 ---
 
 ## Session Completion Protocol
 
-### 🔴 Inviolable - Before Saying "Done"
+### 🔴 Inviolable — Before Saying "Done"
 
 ```bash
 [ ] 1. git status           # Check what changed
@@ -244,9 +264,30 @@ export { rebuildIndex, searchKeyword } from './sqlite.js';
 
 ---
 
+## Build & Test Commands
+
+### Build
+```bash
+pnpm install    # Install dependencies
+pnpm build      # Build with tsup
+```
+
+### Test
+```bash
+pnpm test       # Run all tests
+pnpm test:watch # Watch mode
+```
+
+### Run
+```bash
+pnpm dev        # Development mode
+```
+
+---
+
 ## References
 
-- `doc/SPEC.md` - Full specification
-- `doc/CONTEXT.md` - Research and decisions
-- `doc/PLAN.md` - Implementation plan
-- `docs/verification/closed-loop-review-process.md` - Review workflow
+- `doc/SPEC.md` — Full specification
+- `doc/CONTEXT.md` — Research and decisions
+- `doc/PLAN.md` — Implementation plan
+- `doc/verification/closed-loop-review-process.md` — Review workflow

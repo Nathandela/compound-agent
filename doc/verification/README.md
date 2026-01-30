@@ -7,7 +7,6 @@ This directory contains documentation for the systematic code verification pract
 | Document | Purpose |
 |----------|---------|
 | [closed-loop-review-process.md](closed-loop-review-process.md) | Mandatory review workflow with exit criteria |
-| [systematic-code-verification.md](systematic-code-verification.md) | Complete verification playbook |
 
 ## Quick Reference
 
