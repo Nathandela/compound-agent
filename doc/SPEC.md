@@ -1,0 +1,379 @@
+# Learning Loop for Claude Code Agent
+
+## Project Overview
+
+A learning system that helps Claude Code avoid repeating mistakes across sessions. Captures lessons from corrections and retrieves them when relevant.
+
+**Location**: `/Users/Nathan/Documents/Code/learning_agent/`
+**Timeline**: 2.5-3 weeks
+**Status**: Spec finalized, ready to implement
+**Stack**: TypeScript + pnpm (deployable as dev dependency to any repo)
+
+---
+
+## Problem Statement
+
+Claude Code forgets lessons between sessions:
+- Makes the same mistakes repeatedly
+- User has to re-explain preferences
+- No memory of what worked/failed in past sessions
+
+**Goal**: Efficient, precise learning loop that doesn't explode context.
+
+---
+
+## Key Decisions
+
+| Aspect | Decision | Rationale |
+|--------|----------|-----------|
+| **Scope** | Repository-level only | Simpler. Share lessons between repos via copy on demand |
+| **Storage** | JSONL source + SQLite index | Git-readable diffs + fast search |
+| **Search** | Vector (local nomic model) | Semantic similarity is core value |
+| **Trigger** | Agent-initiated + user confirm | Claude CAN self-correct, needs validation |
+| **Quality** | Tiered (quick vs full) | Balance capture speed vs rigor |
+| **CLAUDE.md relation** | Separate systems | Rules = permanent, Lessons = contextual WHY |
+| **Embeddings** | Local (nomic-embed-text via llama.cpp) | Offline capable, no API deps |
+
+---
+
+## Architecture
+
+```
+.claude/                        (repository scope)
+├── CLAUDE.md                   <- Always loaded (permanent rules)
+├── lessons/
+│   ├── index.jsonl             <- Source of truth (git-tracked)
+│   └── archive/                <- Old lessons (compacted)
+└── .cache/
+    └── lessons.sqlite          <- Rebuildable index (.gitignore)
+
+FLOW:
+┌─────────┐    ┌─────────┐    ┌─────────┐    ┌─────────┐
+│ Mistake │───>│ Claude  │───>│ Quick   │───>│ Stored  │
+│ happens │    │ notices │    │ confirm │    │ lesson  │
+└─────────┘    └─────────┘    └─────────┘    └─────────┘
+                    │              │
+               (or user          [y/n]
+                corrects)
+
+┌─────────┐    ┌─────────┐    ┌─────────┐
+│  Next   │<───│ Retrieve│<───│ Session │
+│  task   │    │ relevant│    │  start  │
+└─────────┘    └─────────┘    └─────────┘
+```
+
+---
+
+## Lesson Schema
+
+### Quick Lesson (capture fast)
+```json
+{
+  "id": "L001",
+  "type": "quick",
+  "trigger": "Used pandas for 500MB file",
+  "insight": "Polars 10x faster",
+  "tags": ["performance", "polars"],
+  "created": "2025-01-30T14:00:00Z",
+  "confirmed": true
+}
+```
+
+### Full Lesson (important, needs detail)
+```json
+{
+  "id": "L002",
+  "type": "full",
+  "trigger": "Auth API returned 401 despite valid token",
+  "insight": "API requires X-Request-ID header",
+  "evidence": "Traced in network tab, header missing",
+  "tags": ["api", "auth"],
+  "severity": "high",
+  "created": "2025-01-30T14:00:00Z",
+  "confirmed": true,
+  "pattern": {
+    "bad": "requests.get(url, headers={'Authorization': token})",
+    "good": "requests.get(url, headers={'Authorization': token, 'X-Request-ID': uuid4()})"
+  }
+}
+```
+
+### Lesson Categories (from user examples)
+- **Preferences**: Use Polars not pandas, uv over pip
+- **Project rules**: API requires X header, never modify Y
+- **Patterns**: Always test, always document
+- **Corrections**: Bad typing, wrong API calls, library misuse
+
+---
+
+## Capture Flow
+
+### Trigger Detection (multi-signal)
+1. Claude self-corrects after iteration (edit -> fail -> re-edit)
+2. User says "no", "wrong", "actually..."
+3. Test fails -> fix -> passes
+4. User explicitly: "remember this" / /learn
+
+### Quality Filter (prevent BS lessons)
+Before proposing, Claude checks:
+- [ ] Is this novel? (not already in lessons)
+- [ ] Is this specific? (not "write better code")
+- [ ] Is this actionable? (clear what to do differently)
+
+If all NO -> don't propose lesson
+If any YES -> propose with quick confirm
+
+### Confirmation UX
+```
+Claude: "Learned: Use Polars for large files. Save? [y/n]"
+User: "y" (or ignores = no)
+```
+
+**Key principle**: Most sessions have NO lessons, and that's fine. Quality over quantity.
+
+---
+
+## Retrieval Strategy
+
+### Session Start
+1. Load CLAUDE.md (always, ~2-5K tokens)
+2. Extract context: current files, recent git diff
+3. Vector search lessons for context
+4. Load top 3-5 relevant lessons (~500-1K tokens)
+
+### Pre-Task (before Edit/Write/Bash)
+1. Extract intent from tool input
+2. Quick vector search (cached embeddings)
+3. If high-severity lesson matches:
+   - Inject reminder: "Note: Last time [trigger], learned [X]"
+
+### Search Ranking
+```
+score = vector_similarity
+      * severity_boost (high=1.5, medium=1.0, low=0.8)
+      * recency_boost (last 30d=1.2, older=1.0)
+      * confirmation_boost (user confirmed=1.3)
+```
+
+---
+
+## Technical Stack
+
+| Component | Technology | Notes |
+|-----------|------------|-------|
+| Language | TypeScript | Deployable as dev dependency to any repo |
+| Package Manager | pnpm | Fast, workspace-friendly |
+| Storage | better-sqlite3 + FTS5 | Sync API, prebuilds available |
+| Embeddings | node-llama-cpp + nomic-embed-text-v1.5 | ~500MB, downloaded on first use to ~/.cache |
+| CLI framework | Commander.js | Standard Node.js CLI |
+| Schema validation | Zod | Runtime type safety |
+| Build | tsup | Fast TypeScript bundler |
+
+## Deployment Model
+
+```
+# Install as dev dependency in any repo
+pnpm add -D @scope/learning-agent
+
+# Or link locally during development
+pnpm add -D ../learning_agent
+
+# Usage via package.json scripts or npx
+pnpm learn "Use Polars not pandas"
+npx learning-agent search "data processing"
+```
+
+The package installs a CLI (`learning-agent` / `learn`) that:
+- Stores lessons in `.claude/lessons/index.jsonl` (per-repo, git-tracked)
+- Caches SQLite index in `.claude/.cache/lessons.sqlite` (gitignored)
+- Downloads embedding model to `~/.cache/learning-agent/models/` (global, first-use)
+
+---
+
+## Implementation Plan
+
+### Week 1: Core Storage + Manual Capture
+
+**Day 1-2: Project setup + JSONL + SQLite**
+- pnpm init, TypeScript config, tsup build
+- Zod schemas for lessons (quick + full types)
+- JSONL read/write with atomic append
+- better-sqlite3 with FTS5 virtual table
+- Rebuild index from JSONL command
+
+**Day 3-4: Local embeddings**
+- node-llama-cpp setup
+- Model download to ~/.cache on first use
+- Embedding cache (content hash -> vector)
+- Vector similarity search (cosine)
+
+**Day 5: Manual capture CLI**
+- Commander.js CLI with `learn` and `lessons` commands
+- Quick vs full lesson prompts
+- Novelty check against existing lessons
+
+### Week 2: Retrieval + Claude Integration
+
+**Day 1-2: Retrieval system**
+- Search ranking with boosts (severity, recency, confirmation)
+- Context injection formatting
+- Programmatic API for hooks
+
+**Day 3-4: Capture triggers**
+- User correction detection patterns
+- Quality filter (novel? specific? actionable?)
+- Contradiction warning (similar lesson exists)
+
+**Day 5: Integration + hooks**
+- Export functions for Claude Code hooks
+- Example hook configurations
+- Quick confirm UX flow
+
+### Week 3: Polish + Iteration
+
+**Day 1-2: Compaction**
+- Archive old lessons (>90 days, never retrieved)
+- Retrieval count tracking
+- Simple truncation (no AI summarization initially)
+
+**Day 3-4: Quality of life**
+- `lessons stats` command
+- `lessons export` / `lessons import` for cross-repo sharing
+- Better CLI output formatting
+
+**Day 5: Testing + docs**
+- Vitest unit tests
+- Integration test: capture -> index -> search
+- README with usage examples
+
+---
+
+## File Structure
+
+```
+learning_agent/
+├── doc/
+│   ├── SPEC.md                 <- This file
+│   ├── CONTEXT.md              <- Research & decisions
+│   └── PLAN.md                 <- Detailed implementation plan
+├── src/
+│   ├── index.ts                <- Public API exports
+│   ├── cli.ts                  <- Commander.js CLI entry
+│   ├── types.ts                <- Zod schemas + TypeScript types
+│   ├── storage/
+│   │   ├── index.ts
+│   │   ├── jsonl.ts            <- JSONL read/write
+│   │   └── sqlite.ts           <- better-sqlite3 + FTS5
+│   ├── embeddings/
+│   │   ├── index.ts
+│   │   ├── nomic.ts            <- node-llama-cpp wrapper
+│   │   ├── download.ts         <- Model download logic
+│   │   └── cache.ts            <- Embedding cache
+│   ├── search/
+│   │   ├── index.ts
+│   │   ├── vector.ts           <- Cosine similarity
+│   │   └── ranking.ts          <- Score boosting
+│   └── capture/
+│       ├── index.ts
+│       ├── triggers.ts         <- Detection patterns
+│       └── quality.ts          <- BS filter
+├── tests/
+│   ├── storage.test.ts
+│   ├── embeddings.test.ts
+│   └── search.test.ts
+├── package.json
+├── tsconfig.json
+├── tsup.config.ts
+└── README.md
+```
+
+## Package.json
+
+```json
+{
+  "name": "@scope/learning-agent",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "learning-agent": "./dist/cli.js",
+    "learn": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "node-llama-cpp": "^3.0.0",
+    "commander": "^12.0.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0",
+    "@types/better-sqlite3": "^7.6.0",
+    "@types/node": "^20.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
+```
+
+---
+
+## Critic Feedback (Incorporated)
+
+From neutral reviewer:
+
+1. **"No definition of mistake"** -> Added lesson categories + quality filter
+2. **"Agent can't recognize mistakes"** -> Kept agent-initiated BUT with user confirm
+3. **"Subagent is over-engineered"** -> Changed to inline capture with quick confirm
+4. **"Start with keyword search"** -> User insisted on vectors, keeping them
+5. **"Lesson inflation risk"** -> Added quality filter + "most sessions have no lessons" principle
+6. **"Missing contradiction detection"** -> Added to Week 2 scope
+7. **"Missing provenance"** -> Lessons track created timestamp, can add retrieval count
+
+---
+
+## Open Questions (Resolved)
+
+| Question | Resolution |
+|----------|------------|
+| Global vs project scope? | Project only, copy to share |
+| SQLite vs JSONL? | Hybrid: JSONL source, SQLite index |
+| Online embedding fallback? | No, local only |
+| Pre-compaction flush? | Cut from MVP, add if needed |
+| Hierarchical scopes? | Cut, too complex |
+
+---
+
+## Success Criteria
+
+1. **Context efficiency**: Lessons add <2K tokens per session
+2. **Retrieval precision**: Relevant lessons surface >80% of time
+3. **Capture quality**: <10% of lessons are "BS" (vague, obvious)
+4. **User friction**: Quick confirm takes <5 seconds
+5. **Reliability**: Works offline, no external API deps
+
+---
+
+## Next Steps
+
+1. Initialize Python project with uv
+2. Implement JSONL storage + schema
+3. Add SQLite index with FTS5
+4. Integrate nomic embeddings
+5. Build CLI for manual capture
+6. Add Claude Code hooks
