@@ -1,1 +1,28 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Cache
+.claude/.cache/
+
+# OS
 .DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
