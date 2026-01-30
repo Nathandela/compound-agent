@@ -1,21 +1,12 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { access } from 'fs/promises';
+import { describe, it, expect, afterAll } from 'vitest';
+import { existsSync } from 'fs';
 import { getModelPath } from './download.js';
 import { embedText, embedTexts, getEmbedding, unloadEmbedding } from './nomic.js';
 
+// Check model availability synchronously at module load time
+const modelAvailable = existsSync(getModelPath());
+
 describe('nomic embeddings', () => {
-  let modelAvailable = false;
-
-  beforeAll(async () => {
-    // Check if model is available (skip download-dependent tests if not)
-    try {
-      await access(getModelPath());
-      modelAvailable = true;
-    } catch {
-      modelAvailable = false;
-    }
-  });
-
   afterAll(() => {
     unloadEmbedding();
   });
@@ -86,15 +77,7 @@ describe('nomic embeddings', () => {
   });
 
   describe('error handling', () => {
-    it('throws if model not available and not downloaded', async () => {
-      // This test checks the hard-fail requirement
-      // When model is missing, it should throw, not silently fail
-      if (modelAvailable) {
-        // Model exists, skip this test
-        return;
-      }
-
-      // Model doesn't exist - should throw when trying to load
+    it.skipIf(modelAvailable)('throws if model not available', async () => {
       await expect(getEmbedding()).rejects.toThrow();
     });
   });
