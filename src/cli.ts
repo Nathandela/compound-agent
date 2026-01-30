@@ -13,6 +13,7 @@ import { VERSION } from './index.js';
 import { appendLesson, readLessons } from './storage/jsonl.js';
 import { rebuildIndex, searchKeyword } from './storage/sqlite.js';
 import { generateId } from './types.js';
+import { ensureModel, getModelPath } from './embeddings/download.js';
 import type { QuickLesson } from './types.js';
 
 const program = new Command();
@@ -125,6 +126,15 @@ program
     console.log('Rebuilding index...');
     await rebuildIndex(repoRoot);
     console.log('Index rebuilt.');
+  });
+
+program
+  .command('download-model')
+  .description('Download the embedding model (~500MB)')
+  .action(async () => {
+    console.log(`Model path: ${getModelPath()}`);
+    await ensureModel();
+    console.log('Model ready.');
   });
 
 program.parse();

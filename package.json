@@ -23,7 +23,9 @@
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:all": "pnpm download-model && vitest run",
     "lint": "tsc --noEmit",
+    "download-model": "node ./dist/cli.js download-model",
     "prepublishOnly": "pnpm build"
   },
   "keywords": [
