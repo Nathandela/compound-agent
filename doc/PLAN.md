@@ -83,10 +83,11 @@ pnpm build
 ### Day 2: Zod Schemas + JSONL Storage
 
 **Tasks**:
-- [ ] Define lesson schemas with Zod
+- [ ] Define lesson schemas with Zod (including provenance + links)
 - [ ] Implement JSONL append (atomic write)
 - [ ] Implement JSONL read (stream for large files)
 - [ ] Add lesson ID generation (hash-based)
+- [ ] Add tombstone records for edits/deletes
 
 **Files to create**:
 ```
@@ -107,8 +108,16 @@ export const QuickLessonSchema = z.object({
   trigger: z.string(),
   insight: z.string(),
   tags: z.array(z.string()).default([]),
+  source: z.enum(['user_correction', 'self_correction', 'test_failure', 'manual']),
+  context: z.object({
+    tool: z.string(),
+    intent: z.string(),
+  }).optional(),
   created: z.string().datetime(),
   confirmed: z.boolean().default(true),
+  supersedes: z.array(z.string()).default([]),
+  related: z.array(z.string()).default([]),
+  deleted: z.boolean().optional(),
   retrievalCount: z.number().default(0),
 });
 
@@ -120,8 +129,16 @@ export const FullLessonSchema = z.object({
   evidence: z.string().optional(),
   tags: z.array(z.string()).default([]),
   severity: z.enum(['high', 'medium', 'low']).default('medium'),
+  source: z.enum(['user_correction', 'self_correction', 'test_failure', 'manual']),
+  context: z.object({
+    tool: z.string(),
+    intent: z.string(),
+  }).optional(),
   created: z.string().datetime(),
   confirmed: z.boolean().default(true),
+  supersedes: z.array(z.string()).default([]),
+  related: z.array(z.string()).default([]),
+  deleted: z.boolean().optional(),
   retrievalCount: z.number().default(0),
   pattern: z.object({
     bad: z.string(),
@@ -160,10 +177,18 @@ export function readLessons(repoRoot: string): Lesson[] {
   if (!fs.existsSync(filePath)) return [];
 
   const content = fs.readFileSync(filePath, 'utf-8');
-  return content
+  const parsed = content
     .split('\n')
     .filter(line => line.trim())
     .map(line => LessonSchema.parse(JSON.parse(line)));
+
+  // Last-write-wins for edits/deletes; drop tombstones
+  const byId = new Map<string, Lesson>();
+  for (const lesson of parsed) {
+    byId.set(lesson.id, lesson);
+  }
+
+  return Array.from(byId.values()).filter(lesson => !lesson.deleted);
 }
 ```
 
@@ -172,7 +197,20 @@ export function readLessons(repoRoot: string): Lesson[] {
 pnpm build
 node -e "
 import { appendLesson, readLessons } from './dist/storage/jsonl.js';
-appendLesson('.', { id: 'test-1', type: 'quick', trigger: 'test', insight: 'test insight', tags: [], created: new Date().toISOString(), confirmed: true, retrievalCount: 0 });
+appendLesson('.', {
+  id: 'test-1',
+  type: 'quick',
+  trigger: 'test',
+  insight: 'test insight',
+  tags: [],
+  source: 'manual',
+  context: { tool: 'cli', intent: 'manual test' },
+  created: new Date().toISOString(),
+  confirmed: true,
+  supersedes: [],
+  related: [],
+  retrievalCount: 0
+});
 console.log(readLessons('.'));
 "
 ```
@@ -215,6 +253,11 @@ const SCHEMA = `
     insight TEXT NOT NULL,
     tags TEXT,
     severity TEXT,
+    source TEXT,
+    context TEXT,
+    supersedes TEXT,
+    related TEXT,
+    deleted INTEGER DEFAULT 0,
     created TEXT NOT NULL,
     confirmed INTEGER DEFAULT 1,
     retrieval_count INTEGER DEFAULT 0,
@@ -252,8 +295,12 @@ export function rebuildIndex(repoRoot: string): void {
   db.exec('DELETE FROM lessons');
 
   const insert = db.prepare(`
-    INSERT INTO lessons (id, type, trigger, insight, tags, severity, created, confirmed, retrieval_count)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO lessons (
+      id, type, trigger, insight, tags, severity,
+      source, context, supersedes, related, deleted,
+      created, confirmed, retrieval_count
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   for (const lesson of lessons) {
@@ -264,6 +311,11 @@ export function rebuildIndex(repoRoot: string): void {
       lesson.insight,
       JSON.stringify(lesson.tags),
       lesson.type === 'full' ? lesson.severity : null,
+      lesson.source,
+      lesson.context ? JSON.stringify(lesson.context) : null,
+      JSON.stringify(lesson.supersedes || []),
+      JSON.stringify(lesson.related || []),
+      lesson.deleted ? 1 : 0,
       lesson.created,
       lesson.confirmed ? 1 : 0,
       lesson.retrievalCount
@@ -279,7 +331,7 @@ export function searchKeyword(repoRoot: string, query: string, limit = 10): Less
   const rows = db.prepare(`
     SELECT l.* FROM lessons l
     JOIN lessons_fts fts ON l.rowid = fts.rowid
-    WHERE lessons_fts MATCH ?
+    WHERE lessons_fts MATCH ? AND l.deleted = 0
     ORDER BY rank
     LIMIT ?
   `).all(query, limit);
@@ -485,8 +537,12 @@ program
       trigger: options.trigger || insight,
       insight,
       tags: options.tags?.split(',') || [],
+      source: 'manual' as const,
+      context: { tool: 'cli', intent: 'manual capture' },
       created: new Date().toISOString(),
       confirmed: true,
+      supersedes: [],
+      related: [],
       retrievalCount: 0,
     };
 
@@ -545,13 +601,16 @@ pnpm build
 
 ## Week 2: Retrieval + Integration
 
-### Day 1-2: Search Ranking
+### Day 1-2: Retrieval System
 
 **Tasks**:
 - [ ] Implement ranking with boosts
 - [ ] Add severity boost (high=1.5)
 - [ ] Add recency boost (30d=1.2)
 - [ ] Add confirmation boost (1.3)
+- [ ] Session-start load of high-severity lessons (no vector search)
+- [ ] Plan-time retrieval + "Lessons Check" message
+- [ ] Hard-fail if embeddings are unavailable
 - [ ] Export retrieval API for hooks
 
 **src/search/ranking.ts**:
@@ -613,6 +672,9 @@ export function rankLessons(
 - [ ] Implement specificity check
 - [ ] Implement actionability check
 - [ ] Add user correction patterns
+- [ ] Add self-correction patterns
+- [ ] Add test-failure -> fix patterns
+- [ ] Add related + supersedes linking logic
 
 **src/capture/quality.ts**:
 ```typescript
@@ -657,6 +719,7 @@ export function shouldPropose(repoRoot: string, insight: string): boolean {
 - [ ] Export public API for programmatic use
 - [ ] Create hook integration examples
 - [ ] Document Claude Code integration
+- [ ] Add compound check (parallel reflection) at task end
 
 **src/index.ts** (public API):
 ```typescript
@@ -693,6 +756,7 @@ export function proposeLesson(
 
 ### Day 1-2: Compaction + Stats
 
+- [ ] Apply tombstones + periodic rewrite compaction
 - [ ] Archive lessons >90 days with 0 retrievals
 - [ ] Track retrieval count
 - [ ] `lessons stats` command

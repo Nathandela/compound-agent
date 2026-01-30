@@ -29,10 +29,13 @@ Claude Code forgets lessons between sessions:
 | **Scope** | Repository-level only | Simpler. Share lessons between repos via copy on demand |
 | **Storage** | JSONL source + SQLite index | Git-readable diffs + fast search |
 | **Search** | Vector (local nomic model) | Semantic similarity is core value |
-| **Trigger** | Agent-initiated + user confirm | Claude CAN self-correct, needs validation |
+| **Trigger** | User correction + self-correction + test-failure fix | Capture real corrections with confirmation |
 | **Quality** | Tiered (quick vs full) | Balance capture speed vs rigor |
+| **Retrieval timing** | Session-start (high severity) + plan-time only | Avoid noisy per-tool retrieval |
+| **Compound check** | End-of-implementation parallel reflection | Capture lessons while context is fresh |
 | **CLAUDE.md relation** | Separate systems | Rules = permanent, Lessons = contextual WHY |
 | **Embeddings** | Local (nomic-embed-text via llama.cpp) | Offline capable, no API deps |
+| **Embedding failure** | Hard fail | Prevent silent misses |
 
 ---
 
@@ -74,8 +77,15 @@ FLOW:
   "trigger": "Used pandas for 500MB file",
   "insight": "Polars 10x faster",
   "tags": ["performance", "polars"],
+  "source": "user_correction",
+  "context": {
+    "tool": "edit",
+    "intent": "optimize CSV processing"
+  },
   "created": "2025-01-30T14:00:00Z",
-  "confirmed": true
+  "confirmed": true,
+  "supersedes": [],
+  "related": ["L003"]
 }
 ```
 
@@ -89,14 +99,28 @@ FLOW:
   "evidence": "Traced in network tab, header missing",
   "tags": ["api", "auth"],
   "severity": "high",
+  "source": "test_failure",
+  "context": {
+    "tool": "bash",
+    "intent": "run auth integration tests"
+  },
   "created": "2025-01-30T14:00:00Z",
   "confirmed": true,
+  "supersedes": ["L001"],
+  "related": [],
   "pattern": {
     "bad": "requests.get(url, headers={'Authorization': token})",
     "good": "requests.get(url, headers={'Authorization': token, 'X-Request-ID': uuid4()})"
   }
 }
 ```
+
+### Metadata & Lifecycle Fields
+- **source**: `user_correction | self_correction | test_failure | manual`
+- **context**: `{ tool: string, intent: string }` (captured at proposal time)
+- **supersedes**: Array of lesson IDs replaced by this one
+- **related**: Array of lesson IDs with adjacent relevance
+- **deleted** (tombstone): Optional boolean; delete/edit appends a record with the same `id` and `deleted: true`
 
 ### Lesson Categories (from user examples)
 - **Preferences**: Use Polars not pandas, uv over pip
@@ -109,10 +133,10 @@ FLOW:
 ## Capture Flow
 
 ### Trigger Detection (multi-signal)
-1. Claude self-corrects after iteration (edit -> fail -> re-edit)
-2. User says "no", "wrong", "actually..."
+1. User says "no", "wrong", "actually..."
+2. Claude self-corrects after iteration (edit -> fail -> re-edit)
 3. Test fails -> fix -> passes
-4. User explicitly: "remember this" / /learn
+4. Manual capture: "remember this" / /learn
 
 ### Quality Filter (prevent BS lessons)
 Before proposing, Claude checks:
@@ -120,8 +144,10 @@ Before proposing, Claude checks:
 - [ ] Is this specific? (not "write better code")
 - [ ] Is this actionable? (clear what to do differently)
 
-If all NO -> don't propose lesson
-If any YES -> propose with quick confirm
+If any NO -> don't propose lesson
+If all YES -> propose with quick confirm
+
+**Self-correction proposals** only appear if the quality filter passes.
 
 ### Confirmation UX
 ```
@@ -137,15 +163,16 @@ User: "y" (or ignores = no)
 
 ### Session Start
 1. Load CLAUDE.md (always, ~2-5K tokens)
-2. Extract context: current files, recent git diff
-3. Vector search lessons for context
-4. Load top 3-5 relevant lessons (~500-1K tokens)
+2. Load top 3-5 **high-severity** lessons (most recent, confirmed)
+3. No vector search (no task context yet)
 
-### Pre-Task (before Edit/Write/Bash)
-1. Extract intent from tool input
-2. Quick vector search (cached embeddings)
-3. If high-severity lesson matches:
-   - Inject reminder: "Note: Last time [trigger], learned [X]"
+### Plan Creation (explicit or internal)
+1. Use the plan text as the retrieval query
+2. Run vector search (must succeed; hard-fail if embeddings are unavailable)
+3. Load top 3-5 relevant lessons
+4. Emit a separate **"Lessons Check"** message after the plan
+
+**No per-tool retrieval**. All context injection happens at plan time only.
 
 ### Search Ranking
 ```
@@ -154,6 +181,26 @@ score = vector_similarity
       * recency_boost (last 30d=1.2, older=1.0)
       * confirmation_boost (user confirmed=1.3)
 ```
+
+---
+
+## Compound Check (End of Implementation)
+
+Runs at the end of a task to propose new lessons while context is fresh.
+
+**Trigger**: Auto + manual.  
+**Preconditions**: Problem solved + verified (user confirmation **or** tests pass).  
+**Scope**: Always run at task end (non-trivial threshold = always).
+
+**Parallel reflection (modeled after compound workflow):**
+1. **Context Analyzer**: Summarize plan + recent tool calls + git diff + test output
+2. **Mistake/Lesson Extractor**: Identify missteps, corrections, and fixes
+3. **Related/Contradiction Checker**: Link `related` lessons, mark `supersedes` when needed
+4. **Prevention Strategist**: Turn lessons into actionable guidance
+5. **Classifier**: Quick vs full + severity for full lessons
+6. **Writer**: Propose lessons directly (confirmation required)
+
+**Output**: Proposed lessons only if they pass the quality filter.
 
 ---
 
@@ -216,22 +263,28 @@ The package installs a CLI (`learning-agent` / `learn`) that:
 
 **Day 1-2: Retrieval system**
 - Search ranking with boosts (severity, recency, confirmation)
-- Context injection formatting
+- Session-start high-severity load (no vector search)
+- Plan-time retrieval + "Lessons Check" message
+- Hard-fail if embeddings are unavailable
 - Programmatic API for hooks
 
 **Day 3-4: Capture triggers**
 - User correction detection patterns
+- Self-correction detection patterns
+- Test failure -> fix detection
 - Quality filter (novel? specific? actionable?)
-- Contradiction warning (similar lesson exists)
+- Related/contradiction linking (related + supersedes)
 
 **Day 5: Integration + hooks**
 - Export functions for Claude Code hooks
 - Example hook configurations
 - Quick confirm UX flow
+- Compound check (parallel reflection) at end of implementation
 
 ### Week 3: Polish + Iteration
 
 **Day 1-2: Compaction**
+- Tombstones + periodic rewrite compaction
 - Archive old lessons (>90 days, never retrieved)
 - Retrieval count tracking
 - Simple truncation (no AI summarization initially)
@@ -343,7 +396,7 @@ From neutral reviewer:
 4. **"Start with keyword search"** -> User insisted on vectors, keeping them
 5. **"Lesson inflation risk"** -> Added quality filter + "most sessions have no lessons" principle
 6. **"Missing contradiction detection"** -> Added to Week 2 scope
-7. **"Missing provenance"** -> Lessons track created timestamp, can add retrieval count
+7. **"Missing provenance"** -> Added source + context metadata
 
 ---
 
@@ -354,6 +407,8 @@ From neutral reviewer:
 | Global vs project scope? | Project only, copy to share |
 | SQLite vs JSONL? | Hybrid: JSONL source, SQLite index |
 | Online embedding fallback? | No, local only |
+| Embedding failure behavior? | Hard fail |
+| Retrieval timing? | Session-start (high severity) + plan-time only |
 | Pre-compaction flush? | Cut from MVP, add if needed |
 | Hierarchical scopes? | Cut, too complex |
 
@@ -362,7 +417,7 @@ From neutral reviewer:
 ## Success Criteria
 
 1. **Context efficiency**: Lessons add <2K tokens per session
-2. **Retrieval precision**: Relevant lessons surface >80% of time
+2. **Retrieval usefulness**: User reports lessons are relevant in periodic review
 3. **Capture quality**: <10% of lessons are "BS" (vague, obvious)
 4. **User friction**: Quick confirm takes <5 seconds
 5. **Reliability**: Works offline, no external API deps
@@ -371,7 +426,7 @@ From neutral reviewer:
 
 ## Next Steps
 
-1. Initialize Python project with uv
+1. Initialize pnpm + TypeScript project
 2. Implement JSONL storage + schema
 3. Add SQLite index with FTS5
 4. Integrate nomic embeddings
