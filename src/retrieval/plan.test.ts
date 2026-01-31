@@ -1,17 +1,16 @@
-import { existsSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getModelPath } from '../embeddings/download.js';
+import { isModelAvailable } from '../embeddings/nomic.js';
 import { appendLesson } from '../storage/jsonl.js';
 import { createFullLesson, createQuickLesson } from '../test-utils.js';
 
 import { formatLessonsCheck, retrieveForPlan } from './plan.js';
 
-// Check model availability synchronously at module load time
-const modelAvailable = existsSync(getModelPath());
+// Check model availability at module load time
+const modelAvailable = isModelAvailable();
 
 describe('plan retrieval', () => {
   let tempDir: string;
@@ -112,8 +111,10 @@ describe('plan retrieval', () => {
   });
 
   describe('error handling', () => {
-    it.skipIf(modelAvailable)('throws if embeddings unavailable', async () => {
-      await expect(retrieveForPlan(tempDir, 'some plan')).rejects.toThrow();
+    it('returns empty results when no lessons exist', async () => {
+      const result = await retrieveForPlan(tempDir, 'some plan');
+      expect(result.lessons).toEqual([]);
+      expect(result.message).toContain('No relevant lessons');
     });
   });
 });

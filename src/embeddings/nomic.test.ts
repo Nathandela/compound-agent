@@ -1,13 +1,17 @@
-import { existsSync } from 'node:fs';
-import { describe, it, expect, afterAll } from 'vitest';
+/**
+ * Tests for text embedding functionality.
+ *
+ * Note: Tests that require the model are skipped if it's not available.
+ * Run `npx node-llama-cpp pull hf:ggml-org/embeddinggemma-300M-qat-q4_0-GGUF` to download.
+ */
 
-import { getModelPath } from './download.js';
-import { embedText, embedTexts, getEmbedding, unloadEmbedding } from './nomic.js';
+import { afterAll, describe, expect, it } from 'vitest';
 
-// Check model availability synchronously at module load time
-const modelAvailable = existsSync(getModelPath());
+import { embedText, embedTexts, getEmbedding, isModelAvailable, unloadEmbedding } from './nomic.js';
 
-describe('nomic embeddings', () => {
+const modelAvailable = isModelAvailable();
+
+describe('embeddings', () => {
   afterAll(() => {
     unloadEmbedding();
   });
@@ -74,12 +78,6 @@ describe('nomic embeddings', () => {
       const e1 = await getEmbedding();
       const e2 = await getEmbedding();
       expect(e1).toBe(e2);
-    });
-  });
-
-  describe('error handling', () => {
-    it.skipIf(modelAvailable)('throws if model not available', async () => {
-      await expect(getEmbedding()).rejects.toThrow();
     });
   });
 });

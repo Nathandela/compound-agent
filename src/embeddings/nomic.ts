@@ -1,23 +1,22 @@
 /**
- * Text embedding via node-llama-cpp with nomic-embed-text model
+ * Text embedding via node-llama-cpp with EmbeddingGemma model
  *
  * **Resource lifecycle:**
- * - Model is loaded lazily on first embedding call (~500MB in memory)
+ * - Model is loaded lazily on first embedding call (~150MB in memory)
  * - Once loaded, the model remains in memory until `unloadEmbedding()` is called
- * - Loading is slow (~2-5s); keeping loaded improves subsequent call performance
+ * - Loading is slow (~1-3s); keeping loaded improves subsequent call performance
  *
  * **Memory usage:**
- * - Embedding model: ~500MB RAM when loaded
+ * - Embedding model: ~150MB RAM when loaded
  * - Embeddings themselves: ~3KB per embedding (768 dimensions x 4 bytes)
  *
  * @see {@link unloadEmbedding} for releasing memory
  * @see {@link getEmbedding} for the lazy-loading mechanism
  */
 
-import { access } from 'node:fs/promises';
 import { getLlama, LlamaEmbeddingContext } from 'node-llama-cpp';
 
-import { getModelPath } from './download.js';
+import { isModelAvailable, resolveModel } from './model.js';
 
 /** Singleton embedding context */
 let embeddingContext: LlamaEmbeddingContext | null = null;
@@ -26,13 +25,10 @@ let embeddingContext: LlamaEmbeddingContext | null = null;
  * Get the LlamaEmbeddingContext instance for generating embeddings.
  *
  * **Lazy loading behavior:**
- * - First call loads the embedding model (~500MB) into memory
- * - Loading takes ~2-5 seconds depending on hardware
+ * - First call loads the embedding model (~150MB) into memory
+ * - Loading takes ~1-3 seconds depending on hardware
  * - Subsequent calls return the cached instance immediately
- * - Throws if model file not downloaded
- *
- * **Prerequisites:**
- * - Model must be downloaded first via `ensureModel()` or CLI `download-model`
+ * - Downloads model automatically if not present
  *
  * **Resource lifecycle:**
  * - Once loaded, model stays in memory until `unloadEmbedding()` is called
@@ -40,7 +36,7 @@ let embeddingContext: LlamaEmbeddingContext | null = null;
  * - For long-running processes: keep loaded for performance
  *
  * @returns The singleton embedding context
- * @throws Error if model file not found at expected path
+ * @throws Error if model download fails
  *
  * @example
  * ```typescript
@@ -54,20 +50,12 @@ let embeddingContext: LlamaEmbeddingContext | null = null;
  *
  * @see {@link embedText} for simpler text-to-vector conversion
  * @see {@link unloadEmbedding} for releasing memory
- * @see {@link ensureModel} for downloading the model
  */
 export async function getEmbedding(): Promise<LlamaEmbeddingContext> {
   if (embeddingContext) return embeddingContext;
 
-  // Check if model exists, fail fast if not
-  const modelPath = getModelPath();
-  try {
-    await access(modelPath);
-  } catch {
-    throw new Error(
-      `Embedding model not found at ${modelPath}. Run 'npx learning-agent download-model' first.`
-    );
-  }
+  // Resolve model path (downloads if needed)
+  const modelPath = await resolveModel({ cli: true });
 
   // Load llama and model
   const llama = await getLlama();
@@ -78,11 +66,11 @@ export async function getEmbedding(): Promise<LlamaEmbeddingContext> {
 }
 
 /**
- * Unload the embedding context to free memory (~500MB).
+ * Unload the embedding context to free memory (~150MB).
  *
  * **Resource lifecycle:**
  * - Disposes the underlying LlamaEmbeddingContext
- * - Releases ~500MB of RAM used by the model
+ * - Releases ~150MB of RAM used by the model
  * - After unloading, subsequent embedding calls will reload the model
  *
  * **When to call:**
@@ -128,12 +116,12 @@ export function unloadEmbedding(): void {
 /**
  * Embed a single text string into a vector.
  *
- * **Lazy loading:** First call loads the embedding model (~500MB, ~2-5s).
+ * **Lazy loading:** First call loads the embedding model (~150MB, ~1-3s).
  * Subsequent calls use the cached model and complete in milliseconds.
  *
  * @param text - The text to embed
  * @returns A 768-dimensional vector (number[])
- * @throws Error if model not downloaded
+ * @throws Error if model download fails
  *
  * @example
  * ```typescript
@@ -156,7 +144,7 @@ export async function embedText(text: string): Promise<number[]> {
 /**
  * Embed multiple texts into vectors.
  *
- * **Lazy loading:** First call loads the embedding model (~500MB, ~2-5s).
+ * **Lazy loading:** First call loads the embedding model (~150MB, ~1-3s).
  * Subsequent calls use the cached model.
  *
  * **Performance:** More efficient than calling `embedText` in a loop
@@ -164,7 +152,7 @@ export async function embedText(text: string): Promise<number[]> {
  *
  * @param texts - Array of texts to embed
  * @returns Array of 768-dimensional vectors, same order as input
- * @throws Error if model not downloaded
+ * @throws Error if model download fails
  *
  * @example
  * ```typescript
@@ -193,3 +181,6 @@ export async function embedTexts(texts: string[]): Promise<number[][]> {
 
   return results;
 }
+
+// Re-export isModelAvailable for test utilities
+export { isModelAvailable };

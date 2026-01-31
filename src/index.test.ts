@@ -14,7 +14,9 @@ import {
   // Embeddings
   embedText,
   embedTexts,
-  ensureModel,
+  isModelAvailable,
+  MODEL_FILENAME,
+  resolveModel,
 
   // Search
   searchVector,
@@ -78,8 +80,17 @@ describe('public API exports', () => {
       expect(typeof embedTexts).toBe('function');
     });
 
-    it('exports ensureModel', () => {
-      expect(typeof ensureModel).toBe('function');
+    it('exports isModelAvailable', () => {
+      expect(typeof isModelAvailable).toBe('function');
+    });
+
+    it('exports resolveModel', () => {
+      expect(typeof resolveModel).toBe('function');
+    });
+
+    it('exports MODEL_FILENAME', () => {
+      expect(typeof MODEL_FILENAME).toBe('string');
+      expect(MODEL_FILENAME).toContain('.gguf');
     });
   });
 

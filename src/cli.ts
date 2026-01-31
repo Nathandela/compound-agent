@@ -13,7 +13,6 @@
 import { Command } from 'commander';
 
 import { detectAndPropose, parseInputFile } from './capture/integration.js';
-import { ensureModel, getModelPath } from './embeddings/download.js';
 import { VERSION } from './index.js';
 import { compact, countTombstones, needsCompaction, TOMBSTONE_THRESHOLD } from './storage/compact.js';
 import { appendLesson, readLessons } from './storage/jsonl.js';
@@ -172,15 +171,6 @@ program
         console.log('Index is up to date.');
       }
     }
-  });
-
-program
-  .command('download-model')
-  .description('Download the embedding model (~500MB)')
-  .action(async () => {
-    console.log(`Model path: ${getModelPath()}`);
-    await ensureModel();
-    console.log('Model ready.');
   });
 
 program

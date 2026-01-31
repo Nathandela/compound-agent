@@ -1,12 +1,12 @@
 /**
- * Embeddings module - Text embedding via nomic-embed-text
+ * Embeddings module - Text embedding via EmbeddingGemma
  *
  * Provides text embedding for semantic search.
- * Model is downloaded on first use (~500MB).
+ * Model is downloaded automatically on first use (~150MB).
  */
 
 // Embedding functions
-export { embedText, embedTexts, getEmbedding, unloadEmbedding } from './nomic.js';
+export { embedText, embedTexts, getEmbedding, isModelAvailable, unloadEmbedding } from './nomic.js';
 
-// Model download
-export { ensureModel, getModelPath, MODEL_FILENAME, MODEL_URL } from './download.js';
+// Model resolution
+export { MODEL_FILENAME, MODEL_URI, resolveModel } from './model.js';

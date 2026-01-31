@@ -44,7 +44,7 @@
  *
  * ### Embedding Model
  * - **Acquired:** Lazily on first embedding call (embedText, embedTexts, searchVector)
- * - **Memory:** ~500MB RAM for the nomic-embed-text model
+ * - **Memory:** ~150MB RAM for the EmbeddingGemma model
  * - **Cleanup:** Call `unloadEmbedding()` before process exit
  *
  * ### Recommended Cleanup Pattern
@@ -92,8 +92,8 @@ export type { ReadLessonsOptions, ReadLessonsResult, ParseError } from './storag
 export { rebuildIndex, searchKeyword, closeDb, DB_PATH } from './storage/sqlite.js';
 
 // Embeddings API
-export { embedText, embedTexts, getEmbedding, unloadEmbedding } from './embeddings/nomic.js';
-export { ensureModel, getModelPath } from './embeddings/download.js';
+export { embedText, embedTexts, getEmbedding, isModelAvailable, unloadEmbedding } from './embeddings/nomic.js';
+export { MODEL_FILENAME, MODEL_URI, resolveModel } from './embeddings/model.js';
 
 // Search API
 export { searchVector, cosineSimilarity } from './search/vector.js';
