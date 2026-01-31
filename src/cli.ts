@@ -286,6 +286,17 @@ Propose when: user correction, self-correction, test failure fix, or manual requ
 Learned: [insight]. Save? [y/n]
 \`\`\`
 
+### Session-End Protocol (Compound Check)
+
+Before closing a session, reflect on lessons learned:
+
+1. **Review**: What mistakes or corrections happened this session?
+2. **Quality gate**: Is it novel, specific, actionable?
+3. **Propose**: "Learned: [insight]. Save? [y/n]"
+4. **Capture**: \`npx learning-agent capture --trigger "..." --insight "..." --yes\`
+
+Then proceed with standard close (git commit, push, etc).
+
 ### CLI Commands
 
 \`\`\`bash
