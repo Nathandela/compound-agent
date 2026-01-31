@@ -15,9 +15,31 @@
 import chalk from 'chalk';
 import { Command } from 'commander';
 
-import { existsSync, statSync } from 'node:fs';
+import { chmodSync, existsSync, statSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+
+// ============================================================================
+// Hooks Constants
+// ============================================================================
+
+/** Pre-commit hook reminder message */
+const PRE_COMMIT_MESSAGE = `Before committing, have you captured any valuable lessons from this session?
+Consider: corrections, mistakes, or insights worth remembering.
+
+To capture a lesson:
+  npx learning-agent capture --trigger "what happened" --insight "what to do" --yes`;
+
+/** Pre-commit hook shell script template */
+const PRE_COMMIT_HOOK_TEMPLATE = `#!/bin/sh
+# Learning Agent pre-commit hook
+# Reminds Claude to consider capturing lessons before commits
+
+npx learning-agent hooks run pre-commit
+`;
+
+/** Marker comment to identify our hook */
+const HOOK_MARKER = '# Learning Agent pre-commit hook';
 
 import { detectAndPropose, parseInputFile } from './capture/index.js';
 import type { DetectionResult } from './capture/index.js';
@@ -355,6 +377,48 @@ async function updateAgentsMd(repoRoot: string): Promise<boolean> {
   return true;
 }
 
+// ============================================================================
+// Hooks Helpers
+// ============================================================================
+
+/** Make hook file executable (mode 0o755) */
+const HOOK_FILE_MODE = 0o755;
+
+/**
+ * Check if a pre-commit hook already exists with our marker.
+ */
+function hasLearningAgentHook(content: string): boolean {
+  return content.includes(HOOK_MARKER);
+}
+
+/**
+ * Install pre-commit hook if .git/hooks directory exists.
+ */
+async function installPreCommitHook(repoRoot: string): Promise<boolean> {
+  const gitHooksDir = join(repoRoot, '.git', 'hooks');
+
+  // Skip if not a git repo
+  if (!existsSync(gitHooksDir)) {
+    return false;
+  }
+
+  const hookPath = join(gitHooksDir, 'pre-commit');
+
+  // Check if hook already exists
+  if (existsSync(hookPath)) {
+    const content = await readFile(hookPath, 'utf-8');
+    if (hasLearningAgentHook(content)) {
+      return false; // Already installed
+    }
+  }
+
+  // Write hook file
+  await writeFile(hookPath, PRE_COMMIT_HOOK_TEMPLATE, 'utf-8');
+  chmodSync(hookPath, HOOK_FILE_MODE);
+
+  return true;
+}
+
 const program = new Command();
 
 // Add global options
@@ -380,8 +444,9 @@ program
   .command('init')
   .description('Initialize learning-agent in this repository')
   .option('--skip-agents', 'Skip AGENTS.md modification')
+  .option('--skip-hooks', 'Skip git hooks installation')
   .option('--json', 'Output result as JSON')
-  .action(async function (this: Command, options: { skipAgents?: boolean; json?: boolean }) {
+  .action(async function (this: Command, options: { skipAgents?: boolean; skipHooks?: boolean; json?: boolean }) {
     const repoRoot = getRepoRoot();
     const { quiet } = getGlobalOpts(this);
 
@@ -396,12 +461,19 @@ program
       agentsMdUpdated = await updateAgentsMd(repoRoot);
     }
 
+    // Install hooks unless skipped
+    let hooksInstalled = false;
+    if (!options.skipHooks) {
+      hooksInstalled = await installPreCommitHook(repoRoot);
+    }
+
     // Output
     if (options.json) {
       console.log(JSON.stringify({
         initialized: true,
         lessonsDir,
         agentsMd: agentsMdUpdated,
+        hooks: hooksInstalled,
       }));
     } else if (!quiet) {
       out.success('Learning agent initialized');
@@ -413,6 +485,43 @@ program
       } else {
         console.log('  AGENTS.md: Already has Learning Agent section');
       }
+      if (hooksInstalled) {
+        console.log('  Git hooks: pre-commit hook installed');
+      } else if (options.skipHooks) {
+        console.log('  Git hooks: Skipped (--skip-hooks)');
+      } else {
+        console.log('  Git hooks: Already installed or not a git repo');
+      }
+    }
+  });
+
+/**
+ * Hooks command - Run git hook scripts.
+ *
+ * Called by git hooks to output prompts/reminders.
+ *
+ * @example npx learning-agent hooks run pre-commit
+ */
+const hooksCommand = program.command('hooks').description('Git hooks management');
+
+hooksCommand
+  .command('run <hook>')
+  .description('Run a hook script (called by git hooks)')
+  .option('--json', 'Output as JSON')
+  .action((hook: string, options: { json?: boolean }) => {
+    if (hook === 'pre-commit') {
+      if (options.json) {
+        console.log(JSON.stringify({ hook: 'pre-commit', message: PRE_COMMIT_MESSAGE }));
+      } else {
+        console.log(PRE_COMMIT_MESSAGE);
+      }
+    } else {
+      if (options.json) {
+        console.log(JSON.stringify({ error: `Unknown hook: ${hook}` }));
+      } else {
+        out.error(`Unknown hook: ${hook}`);
+      }
+      process.exit(1);
     }
   });
 

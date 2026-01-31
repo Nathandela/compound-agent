@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process';
-import { appendFile, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { existsSync, statSync } from 'node:fs';
+import { appendFile, mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -1030,6 +1031,33 @@ describe('CLI', () => {
     });
   });
 
+  describe('hooks run command', () => {
+    it('outputs lesson reminder prompt for pre-commit hook', () => {
+      const { combined } = runCli('hooks run pre-commit');
+      expect(combined).toContain('lessons');
+      expect(combined.toLowerCase()).toMatch(/capture|remember|session/i);
+    });
+
+    it('exits with code 0 (non-blocking)', () => {
+      // runCli will throw if exit code is non-zero
+      const { combined } = runCli('hooks run pre-commit');
+      // Should not contain error indicators
+      expect(combined).not.toMatch(/error|fail/i);
+    });
+
+    it('outputs JSON with --json flag', () => {
+      const { stdout } = runCli('hooks run pre-commit --json');
+      const result = JSON.parse(stdout) as { hook: string; message: string };
+      expect(result.hook).toBe('pre-commit');
+      expect(result.message).toBeDefined();
+    });
+
+    it('shows error for unknown hook', () => {
+      const { combined } = runCli('hooks run unknown-hook');
+      expect(combined.toLowerCase()).toMatch(/unknown|not found|invalid/i);
+    });
+  });
+
   describe('init command', () => {
     it('creates .claude/lessons directory structure', async () => {
       runCli('init');
@@ -1133,6 +1161,87 @@ describe('CLI', () => {
       expect(result.initialized).toBe(true);
       expect(result.lessonsDir).toContain('.claude/lessons');
       expect(result.agentsMd).toBe(true);
+    });
+
+    it('installs pre-commit hook in .git/hooks', async () => {
+      // Create .git directory first (simulating a git repo)
+      const gitHooksDir = join(tempDir, '.git', 'hooks');
+      await mkdir(gitHooksDir, { recursive: true });
+
+      runCli('init');
+
+      const hookPath = join(gitHooksDir, 'pre-commit');
+      const hookExists = existsSync(hookPath);
+      expect(hookExists).toBe(true);
+    });
+
+    it('creates executable pre-commit hook', async () => {
+      const gitHooksDir = join(tempDir, '.git', 'hooks');
+      await mkdir(gitHooksDir, { recursive: true });
+
+      runCli('init');
+
+      const hookPath = join(gitHooksDir, 'pre-commit');
+      const stats = statSync(hookPath);
+      // Check if executable (mode & 0o111 should be non-zero)
+      expect(stats.mode & 0o111).toBeGreaterThan(0);
+    });
+
+    it('pre-commit hook calls learning-agent hooks run', async () => {
+      const gitHooksDir = join(tempDir, '.git', 'hooks');
+      await mkdir(gitHooksDir, { recursive: true });
+
+      runCli('init');
+
+      const hookPath = join(gitHooksDir, 'pre-commit');
+      const content = await readFile(hookPath, 'utf-8');
+      expect(content).toContain('learning-agent');
+      expect(content).toContain('hooks run pre-commit');
+    });
+
+    it('does not duplicate pre-commit hook on re-run', async () => {
+      const gitHooksDir = join(tempDir, '.git', 'hooks');
+      await mkdir(gitHooksDir, { recursive: true });
+
+      runCli('init');
+      runCli('init');
+
+      const hookPath = join(gitHooksDir, 'pre-commit');
+      const content = await readFile(hookPath, 'utf-8');
+      // Count occurrences of the shebang (should be exactly 1)
+      const shebangs = content.match(/#!/g);
+      expect(shebangs?.length).toBe(1);
+    });
+
+    it('skips hook installation if .git/hooks does not exist', async () => {
+      // Don't create .git directory
+      const { combined } = runCli('init');
+
+      // Should still succeed (not a git repo)
+      expect(combined).toMatch(/initialized|created|success/i);
+
+      // Hook should not exist
+      const hookPath = join(tempDir, '.git', 'hooks', 'pre-commit');
+      expect(existsSync(hookPath)).toBe(false);
+    });
+
+    it('--skip-hooks flag skips hook installation', async () => {
+      const gitHooksDir = join(tempDir, '.git', 'hooks');
+      await mkdir(gitHooksDir, { recursive: true });
+
+      runCli('init --skip-hooks');
+
+      const hookPath = join(gitHooksDir, 'pre-commit');
+      expect(existsSync(hookPath)).toBe(false);
+    });
+
+    it('JSON output includes hooks field', async () => {
+      const gitHooksDir = join(tempDir, '.git', 'hooks');
+      await mkdir(gitHooksDir, { recursive: true });
+
+      const { stdout } = runCli('init --json');
+      const result = JSON.parse(stdout) as { hooks: boolean };
+      expect(result.hooks).toBe(true);
     });
   });
 });
