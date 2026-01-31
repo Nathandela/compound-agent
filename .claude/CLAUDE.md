@@ -90,7 +90,67 @@ bd sync                     # Sync with git remote
 
 ---
 
-## TDD Workflow (Mandatory)
+## Closed-Loop TDD Workflow (Mandatory)
+
+**Work is NOT complete until `/implementation-reviewer` returns APPROVED.**
+
+### 🔴 Subagent Sequence (Inviolable)
+
+Every implementation MUST follow this sequence:
+
+```
+1. /invariant-designer     --> Define what must be true
+2. /test-first-enforcer    --> Verify tests written FIRST
+3. /property-test-generator --> Generate edge case tests
+4. /anti-cargo-cult-reviewer --> Reject fake tests
+5. /module-boundary-reviewer --> Validate module design
+6. /implementation-reviewer  --> FINAL gate (must be APPROVED)
+```
+
+### Closed-Loop Process
+
+```
++------------------+
+| 1. INVARIANTS    |  /invariant-designer
+| Define what must |  - Data invariants
+| always be true   |  - Safety properties
++--------+---------+  - Liveness properties
+         |
+         v
++------------------+
+| 2. TESTS FIRST   |  /test-first-enforcer
+| Write failing    |  /property-test-generator
+| tests that verify|  /anti-cargo-cult-reviewer
+| invariants       |
++--------+---------+
+         |
+         v
++------------------+
+| 3. IMPLEMENT     |  /module-boundary-reviewer
+| Minimal code to  |  - One test at a time
+| pass tests       |  - NEVER modify tests to pass
++--------+---------+
+         |
+         v
++------------------+
+| 4. REVIEW        |  /implementation-reviewer
+| Independent gate |  - Validates ALL criteria
+| FINAL authority  |  - Cannot be bypassed
++--------+---------+
+         |
+    +----+----+
+    |         |
+ APPROVED  REJECTED
+    |         |
+    v         v
++-------+  +------------------+
+| DONE  |  | FIX ALL ISSUES   |
++-------+  | Return to stage  |
+           | 2, 3, or 4       |
+           +--------+---------+
+                    |
+                    +-------> (loop back)
+```
 
 ### Phase 1: Define Invariants
 Use `/invariant-designer` to document what must be true:
@@ -102,21 +162,27 @@ Use `/invariant-designer` to document what must be true:
 - Use `/test-first-enforcer` to verify TDD adherence
 - Use `/property-test-generator` for edge cases
 - Use `/anti-cargo-cult-reviewer` to reject fake tests
+- Tests MUST fail before implementation exists
 
 ### Phase 3: Implement
 - Write minimal code to pass tests
 - One test at a time
 - **NEVER** modify tests to make them pass
-
-### Phase 4: Verify
 - Use `/module-boundary-reviewer` for design validation
-- Use `/implementation-reviewer` for final approval (**FINAL AUTHORITY**)
+
+### Phase 4: Review (Closed Loop)
+- Call `/implementation-reviewer` for final approval
+- If **REJECTED**: Fix ALL issues listed, return to appropriate stage, resubmit
+- If **APPROVED**: Work is complete
+- **Do NOT argue** — criteria are objective
 
 ### 🔴 Inviolable TDD Rules
 - Tests must exist BEFORE implementation
 - Real data, real execution (no mocked business logic)
 - Tests must verify meaningful properties
-- Work is NOT complete until `/implementation-reviewer` approves
+- ALL subagents in sequence must be used
+- Work is NOT complete until `/implementation-reviewer` returns APPROVED
+- On rejection, fix ALL issues before resubmitting (not just some)
 
 ---
 
@@ -129,16 +195,48 @@ pnpm test      # 100% pass rate, no skipped tests
 pnpm lint      # Zero violations
 ```
 
-### Exit Criteria
+### 🔴 Exit Criteria (ALL Required)
 
-| Criterion | Check |
-|-----------|-------|
-| Tests pass | `pnpm test` shows 100% |
-| No regressions | All previous tests still pass |
-| Code quality | `pnpm lint` passes |
-| Standards | Type hints, JSDoc on public functions |
-| No bugs | Logic reviewed, edge cases handled |
-| Approved | `/implementation-reviewer` returns APPROVED |
+The `/implementation-reviewer` validates ALL 6 categories. **Every checkbox must pass.**
+
+#### 1. Tests (MUST ALL PASS)
+- [ ] `pnpm test` shows 100% pass rate
+- [ ] No skipped tests
+- [ ] No flaky tests
+
+#### 2. No Regressions
+- [ ] All previously passing tests still pass
+- [ ] No new test failures introduced
+
+#### 3. Code Quality
+- [ ] `pnpm lint` passes with zero violations
+- [ ] No commented-out code
+
+#### 4. Professional Standards
+- [ ] Type hints on all public APIs
+- [ ] JSDoc on all public functions
+- [ ] Clear, descriptive names
+- [ ] No magic numbers
+- [ ] Functions < 50 lines
+
+#### 5. No Bugs
+- [ ] Logic reviewed and sound
+- [ ] Edge cases handled
+- [ ] Error handling appropriate
+
+#### 6. Specification Met
+- [ ] Original requirements fulfilled
+- [ ] Invariants documented and tested
+
+### Rejection Protocol
+
+When `/implementation-reviewer` returns **REJECTED**:
+
+1. **Read ALL issues** — Every issue must be addressed
+2. **Return to appropriate stage** — May need new tests, new implementation, or just fixes
+3. **Fix completely** — Partial fixes will be rejected again
+4. **Resubmit** — Call `/implementation-reviewer` again
+5. **Repeat until APPROVED** — No shortcuts
 
 ---
 
@@ -253,14 +351,30 @@ src/                        # Code with inline JSDoc
 
 ## Verification Subagents
 
-| Agent | Purpose | When to Use |
-|-------|---------|-------------|
-| `/invariant-designer` | Define invariants | Before writing ANY code |
-| `/test-first-enforcer` | Verify TDD adherence | Before implementing |
-| `/property-test-generator` | Generate property tests | For edge cases |
-| `/module-boundary-reviewer` | Validate module design | After implementation |
-| `/anti-cargo-cult-reviewer` | Reject fake tests | During test review |
-| `/implementation-reviewer` | **FINAL authority** | Before marking complete |
+### 🔴 Mandatory Sequence
+
+| Order | Agent | Purpose | When to Use |
+|-------|-------|---------|-------------|
+| 1 | `/invariant-designer` | Define invariants | Before writing ANY code |
+| 2 | `/test-first-enforcer` | Verify TDD adherence | Before implementing |
+| 3 | `/property-test-generator` | Generate property tests | For edge cases |
+| 4 | `/anti-cargo-cult-reviewer` | Reject fake tests | During test review |
+| 5 | `/module-boundary-reviewer` | Validate module design | After implementation |
+| 6 | `/implementation-reviewer` | **FINAL authority** | Before marking complete |
+
+### Subagent Authority
+
+The `/implementation-reviewer` has FINAL authority:
+
+**Can Do**:
+- REJECT implementations that do not meet criteria
+- REQUIRE specific fixes
+- PREVENT completion of substandard work
+
+**Cannot Be**:
+- Bypassed (no exceptions)
+- Overridden (criteria are objective)
+- Rushed (quality over speed)
 
 ---
 
