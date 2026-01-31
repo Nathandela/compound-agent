@@ -25,7 +25,7 @@ describe('embedding model resolution', () => {
 
   describe('MODEL_FILENAME', () => {
     it('matches the expected filename', () => {
-      expect(MODEL_FILENAME).toBe('embeddinggemma-300M-qat-q4_0.gguf');
+      expect(MODEL_FILENAME).toBe('hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf');
     });
   });
 

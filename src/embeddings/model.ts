@@ -13,14 +13,17 @@ import { resolveModelFile } from 'node-llama-cpp';
 /**
  * HuggingFace URI for EmbeddingGemma-300M (Q4_0 quantization).
  *
- * - Size: ~150MB
+ * - Size: ~278MB
  * - Dimensions: 768 (default), supports MRL truncation to 512/256/128
  * - Context: 2048 tokens
  */
-export const MODEL_URI = 'hf:ggml-org/embeddinggemma-300M-qat-q4_0-GGUF/embeddinggemma-300M-qat-q4_0.gguf';
+export const MODEL_URI = 'hf:ggml-org/embeddinggemma-300M-qat-q4_0-GGUF/embeddinggemma-300M-qat-Q4_0.gguf';
 
-/** Expected model filename after download */
-export const MODEL_FILENAME = 'embeddinggemma-300M-qat-q4_0.gguf';
+/**
+ * Expected model filename after download.
+ * node-llama-cpp uses format: hf_{org}_{filename}
+ */
+export const MODEL_FILENAME = 'hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf';
 
 /** Default model directory used by node-llama-cpp */
 const DEFAULT_MODEL_DIR = join(homedir(), '.node-llama-cpp', 'models');
