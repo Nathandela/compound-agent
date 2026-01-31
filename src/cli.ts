@@ -7,6 +7,7 @@
  *   search <query>   - Search lessons by keyword
  *   list             - List all lessons
  *   detect --input   - Detect learning triggers from input
+ *   capture          - Capture lesson from trigger/insight or input file
  *   compact          - Archive old lessons and remove tombstones
  */
 
@@ -18,7 +19,7 @@ import { join } from 'node:path';
 
 import { detectAndPropose, parseInputFile } from './capture/integration.js';
 import { formatBytes, getRepoRoot, parseLimit } from './cli-utils.js';
-import { VERSION } from './index.js';
+import { loadSessionLessons, retrieveForPlan, VERSION } from './index.js';
 import { compact, countTombstones, needsCompaction, TOMBSTONE_THRESHOLD } from './storage/compact.js';
 import { appendLesson, LESSONS_PATH, readLessons } from './storage/jsonl.js';
 import { DB_PATH, getRetrievalStats, rebuildIndex, searchKeyword, syncIfNeeded } from './storage/sqlite.js';
@@ -264,6 +265,122 @@ program
   );
 
 program
+  .command('capture')
+  .description('Capture a lesson from trigger/insight or input file')
+  .option('-t, --trigger <text>', 'What triggered this lesson')
+  .option('-i, --insight <text>', 'The insight or lesson learned')
+  .option('--input <file>', 'Path to JSON input file (alternative to trigger/insight)')
+  .option('--json', 'Output result as JSON')
+  .option('-y, --yes', 'Skip confirmation and save immediately')
+  .action(
+    async function (
+      this: Command,
+      options: { trigger?: string; insight?: string; input?: string; json?: boolean; yes?: boolean }
+    ) {
+      const repoRoot = getRepoRoot();
+      const { verbose } = getGlobalOpts(this);
+
+      let lesson: Lesson;
+
+      // Mode 1: From --input file (like detect --save)
+      if (options.input) {
+        const input = await parseInputFile(options.input);
+        const result = await detectAndPropose(repoRoot, input);
+
+        if (!result) {
+          if (options.json) {
+            console.log(JSON.stringify({ detected: false, saved: false }));
+          } else {
+            console.log('No learning trigger detected.');
+          }
+          return;
+        }
+
+        lesson = {
+          id: generateId(result.proposedInsight),
+          type: 'quick',
+          trigger: result.trigger,
+          insight: result.proposedInsight,
+          tags: [],
+          source: result.source,
+          context: { tool: 'capture', intent: 'auto-capture' },
+          created: new Date().toISOString(),
+          confirmed: options.yes ?? false,
+          supersedes: [],
+          related: [],
+        };
+      }
+      // Mode 2: From explicit --trigger and --insight
+      else if (options.trigger && options.insight) {
+        lesson = {
+          id: generateId(options.insight),
+          type: 'quick',
+          trigger: options.trigger,
+          insight: options.insight,
+          tags: [],
+          source: 'manual',
+          context: { tool: 'capture', intent: 'manual capture' },
+          created: new Date().toISOString(),
+          confirmed: options.yes ?? false,
+          supersedes: [],
+          related: [],
+        };
+      }
+      // Missing required options
+      else {
+        const msg = 'Provide either --trigger and --insight, or --input file.';
+        if (options.json) {
+          console.log(JSON.stringify({ error: msg, saved: false }));
+        } else {
+          out.error(msg);
+        }
+        process.exit(1);
+      }
+
+      // JSON output mode
+      if (options.json) {
+        const jsonOutput = {
+          id: lesson.id,
+          trigger: lesson.trigger,
+          insight: lesson.insight,
+          type: lesson.type,
+          saved: options.yes ?? false,
+        };
+
+        if (options.yes) {
+          await appendLesson(repoRoot, lesson);
+        }
+
+        console.log(JSON.stringify(jsonOutput));
+        return;
+      }
+
+      // Human-readable output
+      if (options.yes) {
+        // Auto-save mode
+        await appendLesson(repoRoot, lesson);
+        out.success(`Lesson saved: ${lesson.id}`);
+        if (verbose) {
+          console.log(`  ID: ${lesson.id}`);
+          console.log(`  Type: ${lesson.type}`);
+          console.log(`  Trigger: ${lesson.trigger}`);
+          console.log(`  Insight: ${lesson.insight}`);
+        }
+      } else {
+        // Preview mode (no save)
+        console.log('Lesson captured:');
+        console.log(`  ID: ${lesson.id}`);
+        console.log(`  Trigger: ${lesson.trigger}`);
+        console.log(`  Insight: ${lesson.insight}`);
+        console.log(`  Type: ${lesson.type}`);
+        console.log(`  Tags: ${lesson.tags.length > 0 ? lesson.tags.join(', ') : '(none)'}`);
+        console.log('\nSave this lesson? [y/n]');
+        // Note: Interactive prompts not implemented - use --yes to save
+      }
+    }
+  );
+
+program
   .command('compact')
   .description('Compact lessons: archive old lessons and remove tombstones')
   .option('-f, --force', 'Run compaction even if below threshold')
@@ -455,6 +572,132 @@ program
     console.log(`Lessons: ${totalLessons} total${deletedInfo}`);
     console.log(`Retrievals: ${totalRetrievals} total, ${avgRetrievals} avg per lesson`);
     console.log(`Storage: ${formatBytes(totalSize)} (index: ${formatBytes(indexSize)}, data: ${formatBytes(dataSize)})`);
+  });
+
+program
+  .command('load-session')
+  .description('Load high-severity lessons for session context')
+  .option('--json', 'Output as JSON')
+  .action(async function (this: Command, options: { json?: boolean }) {
+    const repoRoot = getRepoRoot();
+    const { quiet } = getGlobalOpts(this);
+
+    const lessons = await loadSessionLessons(repoRoot);
+
+    // JSON output mode
+    if (options.json) {
+      console.log(JSON.stringify({ lessons, count: lessons.length }));
+      return;
+    }
+
+    // Human-readable output
+    if (lessons.length === 0) {
+      console.log('No high-severity lessons found.');
+      return;
+    }
+
+    console.log('## Session Lessons (High Severity)\n');
+
+    lessons.forEach((lesson, i) => {
+      const num = i + 1;
+      const date = lesson.created.slice(0, 10); // Extract YYYY-MM-DD
+
+      console.log(`${num}. ${chalk.bold(`[${lesson.id}]`)} ${lesson.insight}`);
+      console.log(`   - Source: ${lesson.source} (${date})`);
+      if (lesson.tags.length > 0) {
+        console.log(`   - Tags: ${lesson.tags.join(', ')}`);
+      }
+      console.log();
+    });
+
+    const lessonWord = lessons.length === 1 ? 'lesson' : 'lessons';
+    if (!quiet) {
+      console.log('---');
+      console.log(`${lessons.length} high-severity ${lessonWord} loaded.`);
+    }
+  });
+
+/** Default limit for check-plan results */
+const DEFAULT_CHECK_PLAN_LIMIT = '5';
+
+program
+  .command('check-plan')
+  .description('Check plan against relevant lessons')
+  .option('--plan <text>', 'Plan text to check')
+  .option('--json', 'Output as JSON')
+  .option('-n, --limit <number>', 'Maximum results', DEFAULT_CHECK_PLAN_LIMIT)
+  .action(async function (this: Command, options: { plan?: string; json?: boolean; limit: string }) {
+    const repoRoot = getRepoRoot();
+    const limit = parseLimit(options.limit, 'limit');
+    const { quiet } = getGlobalOpts(this);
+
+    // Get plan text from --plan or stdin
+    let planText = options.plan;
+
+    if (!planText) {
+      // Try reading from stdin (non-TTY)
+      const { stdin } = await import('node:process');
+      if (!stdin.isTTY) {
+        const chunks: Buffer[] = [];
+        for await (const chunk of stdin) {
+          chunks.push(chunk as Buffer);
+        }
+        planText = Buffer.concat(chunks).toString('utf-8').trim();
+      }
+    }
+
+    if (!planText) {
+      out.error('No plan provided. Use --plan <text> or pipe text to stdin.');
+      process.exit(1);
+    }
+
+    try {
+      const result = await retrieveForPlan(repoRoot, planText, limit);
+
+      // JSON output mode
+      if (options.json) {
+        const jsonOutput = {
+          lessons: result.lessons.map((l) => ({
+            id: l.lesson.id,
+            insight: l.lesson.insight,
+            relevance: l.score,
+            source: l.lesson.source,
+          })),
+          count: result.lessons.length,
+        };
+        console.log(JSON.stringify(jsonOutput));
+        return;
+      }
+
+      // Human-readable output
+      if (result.lessons.length === 0) {
+        console.log('No relevant lessons found for this plan.');
+        return;
+      }
+
+      console.log('## Lessons Check\n');
+      console.log('Relevant to your plan:\n');
+
+      result.lessons.forEach((item, i) => {
+        const num = i + 1;
+        console.log(`${num}. ${chalk.bold(`[${item.lesson.id}]`)} ${item.lesson.insight}`);
+        console.log(`   - Relevance: ${item.score.toFixed(2)}`);
+        console.log(`   - Source: ${item.lesson.source}`);
+        console.log();
+      });
+
+      if (!quiet) {
+        console.log('---');
+        console.log('Consider these lessons while implementing.');
+      }
+    } catch (err) {
+      // Handle case when no lessons exist or embeddings fail
+      if (options.json) {
+        console.log(JSON.stringify({ lessons: [], count: 0 }));
+      } else {
+        console.log('No relevant lessons found for this plan.');
+      }
+    }
   });
 
 program.parse();

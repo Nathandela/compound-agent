@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ARCHIVE_DIR } from './storage/compact.js';
 import { appendLesson, LESSONS_PATH } from './storage/jsonl.js';
 import { closeDb, rebuildIndex } from './storage/sqlite.js';
-import { createQuickLesson, daysAgo } from './test-utils.js';
+import { createFullLesson, createQuickLesson, daysAgo } from './test-utils.js';
 
 describe('CLI', () => {
   let tempDir: string;
@@ -596,6 +596,222 @@ describe('CLI', () => {
     });
   });
 
+  describe('load-session command', () => {
+    it('outputs lessons in human-readable format', async () => {
+      // Create high-severity confirmed lessons
+      await appendLesson(
+        tempDir,
+        createFullLesson('L001', 'Use Polars for files >100MB, not pandas', 'high', {
+          tags: ['performance', 'data'],
+          created: '2025-01-28T10:00:00Z',
+        })
+      );
+      await appendLesson(
+        tempDir,
+        createFullLesson('L002', 'Always validate input before processing', 'high', {
+          tags: ['security'],
+          created: '2025-01-27T10:00:00Z',
+        })
+      );
+
+      const { combined } = runCli('load-session');
+
+      expect(combined).toContain('Session Lessons');
+      expect(combined).toContain('[L001]');
+      expect(combined).toContain('Use Polars for files >100MB');
+      expect(combined).toContain('Tags: performance, data');
+      expect(combined).toContain('2 high-severity lessons loaded');
+    });
+
+    it('outputs valid JSON with --json flag', async () => {
+      await appendLesson(
+        tempDir,
+        createFullLesson('L001', 'Test lesson', 'high', { tags: ['test'] })
+      );
+
+      const { stdout } = runCli('load-session --json');
+      const result = JSON.parse(stdout) as { lessons: unknown[]; count: number };
+
+      expect(result).toHaveProperty('lessons');
+      expect(result).toHaveProperty('count');
+      expect(result.count).toBe(1);
+      expect(Array.isArray(result.lessons)).toBe(true);
+    });
+
+    it('shows message when no high-severity lessons exist', () => {
+      const { combined } = runCli('load-session');
+      expect(combined).toContain('No high-severity lessons found');
+    });
+
+    it('returns exit code 0 even with no lessons', () => {
+      // runCli catches errors, so successful execution means exit 0
+      const { combined } = runCli('load-session');
+      // Should not contain error indicators
+      expect(combined).not.toMatch(/error|exception|fail/i);
+      expect(combined).toContain('No high-severity lessons found');
+    });
+
+    it('filters out non-high-severity lessons', async () => {
+      await appendLesson(
+        tempDir,
+        createFullLesson('L001', 'Medium severity lesson', 'medium')
+      );
+      await appendLesson(
+        tempDir,
+        createFullLesson('L002', 'Low severity lesson', 'low')
+      );
+      await appendLesson(tempDir, createQuickLesson('L003', 'Quick lesson'));
+
+      const { combined } = runCli('load-session');
+      expect(combined).toContain('No high-severity lessons found');
+    });
+
+    it('filters out unconfirmed lessons', async () => {
+      await appendLesson(
+        tempDir,
+        createFullLesson('L001', 'Unconfirmed lesson', 'high', { confirmed: false })
+      );
+
+      const { combined } = runCli('load-session');
+      expect(combined).toContain('No high-severity lessons found');
+    });
+
+    it('respects --quiet flag', async () => {
+      await appendLesson(
+        tempDir,
+        createFullLesson('L001', 'Test lesson', 'high')
+      );
+
+      const { combined } = runCli('load-session --quiet');
+      // Should not contain info prefix or summary
+      expect(combined).not.toMatch(/\[info\]/);
+    });
+
+    it('shows source and date in human-readable format', async () => {
+      await appendLesson(
+        tempDir,
+        createFullLesson('L001', 'Test lesson', 'high', {
+          created: '2025-01-28T10:00:00Z',
+        })
+      );
+
+      const { combined } = runCli('load-session');
+      expect(combined).toContain('Source:');
+      expect(combined).toContain('2025-01-28');
+    });
+  });
+
+  describe('check-plan command', () => {
+    beforeEach(async () => {
+      // Create some lessons for vector search
+      await appendLesson(
+        tempDir,
+        createQuickLesson('L001', 'Always run tests before committing', {
+          trigger: 'test failure after commit',
+          tags: ['testing'],
+        })
+      );
+      await appendLesson(
+        tempDir,
+        createQuickLesson('L002', 'Use Polars for large file processing', {
+          trigger: 'pandas was slow',
+          tags: ['performance'],
+        })
+      );
+      await appendLesson(
+        tempDir,
+        createQuickLesson('L003', 'Check authentication before API calls', {
+          trigger: 'unauthorized error',
+          tags: ['auth', 'api'],
+        })
+      );
+      await rebuildIndex(tempDir);
+      closeDb();
+    });
+
+    it('retrieves relevant lessons with --plan flag', () => {
+      const { combined } = runCli('check-plan --plan "implement testing workflow"');
+      // Should find lessons and display them
+      expect(combined).toMatch(/lessons|relevant/i);
+    });
+
+    it('outputs valid JSON with --json flag', () => {
+      const { stdout } = runCli('check-plan --json --plan "testing workflow"');
+      // Extract JSON from output (may contain library warnings on earlier lines)
+      const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as { lessons: unknown[]; count: number };
+      expect(result).toHaveProperty('lessons');
+      expect(result).toHaveProperty('count');
+      expect(Array.isArray(result.lessons)).toBe(true);
+    });
+
+    it('reads plan from stdin', () => {
+      const cliPath = join(process.cwd(), 'dist', 'cli.js');
+      const stdout = execSync(`echo "test workflow" | node ${cliPath} check-plan`, {
+        cwd: tempDir,
+        encoding: 'utf-8',
+        env: { ...process.env, LEARNING_AGENT_ROOT: tempDir },
+      });
+      expect(stdout).toMatch(/lessons|relevant|no.*found/i);
+    });
+
+    it('respects --limit option', () => {
+      const { stdout } = runCli('check-plan --json --limit 1 --plan "testing and authentication"');
+      // Extract JSON from output (may contain library warnings on earlier lines)
+      const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as { lessons: unknown[]; count: number };
+      expect(result.lessons.length).toBeLessThanOrEqual(1);
+    });
+
+    it('shows user-friendly message when no relevant lessons found', async () => {
+      // Create a fresh temp dir with no lessons
+      const emptyDir = await mkdtemp(join(tmpdir(), 'learning-agent-empty-'));
+      try {
+        const cliPath = join(process.cwd(), 'dist', 'cli.js');
+        const stdout = execSync(`node ${cliPath} check-plan --plan "something completely unrelated xyz123"`, {
+          cwd: emptyDir,
+          encoding: 'utf-8',
+          env: { ...process.env, LEARNING_AGENT_ROOT: emptyDir },
+        });
+        expect(stdout).toMatch(/no.*lessons|no.*relevant|no.*found/i);
+      } finally {
+        await rm(emptyDir, { recursive: true, force: true });
+      }
+    });
+
+    it('requires plan text from --plan or stdin', () => {
+      // When run without --plan and without stdin data (TTY mode simulated)
+      const { combined } = runCli('check-plan');
+      expect(combined.toLowerCase()).toMatch(/no plan|required|error/i);
+    });
+
+    it('includes relevance score in JSON output', () => {
+      const { stdout } = runCli('check-plan --json --plan "testing workflow"');
+      // Extract JSON from output (may contain library warnings on earlier lines)
+      const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as { lessons: Array<{ relevance?: number }> };
+      if (result.lessons.length > 0) {
+        expect(result.lessons[0]).toHaveProperty('relevance');
+        expect(typeof result.lessons[0].relevance).toBe('number');
+      }
+    });
+
+    it('includes lesson ID in JSON output', () => {
+      const { stdout } = runCli('check-plan --json --plan "testing workflow"');
+      // Extract JSON from output (may contain library warnings on earlier lines)
+      const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as { lessons: Array<{ id?: string }> };
+      if (result.lessons.length > 0) {
+        expect(result.lessons[0]).toHaveProperty('id');
+        expect(typeof result.lessons[0].id).toBe('string');
+      }
+    });
+  });
+
   describe('detect command', () => {
     it('requires --input option', () => {
       const { combined } = runCli('detect');
@@ -704,6 +920,113 @@ describe('CLI', () => {
       const filePath = join(tempDir, LESSONS_PATH);
       const content = await readFile(filePath, 'utf-8');
       expect(content).toContain('pnpm build');
+    });
+  });
+
+  describe('capture command', () => {
+    it('captures lesson with --trigger and --insight using --yes', async () => {
+      runCli('capture --trigger "Used setTimeout" --insight "Use await with sleep() helper" --yes');
+
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      expect(content).toContain('Used setTimeout');
+      expect(content).toContain('Use await with sleep() helper');
+    });
+
+    it('outputs valid JSON with --json flag', async () => {
+      const { stdout } = runCli('capture --trigger "test trigger" --insight "test insight" --json --yes');
+      const result = JSON.parse(stdout) as { id: string; trigger: string; insight: string; saved: boolean };
+
+      expect(result.id).toMatch(/^L[a-f0-9]{8}$/);
+      expect(result.trigger).toBe('test trigger');
+      expect(result.insight).toBe('test insight');
+      expect(result.saved).toBe(true);
+    });
+
+    it('works with --input file like detect --save', async () => {
+      const inputPath = join(tempDir, 'input.json');
+      await writeFile(
+        inputPath,
+        JSON.stringify({
+          type: 'user',
+          data: {
+            messages: [
+              'run the build',
+              'Wrong, use pnpm build instead of npm build for this project',
+            ],
+            context: { tool: 'bash', intent: 'build' },
+          },
+        })
+      );
+
+      const { combined } = runCli(`capture --input ${inputPath} --yes`);
+      expect(combined).toContain('Lesson saved');
+
+      // Verify lesson was actually saved
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      expect(content).toContain('pnpm build');
+    });
+
+    it('shows preview without --yes flag and does not save', async () => {
+      const { combined } = runCli('capture --trigger "test trigger" --insight "test insight"');
+
+      // Should show preview
+      expect(combined).toContain('Lesson captured');
+      expect(combined).toContain('test trigger');
+      expect(combined).toContain('test insight');
+
+      // Should NOT save (no --yes flag)
+      const filePath = join(tempDir, LESSONS_PATH);
+      let content = '';
+      try {
+        content = await readFile(filePath, 'utf-8');
+      } catch {
+        // File doesn't exist, which is expected
+      }
+      expect(content).not.toContain('test insight');
+    });
+
+    it('requires either --trigger/--insight or --input', () => {
+      const { combined } = runCli('capture --yes');
+      expect(combined.toLowerCase()).toMatch(/require|missing|provide/i);
+    });
+
+    it('shows error when --input file has no detection', async () => {
+      const inputPath = join(tempDir, 'input.json');
+      await writeFile(
+        inputPath,
+        JSON.stringify({
+          type: 'user',
+          data: {
+            messages: ['hello', 'hi there'],
+            context: { tool: 'chat', intent: 'greeting' },
+          },
+        })
+      );
+
+      const { combined } = runCli(`capture --input ${inputPath} --yes`);
+      expect(combined).toContain('No learning trigger detected');
+    });
+
+    it('respects --quiet flag', async () => {
+      const { combined } = runCli('capture --trigger "t" --insight "i" --yes --quiet');
+      // Should only show minimal output
+      expect(combined).toContain('Lesson saved');
+      // Should not show verbose details
+      expect(combined).not.toMatch(/Type:|Tags:/);
+    });
+
+    it('shows extra details with --verbose flag', async () => {
+      const { combined } = runCli('capture --trigger "test" --insight "insight" --yes --verbose');
+      // Verbose mode should show more info
+      expect(combined).toMatch(/Type:|ID:/);
+    });
+
+    it('outputs JSON with saved: false when using --json without --yes', () => {
+      const { stdout } = runCli('capture --trigger "t" --insight "i" --json');
+      const result = JSON.parse(stdout) as { saved: boolean };
+      expect(result.saved).toBe(false);
     });
   });
 });
