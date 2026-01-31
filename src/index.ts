@@ -32,6 +32,56 @@
  *   }
  * }
  * ```
+ *
+ * ## Resource Management
+ *
+ * This library manages two heavyweight resources that require cleanup:
+ *
+ * ### SQLite Database
+ * - **Acquired:** Lazily on first database operation (search, rebuild, etc.)
+ * - **Memory:** Minimal (~few KB for connection, index cached by OS)
+ * - **Cleanup:** Call `closeDb()` before process exit
+ *
+ * ### Embedding Model
+ * - **Acquired:** Lazily on first embedding call (embedText, embedTexts, searchVector)
+ * - **Memory:** ~500MB RAM for the nomic-embed-text model
+ * - **Cleanup:** Call `unloadEmbedding()` before process exit
+ *
+ * ### Recommended Cleanup Pattern
+ *
+ * ```typescript
+ * import { closeDb, unloadEmbedding } from 'learning-agent';
+ *
+ * // For CLI commands - use try/finally
+ * async function main() {
+ *   try {
+ *     // ... your code that uses learning-agent
+ *   } finally {
+ *     unloadEmbedding();
+ *     closeDb();
+ *   }
+ * }
+ *
+ * // For long-running processes - use shutdown handlers
+ * process.on('SIGTERM', () => {
+ *   unloadEmbedding();
+ *   closeDb();
+ *   process.exit(0);
+ * });
+ * process.on('SIGINT', () => {
+ *   unloadEmbedding();
+ *   closeDb();
+ *   process.exit(0);
+ * });
+ * ```
+ *
+ * **Note:** Failing to clean up will not corrupt data, but may cause:
+ * - Memory leaks in long-running processes
+ * - Unclean process exits (warnings in some environments)
+ *
+ * @see {@link closeDb} for database cleanup
+ * @see {@link unloadEmbedding} for embedding model cleanup
+ * @module learning-agent
  */
 
 export const VERSION = '0.1.0';

@@ -102,8 +102,22 @@ export function contentHash(trigger: string, insight: string): string {
 
 /**
  * Open or create the SQLite database.
+ *
  * Creates directory structure and schema if needed.
- * Returns singleton instance.
+ * Returns a singleton instance - subsequent calls return the same connection.
+ *
+ * **Resource lifecycle:**
+ * - First call creates the database file (if needed) and opens a connection
+ * - Connection uses WAL mode for better concurrent access
+ * - Connection remains open until `closeDb()` is called
+ *
+ * **Note:** Most code should not call this directly. Higher-level functions
+ * like `searchKeyword` and `rebuildIndex` call it internally.
+ *
+ * @param repoRoot - Path to repository root (database stored at `.claude/.cache/lessons.sqlite`)
+ * @returns The singleton database connection
+ *
+ * @see {@link closeDb} for releasing resources
  */
 export function openDb(repoRoot: string): DatabaseType {
   if (db) return db;
@@ -125,8 +139,40 @@ export function openDb(repoRoot: string): DatabaseType {
 }
 
 /**
- * Close the database connection.
- * Resets singleton for reopening.
+ * Close the database connection and release resources.
+ *
+ * **Resource lifecycle:**
+ * - The database is opened lazily on first call to `openDb()` or any function that uses it
+ *   (e.g., `searchKeyword`, `rebuildIndex`, `syncIfNeeded`, `getCachedEmbedding`)
+ * - Once opened, the connection remains active until `closeDb()` is called
+ * - After closing, subsequent database operations will reopen the connection
+ *
+ * **When to call:**
+ * - At the end of CLI commands to ensure clean process exit
+ * - When transitioning between repositories in long-running processes
+ * - Before process exit in graceful shutdown handlers
+ *
+ * **Best practices for long-running processes:**
+ * - In single-operation scripts: call before exit
+ * - In daemon/server processes: call in shutdown handler
+ * - Not necessary to call between operations in the same repository
+ *
+ * @example
+ * ```typescript
+ * // CLI command pattern
+ * try {
+ *   await searchKeyword(repoRoot, 'typescript', 10);
+ *   // ... process results
+ * } finally {
+ *   closeDb();
+ * }
+ *
+ * // Graceful shutdown pattern
+ * process.on('SIGTERM', () => {
+ *   closeDb();
+ *   process.exit(0);
+ * });
+ * ```
  */
 export function closeDb(): void {
   if (db) {
