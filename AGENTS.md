@@ -288,6 +288,275 @@ Tests check `SKIP_EMBEDDING_TESTS` environment variable:
 
 ---
 
+## Using Learning Agent (Claude Integration)
+
+This section explains HOW and WHEN Claude should interact with the learning-agent system.
+
+### Core Principle
+
+**Quality over quantity.** Most sessions should have NO new lessons. Only capture lessons that are:
+- **Novel** - Not already in the lesson database
+- **Specific** - Clear, actionable guidance (not "write better code")
+- **Actionable** - Concrete behavior to change
+
+---
+
+### 1. Lesson Retrieval Flow
+
+#### Session Start (Automatic)
+
+When a new session begins, load high-severity lessons:
+
+```bash
+npx learning-agent load-session --json
+```
+
+**What to do with results:**
+- Inject high-severity lessons into context
+- These are critical lessons that should always be visible
+- Format: Short summary in session preamble
+
+**Output example:**
+```json
+{
+  "lessons": [
+    {"id": "abc12", "insight": "Use Polars not pandas for files >100MB", "source": "user_correction"}
+  ],
+  "count": 1
+}
+```
+
+#### Plan-Time Retrieval (On Plan Creation)
+
+When creating or reviewing a plan, retrieve semantically relevant lessons:
+
+```bash
+echo "Add authentication with JWT tokens" | npx learning-agent check-plan --json
+# OR
+npx learning-agent check-plan --plan "Add authentication with JWT tokens" --json
+```
+
+**What to do with results:**
+- Display as "Lessons Check" after the plan
+- Consider each lesson while implementing
+- Lessons are ranked by relevance score
+
+**Output example:**
+```json
+{
+  "lessons": [
+    {"id": "xyz34", "insight": "JWT tokens need X-Request-ID header", "relevance": 0.87, "source": "test_failure"}
+  ],
+  "count": 1
+}
+```
+
+**Important:** No per-tool retrieval. All context injection happens at plan time only.
+
+---
+
+### 2. Lesson Capture Flow
+
+#### Trigger Detection
+
+Propose a lesson when ANY of these triggers occur:
+
+| Trigger | Signal | Example |
+|---------|--------|---------|
+| **User Correction** | User says "no", "wrong", "actually..." | "Actually, use v2 of the API" |
+| **Self-Correction** | Claude iterates: edit -> fail -> re-edit | Fixed bug after multiple attempts |
+| **Test Failure** | Test fails -> fix -> passes | Auth test failed due to missing header |
+| **Manual** | User says "remember this" or `/learn` | "Remember: always run lint before commit" |
+
+#### Quality Gate (MANDATORY)
+
+Before proposing ANY lesson, verify ALL THREE criteria:
+
+```
+[ ] Is this NOVEL?     - Not already in lessons database
+[ ] Is this SPECIFIC?  - Clear, concrete guidance
+[ ] Is this ACTIONABLE? - Obvious what to do differently
+```
+
+**If ANY check fails → DO NOT propose the lesson.**
+
+#### Confirmation UX
+
+When proposing a lesson, use this exact format:
+
+```
+Learned: [insight]. Save? [y/n]
+```
+
+**Examples:**
+```
+Learned: Use Polars for files >100MB instead of pandas. Save? [y/n]
+```
+
+```
+Learned: API v2 requires X-Request-ID header. Save? [y/n]
+```
+
+**Rules:**
+- Keep insight concise (one sentence)
+- User must explicitly confirm with "y" or "yes"
+- Silence or other response = do not save
+- Never auto-save lessons
+
+#### Capture Command
+
+After user confirms, save the lesson:
+
+```bash
+npx learning-agent capture \
+  --trigger "Used pandas for 500MB file, was too slow" \
+  --insight "Use Polars for files >100MB" \
+  --yes --json
+```
+
+**From input file (auto-detect trigger):**
+```bash
+npx learning-agent capture --input conversation.json --yes --json
+```
+
+---
+
+### 3. Session-End Protocol (Compound Check)
+
+At the end of a task, run a parallel reflection to propose lessons while context is fresh.
+
+#### When to Run
+
+**Preconditions (ALL must be true):**
+- Problem was solved
+- Solution verified (user confirmed OR tests pass)
+- Non-trivial work was done
+
+#### Reflection Process
+
+Run these checks in parallel:
+
+1. **Context Analysis**: Summarize plan + tool calls + git diff + test output
+2. **Mistake/Lesson Extraction**: Identify missteps, corrections, and fixes
+3. **Related/Contradiction Check**: Link related lessons, mark supersedes
+4. **Prevention Strategy**: Turn lessons into actionable guidance
+5. **Classification**: Quick vs Full lesson, severity level
+6. **Proposal**: Propose lessons that pass quality gate
+
+#### Output
+
+Only propose lessons that pass the quality filter. Use the standard confirmation UX:
+
+```
+Session complete. Reflecting on lessons learned...
+
+Learned: Always verify API version before integration. Save? [y/n]
+```
+
+---
+
+### 4. CLI Quick Reference
+
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| `load-session` | Load high-severity lessons | Session start |
+| `check-plan --plan "..."` | Retrieve lessons for plan | Plan creation |
+| `capture --trigger "..." --insight "..."` | Save confirmed lesson | After user confirms |
+| `search <query>` | Search lessons by keyword | Manual lookup |
+| `list` | List all lessons | Debug/review |
+| `stats` | Show database health | Diagnostics |
+
+**Common flags:**
+- `--json` - Machine-readable output (use in hooks)
+- `--quiet` - Suppress non-essential output
+- `-n, --limit <N>` - Limit results
+
+---
+
+### 5. Integration Points
+
+#### Claude Code Hooks
+
+Learning-agent integrates via Claude Code hooks:
+
+```yaml
+# .claude/hooks.yml (example)
+hooks:
+  session_start:
+    - command: "npx learning-agent load-session --json"
+      inject: context
+
+  plan_created:
+    - command: "npx learning-agent check-plan --json"
+      inject: after_plan
+```
+
+#### CLAUDE.md Integration
+
+Reference learning-agent in project CLAUDE.md:
+
+```markdown
+## Learning Agent
+
+This project uses learning-agent for session memory.
+- Lessons loaded at session start (high-severity)
+- Lessons checked at plan time (semantic search)
+- Compound check at task end
+
+See `.claude/lessons/` for lesson history.
+```
+
+---
+
+### 6. Anti-Patterns (DO NOT)
+
+| Pattern | Why It's Wrong |
+|---------|----------------|
+| Propose vague lessons | "Write better code" is not actionable |
+| Auto-save without confirmation | User must explicitly confirm |
+| Retrieve per-tool | Too noisy, plan-time only |
+| Ignore quality gate | Leads to lesson database bloat |
+| Propose every correction | Most corrections don't need lessons |
+| Skip compound check | Misses valuable end-of-task insights |
+
+---
+
+### 7. Example Session Flow
+
+```
+SESSION START
+├─ load-session --json
+│   └─ [2 high-severity lessons injected]
+│
+├─ User: "Add JWT authentication"
+│
+PLAN CREATED
+├─ check-plan --plan "Add JWT authentication" --json
+│   └─ [1 relevant lesson: "JWT needs X-Request-ID header"]
+│
+├─ Display: "## Lessons Check
+│            1. JWT needs X-Request-ID header (relevance: 0.87)"
+│
+IMPLEMENTATION
+├─ [Claude implements with lesson in mind]
+├─ User: "Actually, use RS256 not HS256"
+│
+TRIGGER DETECTED (user correction)
+├─ Quality check: Novel? Yes. Specific? Yes. Actionable? Yes.
+├─ Display: "Learned: Use RS256 algorithm for JWT signing. Save? [y/n]"
+├─ User: "y"
+├─ capture --trigger "Used HS256" --insight "Use RS256 for JWT" --yes
+│
+TASK COMPLETE
+├─ Compound check (parallel reflection)
+├─ No additional lessons pass quality gate
+│
+SESSION END
+└─ [No pending lessons]
+```
+
+---
+
 ## References
 
 | Document | Purpose |

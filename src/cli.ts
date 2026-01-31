@@ -3,6 +3,7 @@
  * Learning Agent CLI
  *
  * Commands:
+ *   init             - Initialize learning-agent in a repository
  *   learn <insight>  - Capture a new lesson
  *   search <query>   - Search lessons by keyword
  *   list             - List all lessons
@@ -14,8 +15,9 @@
 import chalk from 'chalk';
 import { Command } from 'commander';
 
-import { statSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, statSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 import { detectAndPropose, parseInputFile } from './capture/index.js';
 import type { DetectionResult } from './capture/index.js';
@@ -250,6 +252,98 @@ function outputSessionLessonsHuman(lessons: Lesson[], quiet: boolean): void {
   }
 }
 
+// ============================================================================
+// Init Command Helpers
+// ============================================================================
+
+/** Section header to check for idempotency */
+const LEARNING_AGENT_SECTION_HEADER = '## Learning Agent Integration';
+
+/** Template content for AGENTS.md */
+const AGENTS_MD_TEMPLATE = `
+## Learning Agent Integration
+
+This project uses learning-agent for session memory.
+
+### Retrieval Points
+
+- **Session start**: High-severity lessons loaded automatically
+- **Plan creation**: Semantic search for relevant lessons
+
+### Proposing Lessons
+
+Propose when: user correction, self-correction, test failure fix, or manual request.
+
+**Quality gate (ALL must pass):**
+
+- Novel (not already stored)
+- Specific (clear guidance)
+- Actionable (obvious what to do)
+
+**Confirmation format:**
+
+\`\`\`
+Learned: [insight]. Save? [y/n]
+\`\`\`
+
+### CLI Commands
+
+\`\`\`bash
+npx learning-agent load-session --json  # Session start
+npx learning-agent check-plan --json    # Plan-time
+npx learning-agent capture --trigger "..." --insight "..." --yes
+\`\`\`
+
+See [AGENTS.md](https://github.com/Nathandela/learning_agent/blob/main/AGENTS.md) for full documentation.
+`;
+
+/**
+ * Check if AGENTS.md already has the Learning Agent section.
+ */
+function hasLearningAgentSection(content: string): boolean {
+  return content.includes(LEARNING_AGENT_SECTION_HEADER);
+}
+
+/**
+ * Create the lessons directory structure.
+ */
+async function createLessonsDirectory(repoRoot: string): Promise<void> {
+  const lessonsDir = dirname(join(repoRoot, LESSONS_PATH));
+  await mkdir(lessonsDir, { recursive: true });
+}
+
+/**
+ * Create empty index.jsonl if it doesn't exist.
+ */
+async function createIndexFile(repoRoot: string): Promise<void> {
+  const indexPath = join(repoRoot, LESSONS_PATH);
+  if (!existsSync(indexPath)) {
+    await writeFile(indexPath, '', 'utf-8');
+  }
+}
+
+/**
+ * Create or update AGENTS.md with Learning Agent section.
+ */
+async function updateAgentsMd(repoRoot: string): Promise<boolean> {
+  const agentsPath = join(repoRoot, 'AGENTS.md');
+  let content = '';
+  let existed = false;
+
+  if (existsSync(agentsPath)) {
+    content = await readFile(agentsPath, 'utf-8');
+    existed = true;
+    if (hasLearningAgentSection(content)) {
+      return false; // Already has section, no update needed
+    }
+  }
+
+  // Append the template
+  const newContent = existed ? content.trimEnd() + '\n' + AGENTS_MD_TEMPLATE : AGENTS_MD_TEMPLATE.trim() + '\n';
+  await writeFile(agentsPath, newContent, 'utf-8');
+  return true;
+}
+
 const program = new Command();
 
 // Add global options
@@ -261,6 +355,55 @@ program
   .name('learning-agent')
   .description('Repository-scoped learning system for Claude Code')
   .version(VERSION);
+
+/**
+ * Init command - Initialize learning-agent in a repository.
+ *
+ * Creates the lessons directory structure and optionally injects
+ * the Learning Agent Integration section into AGENTS.md.
+ *
+ * @example npx learning-agent init
+ * @example npx learning-agent init --skip-agents
+ */
+program
+  .command('init')
+  .description('Initialize learning-agent in this repository')
+  .option('--skip-agents', 'Skip AGENTS.md modification')
+  .option('--json', 'Output result as JSON')
+  .action(async function (this: Command, options: { skipAgents?: boolean; json?: boolean }) {
+    const repoRoot = getRepoRoot();
+    const { quiet } = getGlobalOpts(this);
+
+    // Create directory structure
+    await createLessonsDirectory(repoRoot);
+    await createIndexFile(repoRoot);
+    const lessonsDir = dirname(join(repoRoot, LESSONS_PATH));
+
+    // Update AGENTS.md unless skipped
+    let agentsMdUpdated = false;
+    if (!options.skipAgents) {
+      agentsMdUpdated = await updateAgentsMd(repoRoot);
+    }
+
+    // Output
+    if (options.json) {
+      console.log(JSON.stringify({
+        initialized: true,
+        lessonsDir,
+        agentsMd: agentsMdUpdated,
+      }));
+    } else if (!quiet) {
+      out.success('Learning agent initialized');
+      console.log(`  Lessons directory: ${lessonsDir}`);
+      if (agentsMdUpdated) {
+        console.log('  AGENTS.md: Updated with Learning Agent section');
+      } else if (options.skipAgents) {
+        console.log('  AGENTS.md: Skipped (--skip-agents)');
+      } else {
+        console.log('  AGENTS.md: Already has Learning Agent section');
+      }
+    }
+  });
 
 program
   .command('learn <insight>')

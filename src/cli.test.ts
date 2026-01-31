@@ -1029,4 +1029,110 @@ describe('CLI', () => {
       expect(result.saved).toBe(false);
     });
   });
+
+  describe('init command', () => {
+    it('creates .claude/lessons directory structure', async () => {
+      runCli('init');
+
+      const lessonsDir = join(tempDir, '.claude', 'lessons');
+      const dirs = await readdir(join(tempDir, '.claude'));
+      expect(dirs).toContain('lessons');
+    });
+
+    it('creates empty index.jsonl file', async () => {
+      runCli('init');
+
+      const indexPath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(indexPath, 'utf-8');
+      // Should be empty or have minimal content
+      expect(content.trim()).toBe('');
+    });
+
+    it('creates AGENTS.md with Learning Agent section', async () => {
+      runCli('init');
+
+      const agentsPath = join(tempDir, 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+      expect(content).toContain('Learning Agent Integration');
+      expect(content).toContain('load-session');
+      expect(content).toContain('check-plan');
+      expect(content).toContain('capture');
+    });
+
+    it('appends to existing AGENTS.md without duplicating', async () => {
+      // Create existing AGENTS.md
+      const agentsPath = join(tempDir, 'AGENTS.md');
+      await writeFile(agentsPath, '# Existing Content\n\nSome existing instructions.\n');
+
+      runCli('init');
+
+      const content = await readFile(agentsPath, 'utf-8');
+      // Should preserve existing content
+      expect(content).toContain('Existing Content');
+      // Should add Learning Agent section
+      expect(content).toContain('Learning Agent Integration');
+    });
+
+    it('is idempotent - does not duplicate section on re-run', async () => {
+      // Run init twice
+      runCli('init');
+      runCli('init');
+
+      const agentsPath = join(tempDir, 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Count occurrences of the section header
+      const matches = content.match(/## Learning Agent Integration/g);
+      expect(matches?.length).toBe(1);
+    });
+
+    it('respects --skip-agents flag', async () => {
+      runCli('init --skip-agents');
+
+      // Should create lessons directory
+      const lessonsDir = join(tempDir, '.claude', 'lessons');
+      const dirs = await readdir(join(tempDir, '.claude'));
+      expect(dirs).toContain('lessons');
+
+      // Should NOT create AGENTS.md
+      const agentsPath = join(tempDir, 'AGENTS.md');
+      let agentsExists = true;
+      try {
+        await readFile(agentsPath, 'utf-8');
+      } catch {
+        agentsExists = false;
+      }
+      expect(agentsExists).toBe(false);
+    });
+
+    it('shows success message', () => {
+      const { combined } = runCli('init');
+      expect(combined).toMatch(/initialized|created|success/i);
+    });
+
+    it('respects --quiet flag', () => {
+      const { combined } = runCli('init --quiet');
+      // Should have minimal output
+      expect(combined.length).toBeLessThan(100);
+    });
+
+    it('does not overwrite existing lessons', async () => {
+      // Create some lessons first
+      await appendLesson(tempDir, createQuickLesson('L001', 'existing lesson'));
+
+      runCli('init');
+
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      expect(content).toContain('existing lesson');
+    });
+
+    it('outputs JSON with --json flag', () => {
+      const { stdout } = runCli('init --json');
+      const result = JSON.parse(stdout) as { initialized: boolean; lessonsDir: string; agentsMd: boolean };
+      expect(result.initialized).toBe(true);
+      expect(result.lessonsDir).toContain('.claude/lessons');
+      expect(result.agentsMd).toBe(true);
+    });
+  });
 });
