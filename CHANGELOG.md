@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Storage Enhancements**
+  - Compaction system for archiving old lessons and removing tombstones
+  - Smart sync: rebuild index only when JSONL changes
+  - Retrieval count tracking for lesson usage statistics
+
+- **CLI Commands**
+  - `learning-agent import <file>` - Import lessons from JSONL file
+  - `learning-agent stats` - Show database health statistics
+  - `learning-agent compact` - Archive old lessons
+  - `learning-agent export` - Export lessons as JSON
+  - Global flags: `--verbose`, `--quiet`
+  - Colored output with chalk
+
+- **Embeddings**
+  - Switched to EmbeddingGemma-300M (~278MB, down from ~500MB)
+  - Simplified model download using node-llama-cpp resolveModelFile
+
+- **Testing**
+  - 100% statement/function/line coverage (435 tests)
+  - Property-based tests with fast-check
+  - Integration tests for capture workflows
+
+### Changed
+
+- Unified QuickLesson and FullLesson into single Lesson type
+- Removed deprecated type exports
+
 ## [0.1.0] - 2025-01-30
 
 ### Added
@@ -19,9 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Embeddings**
   - Local semantic embeddings via node-llama-cpp
-  - Nomic-embed-text-v1.5 model support
-  - Automatic model download on first use (~500MB)
-  - Model stored in `~/.cache/learning-agent/models/`
+  - EmbeddingGemma-300M model (768 dimensions)
+  - Manual model download via CLI (~278MB)
+  - Model stored in `~/.node-llama-cpp/models/`
 
 - **Search & Retrieval**
   - Vector similarity search using cosine distance

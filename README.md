@@ -11,6 +11,28 @@ Claude Code forgets lessons between sessions. This leads to:
 
 Learning Agent solves this by capturing lessons when corrections happen and retrieving relevant ones at session start and plan time.
 
+## Installation
+
+```bash
+# Using pnpm (recommended)
+pnpm add -D learning-agent
+
+# Using npm
+npm install --save-dev learning-agent
+```
+
+After installation, download the embedding model (~278MB, one-time):
+
+```bash
+npx learning-agent download-model
+```
+
+### Requirements
+
+- Node.js >= 20
+- ~278MB disk space for embedding model
+- ~150MB RAM for embedding operations
+
 ## Quick Start
 
 ```bash
@@ -76,7 +98,60 @@ learning-agent search "data processing"
 
 # Rebuild index from JSONL
 learning-agent rebuild
+
+# List all lessons
+learning-agent list
+
+# Show database stats
+learning-agent stats
+
+# Compact and archive old lessons
+learning-agent compact
 ```
+
+## Claude Code Integration
+
+Add to your `.claude/settings.json` to automatically load lessons:
+
+```json
+{
+  "hooks": {
+    "session_start": "npx learning-agent load-session",
+    "pre_plan": "npx learning-agent check-plan"
+  }
+}
+```
+
+### Hook Commands
+
+| Command | Purpose |
+|---------|---------|
+| `load-session` | Load high-severity lessons at session start |
+| `check-plan` | Retrieve relevant lessons when planning |
+
+## API Reference
+
+```typescript
+import {
+  // Storage
+  appendLesson, readLessons, searchKeyword, rebuildIndex, closeDb,
+
+  // Search
+  searchVector, cosineSimilarity, rankLessons,
+
+  // Capture
+  shouldPropose, isNovel, isSpecific, isActionable,
+  detectUserCorrection, detectSelfCorrection, detectTestFailure,
+
+  // Retrieval
+  loadSessionLessons, retrieveForPlan, formatLessonsCheck,
+
+  // Types
+  type Lesson, LessonSchema, generateId,
+} from 'learning-agent';
+```
+
+See [examples/](examples/) for usage examples.
 
 ## Lesson Types
 
