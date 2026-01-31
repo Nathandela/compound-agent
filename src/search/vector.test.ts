@@ -53,6 +53,12 @@ describe('vector search', () => {
       const v2 = [1, 2, 3];
       expect(cosineSimilarity(v1, v2)).toBe(0);
     });
+
+    it('throws error for vectors with different lengths', () => {
+      const v1 = [1, 2, 3];
+      const v2 = [1, 2];
+      expect(() => cosineSimilarity(v1, v2)).toThrow('Vectors must have same length');
+    });
   });
 
   describe('searchVector', () => {

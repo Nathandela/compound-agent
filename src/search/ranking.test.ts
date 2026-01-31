@@ -113,5 +113,25 @@ describe('ranking', () => {
       expect(ranked[0]!.lesson.id).toBe('L2');
       expect(ranked[0]!.finalScore).toBeGreaterThan(ranked[1]!.finalScore!);
     });
+
+    it('always computes finalScore for all ranked lessons', () => {
+      // Note: The sort comparator in rankLessons has a defensive ?? 0 fallback
+      // for finalScore, but this branch is unreachable because the map() always
+      // computes finalScore before sort() is called. This test verifies that
+      // finalScore is always defined, documenting why line 84's ?? 0 is never hit.
+      const lessons: ScoredLesson[] = [
+        { lesson: createQuickLesson('L1', 'test insight'), score: 0.5 },
+        { lesson: createQuickLesson('L2', 'test insight'), score: 0.3 },
+        { lesson: createQuickLesson('L3', 'test insight'), score: 0.8 },
+      ];
+
+      const ranked = rankLessons(lessons);
+
+      // All finalScore values should be defined (never undefined)
+      for (const item of ranked) {
+        expect(item.finalScore).toBeDefined();
+        expect(typeof item.finalScore).toBe('number');
+      }
+    });
   });
 });

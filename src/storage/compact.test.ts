@@ -143,6 +143,22 @@ describe('Compaction', () => {
       const count = await countTombstones(tempDir);
       expect(count).toBe(2);
     });
+
+    it('skips invalid JSON lines when counting', async () => {
+      // Write file with mix of valid lessons and invalid JSON
+      const filePath = join(tempDir, LESSONS_PATH);
+      await mkdir(join(tempDir, '.claude', 'lessons'), { recursive: true });
+
+      const valid1 = JSON.stringify(createLesson('L001', 'valid'));
+      const invalidJson = '{not valid json at all';
+      const tombstone = JSON.stringify({ ...createLesson('L002', 'deleted'), deleted: true });
+
+      await writeFile(filePath, `${valid1}\n${invalidJson}\n${tombstone}\n`, 'utf-8');
+
+      // Should only count valid tombstones, skipping invalid JSON
+      const count = await countTombstones(tempDir);
+      expect(count).toBe(1);
+    });
   });
 
   describe('needsCompaction', () => {

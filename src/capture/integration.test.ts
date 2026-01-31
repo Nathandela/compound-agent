@@ -75,6 +75,22 @@ describe('trigger detection integration', () => {
       expect(result?.source).toBe('self_correction');
     });
 
+    it('returns null when self correction pattern not found', async () => {
+      // Only 2 edits - not enough for edit->fail->re-edit pattern
+      const input: DetectionInput = {
+        type: 'self',
+        data: {
+          edits: [
+            { file: 'src/app.ts', success: true, timestamp: Date.now() - 2000 },
+            { file: 'src/app.ts', success: true, timestamp: Date.now() - 1000 },
+          ],
+        },
+      };
+
+      const result = await detectAndPropose(tempDir, input);
+      expect(result).toBeNull();
+    });
+
     it('detects test failure and returns proposal', async () => {
       const input: DetectionInput = {
         type: 'test',

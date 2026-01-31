@@ -106,6 +106,26 @@ describe('trigger detection', () => {
       const result = detectUserCorrection(signals);
       expect(result).not.toBeNull();
     });
+
+    it('skips falsy messages in the array', () => {
+      const signals: CorrectionSignal = {
+        messages: ['first message', '', 'No, that is wrong'],
+        context: { tool: 'edit', intent: 'test' },
+      };
+      const result = detectUserCorrection(signals);
+      expect(result).not.toBeNull();
+      expect(result?.correctionMessage).toBe('No, that is wrong');
+    });
+
+    it('handles single message array', () => {
+      const signals: CorrectionSignal = {
+        messages: ['No, that is wrong'],
+        context: { tool: 'edit', intent: 'test' },
+      };
+      const result = detectUserCorrection(signals);
+      // Only one message, needs at least 2 to detect correction
+      expect(result).toBeNull();
+    });
   });
 
   describe('detectSelfCorrection', () => {
@@ -170,6 +190,21 @@ describe('trigger detection', () => {
       const result = detectSelfCorrection(history);
       expect(result?.file).toBe('src/utils/helper.ts');
     });
+
+    it('handles sparse edits array with undefined entries', () => {
+      // Create an array with holes (undefined values)
+      const edits = new Array(5);
+      edits[0] = { file: 'src/app.ts', success: true, timestamp: Date.now() - 3000 };
+      // edits[1] is undefined (hole)
+      edits[2] = { file: 'src/app.ts', success: false, timestamp: Date.now() - 2000 };
+      // edits[3] is undefined (hole)
+      edits[4] = { file: 'src/app.ts', success: true, timestamp: Date.now() - 1000 };
+
+      const history: EditHistory = { edits };
+      const result = detectSelfCorrection(history);
+      // Pattern not found because of undefined entries breaking the sequence
+      expect(result).toBeNull();
+    });
   });
 
   describe('detectTestFailure', () => {
@@ -222,6 +257,40 @@ describe('trigger detection', () => {
       const result = detectTestFailure(testResult);
       expect(result?.trigger).toBeDefined();
       expect(result?.trigger.length).toBeGreaterThan(0);
+    });
+
+    it('uses first line when no error/fail/assert keywords found', () => {
+      const testResult: TestResult = {
+        passed: false,
+        output: 'Some unexpected output\nAnother line',
+        testFile: 'src/app.test.ts',
+      };
+      const result = detectTestFailure(testResult);
+      expect(result).not.toBeNull();
+      expect(result?.trigger).toContain('Some unexpected output');
+    });
+
+    it('handles empty output string', () => {
+      const testResult: TestResult = {
+        passed: false,
+        output: '',
+        testFile: 'src/app.test.ts',
+      };
+      const result = detectTestFailure(testResult);
+      expect(result).not.toBeNull();
+      expect(result?.trigger).toBe('Test failure in src/app.test.ts: ');
+    });
+
+    it('handles output with only whitespace', () => {
+      const testResult: TestResult = {
+        passed: false,
+        output: '   \n   \n   ',
+        testFile: 'src/app.test.ts',
+      };
+      const result = detectTestFailure(testResult);
+      expect(result).not.toBeNull();
+      // All lines filtered out due to empty trim, falls back to empty string
+      expect(result?.trigger).toBe('Test failure in src/app.test.ts: ');
     });
   });
 });

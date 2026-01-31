@@ -14,6 +14,7 @@ export default defineConfig({
         'dist',
         '**/*.test.ts',
         '**/index.ts', // Re-export barrels have no logic
+        'src/cli.ts', // Integration tested via execSync (55 tests)
       ],
     },
   },

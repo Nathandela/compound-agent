@@ -17,6 +17,7 @@ import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { detectAndPropose, parseInputFile } from './capture/integration.js';
+import { formatBytes, getRepoRoot, parseLimit } from './cli-utils.js';
 import { VERSION } from './index.js';
 import { compact, countTombstones, needsCompaction, TOMBSTONE_THRESHOLD } from './storage/compact.js';
 import { appendLesson, LESSONS_PATH, readLessons } from './storage/jsonl.js';
@@ -65,31 +66,6 @@ const program = new Command();
 program
   .option('-v, --verbose', 'Show detailed output')
   .option('-q, --quiet', 'Suppress non-essential output');
-
-/**
- * Get repository root from environment variable or current directory.
- *
- * @returns Repository root path for lesson storage
- */
-function getRepoRoot(): string {
-  return process.env['LEARNING_AGENT_ROOT'] ?? process.cwd();
-}
-
-/**
- * Parse limit option and validate it's a positive integer.
- *
- * @param value - String value from command option
- * @param name - Option name for error message
- * @returns Parsed integer
- * @throws Error if value is not a valid positive integer
- */
-function parseLimit(value: string, name: string): number {
-  const parsed = parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    throw new Error(`Invalid ${name}: must be a positive integer`);
-  }
-  return parsed;
-}
 
 program
   .name('learning-agent')
@@ -480,17 +456,5 @@ program
     console.log(`Retrievals: ${totalRetrievals} total, ${avgRetrievals} avg per lesson`);
     console.log(`Storage: ${formatBytes(totalSize)} (index: ${formatBytes(indexSize)}, data: ${formatBytes(dataSize)})`);
   });
-
-/**
- * Format bytes to human-readable string.
- */
-function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  const kb = bytes / 1024;
-  if (kb < 1024) return `${kb.toFixed(1)} KB`;
-  const mb = kb / 1024;
-  return `${mb.toFixed(1)} MB`;
-}
 
 program.parse();

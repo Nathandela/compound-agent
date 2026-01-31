@@ -27,6 +27,12 @@ describe('quality filters', () => {
       expect(result.novel).toBe(true);
     });
 
+    it('returns true when insight has no words longer than 3 chars', async () => {
+      // All words are 3 chars or less, so no keywords extracted for search
+      const result = await isNovel(tempDir, 'a b c d e');
+      expect(result.novel).toBe(true);
+    });
+
     it('returns true for new unique insight', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for CSV processing'));
       await rebuildIndex(tempDir);
@@ -74,6 +80,34 @@ describe('quality filters', () => {
 
       const result = await isNovel(tempDir, 'Always test your code');
       expect(result.existingId).toBe('L123');
+    });
+
+    it('detects exact match when similarity threshold is very high', async () => {
+      // Use a threshold higher than what Jaccard would produce
+      // but still have an exact case-insensitive match
+      await appendLesson(tempDir, createQuickLesson('L001', 'Use POLARS for data'));
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      // Same text, different case - exact match should catch this
+      // Set threshold to 0.99 so similarity check might pass but exact match is definitive
+      const result = await isNovel(tempDir, 'use polars for data', { threshold: 0.99 });
+      // The similarity for identical text is 1.0, so this will be caught by similarity check
+      expect(result.novel).toBe(false);
+    });
+
+    it('detects exact duplicate via exact match fallback when threshold exceeds 1.0', async () => {
+      // Set threshold > 1.0 so similarity check never triggers
+      // forcing the exact match check to be reached
+      await appendLesson(tempDir, createQuickLesson('L002', 'Check tests before pushing'));
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      // Same text, different case - will fall through similarity check to exact match
+      const result = await isNovel(tempDir, 'check tests before pushing', { threshold: 1.01 });
+      expect(result.novel).toBe(false);
+      expect(result.reason).toBe('Exact duplicate found');
+      expect(result.existingId).toBe('L002');
     });
   });
 

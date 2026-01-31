@@ -234,6 +234,14 @@ describe('JSONL storage', () => {
 
         await expect(readLessons(tempDir, { strict: true })).rejects.toThrow(/line 3/i);
       });
+
+      it('rethrows non-ENOENT errors from readFile', async () => {
+        // Create a directory where the file should be - reading a directory throws EISDIR
+        const filePath = join(tempDir, LESSONS_PATH);
+        await mkdir(filePath, { recursive: true }); // Create lessons path as directory
+
+        await expect(readLessons(tempDir)).rejects.toThrow();
+      });
     });
   });
 });

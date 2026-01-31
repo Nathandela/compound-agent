@@ -1,4 +1,4 @@
-import { access, mkdtemp, rm, utimes } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -165,6 +165,23 @@ describe('SQLite schema', () => {
       const db = openDb(tempDir);
       const count = db.prepare('SELECT COUNT(*) as cnt FROM lessons').get() as { cnt: number };
       expect(count.cnt).toBe(0);
+    });
+
+    it('updates sync mtime even when JSONL is empty but file exists', async () => {
+      // Create empty JSONL file (exists but has no lessons)
+      const filePath = join(tempDir, LESSONS_PATH);
+      await mkdir(join(tempDir, '.claude', 'lessons'), { recursive: true });
+      await writeFile(filePath, '', 'utf-8');
+
+      await rebuildIndex(tempDir);
+
+      // Should have stored mtime in metadata
+      const db = openDb(tempDir);
+      const row = db.prepare("SELECT value FROM metadata WHERE key = 'last_sync_mtime'").get() as
+        | { value: string }
+        | undefined;
+      expect(row).toBeDefined();
+      expect(parseFloat(row!.value)).toBeGreaterThan(0);
     });
 
     it('preserves lesson types', async () => {
@@ -405,6 +422,20 @@ describe('SQLite schema', () => {
       const results = await searchKeyword(tempDir, 'low', 10);
       expect(results).toHaveLength(1);
       expect(results[0]!.severity).toBe('low');
+    });
+
+    it('preserves deleted flag when present in database row', async () => {
+      // Manually insert a deleted lesson to test rowToLesson handling
+      const db = openDb(tempDir);
+      db.prepare(`
+        INSERT INTO lessons (id, type, trigger, insight, tags, source, context, supersedes, related, created, confirmed, deleted)
+        VALUES ('L001', 'quick', 'test trigger', 'test insight', 'tag1', 'manual', '{}', '[]', '[]', '2026-01-30', 1, 1)
+      `).run();
+
+      // Query directly to get the deleted lesson through rowToLesson
+      const results = await searchKeyword(tempDir, 'test', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.deleted).toBe(true);
     });
   });
 
