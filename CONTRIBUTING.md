@@ -13,7 +13,7 @@ Thank you for your interest in contributing to Learning Agent! This document out
 
 ```bash
 # Clone the repository
-git clone https://github.com/nathanbraun/learning_agent.git
+git clone https://github.com/Nathandela/learning_agent.git
 cd learning_agent
 
 # Install dependencies
@@ -214,6 +214,62 @@ src/
     session.ts      # Session-start loading
     plan.ts         # Plan-time retrieval
 ```
+
+## Releasing
+
+### Pre-Release Checklist
+
+Before publishing a new version:
+
+```bash
+# 1. Ensure all tests pass
+pnpm test
+
+# 2. Ensure lint passes
+pnpm lint
+
+# 3. Build the package
+pnpm build
+
+# 4. Verify tarball contents
+pnpm pack --dry-run
+```
+
+Expected tarball contents:
+- `dist/` (compiled JavaScript + TypeScript declarations)
+- `package.json`
+- `README.md`
+- `CHANGELOG.md`
+
+### Publishing
+
+```bash
+# 1. Update version in package.json
+pnpm version patch  # or minor, or major
+
+# 2. Update CHANGELOG.md with new version
+
+# 3. Commit version bump
+git add -A && git commit -m "chore: bump version to x.x.x"
+
+# 4. Create git tag
+git tag vx.x.x
+
+# 5. Verify publish (dry run)
+pnpm publish --dry-run
+
+# 6. Publish to npm
+pnpm publish
+
+# 7. Push commits and tag
+git push && git push --tags
+```
+
+### Version Guidelines
+
+- **patch**: Bug fixes, documentation updates
+- **minor**: New features, backwards compatible
+- **major**: Breaking changes
 
 ## Questions?
 

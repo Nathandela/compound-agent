@@ -16,8 +16,17 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Nathandela/learning_agent.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Nathandela/learning_agent/issues"
+  },
+  "homepage": "https://github.com/Nathandela/learning_agent#readme",
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
