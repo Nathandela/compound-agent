@@ -7,7 +7,8 @@
 
 import { homedir } from 'os';
 import { join } from 'path';
-import { access, mkdir, writeFile } from 'fs/promises';
+import { access, mkdir, rename, unlink } from 'fs/promises';
+import { createWriteStream } from 'fs';
 
 /** Model filename */
 export const MODEL_FILENAME = 'nomic-embed-text-v1.5.Q4_K_M.gguf';
@@ -56,7 +57,8 @@ async function modelExists(): Promise<boolean> {
 }
 
 /**
- * Download file with progress reporting.
+ * Download file with streaming to disk (O(chunk_size) memory).
+ * Uses .tmp file with atomic rename for safety.
  */
 async function downloadFile(url: string, destPath: string): Promise<void> {
   const response = await fetch(url);
@@ -72,37 +74,64 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
     throw new Error('Response body is null');
   }
 
+  const tmpPath = destPath + '.tmp';
+  const writeStream = createWriteStream(tmpPath);
   const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
   let receivedBytes = 0;
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-    chunks.push(value);
-    receivedBytes += value.length;
+      // Write chunk directly to disk (streaming)
+      await new Promise<void>((resolve, reject) => {
+        const canContinue = writeStream.write(value, (err) => {
+          if (err) reject(err);
+        });
+        if (canContinue) {
+          resolve();
+        } else {
+          writeStream.once('drain', resolve);
+        }
+      });
 
-    // Progress reporting (simple console output)
-    if (totalBytes > 0) {
-      const percent = Math.round((receivedBytes / totalBytes) * 100);
-      process.stdout.write(`\rDownloading model: ${percent}% (${formatBytes(receivedBytes)}/${formatBytes(totalBytes)})`);
-    } else {
-      process.stdout.write(`\rDownloading model: ${formatBytes(receivedBytes)}`);
+      receivedBytes += value.length;
+
+      // Progress reporting
+      if (totalBytes > 0) {
+        const percent = Math.round((receivedBytes / totalBytes) * 100);
+        process.stdout.write(`\rDownloading model: ${percent}% (${formatBytes(receivedBytes)}/${formatBytes(totalBytes)})`);
+      } else {
+        process.stdout.write(`\rDownloading model: ${formatBytes(receivedBytes)}`);
+      }
     }
+
+    // Close write stream and wait for completion
+    await new Promise<void>((resolve, reject) => {
+      writeStream.end((err: Error | null | undefined) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    console.log('\nDownload complete.');
+
+    // Atomic rename from .tmp to final destination
+    await rename(tmpPath, destPath);
+  } catch (error) {
+    // Clean up: close stream properly before deleting
+    await new Promise<void>((resolve) => {
+      writeStream.on('close', resolve);
+      writeStream.destroy();
+    });
+    try {
+      await unlink(tmpPath);
+    } catch {
+      // Ignore if .tmp doesn't exist
+    }
+    throw error;
   }
-
-  console.log('\nDownload complete.');
-
-  // Combine chunks and write to file
-  const allChunks = new Uint8Array(receivedBytes);
-  let position = 0;
-  for (const chunk of chunks) {
-    allChunks.set(chunk, position);
-    position += chunk.length;
-  }
-
-  await writeFile(destPath, allChunks);
 }
 
 /**

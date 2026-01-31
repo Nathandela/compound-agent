@@ -2,10 +2,12 @@
  * Vector search with cosine similarity
  *
  * Embeds query text and ranks lessons by semantic similarity.
+ * Uses SQLite cache to avoid recomputing embeddings.
  */
 
 import { readLessons } from '../storage/jsonl.js';
 import { embedText } from '../embeddings/nomic.js';
+import { contentHash, getCachedEmbedding, setCachedEmbedding } from '../storage/sqlite.js';
 import type { Lesson } from '../types.js';
 
 /**
@@ -42,6 +44,7 @@ export interface ScoredLesson {
 /**
  * Search lessons by vector similarity to query text.
  * Returns top N lessons sorted by similarity score (descending).
+ * Uses embedding cache to avoid recomputing embeddings.
  */
 export async function searchVector(
   repoRoot: string,
@@ -49,7 +52,7 @@ export async function searchVector(
   limit: number
 ): Promise<ScoredLesson[]> {
   // Read all lessons
-  const lessons = await readLessons(repoRoot);
+  const { lessons } = await readLessons(repoRoot);
   if (lessons.length === 0) return [];
 
   // Embed the query
@@ -58,9 +61,17 @@ export async function searchVector(
   // Score each lesson
   const scored: ScoredLesson[] = [];
   for (const lesson of lessons) {
-    // Embed the lesson's insight (primary text)
     const lessonText = `${lesson.trigger} ${lesson.insight}`;
-    const lessonVector = await embedText(lessonText);
+    const hash = contentHash(lesson.trigger, lesson.insight);
+
+    // Try cache first
+    let lessonVector = getCachedEmbedding(repoRoot, lesson.id, hash);
+
+    if (!lessonVector) {
+      // Cache miss - compute and store
+      lessonVector = await embedText(lessonText);
+      setCachedEmbedding(repoRoot, lesson.id, lessonVector, hash);
+    }
 
     const score = cosineSimilarity(queryVector, lessonVector);
     scored.push({ lesson, score });

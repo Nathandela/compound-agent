@@ -98,7 +98,7 @@ program
     const repoRoot = getRepoRoot();
     const limit = parseInt(options.limit, 10);
 
-    const lessons = await readLessons(repoRoot);
+    const { lessons } = await readLessons(repoRoot);
 
     if (lessons.length === 0) {
       console.log('No lessons found.');

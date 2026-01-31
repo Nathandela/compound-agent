@@ -33,7 +33,7 @@ export async function loadSessionLessons(
   repoRoot: string,
   limit: number = DEFAULT_LIMIT
 ): Promise<FullLesson[]> {
-  const allLessons = await readLessons(repoRoot);
+  const { lessons: allLessons } = await readLessons(repoRoot);
 
   // Filter for high-severity, confirmed, full lessons
   const highSeverityLessons = allLessons.filter(

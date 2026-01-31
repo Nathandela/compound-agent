@@ -2,7 +2,16 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtemp, rm, access } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { openDb, closeDb, rebuildIndex, searchKeyword, DB_PATH } from './sqlite.js';
+import {
+  openDb,
+  closeDb,
+  rebuildIndex,
+  searchKeyword,
+  DB_PATH,
+  contentHash,
+  getCachedEmbedding,
+  setCachedEmbedding,
+} from './sqlite.js';
 import { appendLesson } from './jsonl.js';
 import type { QuickLesson, FullLesson } from '../types.js';
 
@@ -196,6 +205,122 @@ describe('SQLite schema', () => {
       expect(rows).toHaveLength(2);
       expect(rows[0]!.type).toBe('quick');
       expect(rows[1]!.type).toBe('full');
+    });
+  });
+
+  describe('contentHash', () => {
+    it('returns deterministic hash for same input', () => {
+      const hash1 = contentHash('trigger text', 'insight text');
+      const hash2 = contentHash('trigger text', 'insight text');
+      expect(hash1).toBe(hash2);
+    });
+
+    it('returns different hash for different trigger', () => {
+      const hash1 = contentHash('trigger A', 'insight');
+      const hash2 = contentHash('trigger B', 'insight');
+      expect(hash1).not.toBe(hash2);
+    });
+
+    it('returns different hash for different insight', () => {
+      const hash1 = contentHash('trigger', 'insight A');
+      const hash2 = contentHash('trigger', 'insight B');
+      expect(hash1).not.toBe(hash2);
+    });
+
+    it('returns 64-character hex string (SHA-256)', () => {
+      const hash = contentHash('trigger', 'insight');
+      expect(hash).toMatch(/^[a-f0-9]{64}$/);
+    });
+  });
+
+  describe('embedding cache', () => {
+    it('returns null for non-existent lesson', () => {
+      openDb(tempDir);
+      const result = getCachedEmbedding(tempDir, 'nonexistent');
+      expect(result).toBeNull();
+    });
+
+    it('returns null when content_hash does not match', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'original insight'));
+      await rebuildIndex(tempDir);
+
+      // Set embedding with current hash
+      const embedding = new Float32Array([1, 2, 3]);
+      setCachedEmbedding(tempDir, 'L001', embedding, contentHash('trigger for original insight', 'original insight'));
+
+      // Get with different hash (simulating content change)
+      const result = getCachedEmbedding(tempDir, 'L001', 'different_hash');
+      expect(result).toBeNull();
+    });
+
+    it('returns cached embedding when content_hash matches', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'test insight'));
+      await rebuildIndex(tempDir);
+
+      const hash = contentHash('trigger for test insight', 'test insight');
+      const embedding = new Float32Array([1.5, 2.5, 3.5]);
+      setCachedEmbedding(tempDir, 'L001', embedding, hash);
+
+      const result = getCachedEmbedding(tempDir, 'L001', hash);
+      expect(result).not.toBeNull();
+      expect(result).toHaveLength(3);
+      expect(result![0]).toBeCloseTo(1.5);
+      expect(result![1]).toBeCloseTo(2.5);
+      expect(result![2]).toBeCloseTo(3.5);
+    });
+
+    it('setCachedEmbedding updates content_hash in database', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'test insight'));
+      await rebuildIndex(tempDir);
+
+      const hash = contentHash('trigger for test insight', 'test insight');
+      const embedding = new Float32Array([1, 2, 3]);
+      setCachedEmbedding(tempDir, 'L001', embedding, hash);
+
+      // Verify hash was stored
+      const db = openDb(tempDir);
+      const row = db.prepare('SELECT content_hash FROM lessons WHERE id = ?').get('L001') as { content_hash: string };
+      expect(row.content_hash).toBe(hash);
+    });
+  });
+
+  describe('rebuildIndex with embedding preservation', () => {
+    it('preserves embeddings when content_hash unchanged', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'test insight'));
+      await rebuildIndex(tempDir);
+
+      // Set embedding with correct hash
+      const hash = contentHash('trigger for test insight', 'test insight');
+      const embedding = new Float32Array([1, 2, 3]);
+      setCachedEmbedding(tempDir, 'L001', embedding, hash);
+
+      // Rebuild index
+      await rebuildIndex(tempDir);
+
+      // Embedding should still be there
+      const result = getCachedEmbedding(tempDir, 'L001', hash);
+      expect(result).not.toBeNull();
+      expect(result![0]).toBeCloseTo(1);
+    });
+
+    it('clears embeddings when content changes', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'original insight'));
+      await rebuildIndex(tempDir);
+
+      // Set embedding with original hash
+      const oldHash = contentHash('trigger for original insight', 'original insight');
+      const embedding = new Float32Array([1, 2, 3]);
+      setCachedEmbedding(tempDir, 'L001', embedding, oldHash);
+
+      // Simulate content change by manually updating the lesson text
+      // (In practice this would be a new lesson in JSONL)
+      const db = openDb(tempDir);
+      db.prepare('UPDATE lessons SET insight = ? WHERE id = ?').run('modified insight', 'L001');
+
+      // Now getCachedEmbedding with new hash should return null
+      const newHash = contentHash('trigger for original insight', 'modified insight');
+      const result = getCachedEmbedding(tempDir, 'L001', newHash);
+      expect(result).toBeNull();
     });
   });
 

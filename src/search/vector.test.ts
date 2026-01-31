@@ -4,7 +4,13 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { cosineSimilarity, searchVector } from './vector.js';
 import { appendLesson } from '../storage/jsonl.js';
-import { rebuildIndex, closeDb } from '../storage/sqlite.js';
+import {
+  rebuildIndex,
+  closeDb,
+  contentHash,
+  setCachedEmbedding,
+  openDb,
+} from '../storage/sqlite.js';
 import type { QuickLesson } from '../types.js';
 
 describe('vector search', () => {
@@ -115,6 +121,71 @@ describe('vector search', () => {
 
       const results = await searchVector(tempDir, 'test', 2);
       expect(results.length).toBeLessThanOrEqual(2);
+    });
+
+    describe('embedding cache', () => {
+      it('uses cached embedding instead of recomputing', async () => {
+        await appendLesson(tempDir, createLesson('L001', 'test lesson'));
+        await rebuildIndex(tempDir);
+
+        // Pre-cache the embedding
+        const hash = contentHash('trigger for test lesson', 'test lesson');
+        const cachedEmbedding = new Float32Array([0.9, 0.1, 0]);
+        setCachedEmbedding(tempDir, 'L001', cachedEmbedding, hash);
+
+        // Mock embedText to track calls
+        const embedMock = vi.fn().mockResolvedValue([0.8, 0.2, 0]);
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
+
+        await searchVector(tempDir, 'test query', 10);
+
+        // embedText should only be called once for the query, not for the lesson
+        expect(embedMock).toHaveBeenCalledTimes(1);
+        expect(embedMock).toHaveBeenCalledWith('test query');
+      });
+
+      it('computes and caches embedding on cache miss', async () => {
+        await appendLesson(tempDir, createLesson('L001', 'test lesson'));
+        await rebuildIndex(tempDir);
+
+        // No cached embedding
+        const embedMock = vi.fn().mockResolvedValue([0.8, 0.2, 0]);
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
+
+        await searchVector(tempDir, 'test query', 10);
+
+        // embedText should be called twice: once for query, once for lesson
+        expect(embedMock).toHaveBeenCalledTimes(2);
+        expect(embedMock).toHaveBeenCalledWith('test query');
+        expect(embedMock).toHaveBeenCalledWith('trigger for test lesson test lesson');
+
+        // Verify embedding was cached
+        const db = openDb(tempDir);
+        const row = db.prepare('SELECT embedding, content_hash FROM lessons WHERE id = ?').get('L001') as {
+          embedding: Buffer | null;
+          content_hash: string | null;
+        };
+        expect(row.embedding).not.toBeNull();
+        expect(row.content_hash).toBe(contentHash('trigger for test lesson', 'test lesson'));
+      });
+
+      it('recomputes embedding when content hash mismatches', async () => {
+        await appendLesson(tempDir, createLesson('L001', 'test lesson'));
+        await rebuildIndex(tempDir);
+
+        // Cache embedding with wrong hash (simulates stale cache)
+        const staleHash = 'stale_hash_value_that_does_not_match';
+        const staleEmbedding = new Float32Array([0.1, 0.1, 0.1]);
+        setCachedEmbedding(tempDir, 'L001', staleEmbedding, staleHash);
+
+        const embedMock = vi.fn().mockResolvedValue([0.8, 0.2, 0]);
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
+
+        await searchVector(tempDir, 'test query', 10);
+
+        // embedText should be called twice: query + lesson (cache miss due to hash mismatch)
+        expect(embedMock).toHaveBeenCalledTimes(2);
+      });
     });
   });
 });

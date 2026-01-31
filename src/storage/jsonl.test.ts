@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtemp, rm, readFile, mkdir, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { appendLesson, readLessons, LESSONS_PATH } from './jsonl.js';
 import type { QuickLesson, FullLesson, Lesson } from '../types.js';
+import type { ReadLessonsResult } from './jsonl.js';
 
 describe('JSONL storage', () => {
   let tempDir: string;
@@ -97,25 +98,26 @@ describe('JSONL storage', () => {
   });
 
   describe('readLessons', () => {
-    it('returns empty array for missing file', async () => {
-      const lessons = await readLessons(tempDir);
-      expect(lessons).toEqual([]);
+    it('returns empty result for missing file', async () => {
+      const result = await readLessons(tempDir);
+      expect(result.lessons).toEqual([]);
+      expect(result.skippedCount).toBe(0);
     });
 
     it('reads single lesson', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'test'));
-      const lessons = await readLessons(tempDir);
+      const result = await readLessons(tempDir);
 
-      expect(lessons).toHaveLength(1);
-      expect(lessons[0]!.id).toBe('L001');
+      expect(result.lessons).toHaveLength(1);
+      expect(result.lessons[0]!.id).toBe('L001');
     });
 
     it('reads multiple lessons', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'first'));
       await appendLesson(tempDir, createQuickLesson('L002', 'second'));
 
-      const lessons = await readLessons(tempDir);
-      expect(lessons).toHaveLength(2);
+      const result = await readLessons(tempDir);
+      expect(result.lessons).toHaveLength(2);
     });
 
     it('filters out deleted lessons (tombstones)', async () => {
@@ -123,28 +125,28 @@ describe('JSONL storage', () => {
       await appendLesson(tempDir, createQuickLesson('L002', 'delete me'));
       await appendLesson(tempDir, { ...createQuickLesson('L002', 'delete me'), deleted: true });
 
-      const lessons = await readLessons(tempDir);
-      expect(lessons).toHaveLength(1);
-      expect(lessons[0]!.id).toBe('L001');
+      const result = await readLessons(tempDir);
+      expect(result.lessons).toHaveLength(1);
+      expect(result.lessons[0]!.id).toBe('L001');
     });
 
     it('deduplicates by ID (last-write-wins)', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'original'));
       await appendLesson(tempDir, createQuickLesson('L001', 'updated'));
 
-      const lessons = await readLessons(tempDir);
-      expect(lessons).toHaveLength(1);
-      expect(lessons[0]!.insight).toBe('updated');
+      const result = await readLessons(tempDir);
+      expect(result.lessons).toHaveLength(1);
+      expect(result.lessons[0]!.insight).toBe('updated');
     });
 
     it('handles mixed quick and full lessons', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'quick'));
       await appendLesson(tempDir, createFullLesson('L002', 'full'));
 
-      const lessons = await readLessons(tempDir);
-      expect(lessons).toHaveLength(2);
-      expect(lessons.find((l) => l.id === 'L001')?.type).toBe('quick');
-      expect(lessons.find((l) => l.id === 'L002')?.type).toBe('full');
+      const result = await readLessons(tempDir);
+      expect(result.lessons).toHaveLength(2);
+      expect(result.lessons.find((l) => l.id === 'L001')?.type).toBe('quick');
+      expect(result.lessons.find((l) => l.id === 'L002')?.type).toBe('full');
     });
 
     it('handles empty lines gracefully', async () => {
@@ -156,8 +158,110 @@ describe('JSONL storage', () => {
         'utf-8'
       );
 
-      const lessons = await readLessons(tempDir);
-      expect(lessons).toHaveLength(1);
+      const result = await readLessons(tempDir);
+      expect(result.lessons).toHaveLength(1);
+    });
+
+    describe('error handling', () => {
+      it('returns result object with lessons and skippedCount', async () => {
+        await appendLesson(tempDir, createQuickLesson('L001', 'test'));
+        const result = await readLessons(tempDir);
+
+        // Result should be an object with lessons array and skippedCount
+        expect(result).toHaveProperty('lessons');
+        expect(result).toHaveProperty('skippedCount');
+        expect((result as ReadLessonsResult).lessons).toHaveLength(1);
+        expect((result as ReadLessonsResult).skippedCount).toBe(0);
+      });
+
+      it('skips invalid JSON and continues in non-strict mode', async () => {
+        const filePath = join(tempDir, LESSONS_PATH);
+        await mkdir(join(tempDir, '.claude', 'lessons'), { recursive: true });
+
+        const validLesson = JSON.stringify(createQuickLesson('L001', 'valid'));
+        const invalidJson = '{not valid json';
+        const anotherValid = JSON.stringify(createQuickLesson('L002', 'also valid'));
+
+        await writeFile(filePath, `${validLesson}\n${invalidJson}\n${anotherValid}\n`, 'utf-8');
+
+        const result = await readLessons(tempDir) as ReadLessonsResult;
+
+        expect(result.lessons).toHaveLength(2);
+        expect(result.skippedCount).toBe(1);
+      });
+
+      it('skips schema validation failures in non-strict mode', async () => {
+        const filePath = join(tempDir, LESSONS_PATH);
+        await mkdir(join(tempDir, '.claude', 'lessons'), { recursive: true });
+
+        const validLesson = JSON.stringify(createQuickLesson('L001', 'valid'));
+        // Valid JSON but missing required fields
+        const invalidSchema = JSON.stringify({ id: 'L002', type: 'unknown' });
+        const anotherValid = JSON.stringify(createQuickLesson('L003', 'also valid'));
+
+        await writeFile(filePath, `${validLesson}\n${invalidSchema}\n${anotherValid}\n`, 'utf-8');
+
+        const result = await readLessons(tempDir) as ReadLessonsResult;
+
+        expect(result.lessons).toHaveLength(2);
+        expect(result.skippedCount).toBe(1);
+      });
+
+      it('calls logger for each skipped line in non-strict mode', async () => {
+        const mockLogger = vi.fn();
+        const filePath = join(tempDir, LESSONS_PATH);
+        await mkdir(join(tempDir, '.claude', 'lessons'), { recursive: true });
+
+        const validLesson = JSON.stringify(createQuickLesson('L001', 'valid'));
+        const invalidJson = '{bad json';
+        const invalidSchema = JSON.stringify({ id: 'L002' });
+
+        await writeFile(filePath, `${validLesson}\n${invalidJson}\n${invalidSchema}\n`, 'utf-8');
+
+        await readLessons(tempDir, { onParseError: mockLogger });
+
+        expect(mockLogger).toHaveBeenCalledTimes(2);
+        // Verify line numbers are included
+        expect(mockLogger).toHaveBeenCalledWith(expect.objectContaining({ line: 2 }));
+        expect(mockLogger).toHaveBeenCalledWith(expect.objectContaining({ line: 3 }));
+      });
+
+      it('throws on invalid JSON in strict mode', async () => {
+        const filePath = join(tempDir, LESSONS_PATH);
+        await mkdir(join(tempDir, '.claude', 'lessons'), { recursive: true });
+
+        const validLesson = JSON.stringify(createQuickLesson('L001', 'valid'));
+        const invalidJson = '{not valid json';
+
+        await writeFile(filePath, `${validLesson}\n${invalidJson}\n`, 'utf-8');
+
+        await expect(readLessons(tempDir, { strict: true })).rejects.toThrow(/line 2/i);
+      });
+
+      it('throws on schema validation failure in strict mode', async () => {
+        const filePath = join(tempDir, LESSONS_PATH);
+        await mkdir(join(tempDir, '.claude', 'lessons'), { recursive: true });
+
+        const validLesson = JSON.stringify(createQuickLesson('L001', 'valid'));
+        const invalidSchema = JSON.stringify({ id: 'L002', type: 'invalid' });
+
+        await writeFile(filePath, `${validLesson}\n${invalidSchema}\n`, 'utf-8');
+
+        await expect(readLessons(tempDir, { strict: true })).rejects.toThrow(/line 2/i);
+      });
+
+      it('includes correct line numbers in error messages', async () => {
+        const filePath = join(tempDir, LESSONS_PATH);
+        await mkdir(join(tempDir, '.claude', 'lessons'), { recursive: true });
+
+        const line1 = JSON.stringify(createQuickLesson('L001', 'valid'));
+        const line2 = JSON.stringify(createQuickLesson('L002', 'valid'));
+        const line3 = '{bad json'; // Error on line 3
+
+        await writeFile(filePath, `${line1}\n${line2}\n${line3}\n`, 'utf-8');
+
+        await expect(readLessons(tempDir, { strict: true })).rejects.toThrow(/line 3/i);
+      });
     });
   });
 });

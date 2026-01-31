@@ -38,6 +38,7 @@ export const VERSION = '0.1.0';
 
 // Storage API
 export { appendLesson, readLessons, LESSONS_PATH } from './storage/jsonl.js';
+export type { ReadLessonsOptions, ReadLessonsResult, ParseError } from './storage/jsonl.js';
 export { rebuildIndex, searchKeyword, closeDb, DB_PATH } from './storage/sqlite.js';
 
 // Embeddings API

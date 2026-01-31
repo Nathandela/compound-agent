@@ -9,11 +9,20 @@ import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 import { mkdirSync } from 'fs';
 import { join, dirname } from 'path';
+import { createHash } from 'crypto';
 
 /** Relative path to database file from repo root */
 export const DB_PATH = '.claude/.cache/lessons.sqlite';
 
 let db: DatabaseType | null = null;
+
+/**
+ * Compute deterministic content hash for embedding cache validation.
+ * Format: SHA-256 hex of "trigger insight"
+ */
+export function contentHash(trigger: string, insight: string): string {
+  return createHash('sha256').update(`${trigger} ${insight}`).digest('hex');
+}
 
 /**
  * Open or create the SQLite database.
@@ -53,7 +62,8 @@ export function openDb(repoRoot: string): DatabaseType {
       confirmed INTEGER NOT NULL DEFAULT 0,
       deleted INTEGER NOT NULL DEFAULT 0,
       retrieval_count INTEGER NOT NULL DEFAULT 0,
-      embedding BLOB
+      embedding BLOB,
+      content_hash TEXT
     );
 
     -- FTS5 virtual table for full-text search
@@ -104,6 +114,58 @@ export function closeDb(): void {
     db.close();
     db = null;
   }
+}
+
+/**
+ * Get cached embedding for a lesson if content hash matches.
+ * Returns null if no cache exists or hash mismatches.
+ */
+export function getCachedEmbedding(
+  repoRoot: string,
+  lessonId: string,
+  expectedHash?: string
+): number[] | null {
+  const database = openDb(repoRoot);
+  const row = database
+    .prepare('SELECT embedding, content_hash FROM lessons WHERE id = ?')
+    .get(lessonId) as { embedding: Buffer | null; content_hash: string | null } | undefined;
+
+  if (!row || !row.embedding || !row.content_hash) {
+    return null;
+  }
+
+  // If expected hash provided, validate it matches
+  if (expectedHash && row.content_hash !== expectedHash) {
+    return null;
+  }
+
+  // Convert Buffer to Float32Array then to number[]
+  const float32 = new Float32Array(
+    row.embedding.buffer,
+    row.embedding.byteOffset,
+    row.embedding.byteLength / 4
+  );
+  return Array.from(float32);
+}
+
+/**
+ * Cache an embedding for a lesson with content hash.
+ */
+export function setCachedEmbedding(
+  repoRoot: string,
+  lessonId: string,
+  embedding: Float32Array | number[],
+  hash: string
+): void {
+  const database = openDb(repoRoot);
+
+  // Convert to Buffer for storage
+  const float32 = embedding instanceof Float32Array ? embedding : new Float32Array(embedding);
+  const buffer = Buffer.from(float32.buffer, float32.byteOffset, float32.byteLength);
+
+  database
+    .prepare('UPDATE lessons SET embedding = ?, content_hash = ? WHERE id = ?')
+    .run(buffer, hash, lessonId);
 }
 
 // Import for rebuildIndex
@@ -164,13 +226,34 @@ function rowToLesson(row: LessonRow): Lesson {
   };
 }
 
+/** Cached embedding with its content hash */
+interface CachedEmbeddingData {
+  embedding: Buffer;
+  contentHash: string;
+}
+
 /**
  * Rebuild the SQLite index from the JSONL source of truth.
- * Clears existing data and repopulates.
+ * Preserves embeddings where content hash is unchanged.
  */
 export async function rebuildIndex(repoRoot: string): Promise<void> {
   const database = openDb(repoRoot);
-  const lessons = await readLessons(repoRoot);
+  const { lessons } = await readLessons(repoRoot);
+
+  // Save existing embeddings before clearing
+  const cachedEmbeddings = new Map<string, CachedEmbeddingData>();
+  const existingRows = database
+    .prepare('SELECT id, embedding, content_hash FROM lessons WHERE embedding IS NOT NULL')
+    .all() as Array<{ id: string; embedding: Buffer; content_hash: string | null }>;
+
+  for (const row of existingRows) {
+    if (row.embedding && row.content_hash) {
+      cachedEmbeddings.set(row.id, {
+        embedding: row.embedding,
+        contentHash: row.content_hash,
+      });
+    }
+  }
 
   // Clear existing data (triggers will clear FTS)
   database.exec('DELETE FROM lessons');
@@ -179,13 +262,18 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
 
   // Prepare insert statement
   const insert = database.prepare(`
-    INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count)
-    VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count)
+    INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, embedding, content_hash)
+    VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count, @embedding, @content_hash)
   `);
 
   // Insert all lessons in a transaction
   const insertMany = database.transaction((items: Lesson[]) => {
     for (const lesson of items) {
+      // Check if we have a valid cached embedding
+      const newHash = contentHash(lesson.trigger, lesson.insight);
+      const cached = cachedEmbeddings.get(lesson.id);
+      const hasValidCache = cached && cached.contentHash === newHash;
+
       insert.run({
         id: lesson.id,
         type: lesson.type,
@@ -202,6 +290,8 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
         confirmed: lesson.confirmed ? 1 : 0,
         deleted: lesson.deleted ? 1 : 0,
         retrieval_count: lesson.retrievalCount ?? 0,
+        embedding: hasValidCache ? cached.embedding : null,
+        content_hash: hasValidCache ? cached.contentHash : null,
       });
     }
   });
