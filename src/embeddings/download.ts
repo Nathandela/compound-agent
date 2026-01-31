@@ -5,10 +5,10 @@
  * on first use. Model is ~500MB and cached for reuse.
  */
 
-import { homedir } from 'os';
-import { join } from 'path';
-import { access, mkdir, rename, unlink } from 'fs/promises';
-import { createWriteStream } from 'fs';
+import { createWriteStream } from 'node:fs';
+import { access, mkdir, rename, unlink } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 
 /** Model filename */
 export const MODEL_FILENAME = 'nomic-embed-text-v1.5.Q4_K_M.gguf';
@@ -56,6 +56,63 @@ async function modelExists(): Promise<boolean> {
   }
 }
 
+/** Write chunk to stream with backpressure handling */
+async function writeChunkToStream(
+  stream: ReturnType<typeof createWriteStream>,
+  chunk: Uint8Array
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    const canContinue = stream.write(chunk, (err) => {
+      if (err) reject(err);
+    });
+    if (canContinue) {
+      resolve();
+    } else {
+      stream.once('drain', resolve);
+    }
+  });
+}
+
+/** Report download progress to stdout */
+function reportProgress(receivedBytes: number, totalBytes: number): void {
+  if (totalBytes > 0) {
+    const percent = Math.round((receivedBytes / totalBytes) * 100);
+    process.stdout.write(
+      `\rDownloading model: ${percent}% (${formatBytes(receivedBytes)}/${formatBytes(totalBytes)})`
+    );
+  } else {
+    process.stdout.write(`\rDownloading model: ${formatBytes(receivedBytes)}`);
+  }
+}
+
+/** Close write stream and wait for completion */
+async function closeWriteStream(
+  stream: ReturnType<typeof createWriteStream>
+): Promise<void> {
+  return new Promise<void>((resolve, reject) => {
+    stream.end((err: Error | null | undefined) => {
+      if (err) reject(err);
+      else resolve();
+    });
+  });
+}
+
+/** Clean up temp file on error */
+async function cleanupTempFile(
+  stream: ReturnType<typeof createWriteStream>,
+  tmpPath: string
+): Promise<void> {
+  await new Promise<void>((resolve) => {
+    stream.on('close', resolve);
+    stream.destroy();
+  });
+  try {
+    await unlink(tmpPath);
+  } catch {
+    // Ignore if .tmp doesn't exist
+  }
+}
+
 /**
  * Download file with streaming to disk (O(chunk_size) memory).
  * Uses .tmp file with atomic rename for safety.
@@ -67,13 +124,12 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
     throw new Error(`Download failed: ${response.status} ${response.statusText}`);
   }
 
-  const contentLength = response.headers.get('content-length');
-  const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-
   if (!response.body) {
     throw new Error('Response body is null');
   }
 
+  const contentLength = response.headers.get('content-length');
+  const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
   const tmpPath = destPath + '.tmp';
   const writeStream = createWriteStream(tmpPath);
   const reader = response.body.getReader();
@@ -84,52 +140,16 @@ async function downloadFile(url: string, destPath: string): Promise<void> {
       const { done, value } = await reader.read();
       if (done) break;
 
-      // Write chunk directly to disk (streaming)
-      await new Promise<void>((resolve, reject) => {
-        const canContinue = writeStream.write(value, (err) => {
-          if (err) reject(err);
-        });
-        if (canContinue) {
-          resolve();
-        } else {
-          writeStream.once('drain', resolve);
-        }
-      });
-
+      await writeChunkToStream(writeStream, value);
       receivedBytes += value.length;
-
-      // Progress reporting
-      if (totalBytes > 0) {
-        const percent = Math.round((receivedBytes / totalBytes) * 100);
-        process.stdout.write(`\rDownloading model: ${percent}% (${formatBytes(receivedBytes)}/${formatBytes(totalBytes)})`);
-      } else {
-        process.stdout.write(`\rDownloading model: ${formatBytes(receivedBytes)}`);
-      }
+      reportProgress(receivedBytes, totalBytes);
     }
 
-    // Close write stream and wait for completion
-    await new Promise<void>((resolve, reject) => {
-      writeStream.end((err: Error | null | undefined) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
-
+    await closeWriteStream(writeStream);
     console.log('\nDownload complete.');
-
-    // Atomic rename from .tmp to final destination
     await rename(tmpPath, destPath);
   } catch (error) {
-    // Clean up: close stream properly before deleting
-    await new Promise<void>((resolve) => {
-      writeStream.on('close', resolve);
-      writeStream.destroy();
-    });
-    try {
-      await unlink(tmpPath);
-    } catch {
-      // Ignore if .tmp doesn't exist
-    }
+    await cleanupTempFile(writeStream, tmpPath);
     throw error;
   }
 }
