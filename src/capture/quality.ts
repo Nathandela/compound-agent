@@ -7,7 +7,7 @@
  * - Actionable (contains action words)
  */
 
-import { searchKeyword, rebuildIndex } from '../storage/sqlite.js';
+import { searchKeyword, syncIfNeeded } from '../storage/sqlite.js';
 
 /** Default similarity threshold for duplicate detection */
 const DEFAULT_SIMILARITY_THRESHOLD = 0.8;
@@ -35,8 +35,8 @@ export async function isNovel(
 ): Promise<NoveltyResult> {
   const threshold = options.threshold ?? DEFAULT_SIMILARITY_THRESHOLD;
 
-  // Rebuild index to ensure fresh data
-  await rebuildIndex(repoRoot);
+  // Sync index if JSONL has changed
+  await syncIfNeeded(repoRoot);
 
   // Extract key words for search (take first 3 significant words)
   const words = insight

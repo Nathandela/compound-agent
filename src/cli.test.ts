@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { appendFile, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
@@ -34,36 +34,37 @@ describe('CLI', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  const runCli = (args: string): string => {
+  const runCli = (args: string): { stdout: string; stderr: string; combined: string } => {
     const cliPath = join(process.cwd(), 'dist', 'cli.js');
     try {
-      return execSync(`node ${cliPath} ${args}`, {
+      const stdout = execSync(`node ${cliPath} ${args} 2>&1`, {
         cwd: tempDir,
         encoding: 'utf-8',
-        stdio: ['pipe', 'pipe', 'pipe'],
         env: { ...process.env, LEARNING_AGENT_ROOT: tempDir },
       });
+      return { stdout, stderr: '', combined: stdout };
     } catch (error) {
       const err = error as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
       const stdout = err.stdout?.toString() ?? '';
       const stderr = err.stderr?.toString() ?? '';
-      return stdout + stderr + (err.message ?? '');
+      const combined = stdout + stderr + (err.message ?? '');
+      return { stdout, stderr, combined };
     }
   };
 
   describe('--version', () => {
     it('shows version', () => {
-      const output = runCli('--version');
-      expect(output).toMatch(/\d+\.\d+\.\d+/);
+      const { combined } = runCli('--version');
+      expect(combined).toMatch(/\d+\.\d+\.\d+/);
     });
   });
 
   describe('--help', () => {
     it('shows help', () => {
-      const output = runCli('--help');
-      expect(output).toContain('learn');
-      expect(output).toContain('search');
-      expect(output).toContain('list');
+      const { combined } = runCli('--help');
+      expect(combined).toContain('learn');
+      expect(combined).toContain('search');
+      expect(combined).toContain('list');
     });
   });
 
@@ -78,8 +79,8 @@ describe('CLI', () => {
     });
 
     it('requires insight argument', () => {
-      const output = runCli('learn');
-      expect(output.toLowerCase()).toMatch(/missing|required|argument/i);
+      const { combined } = runCli('learn');
+      expect(combined.toLowerCase()).toMatch(/missing|required|argument/i);
     });
   });
 
@@ -91,15 +92,27 @@ describe('CLI', () => {
     });
 
     it('lists lessons', () => {
-      const output = runCli('list');
-      expect(output).toContain('first lesson');
-      expect(output).toContain('second lesson');
+      const { combined } = runCli('list');
+      expect(combined).toContain('first lesson');
+      expect(combined).toContain('second lesson');
     });
 
     it('respects limit option', () => {
-      const output = runCli('list -n 1');
-      const lines = output.trim().split('\n').filter((l) => l.includes('lesson'));
+      const { combined } = runCli('list -n 1');
+      const lines = combined.trim().split('\n').filter((l: string) => l.includes('lesson'));
       expect(lines.length).toBeLessThanOrEqual(2); // Header + 1 lesson
+    });
+
+    it('warns about corrupted lessons', async () => {
+      // Write corrupted data directly to JSONL (bypasses appendLesson validation)
+      const filePath = join(tempDir, LESSONS_PATH);
+      await appendFile(filePath, 'not valid json\n', 'utf-8');
+      await appendFile(filePath, '{"id": "bad", "missing": "fields"}\n', 'utf-8');
+
+      const { combined } = runCli('list');
+      expect(combined).toContain('first lesson'); // Valid lessons still shown
+      expect(combined.toLowerCase()).toMatch(/warn|skip|corrupt/i);
+      expect(combined).toMatch(/2/); // Should mention 2 skipped
     });
   });
 
@@ -112,13 +125,13 @@ describe('CLI', () => {
     });
 
     it('searches by keyword', () => {
-      const output = runCli('search "Polars"');
-      expect(output).toContain('Polars');
+      const { combined } = runCli('search "Polars"');
+      expect(combined).toContain('Polars');
     });
 
     it('shows no results for non-matching query', () => {
-      const output = runCli('search "nonexistent"');
-      expect(output.toLowerCase()).toMatch(/no.*found|0.*result/i);
+      const { combined } = runCli('search "nonexistent"');
+      expect(combined.toLowerCase()).toMatch(/no.*found|0.*result/i);
     });
   });
 });

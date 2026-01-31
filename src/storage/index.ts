@@ -19,4 +19,6 @@ export {
   rebuildIndex,
   searchKeyword,
   setCachedEmbedding,
+  syncIfNeeded,
 } from './sqlite.js';
+export type { SyncOptions } from './sqlite.js';

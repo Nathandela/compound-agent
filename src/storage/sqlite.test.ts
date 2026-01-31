@@ -1,11 +1,11 @@
-import { access, mkdtemp, rm } from 'node:fs/promises';
+import { access, mkdtemp, rm, utimes } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import type { FullLesson, QuickLesson } from '../types.js';
 
-import { appendLesson } from './jsonl.js';
+import { appendLesson, LESSONS_PATH } from './jsonl.js';
 import {
   closeDb,
   contentHash,
@@ -15,6 +15,7 @@ import {
   rebuildIndex,
   searchKeyword,
   setCachedEmbedding,
+  syncIfNeeded,
 } from './sqlite.js';
 
 describe('SQLite schema', () => {
@@ -376,6 +377,65 @@ describe('SQLite schema', () => {
       } finally {
         await rm(emptyDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  describe('syncIfNeeded', () => {
+    it('rebuilds index when JSONL is newer than last sync', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'first lesson'));
+      await rebuildIndex(tempDir);
+
+      // Add new lesson without rebuilding
+      await appendLesson(tempDir, createQuickLesson('L002', 'second lesson'));
+
+      // syncIfNeeded should detect change and rebuild
+      const rebuilt = await syncIfNeeded(tempDir);
+      expect(rebuilt).toBe(true);
+
+      // Verify both lessons are in index
+      const db = openDb(tempDir);
+      const count = db.prepare('SELECT COUNT(*) as cnt FROM lessons').get() as { cnt: number };
+      expect(count.cnt).toBe(2);
+    });
+
+    it('skips rebuild when JSONL unchanged since last sync', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'lesson'));
+      await rebuildIndex(tempDir);
+
+      // syncIfNeeded twice - second should skip
+      const first = await syncIfNeeded(tempDir);
+      const second = await syncIfNeeded(tempDir);
+
+      expect(first).toBe(false); // Already synced by rebuildIndex
+      expect(second).toBe(false);
+    });
+
+    it('forces rebuild when force=true', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'lesson'));
+      await rebuildIndex(tempDir);
+
+      // Force should always rebuild
+      const rebuilt = await syncIfNeeded(tempDir, { force: true });
+      expect(rebuilt).toBe(true);
+    });
+
+    it('handles missing JSONL file gracefully', async () => {
+      // No JSONL file exists yet
+      const rebuilt = await syncIfNeeded(tempDir);
+      expect(rebuilt).toBe(false);
+    });
+
+    it('detects mtime changes at second precision', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'lesson'));
+      await rebuildIndex(tempDir);
+
+      // Touch the file to update mtime
+      const jsonlPath = join(tempDir, LESSONS_PATH);
+      const futureTime = new Date(Date.now() + 2000);
+      await utimes(jsonlPath, futureTime, futureTime);
+
+      const rebuilt = await syncIfNeeded(tempDir);
+      expect(rebuilt).toBe(true);
     });
   });
 });

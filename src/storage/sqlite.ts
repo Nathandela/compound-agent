@@ -6,14 +6,14 @@
  */
 
 import { createHash } from 'node:crypto';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
 
 import type { Lesson } from '../types.js';
 
-import { readLessons } from './jsonl.js';
+import { LESSONS_PATH, readLessons } from './jsonl.js';
 
 /** Relative path to database file from repo root */
 export const DB_PATH = '.claude/.cache/lessons.sqlite';
@@ -75,6 +75,12 @@ const SCHEMA_SQL = `
   CREATE INDEX IF NOT EXISTS idx_lessons_created ON lessons(created);
   CREATE INDEX IF NOT EXISTS idx_lessons_confirmed ON lessons(confirmed);
   CREATE INDEX IF NOT EXISTS idx_lessons_severity ON lessons(severity);
+
+  -- Metadata table for sync tracking
+  CREATE TABLE IF NOT EXISTS metadata (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
 `;
 
 /**
@@ -265,8 +271,41 @@ const INSERT_LESSON_SQL = `
 `;
 
 /**
+ * Get the mtime of the JSONL file, or null if it doesn't exist.
+ */
+function getJsonlMtime(repoRoot: string): number | null {
+  const jsonlPath = join(repoRoot, LESSONS_PATH);
+  try {
+    const stat = statSync(jsonlPath);
+    return stat.mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Get the last synced mtime from metadata table.
+ */
+function getLastSyncMtime(database: DatabaseType): number | null {
+  const row = database
+    .prepare('SELECT value FROM metadata WHERE key = ?')
+    .get('last_sync_mtime') as { value: string } | undefined;
+  return row ? parseFloat(row.value) : null;
+}
+
+/**
+ * Store the last synced mtime in metadata table.
+ */
+function setLastSyncMtime(database: DatabaseType, mtime: number): void {
+  database
+    .prepare('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)')
+    .run('last_sync_mtime', mtime.toString());
+}
+
+/**
  * Rebuild the SQLite index from the JSONL source of truth.
  * Preserves embeddings where content hash is unchanged.
+ * Updates the last sync mtime after successful rebuild.
  */
 export async function rebuildIndex(repoRoot: string): Promise<void> {
   const database = openDb(repoRoot);
@@ -275,7 +314,14 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
   const cachedEmbeddings = collectCachedEmbeddings(database);
   database.exec('DELETE FROM lessons');
 
-  if (lessons.length === 0) return;
+  if (lessons.length === 0) {
+    // Still update mtime even for empty file
+    const mtime = getJsonlMtime(repoRoot);
+    if (mtime !== null) {
+      setLastSyncMtime(database, mtime);
+    }
+    return;
+  }
 
   const insert = database.prepare(INSERT_LESSON_SQL);
   const insertMany = database.transaction((items: Lesson[]) => {
@@ -307,6 +353,49 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
   });
 
   insertMany(lessons);
+
+  // Update last sync mtime
+  const mtime = getJsonlMtime(repoRoot);
+  if (mtime !== null) {
+    setLastSyncMtime(database, mtime);
+  }
+}
+
+/** Options for syncIfNeeded */
+export interface SyncOptions {
+  /** Force rebuild even if JSONL unchanged */
+  force?: boolean;
+}
+
+/**
+ * Sync the index if JSONL has changed since last sync.
+ * Returns true if a rebuild was performed, false if skipped.
+ */
+export async function syncIfNeeded(
+  repoRoot: string,
+  options: SyncOptions = {}
+): Promise<boolean> {
+  const { force = false } = options;
+
+  // Check JSONL mtime
+  const jsonlMtime = getJsonlMtime(repoRoot);
+  if (jsonlMtime === null && !force) {
+    // No JSONL file exists
+    return false;
+  }
+
+  const database = openDb(repoRoot);
+  const lastSyncMtime = getLastSyncMtime(database);
+
+  // Rebuild if forced, no previous sync, or JSONL is newer
+  const needsRebuild = force || lastSyncMtime === null || (jsonlMtime !== null && jsonlMtime > lastSyncMtime);
+
+  if (needsRebuild) {
+    await rebuildIndex(repoRoot);
+    return true;
+  }
+
+  return false;
 }
 
 /**

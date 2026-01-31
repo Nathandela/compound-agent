@@ -13,7 +13,7 @@ import { Command } from 'commander';
 import { ensureModel, getModelPath } from './embeddings/download.js';
 import { VERSION } from './index.js';
 import { appendLesson, readLessons } from './storage/jsonl.js';
-import { rebuildIndex, searchKeyword } from './storage/sqlite.js';
+import { rebuildIndex, searchKeyword, syncIfNeeded } from './storage/sqlite.js';
 import { generateId } from './types.js';
 import type { QuickLesson } from './types.js';
 
@@ -70,8 +70,8 @@ program
     const repoRoot = getRepoRoot();
     const limit = parseInt(options.limit, 10);
 
-    // Rebuild index before searching
-    await rebuildIndex(repoRoot);
+    // Sync index if JSONL has changed
+    await syncIfNeeded(repoRoot);
 
     const results = await searchKeyword(repoRoot, query, limit);
 
@@ -99,10 +99,13 @@ program
     const repoRoot = getRepoRoot();
     const limit = parseInt(options.limit, 10);
 
-    const { lessons } = await readLessons(repoRoot);
+    const { lessons, skippedCount } = await readLessons(repoRoot);
 
     if (lessons.length === 0) {
       console.log('No lessons found.');
+      if (skippedCount > 0) {
+        console.error(`Warning: ${skippedCount} corrupted lesson(s) skipped.`);
+      }
       return;
     }
 
@@ -117,16 +120,30 @@ program
       }
       console.log();
     }
+
+    if (skippedCount > 0) {
+      console.error(`Warning: ${skippedCount} corrupted lesson(s) skipped.`);
+    }
   });
 
 program
   .command('rebuild')
   .description('Rebuild SQLite index from JSONL')
-  .action(async () => {
+  .option('-f, --force', 'Force rebuild even if unchanged')
+  .action(async (options: { force?: boolean }) => {
     const repoRoot = getRepoRoot();
-    console.log('Rebuilding index...');
-    await rebuildIndex(repoRoot);
-    console.log('Index rebuilt.');
+    if (options.force) {
+      console.log('Forcing index rebuild...');
+      await rebuildIndex(repoRoot);
+      console.log('Index rebuilt.');
+    } else {
+      const rebuilt = await syncIfNeeded(repoRoot);
+      if (rebuilt) {
+        console.log('Index rebuilt (JSONL changed).');
+      } else {
+        console.log('Index is up to date.');
+      }
+    }
   });
 
 program
