@@ -21,12 +21,18 @@ importers:
         specifier: ^3.22.0
         version: 3.25.76
     devDependencies:
+      '@fast-check/vitest':
+        specifier: 0.2.4
+        version: 0.2.4(vitest@2.1.9(@types/node@20.19.30))
       '@types/better-sqlite3':
         specifier: ^7.6.13
         version: 7.6.13
       '@types/node':
         specifier: ^20.11.0
         version: 20.19.30
+      fast-check:
+        specifier: 4.5.3
+        version: 4.5.3
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(postcss@8.5.6)(typescript@5.9.3)
@@ -332,6 +338,11 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@fast-check/vitest@0.2.4':
+    resolution: {integrity: sha512-Ilcr+JAIPhb1s6FRm4qoglQYSGXXrS+zAupZeNuWAA3qHVGDA1d1Gb84Hb/+otL3GzVZjFJESg5/1SfIvrgssA==}
+    peerDependencies:
+      vitest: ^1 || ^2 || ^3 || ^4
 
   '@huggingface/jinja@0.5.4':
     resolution: {integrity: sha512-VoQJywjpjy2D88Oj0BTHRuS8JCbUgoOg5t1UGgbtGh2fRia9Dx/k6Wf8FqrEWIvWK9fAkfJeeLB9fcSpCNPCpw==}
@@ -1058,6 +1069,10 @@ packages:
     resolution: {integrity: sha512-knvyeauYhqjOYvQ66MznSMs83wmHrCycNEN6Ao+2AeYEfxUIkuiVxdEa1qlGEPK+We3n0THiDciYSsCcgW/DoA==}
     engines: {node: '>=12.0.0'}
 
+  fast-check@4.5.3:
+    resolution: {integrity: sha512-IE9csY7lnhxBnA8g/WI5eg/hygA6MGWJMSNfFRrBlXUciADEhS1EDB0SIsMSvzubzIlOBbVITSsypCsW717poA==}
+    engines: {node: '>=12.17.0'}
+
   fast-content-type-parse@3.0.0:
     resolution: {integrity: sha512-ZvLdcY8P+N8mGQJahJV5G4U88CSvT1rP8ApL6uETe88MBXrBHAkZlSEySdUlyztF7ccb+Znos3TFqaepHxdhBg==}
 
@@ -1448,6 +1463,9 @@ packages:
 
   pump@3.0.3:
     resolution: {integrity: sha512-todwxLMY7/heScKmntwQG8CXVkWUOdYxIvY2s0VWAAMh/nd8SoYiRaKjlr7+iCs984f2P8zvrfWcDDYVb73NfA==}
+
+  pure-rand@7.0.1:
+    resolution: {integrity: sha512-oTUZM/NAZS8p7ANR3SHh30kXB+zK2r2BPcEn/awJIbOvq82WoMN4p62AWWp3Hhw50G0xMsw1mhIBLqHw64EcNQ==}
 
   rc@1.2.8:
     resolution: {integrity: sha512-y3bGgqKj3QBdxLbLkomlohkvsA8gdAiUQlSBJnBhfn+BPxg4bc62d8TcBW15wavDfgexCgccckhcZvywyQYPOw==}
@@ -1946,6 +1964,11 @@ snapshots:
 
   '@esbuild/win32-x64@0.27.2':
     optional: true
+
+  '@fast-check/vitest@0.2.4(vitest@2.1.9(@types/node@20.19.30))':
+    dependencies:
+      fast-check: 4.5.3
+      vitest: 2.1.9(@types/node@20.19.30)
 
   '@huggingface/jinja@0.5.4': {}
 
@@ -2602,6 +2625,10 @@ snapshots:
 
   expect-type@1.3.0: {}
 
+  fast-check@4.5.3:
+    dependencies:
+      pure-rand: 7.0.1
+
   fast-content-type-parse@3.0.0: {}
 
   fdir@6.5.0(picomatch@4.0.3):
@@ -3017,6 +3044,8 @@ snapshots:
     dependencies:
       end-of-stream: 1.4.5
       once: 1.4.0
+
+  pure-rand@7.0.1: {}
 
   rc@1.2.8:
     dependencies:

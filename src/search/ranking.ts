@@ -24,12 +24,10 @@ const RECENCY_BOOST = 1.2;
 const CONFIRMATION_BOOST = 1.3;
 
 /**
- * Calculate severity boost based on lesson type and severity.
- * Quick lessons (no severity) get 1.0.
+ * Calculate severity boost based on lesson severity.
+ * Lessons without severity get 1.0 (medium boost).
  */
 export function severityBoost(lesson: Lesson): number {
-  if (lesson.type !== 'full') return MEDIUM_SEVERITY_BOOST;
-
   switch (lesson.severity) {
     case 'high':
       return HIGH_SEVERITY_BOOST;
@@ -37,6 +35,8 @@ export function severityBoost(lesson: Lesson): number {
       return MEDIUM_SEVERITY_BOOST;
     case 'low':
       return LOW_SEVERITY_BOOST;
+    default:
+      return MEDIUM_SEVERITY_BOOST;
   }
 }
 

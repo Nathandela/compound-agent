@@ -126,16 +126,20 @@ export type { PlanRetrievalResult } from './retrieval/plan.js';
 export {
   generateId,
   LessonSchema,
+  LessonTypeSchema,
+  TombstoneSchema,
+  // Deprecated - use LessonSchema instead
   QuickLessonSchema,
   FullLessonSchema,
-  TombstoneSchema,
 } from './types.js';
 export type {
   Lesson,
-  QuickLesson,
-  FullLesson,
+  LessonType,
   Tombstone,
   Source,
   Severity,
   Context,
+  // Deprecated - use Lesson instead
+  QuickLesson,
+  FullLesson,
 } from './types.js';
