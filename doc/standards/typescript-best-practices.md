@@ -1,7 +1,6 @@
 # TypeScript Best Practices
 
-> Comprehensive guide for TypeScript development, adapted from Quanthome standards.
-> Source: [Quanthome/doc](https://github.com/Quanthome/doc/blob/research/standards/typescript-best-practices.md)
+> Comprehensive guide for TypeScript development.
 
 ## Table of Contents
 
@@ -452,5 +451,4 @@ See [AGENTS.md](../../AGENTS.md) for project-specific conventions.
 
 ---
 
-*Adapted from Quanthome TypeScript Best Practices*
 *Last updated: January 2026*

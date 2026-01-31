@@ -8,12 +8,6 @@ This directory contains coding standards and best practices for the Learning Age
 |----------|-------------|
 | [typescript-best-practices.md](typescript-best-practices.md) | TypeScript patterns, configuration, and conventions |
 
-## Source
-
-These standards are adapted from [Quanthome/doc](https://github.com/Quanthome/doc) research branch, specifically:
-
-- `standards/typescript-best-practices.md` - Core TypeScript patterns
-
 ## Applicability
 
 For this project (TypeScript library), the most relevant sections are:
