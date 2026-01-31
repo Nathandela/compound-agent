@@ -5,9 +5,9 @@
  * Uses SQLite cache to avoid recomputing embeddings.
  */
 
-import { readLessons } from '../storage/jsonl.js';
 import { embedText } from '../embeddings/nomic.js';
 import { contentHash, getCachedEmbedding, setCachedEmbedding } from '../storage/sqlite.js';
+import { readLessons } from '../storage/jsonl.js';
 import type { Lesson } from '../types.js';
 
 /**
@@ -41,6 +41,15 @@ export interface ScoredLesson {
   score: number;
 }
 
+/** Options for vector search */
+export interface SearchVectorOptions {
+  /** Maximum number of results to return (default: 10) */
+  limit?: number;
+}
+
+/** Default number of results to return */
+const DEFAULT_LIMIT = 10;
+
 /**
  * Search lessons by vector similarity to query text.
  * Returns top N lessons sorted by similarity score (descending).
@@ -49,8 +58,9 @@ export interface ScoredLesson {
 export async function searchVector(
   repoRoot: string,
   query: string,
-  limit: number
+  options?: SearchVectorOptions
 ): Promise<ScoredLesson[]> {
+  const limit = options?.limit ?? DEFAULT_LIMIT;
   // Read all lessons
   const { lessons } = await readLessons(repoRoot);
   if (lessons.length === 0) return [];

@@ -36,7 +36,7 @@ export async function retrieveForPlan(
   limit: number = DEFAULT_LIMIT
 ): Promise<PlanRetrievalResult> {
   // Get lessons by vector similarity (will throw if embeddings unavailable)
-  const scored = await searchVector(repoRoot, planText, limit * 2);
+  const scored = await searchVector(repoRoot, planText, { limit: limit * 2 });
 
   // Apply ranking boosts
   const ranked = rankLessons(scored);

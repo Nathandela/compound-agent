@@ -1,11 +1,13 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { isNovel, isSpecific, isActionable, shouldPropose } from './quality.js';
+
 import { appendLesson } from '../storage/jsonl.js';
-import { rebuildIndex, closeDb } from '../storage/sqlite.js';
+import { closeDb, rebuildIndex } from '../storage/sqlite.js';
 import type { QuickLesson } from '../types.js';
+
+import { isActionable, isNovel, isSpecific, shouldPropose } from './quality.js';
 
 describe('quality filters', () => {
   let tempDir: string;

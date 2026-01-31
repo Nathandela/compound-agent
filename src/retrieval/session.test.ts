@@ -1,10 +1,12 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, mkdir } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { loadSessionLessons } from './session.js';
+
 import { appendLesson } from '../storage/jsonl.js';
 import type { FullLesson, QuickLesson } from '../types.js';
+
+import { loadSessionLessons } from './session.js';
 
 describe('session retrieval', () => {
   let tempDir: string;

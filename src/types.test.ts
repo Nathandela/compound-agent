@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
+
 import {
   QuickLessonSchema,
   FullLessonSchema,
   LessonSchema,
   TombstoneSchema,
+  SourceSchema,
+  ContextSchema,
+  PatternSchema,
+  SeveritySchema,
   generateId,
   type QuickLesson,
   type FullLesson,
@@ -206,6 +211,70 @@ describe('TombstoneSchema', () => {
       deletedAt: '2026-01-30T12:00:00Z',
     };
     const result = TombstoneSchema.safeParse(invalid);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('SourceSchema', () => {
+  it('validates all source types', () => {
+    const sources = ['user_correction', 'self_correction', 'test_failure', 'manual'];
+    for (const source of sources) {
+      const result = SourceSchema.safeParse(source);
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it('rejects invalid source', () => {
+    const result = SourceSchema.safeParse('invalid_source');
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('ContextSchema', () => {
+  it('validates context with required fields', () => {
+    const result = ContextSchema.safeParse({ tool: 'edit', intent: 'refactor' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects context missing tool', () => {
+    const result = ContextSchema.safeParse({ intent: 'refactor' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects context missing intent', () => {
+    const result = ContextSchema.safeParse({ tool: 'edit' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('PatternSchema', () => {
+  it('validates pattern with bad and good', () => {
+    const result = PatternSchema.safeParse({ bad: 'old code', good: 'new code' });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects pattern missing bad', () => {
+    const result = PatternSchema.safeParse({ good: 'new code' });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects pattern missing good', () => {
+    const result = PatternSchema.safeParse({ bad: 'old code' });
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('SeveritySchema', () => {
+  it('validates all severity levels', () => {
+    const severities = ['high', 'medium', 'low'];
+    for (const severity of severities) {
+      const result = SeveritySchema.safeParse(severity);
+      expect(result.success).toBe(true);
+    }
+  });
+
+  it('rejects invalid severity', () => {
+    const result = SeveritySchema.safeParse('critical');
     expect(result.success).toBe(false);
   });
 });

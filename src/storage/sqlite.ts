@@ -5,14 +5,84 @@
  * Stored in .claude/.cache (gitignored).
  */
 
+import { createHash } from 'node:crypto';
+import { mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import Database from 'better-sqlite3';
 import type { Database as DatabaseType } from 'better-sqlite3';
-import { mkdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { createHash } from 'crypto';
+
+import type { Lesson } from '../types.js';
+
+import { readLessons } from './jsonl.js';
 
 /** Relative path to database file from repo root */
 export const DB_PATH = '.claude/.cache/lessons.sqlite';
+
+/** SQL schema for lessons database */
+const SCHEMA_SQL = `
+  -- Main lessons table
+  CREATE TABLE IF NOT EXISTS lessons (
+    id TEXT PRIMARY KEY,
+    type TEXT NOT NULL,
+    trigger TEXT NOT NULL,
+    insight TEXT NOT NULL,
+    evidence TEXT,
+    severity TEXT,
+    tags TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL,
+    context TEXT NOT NULL DEFAULT '{}',
+    supersedes TEXT NOT NULL DEFAULT '[]',
+    related TEXT NOT NULL DEFAULT '[]',
+    created TEXT NOT NULL,
+    confirmed INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    retrieval_count INTEGER NOT NULL DEFAULT 0,
+    embedding BLOB,
+    content_hash TEXT
+  );
+
+  -- FTS5 virtual table for full-text search
+  CREATE VIRTUAL TABLE IF NOT EXISTS lessons_fts USING fts5(
+    id,
+    trigger,
+    insight,
+    tags,
+    content='lessons',
+    content_rowid='rowid'
+  );
+
+  -- Trigger to sync FTS on INSERT
+  CREATE TRIGGER IF NOT EXISTS lessons_ai AFTER INSERT ON lessons BEGIN
+    INSERT INTO lessons_fts(rowid, id, trigger, insight, tags)
+    VALUES (new.rowid, new.id, new.trigger, new.insight, new.tags);
+  END;
+
+  -- Trigger to sync FTS on DELETE
+  CREATE TRIGGER IF NOT EXISTS lessons_ad AFTER DELETE ON lessons BEGIN
+    INSERT INTO lessons_fts(lessons_fts, rowid, id, trigger, insight, tags)
+    VALUES ('delete', old.rowid, old.id, old.trigger, old.insight, old.tags);
+  END;
+
+  -- Trigger to sync FTS on UPDATE
+  CREATE TRIGGER IF NOT EXISTS lessons_au AFTER UPDATE ON lessons BEGIN
+    INSERT INTO lessons_fts(lessons_fts, rowid, id, trigger, insight, tags)
+    VALUES ('delete', old.rowid, old.id, old.trigger, old.insight, old.tags);
+    INSERT INTO lessons_fts(rowid, id, trigger, insight, tags)
+    VALUES (new.rowid, new.id, new.trigger, new.insight, new.tags);
+  END;
+
+  -- Index for common queries
+  CREATE INDEX IF NOT EXISTS idx_lessons_created ON lessons(created);
+  CREATE INDEX IF NOT EXISTS idx_lessons_confirmed ON lessons(confirmed);
+  CREATE INDEX IF NOT EXISTS idx_lessons_severity ON lessons(severity);
+`;
+
+/**
+ * Create database schema for lessons storage.
+ */
+function createSchema(database: DatabaseType): void {
+  database.exec(SCHEMA_SQL);
+}
 
 let db: DatabaseType | null = null;
 
@@ -43,64 +113,7 @@ export function openDb(repoRoot: string): DatabaseType {
   // Enable WAL mode for better concurrent access
   db.pragma('journal_mode = WAL');
 
-  // Create schema
-  db.exec(`
-    -- Main lessons table
-    CREATE TABLE IF NOT EXISTS lessons (
-      id TEXT PRIMARY KEY,
-      type TEXT NOT NULL,
-      trigger TEXT NOT NULL,
-      insight TEXT NOT NULL,
-      evidence TEXT,
-      severity TEXT,
-      tags TEXT NOT NULL DEFAULT '',
-      source TEXT NOT NULL,
-      context TEXT NOT NULL DEFAULT '{}',
-      supersedes TEXT NOT NULL DEFAULT '[]',
-      related TEXT NOT NULL DEFAULT '[]',
-      created TEXT NOT NULL,
-      confirmed INTEGER NOT NULL DEFAULT 0,
-      deleted INTEGER NOT NULL DEFAULT 0,
-      retrieval_count INTEGER NOT NULL DEFAULT 0,
-      embedding BLOB,
-      content_hash TEXT
-    );
-
-    -- FTS5 virtual table for full-text search
-    CREATE VIRTUAL TABLE IF NOT EXISTS lessons_fts USING fts5(
-      id,
-      trigger,
-      insight,
-      tags,
-      content='lessons',
-      content_rowid='rowid'
-    );
-
-    -- Trigger to sync FTS on INSERT
-    CREATE TRIGGER IF NOT EXISTS lessons_ai AFTER INSERT ON lessons BEGIN
-      INSERT INTO lessons_fts(rowid, id, trigger, insight, tags)
-      VALUES (new.rowid, new.id, new.trigger, new.insight, new.tags);
-    END;
-
-    -- Trigger to sync FTS on DELETE
-    CREATE TRIGGER IF NOT EXISTS lessons_ad AFTER DELETE ON lessons BEGIN
-      INSERT INTO lessons_fts(lessons_fts, rowid, id, trigger, insight, tags)
-      VALUES ('delete', old.rowid, old.id, old.trigger, old.insight, old.tags);
-    END;
-
-    -- Trigger to sync FTS on UPDATE
-    CREATE TRIGGER IF NOT EXISTS lessons_au AFTER UPDATE ON lessons BEGIN
-      INSERT INTO lessons_fts(lessons_fts, rowid, id, trigger, insight, tags)
-      VALUES ('delete', old.rowid, old.id, old.trigger, old.insight, old.tags);
-      INSERT INTO lessons_fts(rowid, id, trigger, insight, tags)
-      VALUES (new.rowid, new.id, new.trigger, new.insight, new.tags);
-    END;
-
-    -- Index for common queries
-    CREATE INDEX IF NOT EXISTS idx_lessons_created ON lessons(created);
-    CREATE INDEX IF NOT EXISTS idx_lessons_confirmed ON lessons(confirmed);
-    CREATE INDEX IF NOT EXISTS idx_lessons_severity ON lessons(severity);
-  `);
+  createSchema(db);
 
   return db;
 }
@@ -168,10 +181,6 @@ export function setCachedEmbedding(
     .run(buffer, hash, lessonId);
 }
 
-// Import for rebuildIndex
-import { readLessons } from './jsonl.js';
-import type { Lesson } from '../types.js';
-
 /** DB row type for lessons table */
 interface LessonRow {
   id: string;
@@ -233,6 +242,29 @@ interface CachedEmbeddingData {
 }
 
 /**
+ * Collect cached embeddings from existing lessons for preservation.
+ */
+function collectCachedEmbeddings(database: DatabaseType): Map<string, CachedEmbeddingData> {
+  const cache = new Map<string, CachedEmbeddingData>();
+  const rows = database
+    .prepare('SELECT id, embedding, content_hash FROM lessons WHERE embedding IS NOT NULL')
+    .all() as Array<{ id: string; embedding: Buffer; content_hash: string | null }>;
+
+  for (const row of rows) {
+    if (row.embedding && row.content_hash) {
+      cache.set(row.id, { embedding: row.embedding, contentHash: row.content_hash });
+    }
+  }
+  return cache;
+}
+
+/** SQL for inserting a lesson row */
+const INSERT_LESSON_SQL = `
+  INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, embedding, content_hash)
+  VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count, @embedding, @content_hash)
+`;
+
+/**
  * Rebuild the SQLite index from the JSONL source of truth.
  * Preserves embeddings where content hash is unchanged.
  */
@@ -240,36 +272,14 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
   const database = openDb(repoRoot);
   const { lessons } = await readLessons(repoRoot);
 
-  // Save existing embeddings before clearing
-  const cachedEmbeddings = new Map<string, CachedEmbeddingData>();
-  const existingRows = database
-    .prepare('SELECT id, embedding, content_hash FROM lessons WHERE embedding IS NOT NULL')
-    .all() as Array<{ id: string; embedding: Buffer; content_hash: string | null }>;
-
-  for (const row of existingRows) {
-    if (row.embedding && row.content_hash) {
-      cachedEmbeddings.set(row.id, {
-        embedding: row.embedding,
-        contentHash: row.content_hash,
-      });
-    }
-  }
-
-  // Clear existing data (triggers will clear FTS)
+  const cachedEmbeddings = collectCachedEmbeddings(database);
   database.exec('DELETE FROM lessons');
 
   if (lessons.length === 0) return;
 
-  // Prepare insert statement
-  const insert = database.prepare(`
-    INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, embedding, content_hash)
-    VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count, @embedding, @content_hash)
-  `);
-
-  // Insert all lessons in a transaction
+  const insert = database.prepare(INSERT_LESSON_SQL);
   const insertMany = database.transaction((items: Lesson[]) => {
     for (const lesson of items) {
-      // Check if we have a valid cached embedding
       const newHash = contentHash(lesson.trigger, lesson.insight);
       const cached = cachedEmbeddings.get(lesson.id);
       const hasValidCache = cached && cached.contentHash === newHash;

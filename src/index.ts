@@ -47,7 +47,7 @@ export { ensureModel, getModelPath } from './embeddings/download.js';
 
 // Search API
 export { searchVector, cosineSimilarity } from './search/vector.js';
-export type { ScoredLesson } from './search/vector.js';
+export type { ScoredLesson, SearchVectorOptions } from './search/vector.js';
 export { rankLessons, calculateScore, severityBoost, recencyBoost, confirmationBoost } from './search/ranking.js';
 export type { RankedLesson } from './search/ranking.js';
 

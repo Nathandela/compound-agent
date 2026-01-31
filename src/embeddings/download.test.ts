@@ -1,15 +1,16 @@
+import { existsSync } from 'node:fs';
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { homedir, tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtemp, rm, access, writeFile, mkdir, readFile } from 'fs/promises';
-import { tmpdir, homedir } from 'os';
-import { join } from 'path';
-import { existsSync } from 'fs';
+
 import {
+  ensureModel,
   getModelPath,
   MODEL_FILENAME,
   MODEL_URL,
-  ensureModel,
-  setModelDir,
   resetModelDir,
+  setModelDir,
 } from './download.js';
 
 describe('embedding model download', () => {

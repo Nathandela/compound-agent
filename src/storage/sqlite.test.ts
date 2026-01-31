@@ -1,19 +1,21 @@
+import { access, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtemp, rm, access } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
+
+import type { FullLesson, QuickLesson } from '../types.js';
+
+import { appendLesson } from './jsonl.js';
 import {
-  openDb,
   closeDb,
+  contentHash,
+  DB_PATH,
+  getCachedEmbedding,
+  openDb,
   rebuildIndex,
   searchKeyword,
-  DB_PATH,
-  contentHash,
-  getCachedEmbedding,
   setCachedEmbedding,
 } from './sqlite.js';
-import { appendLesson } from './jsonl.js';
-import type { QuickLesson, FullLesson } from '../types.js';
 
 describe('SQLite schema', () => {
   let tempDir: string;

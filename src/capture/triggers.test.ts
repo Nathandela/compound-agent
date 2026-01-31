@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
+
 import {
-  detectUserCorrection,
   detectSelfCorrection,
   detectTestFailure,
+  detectUserCorrection,
 } from './triggers.js';
 import type { CorrectionSignal, EditHistory, TestResult } from './triggers.js';
 

@@ -1,5 +1,6 @@
+import { existsSync } from 'node:fs';
 import { describe, it, expect, afterAll } from 'vitest';
-import { existsSync } from 'fs';
+
 import { getModelPath } from './download.js';
 import { embedText, embedTexts, getEmbedding, unloadEmbedding } from './nomic.js';
 

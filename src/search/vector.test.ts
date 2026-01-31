@@ -1,17 +1,19 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtemp, rm } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { cosineSimilarity, searchVector } from './vector.js';
+
 import { appendLesson } from '../storage/jsonl.js';
 import {
-  rebuildIndex,
   closeDb,
   contentHash,
-  setCachedEmbedding,
   openDb,
+  rebuildIndex,
+  setCachedEmbedding,
 } from '../storage/sqlite.js';
 import type { QuickLesson } from '../types.js';
+
+import { cosineSimilarity, searchVector } from './vector.js';
 
 describe('vector search', () => {
   describe('cosineSimilarity', () => {
@@ -81,7 +83,7 @@ describe('vector search', () => {
     });
 
     it('returns empty array for empty database', async () => {
-      const results = await searchVector(tempDir, 'test query', 10);
+      const results = await searchVector(tempDir, 'test query', { limit: 10 });
       expect(results).toEqual([]);
     });
 
@@ -105,7 +107,7 @@ describe('vector search', () => {
         }
       );
 
-      const results = await searchVector(tempDir, 'data processing', 10);
+      const results = await searchVector(tempDir, 'data processing', { limit: 10 });
       expect(results.length).toBeGreaterThan(0);
     });
 
@@ -119,7 +121,7 @@ describe('vector search', () => {
       // Mock embedText
       vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
 
-      const results = await searchVector(tempDir, 'test', 2);
+      const results = await searchVector(tempDir, 'test', { limit: 2 });
       expect(results.length).toBeLessThanOrEqual(2);
     });
 
@@ -137,7 +139,7 @@ describe('vector search', () => {
         const embedMock = vi.fn().mockResolvedValue([0.8, 0.2, 0]);
         vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
-        await searchVector(tempDir, 'test query', 10);
+        await searchVector(tempDir, 'test query', { limit: 10 });
 
         // embedText should only be called once for the query, not for the lesson
         expect(embedMock).toHaveBeenCalledTimes(1);
@@ -152,7 +154,7 @@ describe('vector search', () => {
         const embedMock = vi.fn().mockResolvedValue([0.8, 0.2, 0]);
         vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
-        await searchVector(tempDir, 'test query', 10);
+        await searchVector(tempDir, 'test query', { limit: 10 });
 
         // embedText should be called twice: once for query, once for lesson
         expect(embedMock).toHaveBeenCalledTimes(2);
@@ -181,11 +183,26 @@ describe('vector search', () => {
         const embedMock = vi.fn().mockResolvedValue([0.8, 0.2, 0]);
         vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
-        await searchVector(tempDir, 'test query', 10);
+        await searchVector(tempDir, 'test query', { limit: 10 });
 
         // embedText should be called twice: query + lesson (cache miss due to hash mismatch)
         expect(embedMock).toHaveBeenCalledTimes(2);
       });
+    });
+
+    it('uses default limit of 10 when no options provided', async () => {
+      // Add 15 lessons
+      for (let i = 0; i < 15; i++) {
+        await appendLesson(tempDir, createLesson(`L${String(i).padStart(3, '0')}`, `lesson ${i}`));
+      }
+      await rebuildIndex(tempDir);
+
+      // Mock embedText
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+
+      // Call without options - should use default limit of 10
+      const results = await searchVector(tempDir, 'test');
+      expect(results.length).toBe(10);
     });
   });
 });

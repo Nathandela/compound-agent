@@ -4,9 +4,10 @@
  * Lazy-loads the model on first call. Hard-fails if model unavailable.
  */
 
+import { access } from 'node:fs/promises';
 import { getLlama, LlamaEmbeddingContext } from 'node-llama-cpp';
+
 import { getModelPath } from './download.js';
-import { access } from 'fs/promises';
 
 /** Singleton embedding context */
 let embeddingContext: LlamaEmbeddingContext | null = null;

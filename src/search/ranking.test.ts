@@ -1,12 +1,14 @@
 import { describe, it, expect } from 'vitest';
+
+import type { FullLesson, Lesson, QuickLesson } from '../types.js';
+
 import {
-  severityBoost,
-  recencyBoost,
-  confirmationBoost,
   calculateScore,
+  confirmationBoost,
   rankLessons,
+  recencyBoost,
+  severityBoost,
 } from './ranking.js';
-import type { QuickLesson, FullLesson, Lesson } from '../types.js';
 import type { ScoredLesson } from './vector.js';
 
 describe('ranking', () => {

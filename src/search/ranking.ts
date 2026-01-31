@@ -8,6 +8,7 @@
  */
 
 import type { Lesson } from '../types.js';
+
 import type { ScoredLesson } from './vector.js';
 
 /** Lesson with final ranked score */

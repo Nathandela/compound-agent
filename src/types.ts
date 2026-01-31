@@ -2,11 +2,11 @@
  * Lesson type definitions using Zod schemas
  */
 
+import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { createHash } from 'crypto';
 
 // Source of lesson capture
-const SourceSchema = z.enum([
+export const SourceSchema = z.enum([
   'user_correction',
   'self_correction',
   'test_failure',
@@ -14,19 +14,19 @@ const SourceSchema = z.enum([
 ]);
 
 // Context about when lesson was learned
-const ContextSchema = z.object({
+export const ContextSchema = z.object({
   tool: z.string(),
   intent: z.string(),
 });
 
 // Code pattern (bad -> good)
-const PatternSchema = z.object({
+export const PatternSchema = z.object({
   bad: z.string(),
   good: z.string(),
 });
 
 // Severity levels for full lessons
-const SeveritySchema = z.enum(['high', 'medium', 'low']);
+export const SeveritySchema = z.enum(['high', 'medium', 'low']);
 
 // Base fields shared by all lessons
 const BaseLessonSchema = z.object({

@@ -9,11 +9,12 @@
  */
 
 import { Command } from 'commander';
+
+import { ensureModel, getModelPath } from './embeddings/download.js';
 import { VERSION } from './index.js';
 import { appendLesson, readLessons } from './storage/jsonl.js';
 import { rebuildIndex, searchKeyword } from './storage/sqlite.js';
 import { generateId } from './types.js';
-import { ensureModel, getModelPath } from './embeddings/download.js';
 import type { QuickLesson } from './types.js';
 
 const program = new Command();

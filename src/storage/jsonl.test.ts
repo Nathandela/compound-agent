@@ -1,9 +1,11 @@
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtemp, rm, readFile, mkdir, writeFile } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { appendLesson, readLessons, LESSONS_PATH } from './jsonl.js';
-import type { QuickLesson, FullLesson, Lesson } from '../types.js';
+
+import type { FullLesson, Lesson, QuickLesson } from '../types.js';
+
+import { appendLesson, LESSONS_PATH, readLessons } from './jsonl.js';
 import type { ReadLessonsResult } from './jsonl.js';
 
 describe('JSONL storage', () => {

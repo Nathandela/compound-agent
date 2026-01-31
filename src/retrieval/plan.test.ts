@@ -1,12 +1,14 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtemp, rm } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { existsSync } from 'fs';
+import { existsSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
 import { getModelPath } from '../embeddings/download.js';
-import { retrieveForPlan, formatLessonsCheck } from './plan.js';
 import { appendLesson } from '../storage/jsonl.js';
-import type { QuickLesson, FullLesson } from '../types.js';
+import type { FullLesson, QuickLesson } from '../types.js';
+
+import { formatLessonsCheck, retrieveForPlan } from './plan.js';
 
 // Check model availability synchronously at module load time
 const modelAvailable = existsSync(getModelPath());

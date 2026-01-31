@@ -1,11 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtemp, rm, readFile } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
-import { execSync } from 'child_process';
-import { appendLesson } from './storage/jsonl.js';
-import { rebuildIndex, closeDb } from './storage/sqlite.js';
-import { LESSONS_PATH } from './storage/jsonl.js';
+import { execSync } from 'node:child_process';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+
+import { appendLesson, LESSONS_PATH } from './storage/jsonl.js';
+import { closeDb, rebuildIndex } from './storage/sqlite.js';
 import type { QuickLesson } from './types.js';
 
 describe('CLI', () => {

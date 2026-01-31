@@ -5,8 +5,8 @@
  * Source of truth - git trackable.
  */
 
-import { appendFile, readFile, mkdir } from 'fs/promises';
-import { join, dirname } from 'path';
+import { appendFile, mkdir, readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { LessonSchema, type Lesson } from '../types.js';
 
 /** Relative path to lessons file from repo root */
@@ -51,6 +51,51 @@ export async function appendLesson(repoRoot: string, lesson: Lesson): Promise<vo
 }
 
 /**
+ * Parse and validate a single JSON line.
+ * @returns Parsed lesson or null if invalid
+ */
+function parseJsonLine(
+  line: string,
+  lineNumber: number,
+  strict: boolean,
+  onParseError?: (error: ParseError) => void
+): Lesson | null {
+  // Try to parse JSON
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(line);
+  } catch (err) {
+    const parseError: ParseError = {
+      line: lineNumber,
+      message: `Invalid JSON: ${(err as Error).message}`,
+      cause: err,
+    };
+    if (strict) {
+      throw new Error(`Parse error on line ${lineNumber}: ${parseError.message}`);
+    }
+    onParseError?.(parseError);
+    return null;
+  }
+
+  // Validate against schema
+  const result = LessonSchema.safeParse(parsed);
+  if (!result.success) {
+    const parseError: ParseError = {
+      line: lineNumber,
+      message: `Schema validation failed: ${result.error.message}`,
+      cause: result.error,
+    };
+    if (strict) {
+      throw new Error(`Parse error on line ${lineNumber}: ${parseError.message}`);
+    }
+    onParseError?.(parseError);
+    return null;
+  }
+
+  return result.data;
+}
+
+/**
  * Read all non-deleted lessons from the JSONL file.
  * Applies last-write-wins deduplication by ID.
  * Returns result object with lessons and skippedCount.
@@ -78,55 +123,18 @@ export async function readLessons(
 
   const lessons = new Map<string, Lesson>();
   let skippedCount = 0;
-  const lines = content.split('\n');
 
+  const lines = content.split('\n');
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!;
-    const trimmed = line.trim();
+    const trimmed = lines[i]!.trim();
     if (!trimmed) continue;
 
-    const lineNumber = i + 1; // 1-based line number
-
-    // Try to parse JSON
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(trimmed);
-    } catch (err) {
-      const parseError: ParseError = {
-        line: lineNumber,
-        message: `Invalid JSON: ${(err as Error).message}`,
-        cause: err,
-      };
-
-      if (strict) {
-        throw new Error(`Parse error on line ${lineNumber}: ${parseError.message}`);
-      }
-
+    const lesson = parseJsonLine(trimmed, i + 1, strict, onParseError);
+    if (!lesson) {
       skippedCount++;
-      onParseError?.(parseError);
       continue;
     }
 
-    // Validate against schema
-    const result = LessonSchema.safeParse(parsed);
-
-    if (!result.success) {
-      const parseError: ParseError = {
-        line: lineNumber,
-        message: `Schema validation failed: ${result.error.message}`,
-        cause: result.error,
-      };
-
-      if (strict) {
-        throw new Error(`Parse error on line ${lineNumber}: ${parseError.message}`);
-      }
-
-      skippedCount++;
-      onParseError?.(parseError);
-      continue;
-    }
-
-    const lesson = result.data;
     if (lesson.deleted) {
       lessons.delete(lesson.id);
     } else {
