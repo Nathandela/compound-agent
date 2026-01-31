@@ -118,7 +118,8 @@ describe('CLI', () => {
 
     it('shows no results for non-matching query', () => {
       const { combined } = runCli('search "nonexistent"');
-      expect(combined.toLowerCase()).toMatch(/no.*found|0.*result/i);
+      // Now shows user-friendly message with suggestions
+      expect(combined.toLowerCase()).toMatch(/no lessons match|no.*found|0.*result/i);
     });
   });
 
@@ -441,6 +442,157 @@ describe('CLI', () => {
       expect(combined).toMatch(/imported.*1.*lesson/i);
       expect(combined).toMatch(/1.*skipped/i);
       expect(combined).toMatch(/1.*invalid/i);
+    });
+  });
+
+  describe('global options', () => {
+    beforeEach(async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
+      await rebuildIndex(tempDir);
+      closeDb();
+    });
+
+    it('--verbose flag shows extra detail', () => {
+      const { combined } = runCli('list --verbose');
+      // Verbose mode should show more info (e.g., created date, context)
+      expect(combined).toMatch(/created|context/i);
+    });
+
+    it('--quiet flag suppresses info messages', () => {
+      const { combined } = runCli('list --quiet');
+      // Quiet mode should only show essential output (the lessons)
+      expect(combined).toContain('test lesson');
+      // Should not include summary line like "Showing X of Y"
+      expect(combined).not.toMatch(/showing.*of/i);
+    });
+
+    it('-v is alias for --verbose', () => {
+      const { combined } = runCli('list -v');
+      expect(combined).toMatch(/created|context/i);
+    });
+
+    it('-q is alias for --quiet', () => {
+      const { combined } = runCli('list -q');
+      expect(combined).not.toMatch(/showing.*of/i);
+    });
+  });
+
+  describe('user-friendly error messages', () => {
+    it('shows friendly message for file not found', () => {
+      const { combined } = runCli('import /nonexistent/file.jsonl');
+      expect(combined).toContain('File not found');
+      expect(combined).not.toContain('ENOENT');
+    });
+
+    it('shows friendly message when no lessons match search', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      const { combined } = runCli('search "zzzznonexistent"');
+      expect(combined).toContain('No lessons match your search');
+      // Should suggest alternative actions
+      expect(combined).toMatch(/try|list|different/i);
+    });
+
+    it('shows friendly message for invalid limit', () => {
+      const { combined } = runCli('list -n abc');
+      expect(combined).toContain('must be a positive integer');
+    });
+
+    it('shows friendly message for empty lesson list', () => {
+      const { combined } = runCli('list');
+      // Should be friendly and suggest getting started
+      expect(combined).toMatch(/no lessons|get started|learn/i);
+    });
+  });
+
+  describe('formatted output', () => {
+    beforeEach(async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'first test lesson', { tags: ['test', 'cli'] }));
+      await appendLesson(tempDir, createQuickLesson('L002', 'second test lesson', { tags: ['api'] }));
+      await rebuildIndex(tempDir);
+      closeDb();
+    });
+
+    it('list shows formatted table with aligned columns', () => {
+      const { combined } = runCli('list');
+      // Output should have consistent spacing/formatting
+      const lines = combined.split('\n').filter((l: string) => l.trim());
+      // Each lesson line should have ID in brackets
+      expect(lines.some((l: string) => l.includes('[L001]'))).toBe(true);
+      expect(lines.some((l: string) => l.includes('[L002]'))).toBe(true);
+    });
+
+    it('search results show formatted output', async () => {
+      const { combined } = runCli('search "test"');
+      expect(combined).toMatch(/found.*lesson/i);
+      expect(combined).toContain('[L001]');
+    });
+
+    it('learn command shows success indicator', () => {
+      const { combined } = runCli('learn "new lesson" --yes');
+      // Should show success message with checkmark or "Learned"
+      expect(combined).toMatch(/learned|saved/i);
+    });
+
+    it('rebuild command shows progress', () => {
+      const { combined } = runCli('rebuild --force');
+      expect(combined).toMatch(/rebuild|index/i);
+    });
+  });
+
+  describe('stats command', () => {
+    it('shows stats for empty database', () => {
+      const { combined } = runCli('stats');
+      expect(combined).toContain('Lessons: 0 total');
+      expect(combined).toContain('Retrievals: 0 total');
+    });
+
+    it('shows correct counts with mixed lesson types', async () => {
+      // Add active lessons
+      await appendLesson(tempDir, createQuickLesson('L001', 'first lesson'));
+      await appendLesson(tempDir, createQuickLesson('L002', 'second lesson'));
+      // Add deleted lesson (tombstone)
+      await appendLesson(tempDir, { ...createQuickLesson('L003', 'deleted lesson'), deleted: true });
+      // Rebuild index to include lessons
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      const { combined } = runCli('stats');
+      expect(combined).toContain('Lessons: 2 total');
+      expect(combined).toContain('1 deleted');
+    });
+
+    it('handles missing database gracefully', async () => {
+      // Add a lesson so JSONL exists but no database yet
+      await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
+
+      const { combined } = runCli('stats');
+      // Should still work - stats command syncs index if needed
+      expect(combined).toContain('Lessons: 1 total');
+    });
+
+    it('shows storage size info', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      const { combined } = runCli('stats');
+      expect(combined).toMatch(/Storage:/);
+      expect(combined).toMatch(/KB|B/); // Size units
+    });
+
+    it('shows retrieval statistics', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'searchable lesson'));
+      await rebuildIndex(tempDir);
+      // Trigger a retrieval by searching
+      closeDb(); // Close so search opens fresh connection
+      runCli('search "searchable"');
+      closeDb();
+
+      const { combined } = runCli('stats');
+      expect(combined).toMatch(/Retrievals:/);
     });
   });
 

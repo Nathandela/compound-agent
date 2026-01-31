@@ -10,15 +10,48 @@
  *   compact          - Archive old lessons and remove tombstones
  */
 
+import chalk from 'chalk';
 import { Command } from 'commander';
+
+import { statSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { detectAndPropose, parseInputFile } from './capture/integration.js';
 import { VERSION } from './index.js';
 import { compact, countTombstones, needsCompaction, TOMBSTONE_THRESHOLD } from './storage/compact.js';
-import { appendLesson, readLessons } from './storage/jsonl.js';
-import { rebuildIndex, searchKeyword, syncIfNeeded } from './storage/sqlite.js';
+import { appendLesson, LESSONS_PATH, readLessons } from './storage/jsonl.js';
+import { DB_PATH, getRetrievalStats, rebuildIndex, searchKeyword, syncIfNeeded } from './storage/sqlite.js';
 import { generateId, LessonSchema } from './types.js';
 import type { Lesson } from './types.js';
+
+// ============================================================================
+// Output Formatting Helpers
+// ============================================================================
+
+/** Output helper functions for consistent formatting */
+const out = {
+  success: (msg: string): void => console.log(chalk.green('[ok]'), msg),
+  error: (msg: string): void => console.error(chalk.red('[error]'), msg),
+  info: (msg: string): void => console.log(chalk.blue('[info]'), msg),
+  warn: (msg: string): void => console.log(chalk.yellow('[warn]'), msg),
+};
+
+/** Global options interface */
+interface GlobalOpts {
+  verbose: boolean;
+  quiet: boolean;
+}
+
+/**
+ * Get global options from command.
+ */
+function getGlobalOpts(cmd: Command): GlobalOpts {
+  const opts = cmd.optsWithGlobals() as { verbose?: boolean; quiet?: boolean };
+  return {
+    verbose: opts.verbose ?? false,
+    quiet: opts.quiet ?? false,
+  };
+}
 
 /** Default limit for search results */
 const DEFAULT_SEARCH_LIMIT = '10';
@@ -27,6 +60,11 @@ const DEFAULT_SEARCH_LIMIT = '10';
 const DEFAULT_LIST_LIMIT = '20';
 
 const program = new Command();
+
+// Add global options
+program
+  .option('-v, --verbose', 'Show detailed output')
+  .option('-q, --quiet', 'Suppress non-essential output');
 
 /**
  * Get repository root from environment variable or current directory.
@@ -64,8 +102,9 @@ program
   .option('-t, --trigger <text>', 'What triggered this lesson')
   .option('--tags <tags>', 'Comma-separated tags', '')
   .option('-y, --yes', 'Skip confirmation')
-  .action(async (insight: string, options: { trigger?: string; tags: string; yes?: boolean }) => {
+  .action(async function (this: Command, insight: string, options: { trigger?: string; tags: string; yes?: boolean }) {
     const repoRoot = getRepoRoot();
+    const { quiet } = getGlobalOpts(this);
 
     const lesson: Lesson = {
       id: generateId(insight),
@@ -85,17 +124,20 @@ program
     };
 
     await appendLesson(repoRoot, lesson);
-    console.log(`Learned: ${insight}`);
-    console.log(`ID: ${lesson.id}`);
+    out.success(`Learned: ${insight}`);
+    if (!quiet) {
+      console.log(`ID: ${chalk.dim(lesson.id)}`);
+    }
   });
 
 program
   .command('search <query>')
   .description('Search lessons by keyword')
   .option('-n, --limit <number>', 'Maximum results', DEFAULT_SEARCH_LIMIT)
-  .action(async (query: string, options: { limit: string }) => {
+  .action(async function (this: Command, query: string, options: { limit: string }) {
     const repoRoot = getRepoRoot();
     const limit = parseLimit(options.limit, 'limit');
+    const { verbose, quiet } = getGlobalOpts(this);
 
     // Sync index if JSONL has changed
     await syncIfNeeded(repoRoot);
@@ -103,14 +145,20 @@ program
     const results = await searchKeyword(repoRoot, query, limit);
 
     if (results.length === 0) {
-      console.log('No lessons found.');
+      console.log('No lessons match your search. Try a different query or use "list" to see all lessons.');
       return;
     }
 
-    console.log(`Found ${results.length} lesson(s):\n`);
+    if (!quiet) {
+      out.info(`Found ${results.length} lesson(s):\n`);
+    }
     for (const lesson of results) {
-      console.log(`[${lesson.id}] ${lesson.insight}`);
+      console.log(`[${chalk.cyan(lesson.id)}] ${lesson.insight}`);
       console.log(`  Trigger: ${lesson.trigger}`);
+      if (verbose && lesson.context) {
+        console.log(`  Context: ${lesson.context.tool} - ${lesson.context.intent}`);
+        console.log(`  Created: ${lesson.created}`);
+      }
       if (lesson.tags.length > 0) {
         console.log(`  Tags: ${lesson.tags.join(', ')}`);
       }
@@ -122,26 +170,39 @@ program
   .command('list')
   .description('List all lessons')
   .option('-n, --limit <number>', 'Maximum results', DEFAULT_LIST_LIMIT)
-  .action(async (options: { limit: string }) => {
+  .action(async function (this: Command, options: { limit: string }) {
     const repoRoot = getRepoRoot();
     const limit = parseLimit(options.limit, 'limit');
+    const { verbose, quiet } = getGlobalOpts(this);
 
     const { lessons, skippedCount } = await readLessons(repoRoot);
 
     if (lessons.length === 0) {
-      console.log('No lessons found.');
+      console.log('No lessons found. Get started with: learn "Your first lesson"');
       if (skippedCount > 0) {
-        console.error(`Warning: ${skippedCount} corrupted lesson(s) skipped.`);
+        out.warn(`${skippedCount} corrupted lesson(s) skipped.`);
       }
       return;
     }
 
     const toShow = lessons.slice(0, limit);
-    console.log(`Showing ${toShow.length} of ${lessons.length} lesson(s):\n`);
+
+    // Show summary unless quiet mode
+    if (!quiet) {
+      out.info(`Showing ${toShow.length} of ${lessons.length} lesson(s):\n`);
+    }
 
     for (const lesson of toShow) {
-      console.log(`[${lesson.id}] ${lesson.insight}`);
-      console.log(`  Type: ${lesson.type} | Source: ${lesson.source}`);
+      console.log(`[${chalk.cyan(lesson.id)}] ${lesson.insight}`);
+      if (verbose) {
+        console.log(`  Type: ${lesson.type} | Source: ${lesson.source}`);
+        console.log(`  Created: ${lesson.created}`);
+        if (lesson.context) {
+          console.log(`  Context: ${lesson.context.tool} - ${lesson.context.intent}`);
+        }
+      } else {
+        console.log(`  Type: ${lesson.type} | Source: ${lesson.source}`);
+      }
       if (lesson.tags.length > 0) {
         console.log(`  Tags: ${lesson.tags.join(', ')}`);
       }
@@ -149,7 +210,7 @@ program
     }
 
     if (skippedCount > 0) {
-      console.error(`Warning: ${skippedCount} corrupted lesson(s) skipped.`);
+      out.warn(`${skippedCount} corrupted lesson(s) skipped.`);
     }
   });
 
@@ -372,5 +433,64 @@ program
       console.log(`Imported ${imported} ${lessonWord}`);
     }
   });
+
+program
+  .command('stats')
+  .description('Show database health and statistics')
+  .action(async () => {
+    const repoRoot = getRepoRoot();
+
+    // Sync index to ensure accurate stats
+    await syncIfNeeded(repoRoot);
+
+    // Read lessons from JSONL to get accurate counts
+    const { lessons } = await readLessons(repoRoot);
+    const deletedCount = await countTombstones(repoRoot);
+    const totalLessons = lessons.length;
+
+    // Get retrieval stats from SQLite
+    const retrievalStats = getRetrievalStats(repoRoot);
+    const totalRetrievals = retrievalStats.reduce((sum, s) => sum + s.count, 0);
+    const avgRetrievals = totalLessons > 0 ? (totalRetrievals / totalLessons).toFixed(1) : '0.0';
+
+    // Get storage sizes
+    const jsonlPath = join(repoRoot, LESSONS_PATH);
+    const dbPath = join(repoRoot, DB_PATH);
+
+    let dataSize = 0;
+    let indexSize = 0;
+
+    try {
+      dataSize = statSync(jsonlPath).size;
+    } catch {
+      // File doesn't exist
+    }
+
+    try {
+      indexSize = statSync(dbPath).size;
+    } catch {
+      // File doesn't exist
+    }
+
+    const totalSize = dataSize + indexSize;
+
+    // Format output
+    const deletedInfo = deletedCount > 0 ? ` (${deletedCount} deleted)` : '';
+    console.log(`Lessons: ${totalLessons} total${deletedInfo}`);
+    console.log(`Retrievals: ${totalRetrievals} total, ${avgRetrievals} avg per lesson`);
+    console.log(`Storage: ${formatBytes(totalSize)} (index: ${formatBytes(indexSize)}, data: ${formatBytes(dataSize)})`);
+  });
+
+/**
+ * Format bytes to human-readable string.
+ */
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  const kb = bytes / 1024;
+  if (kb < 1024) return `${kb.toFixed(1)} KB`;
+  const mb = kb / 1024;
+  return `${mb.toFixed(1)} MB`;
+}
 
 program.parse();
