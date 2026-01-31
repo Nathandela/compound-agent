@@ -111,13 +111,42 @@ learning-agent compact
 
 ## Claude Code Integration
 
-Add to your `.claude/settings.json` to automatically load lessons:
+### Automatic Setup (Recommended)
+
+```bash
+# Install hooks into Claude Code settings (global)
+npx learning-agent setup claude
+
+# Install to project only
+npx learning-agent setup claude --project
+
+# Preview what would change
+npx learning-agent setup claude --dry-run
+
+# Remove hooks
+npx learning-agent setup claude --uninstall
+```
+
+This installs a SessionStart hook that automatically loads lessons when Claude starts, resumes, or compacts context.
+
+### Manual Setup
+
+Add to your `~/.claude/settings.json`:
 
 ```json
 {
   "hooks": {
-    "session_start": "npx learning-agent load-session",
-    "pre_plan": "npx learning-agent check-plan"
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx learning-agent load-session 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -127,7 +156,7 @@ Add to your `.claude/settings.json` to automatically load lessons:
 | Command | Purpose |
 |---------|---------|
 | `load-session` | Load high-severity lessons at session start |
-| `check-plan` | Retrieve relevant lessons when planning |
+| `check-plan --plan "..."` | Retrieve relevant lessons when planning |
 
 ## API Reference
 
@@ -208,7 +237,7 @@ pnpm lint
 
 ## Project Status
 
-Version 0.1.0 - Core infrastructure implemented. See [doc/SPEC.md](doc/SPEC.md) for the full specification and [doc/PLAN.md](doc/PLAN.md) for the implementation roadmap.
+Version 0.2.0 - Claude Code hooks integration complete. See [doc/SPEC.md](doc/SPEC.md) for the full specification and [CHANGELOG.md](CHANGELOG.md) for recent changes.
 
 ## Documentation
 

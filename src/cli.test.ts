@@ -5,10 +5,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { isModelAvailable } from './embeddings/nomic.js';
 import { ARCHIVE_DIR } from './storage/compact.js';
 import { appendLesson, LESSONS_PATH } from './storage/jsonl.js';
 import { closeDb, rebuildIndex } from './storage/sqlite.js';
 import { createFullLesson, createQuickLesson, daysAgo } from './test-utils.js';
+
+// Check model availability at module load time for conditional tests
+const modelAvailable = isModelAvailable();
 
 describe('CLI', () => {
   let tempDir: string;
@@ -69,6 +73,15 @@ describe('CLI', () => {
     it('requires insight argument', () => {
       const { combined } = runCli('learn');
       expect(combined.toLowerCase()).toMatch(/missing|required|argument/i);
+    });
+
+    it('always saves with confirmed: true even without --yes', async () => {
+      runCli('learn "Always confirm manual lessons"');
+
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lesson = JSON.parse(content.trim()) as { confirmed: boolean };
+      expect(lesson.confirmed).toBe(true);
     });
   });
 
@@ -811,6 +824,18 @@ describe('CLI', () => {
         expect(typeof result.lessons[0].id).toBe('string');
       }
     });
+
+    // Test that check-plan returns proper error when model unavailable
+    // This test only runs when model IS available (to verify format of success case)
+    it.skipIf(!modelAvailable)('returns lessons array when model is available', () => {
+      const { stdout } = runCli('check-plan --json --plan "testing workflow"');
+      const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as { lessons?: unknown[]; error?: string };
+      // Should have lessons (not error) when model is available
+      expect(result.lessons).toBeDefined();
+      expect(result.error).toBeUndefined();
+    });
   });
 
   describe('detect command', () => {
@@ -898,7 +923,7 @@ describe('CLI', () => {
       expect(combined).toContain('test_failure');
     });
 
-    it('saves lesson when --save flag is used', async () => {
+    it('--save without --yes shows error and does not save', async () => {
       const inputPath = join(tempDir, 'input.json');
       await writeFile(
         inputPath,
@@ -915,6 +940,36 @@ describe('CLI', () => {
       );
 
       const { combined } = runCli(`detect --input ${inputPath} --save`);
+      expect(combined.toLowerCase()).toMatch(/--yes|confirmation|required/i);
+
+      // Should NOT save without --yes
+      const filePath = join(tempDir, LESSONS_PATH);
+      let content = '';
+      try {
+        content = await readFile(filePath, 'utf-8');
+      } catch {
+        // File doesn't exist, which is expected
+      }
+      expect(content).not.toContain('pnpm build');
+    });
+
+    it('saves lesson when --save and --yes are used together', async () => {
+      const inputPath = join(tempDir, 'input.json');
+      await writeFile(
+        inputPath,
+        JSON.stringify({
+          type: 'user',
+          data: {
+            messages: [
+              'run the build',
+              'Wrong, use pnpm build instead of npm build for this project',
+            ],
+            context: { tool: 'bash', intent: 'build' },
+          },
+        })
+      );
+
+      const { combined } = runCli(`detect --input ${inputPath} --save --yes`);
       expect(combined).toContain('Saved as lesson');
 
       // Verify lesson was actually saved
@@ -969,13 +1024,11 @@ describe('CLI', () => {
       expect(content).toContain('pnpm build');
     });
 
-    it('shows preview without --yes flag and does not save', async () => {
+    it('errors in non-interactive mode without --yes flag', async () => {
       const { combined } = runCli('capture --trigger "test trigger" --insight "test insight"');
 
-      // Should show preview
-      expect(combined).toContain('Lesson captured');
-      expect(combined).toContain('test trigger');
-      expect(combined).toContain('test insight');
+      // Should show error about requiring --yes in non-interactive mode
+      expect(combined.toLowerCase()).toMatch(/--yes|non.?interactive|confirmation|required/i);
 
       // Should NOT save (no --yes flag)
       const filePath = join(tempDir, LESSONS_PATH);
@@ -986,6 +1039,15 @@ describe('CLI', () => {
         // File doesn't exist, which is expected
       }
       expect(content).not.toContain('test insight');
+    });
+
+    it('saves with confirmed: true when --yes is used', async () => {
+      runCli('capture --trigger "test trigger" --insight "test insight" --yes');
+
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lesson = JSON.parse(content.trim()) as { confirmed: boolean };
+      expect(lesson.confirmed).toBe(true);
     });
 
     it('requires either --trigger/--insight or --input', () => {
@@ -1058,6 +1120,227 @@ describe('CLI', () => {
     });
   });
 
+  describe('setup claude command', () => {
+    let mockHome: string;
+
+    beforeEach(async () => {
+      // Create a mock home directory for testing global settings
+      mockHome = join(tempDir, 'mock-home');
+      await mkdir(join(mockHome, '.claude'), { recursive: true });
+    });
+
+    const runSetupClaude = (args = ''): { stdout: string; stderr: string; combined: string } => {
+      const cliPath = join(process.cwd(), 'dist', 'cli.js');
+      try {
+        const stdout = execSync(`node ${cliPath} setup claude ${args} 2>&1`, {
+          cwd: tempDir,
+          encoding: 'utf-8',
+          env: { ...process.env, HOME: mockHome, LEARNING_AGENT_ROOT: tempDir },
+        });
+        return { stdout, stderr: '', combined: stdout };
+      } catch (error) {
+        const err = error as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
+        const stdout = err.stdout?.toString() ?? '';
+        const stderr = err.stderr?.toString() ?? '';
+        const combined = stdout + stderr + (err.message ?? '');
+        return { stdout, stderr, combined };
+      }
+    };
+
+    it('installs hooks to global settings file', async () => {
+      const { combined } = runSetupClaude();
+
+      // Should indicate success
+      expect(combined.toLowerCase()).toMatch(/installed|ok|success/i);
+
+      // Verify settings file was created
+      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+      // Should have SessionStart hook
+      expect(settings.hooks).toBeDefined();
+      expect(settings.hooks.SessionStart).toBeDefined();
+      expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
+
+      // Hook should contain our command
+      const hookEntry = settings.hooks.SessionStart[0];
+      expect(hookEntry.hooks[0].command).toContain('learning-agent');
+      expect(hookEntry.hooks[0].command).toContain('load-session');
+    });
+
+    it('preserves existing settings when adding hooks', async () => {
+      // Create existing settings
+      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            permissions: { enabled: true },
+            mcpServers: { test: { command: 'test' } },
+          },
+          null,
+          2
+        )
+      );
+
+      runSetupClaude();
+
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+      // Should preserve existing fields
+      expect(settings.permissions).toEqual({ enabled: true });
+      expect(settings.mcpServers).toEqual({ test: { command: 'test' } });
+      // Should add hooks
+      expect(settings.hooks.SessionStart).toBeDefined();
+    });
+
+    it('preserves existing SessionStart hooks when adding our hook', async () => {
+      // Create settings with existing SessionStart hook
+      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                {
+                  matcher: 'startup',
+                  hooks: [{ type: 'command', command: 'echo "existing hook"' }],
+                },
+              ],
+            },
+          },
+          null,
+          2
+        )
+      );
+
+      runSetupClaude();
+
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+      // Should have 2 hooks now
+      expect(settings.hooks.SessionStart.length).toBe(2);
+      // First should be existing
+      expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('echo "existing hook"');
+      // Second should be ours
+      expect(settings.hooks.SessionStart[1].hooks[0].command).toContain('learning-agent');
+    });
+
+    it('is idempotent - does not duplicate hook on re-run', async () => {
+      runSetupClaude();
+      runSetupClaude();
+
+      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+      // Should still have only 1 hook
+      expect(settings.hooks.SessionStart.length).toBe(1);
+    });
+
+    it('reports already installed when hook exists', async () => {
+      runSetupClaude();
+      const { combined } = runSetupClaude();
+
+      expect(combined.toLowerCase()).toMatch(/already|unchanged/i);
+    });
+
+    it('--uninstall removes our hook', async () => {
+      // First install
+      runSetupClaude();
+
+      // Then uninstall
+      const { combined } = runSetupClaude('--uninstall');
+      expect(combined.toLowerCase()).toMatch(/removed|uninstalled/i);
+
+      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+      // Hook should be removed
+      expect(settings.hooks.SessionStart).toHaveLength(0);
+    });
+
+    it('--uninstall preserves other hooks', async () => {
+      // Create settings with existing and our hook
+      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                { matcher: 'startup', hooks: [{ type: 'command', command: 'echo "keep me"' }] },
+                {
+                  matcher: 'startup|resume|compact',
+                  hooks: [{ type: 'command', command: 'npx learning-agent load-session 2>/dev/null || true' }],
+                },
+              ],
+            },
+          },
+          null,
+          2
+        )
+      );
+
+      runSetupClaude('--uninstall');
+
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+      // Should keep other hook
+      expect(settings.hooks.SessionStart.length).toBe(1);
+      expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('echo "keep me"');
+    });
+
+    it('--dry-run shows changes without writing', async () => {
+      const { combined } = runSetupClaude('--dry-run');
+
+      expect(combined.toLowerCase()).toMatch(/would|dry.run/i);
+
+      // File should not exist
+      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      expect(existsSync(settingsPath)).toBe(false);
+    });
+
+    it('--project installs to project .claude directory', async () => {
+      // Create project .claude directory
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+      const { combined } = runSetupClaude('--project');
+      expect(combined.toLowerCase()).toMatch(/project|installed/i);
+
+      // Should be in project, not global
+      const projectSettings = join(tempDir, '.claude', 'settings.json');
+      const globalSettings = join(mockHome, '.claude', 'settings.json');
+
+      expect(existsSync(projectSettings)).toBe(true);
+      expect(existsSync(globalSettings)).toBe(false);
+    });
+
+    it('--json outputs machine-readable result', async () => {
+      const { stdout } = runSetupClaude('--json');
+      const result = JSON.parse(stdout) as {
+        installed: boolean;
+        location: string;
+        hooks: string[];
+        action: string;
+      };
+
+      expect(result.installed).toBe(true);
+      expect(result.location).toContain('settings.json');
+      expect(result.hooks).toContain('SessionStart');
+      expect(['created', 'updated']).toContain(result.action);
+    });
+
+    it('--json with --dry-run shows what would happen', async () => {
+      const { stdout } = runSetupClaude('--dry-run --json');
+      const result = JSON.parse(stdout) as {
+        dryRun: boolean;
+        wouldInstall: boolean;
+        location: string;
+      };
+
+      expect(result.dryRun).toBe(true);
+      expect(result.wouldInstall).toBe(true);
+    });
+  });
+
   describe('init command', () => {
     it('creates .claude/lessons directory structure', async () => {
       runCli('init');
@@ -1085,6 +1368,20 @@ describe('CLI', () => {
       expect(content).toContain('load-session');
       expect(content).toContain('check-plan');
       expect(content).toContain('capture');
+    });
+
+    it('AGENTS.md template includes explicit plan-time instructions', async () => {
+      runCli('init');
+
+      const agentsPath = join(tempDir, 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Must include explicit instruction to run check-plan BEFORE implementing
+      expect(content).toMatch(/before\s+(implementing|starting|coding)/i);
+      // Must mention running check-plan command
+      expect(content).toContain('npx learning-agent check-plan');
+      // Must explain what to do with results
+      expect(content).toMatch(/lessons?\s*check/i);
     });
 
     it('appends to existing AGENTS.md without duplicating', async () => {
@@ -1242,6 +1539,77 @@ describe('CLI', () => {
       const { stdout } = runCli('init --json');
       const result = JSON.parse(stdout) as { hooks: boolean };
       expect(result.hooks).toBe(true);
+    });
+
+    it('appends to existing hook without overwriting original content', async () => {
+      const gitHooksDir = join(tempDir, '.git', 'hooks');
+      await mkdir(gitHooksDir, { recursive: true });
+
+      // Create existing hook
+      const hookPath = join(gitHooksDir, 'pre-commit');
+      const existingContent = '#!/bin/sh\necho "existing hook"\npnpm test\n';
+      await writeFile(hookPath, existingContent);
+
+      runCli('init');
+
+      const newContent = await readFile(hookPath, 'utf-8');
+      // Should preserve existing content
+      expect(newContent).toContain('existing hook');
+      expect(newContent).toContain('pnpm test');
+      // Should also have our marker
+      expect(newContent).toContain('Learning Agent');
+      expect(newContent).toContain('learning-agent hooks run');
+    });
+
+    it('does not modify hook that already has Learning Agent marker', async () => {
+      const gitHooksDir = join(tempDir, '.git', 'hooks');
+      await mkdir(gitHooksDir, { recursive: true });
+
+      // Create existing hook with our marker
+      const hookPath = join(gitHooksDir, 'pre-commit');
+      const contentWithMarker = '#!/bin/sh\n# Learning Agent pre-commit hook\nnpx learning-agent hooks run pre-commit\n';
+      await writeFile(hookPath, contentWithMarker);
+
+      runCli('init');
+
+      const newContent = await readFile(hookPath, 'utf-8');
+      // Should be unchanged
+      expect(newContent).toBe(contentWithMarker);
+    });
+
+    it('respects core.hooksPath configuration', async () => {
+      // Create custom hooks directory
+      const customHooksDir = join(tempDir, 'custom-hooks');
+      await mkdir(customHooksDir, { recursive: true });
+
+      // Create minimal .git directory with config
+      await mkdir(join(tempDir, '.git'), { recursive: true });
+      await writeFile(join(tempDir, '.git', 'config'), `[core]\n\thooksPath = custom-hooks\n`);
+
+      runCli('init');
+
+      // Hook should be in custom directory, not .git/hooks
+      const customHookPath = join(customHooksDir, 'pre-commit');
+      const defaultHookPath = join(tempDir, '.git', 'hooks', 'pre-commit');
+
+      expect(existsSync(customHookPath)).toBe(true);
+      expect(existsSync(defaultHookPath)).toBe(false);
+    });
+
+    it('handles absolute core.hooksPath', async () => {
+      // Create custom hooks directory with absolute path
+      const customHooksDir = join(tempDir, 'absolute-hooks');
+      await mkdir(customHooksDir, { recursive: true });
+
+      // Create minimal .git directory with config
+      await mkdir(join(tempDir, '.git'), { recursive: true });
+      await writeFile(join(tempDir, '.git', 'config'), `[core]\n\thooksPath = ${customHooksDir}\n`);
+
+      runCli('init');
+
+      // Hook should be in custom directory
+      const customHookPath = join(customHooksDir, 'pre-commit');
+      expect(existsSync(customHookPath)).toBe(true);
     });
   });
 });

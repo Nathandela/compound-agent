@@ -7,7 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-01-31
+
 ### Added
+
+- **Claude Code Integration**
+  - `learning-agent setup claude` - Install SessionStart hooks into Claude Code settings
+  - `--project` flag for project-level hooks (vs global)
+  - `--uninstall` to remove hooks
+  - `--dry-run` to preview changes
+  - Automatic lesson injection at session start, resume, and compact events
 
 - **Storage Enhancements**
   - Compaction system for archiving old lessons and removing tombstones
@@ -27,14 +36,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Simplified model download using node-llama-cpp resolveModelFile
 
 - **Testing**
-  - 100% statement/function/line coverage (435 tests)
-  - Property-based tests with fast-check
+  - 501 tests with property-based testing (fast-check)
   - Integration tests for capture workflows
 
 ### Changed
 
 - Unified QuickLesson and FullLesson into single Lesson type
 - Removed deprecated type exports
+- `check-plan` now hard-fails on embedding errors (exit non-zero with actionable message)
+- `capture` and `detect --save` now require `--yes` flag for saves
+- `learn` command always saves with `confirmed: true`
+- Hook installation is non-destructive (appends to existing hooks)
+- Hook installation respects `core.hooksPath` git configuration
+
+### Fixed
+
+- Embedding errors no longer masked as "no relevant lessons" in check-plan
+- Git hooks no longer overwrite existing pre-commit hooks
+- AGENTS.md template now includes explicit plan-time instructions
 
 ## [0.1.0] - 2025-01-30
 

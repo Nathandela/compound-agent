@@ -16,7 +16,8 @@ import chalk from 'chalk';
 import { Command } from 'commander';
 
 import { chmodSync, existsSync, statSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
 // ============================================================================
@@ -38,13 +39,31 @@ const PRE_COMMIT_HOOK_TEMPLATE = `#!/bin/sh
 npx learning-agent hooks run pre-commit
 `;
 
+// ============================================================================
+// Claude Code Hooks Configuration
+// ============================================================================
+
+/** Marker to identify our hook in Claude Code settings */
+const CLAUDE_HOOK_MARKER = 'learning-agent load-session';
+
+/** Claude Code SessionStart hook configuration */
+const CLAUDE_HOOK_CONFIG = {
+  matcher: 'startup|resume|compact',
+  hooks: [
+    {
+      type: 'command',
+      command: 'npx learning-agent load-session 2>/dev/null || true',
+    },
+  ],
+};
+
 /** Marker comment to identify our hook */
 const HOOK_MARKER = '# Learning Agent pre-commit hook';
 
 import { detectAndPropose, parseInputFile } from './capture/index.js';
 import type { DetectionResult } from './capture/index.js';
 import { formatBytes, getRepoRoot, parseLimit } from './cli-utils.js';
-import { loadSessionLessons, retrieveForPlan, VERSION } from './index.js';
+import { isModelAvailable, loadSessionLessons, retrieveForPlan, VERSION } from './index.js';
 import {
   appendLesson,
   compact,
@@ -290,7 +309,25 @@ This project uses learning-agent for session memory.
 ### Retrieval Points
 
 - **Session start**: High-severity lessons loaded automatically
-- **Plan creation**: Semantic search for relevant lessons
+- **Plan-time**: BEFORE implementing a plan, run check-plan to retrieve relevant lessons
+
+### Plan-Time Retrieval (Explicit Step)
+
+**BEFORE implementing any plan**, run:
+
+\`\`\`bash
+npx learning-agent check-plan --plan "your plan description" --json
+\`\`\`
+
+Display results as a **Lessons Check** section after your plan:
+
+\`\`\`
+## Lessons Check
+1. [insight from lesson 1] (relevance: 0.85)
+2. [insight from lesson 2] (relevance: 0.72)
+\`\`\`
+
+Consider each lesson while implementing.
 
 ### Proposing Lessons
 
@@ -308,22 +345,20 @@ Propose when: user correction, self-correction, test failure fix, or manual requ
 Learned: [insight]. Save? [y/n]
 \`\`\`
 
-### Session-End Protocol (Compound Check)
+### Session-End Protocol
 
 Before closing a session, reflect on lessons learned:
 
-1. **Review**: What mistakes or corrections happened this session?
+1. **Review**: What mistakes or corrections happened?
 2. **Quality gate**: Is it novel, specific, actionable?
 3. **Propose**: "Learned: [insight]. Save? [y/n]"
 4. **Capture**: \`npx learning-agent capture --trigger "..." --insight "..." --yes\`
-
-Then proceed with standard close (git commit, push, etc).
 
 ### CLI Commands
 
 \`\`\`bash
 npx learning-agent load-session --json  # Session start
-npx learning-agent check-plan --json    # Plan-time
+npx learning-agent check-plan --plan "..." --json  # Before implementing
 npx learning-agent capture --trigger "..." --insight "..." --yes
 \`\`\`
 
@@ -392,15 +427,56 @@ function hasLearningAgentHook(content: string): boolean {
 }
 
 /**
- * Install pre-commit hook if .git/hooks directory exists.
+ * Get the git hooks directory, respecting core.hooksPath if set.
+ */
+async function getGitHooksDir(repoRoot: string): Promise<string | null> {
+  const gitDir = join(repoRoot, '.git');
+
+  // Check if .git directory exists
+  if (!existsSync(gitDir)) {
+    return null;
+  }
+
+  // Check for core.hooksPath in .git/config
+  const configPath = join(gitDir, 'config');
+  if (existsSync(configPath)) {
+    const config = await readFile(configPath, 'utf-8');
+    const match = /hooksPath\s*=\s*(.+)$/m.exec(config);
+    if (match?.[1]) {
+      const hooksPath = match[1].trim();
+      // Resolve relative paths from repo root
+      return hooksPath.startsWith('/') ? hooksPath : join(repoRoot, hooksPath);
+    }
+  }
+
+  // Default to .git/hooks
+  const defaultHooksDir = join(gitDir, 'hooks');
+  return existsSync(defaultHooksDir) ? defaultHooksDir : null;
+}
+
+/** Block to append to existing hooks */
+const LEARNING_AGENT_HOOK_BLOCK = `
+# Learning Agent pre-commit hook (appended)
+npx learning-agent hooks run pre-commit
+`;
+
+/**
+ * Install pre-commit hook, respecting core.hooksPath and existing hooks.
+ *
+ * - Respects core.hooksPath when configured
+ * - Appends to existing hooks instead of overwriting
+ * - Uses marker to ensure idempotency
  */
 async function installPreCommitHook(repoRoot: string): Promise<boolean> {
-  const gitHooksDir = join(repoRoot, '.git', 'hooks');
+  const gitHooksDir = await getGitHooksDir(repoRoot);
 
-  // Skip if not a git repo
-  if (!existsSync(gitHooksDir)) {
+  // Skip if not a git repo or no hooks directory
+  if (!gitHooksDir) {
     return false;
   }
+
+  // Ensure hooks directory exists
+  await mkdir(gitHooksDir, { recursive: true });
 
   const hookPath = join(gitHooksDir, 'pre-commit');
 
@@ -410,9 +486,15 @@ async function installPreCommitHook(repoRoot: string): Promise<boolean> {
     if (hasLearningAgentHook(content)) {
       return false; // Already installed
     }
+
+    // Append our block to existing hook (non-destructive)
+    const newContent = content.trimEnd() + '\n' + LEARNING_AGENT_HOOK_BLOCK;
+    await writeFile(hookPath, newContent, 'utf-8');
+    chmodSync(hookPath, HOOK_FILE_MODE);
+    return true;
   }
 
-  // Write hook file
+  // Create new hook file with full template
   await writeFile(hookPath, PRE_COMMIT_HOOK_TEMPLATE, 'utf-8');
   chmodSync(hookPath, HOOK_FILE_MODE);
 
@@ -525,6 +607,203 @@ hooksCommand
     }
   });
 
+// ============================================================================
+// Setup Command - Configure Claude Code hooks
+// ============================================================================
+
+/**
+ * Get the path to Claude Code settings file.
+ */
+function getClaudeSettingsPath(project: boolean): string {
+  if (project) {
+    const repoRoot = getRepoRoot();
+    return join(repoRoot, '.claude', 'settings.json');
+  }
+  return join(homedir(), '.claude', 'settings.json');
+}
+
+/**
+ * Read and parse Claude Code settings.
+ */
+async function readClaudeSettings(settingsPath: string): Promise<Record<string, unknown>> {
+  if (!existsSync(settingsPath)) {
+    return {};
+  }
+  const content = await readFile(settingsPath, 'utf-8');
+  return JSON.parse(content) as Record<string, unknown>;
+}
+
+/**
+ * Check if our hook is already installed.
+ */
+function hasClaudeHook(settings: Record<string, unknown>): boolean {
+  const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+  if (!hooks?.SessionStart) return false;
+
+  return hooks.SessionStart.some((entry) => {
+    const hookEntry = entry as { hooks?: Array<{ command?: string }> };
+    return hookEntry.hooks?.some((h) => h.command?.includes(CLAUDE_HOOK_MARKER));
+  });
+}
+
+/**
+ * Add our hook to SessionStart array.
+ */
+function addLearningAgentHook(settings: Record<string, unknown>): void {
+  if (!settings.hooks) {
+    settings.hooks = {};
+  }
+  const hooks = settings.hooks as Record<string, unknown[]>;
+  if (!hooks.SessionStart) {
+    hooks.SessionStart = [];
+  }
+  hooks.SessionStart.push(CLAUDE_HOOK_CONFIG);
+}
+
+/**
+ * Remove our hook from SessionStart array.
+ */
+function removeLearningAgentHook(settings: Record<string, unknown>): boolean {
+  const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+  if (!hooks?.SessionStart) return false;
+
+  const originalLength = hooks.SessionStart.length;
+  hooks.SessionStart = hooks.SessionStart.filter((entry) => {
+    const hookEntry = entry as { hooks?: Array<{ command?: string }> };
+    return !hookEntry.hooks?.some((h) => h.command?.includes(CLAUDE_HOOK_MARKER));
+  });
+
+  return hooks.SessionStart.length < originalLength;
+}
+
+/**
+ * Write Claude Code settings atomically.
+ */
+async function writeClaudeSettings(settingsPath: string, settings: Record<string, unknown>): Promise<void> {
+  const dir = dirname(settingsPath);
+  await mkdir(dir, { recursive: true });
+
+  // Write to temp file, then rename (atomic)
+  const tempPath = settingsPath + '.tmp';
+  await writeFile(tempPath, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
+  await rename(tempPath, settingsPath);
+}
+
+const setupCommand = program.command('setup').description('Setup integrations');
+
+setupCommand
+  .command('claude')
+  .description('Install Claude Code SessionStart hooks')
+  .option('--project', 'Install to project .claude directory instead of global')
+  .option('--uninstall', 'Remove learning-agent hooks')
+  .option('--dry-run', 'Show what would change without writing')
+  .option('--json', 'Output as JSON')
+  .action(async (options: { project?: boolean; uninstall?: boolean; dryRun?: boolean; json?: boolean }) => {
+    const settingsPath = getClaudeSettingsPath(options.project ?? false);
+    const displayPath = options.project ? '.claude/settings.json' : '~/.claude/settings.json';
+
+    let settings: Record<string, unknown>;
+    try {
+      settings = await readClaudeSettings(settingsPath);
+    } catch {
+      if (options.json) {
+        console.log(JSON.stringify({ error: 'Failed to parse settings file' }));
+      } else {
+        out.error('Failed to parse settings file. Check if JSON is valid.');
+      }
+      process.exit(1);
+    }
+
+    const alreadyInstalled = hasClaudeHook(settings);
+
+    // Handle uninstall
+    if (options.uninstall) {
+      if (options.dryRun) {
+        if (options.json) {
+          console.log(JSON.stringify({ dryRun: true, wouldRemove: alreadyInstalled, location: displayPath }));
+        } else {
+          if (alreadyInstalled) {
+            console.log(`Would remove learning-agent hooks from ${displayPath}`);
+          } else {
+            console.log('No learning-agent hooks to remove');
+          }
+        }
+        return;
+      }
+
+      const removed = removeLearningAgentHook(settings);
+      if (removed) {
+        await writeClaudeSettings(settingsPath, settings);
+        if (options.json) {
+          console.log(JSON.stringify({ installed: false, location: displayPath, action: 'removed' }));
+        } else {
+          out.success('Learning agent hooks removed');
+          console.log(`  Location: ${displayPath}`);
+        }
+      } else {
+        if (options.json) {
+          console.log(JSON.stringify({ installed: false, location: displayPath, action: 'unchanged' }));
+        } else {
+          out.info('No learning agent hooks to remove');
+        }
+      }
+      return;
+    }
+
+    // Handle install
+    if (options.dryRun) {
+      if (options.json) {
+        console.log(JSON.stringify({ dryRun: true, wouldInstall: !alreadyInstalled, location: displayPath }));
+      } else {
+        if (alreadyInstalled) {
+          console.log('Learning agent hooks already installed');
+        } else {
+          console.log(`Would install learning-agent hooks to ${displayPath}`);
+        }
+      }
+      return;
+    }
+
+    if (alreadyInstalled) {
+      if (options.json) {
+        console.log(JSON.stringify({
+          installed: true,
+          location: displayPath,
+          hooks: ['SessionStart'],
+          action: 'unchanged',
+        }));
+      } else {
+        out.info('Learning agent hooks already installed');
+        console.log(`  Location: ${displayPath}`);
+      }
+      return;
+    }
+
+    // Add hook
+    const fileExists = existsSync(settingsPath);
+    addLearningAgentHook(settings);
+    await writeClaudeSettings(settingsPath, settings);
+
+    if (options.json) {
+      console.log(JSON.stringify({
+        installed: true,
+        location: displayPath,
+        hooks: ['SessionStart'],
+        action: fileExists ? 'updated' : 'created',
+      }));
+    } else {
+      out.success(options.project ? 'Claude Code hooks installed (project-level)' : 'Claude Code hooks installed');
+      console.log(`  Location: ${displayPath}`);
+      console.log('  Hook: SessionStart (startup|resume|compact)');
+      console.log('');
+      console.log('Lessons will be loaded automatically at session start.');
+      if (options.project) {
+        console.log('');
+        console.log('Note: Project hooks override global hooks.');
+      }
+    }
+  });
+
 program
   .command('learn <insight>')
   .description('Capture a new lesson')
@@ -547,7 +826,7 @@ program
         intent: 'manual learning',
       },
       created: new Date().toISOString(),
-      confirmed: options.yes ?? false,
+      confirmed: true,  // learn command is explicit confirmation
       supersedes: [],
       related: [],
     };
@@ -667,11 +946,23 @@ program
   .command('detect')
   .description('Detect learning triggers from input')
   .requiredOption('--input <file>', 'Path to JSON input file')
-  .option('--save', 'Automatically save proposed lesson')
+  .option('--save', 'Save proposed lesson (requires --yes)')
+  .option('-y, --yes', 'Confirm save (required with --save)')
   .option('--json', 'Output result as JSON')
   .action(
-    async (options: { input: string; save?: boolean; json?: boolean }) => {
+    async (options: { input: string; save?: boolean; yes?: boolean; json?: boolean }) => {
       const repoRoot = getRepoRoot();
+
+      // --save requires --yes
+      if (options.save && !options.yes) {
+        if (options.json) {
+          console.log(JSON.stringify({ error: '--save requires --yes flag for confirmation' }));
+        } else {
+          out.error('--save requires --yes flag for confirmation');
+          console.log('Use: detect --input <file> --save --yes');
+        }
+        process.exit(1);
+      }
 
       const input = await parseInputFile(options.input);
       const result = await detectAndPropose(repoRoot, input);
@@ -695,7 +986,7 @@ program
       console.log(`  Source: ${result.source}`);
       console.log(`  Proposed: ${result.proposedInsight}`);
 
-      if (options.save) {
+      if (options.save && options.yes) {
         const lesson: Lesson = {
           id: generateId(result.proposedInsight),
           type: 'quick',
@@ -705,7 +996,7 @@ program
           source: result.source,
           context: { tool: 'detect', intent: 'auto-capture' },
           created: new Date().toISOString(),
-          confirmed: false,
+          confirmed: true,  // --yes confirms the lesson
           supersedes: [],
           related: [],
         };
@@ -760,6 +1051,17 @@ program
       process.exit(1);
     }
 
+    // In non-interactive mode, --yes is required
+    if (!options.yes && !process.stdin.isTTY) {
+      if (options.json) {
+        console.log(JSON.stringify({ error: '--yes required in non-interactive mode', saved: false }));
+      } else {
+        out.error('--yes required in non-interactive mode');
+        console.log('Use: capture --trigger "..." --insight "..." --yes');
+      }
+      process.exit(1);
+    }
+
     // Output and optionally save
     if (options.json) {
       if (options.yes) await appendLesson(repoRoot, lesson);
@@ -769,6 +1071,7 @@ program
       out.success(`Lesson saved: ${lesson.id}`);
       if (verbose) console.log(`  Type: ${lesson.type} | Trigger: ${lesson.trigger}`);
     } else {
+      // Interactive mode - show preview (TTY only)
       outputCapturePreview(lesson);
     }
   });
@@ -1025,6 +1328,21 @@ program
       process.exit(1);
     }
 
+    // Check model availability - hard fail if not available
+    if (!isModelAvailable()) {
+      if (options.json) {
+        console.log(JSON.stringify({
+          error: 'Embedding model not available',
+          action: 'Run: npx learning-agent download-model',
+        }));
+      } else {
+        out.error('Embedding model not available');
+        console.log('');
+        console.log('Run: npx learning-agent download-model');
+      }
+      process.exit(1);
+    }
+
     try {
       const result = await retrieveForPlan(repoRoot, planText, limit);
 
@@ -1039,13 +1357,15 @@ program
       }
 
       outputCheckPlanHuman(result.lessons, quiet);
-    } catch {
-      // Handle case when no lessons exist or embeddings fail
+    } catch (err) {
+      // Don't mask errors - surface them clearly
+      const message = err instanceof Error ? err.message : 'Unknown error';
       if (options.json) {
-        console.log(JSON.stringify({ lessons: [], count: 0 }));
+        console.log(JSON.stringify({ error: message }));
       } else {
-        console.log('No relevant lessons found for this plan.');
+        out.error(`Failed to check plan: ${message}`);
       }
+      process.exit(1);
     }
   });
 
