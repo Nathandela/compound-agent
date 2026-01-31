@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { getModelPath } from '../embeddings/download.js';
 import { appendLesson } from '../storage/jsonl.js';
-import type { FullLesson, QuickLesson } from '../types.js';
+import { createFullLesson, createQuickLesson } from '../test-utils.js';
 
 import { formatLessonsCheck, retrieveForPlan } from './plan.js';
 
@@ -15,40 +15,6 @@ const modelAvailable = existsSync(getModelPath());
 
 describe('plan retrieval', () => {
   let tempDir: string;
-
-  const createQuickLesson = (id: string, insight: string, trigger: string): QuickLesson => ({
-    id,
-    type: 'quick',
-    trigger,
-    insight,
-    tags: [],
-    source: 'manual',
-    context: { tool: 'test', intent: 'testing' },
-    created: new Date().toISOString(),
-    confirmed: true,
-    supersedes: [],
-    related: [],
-  });
-
-  const createFullLesson = (
-    id: string,
-    insight: string,
-    severity: 'high' | 'medium' | 'low'
-  ): FullLesson => ({
-    id,
-    type: 'full',
-    trigger: `trigger for ${insight}`,
-    insight,
-    tags: [],
-    source: 'manual',
-    context: { tool: 'test', intent: 'testing' },
-    created: new Date().toISOString(),
-    confirmed: true,
-    supersedes: [],
-    related: [],
-    evidence: 'Test evidence',
-    severity,
-  });
 
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-plan-'));
@@ -67,11 +33,11 @@ describe('plan retrieval', () => {
     it.skipIf(!modelAvailable)('returns relevant lessons based on plan text', async () => {
       await appendLesson(
         tempDir,
-        createQuickLesson('L001', 'Use JWT tokens for authentication', 'login feature')
+        createQuickLesson('L001', 'Use JWT tokens for authentication', { trigger: 'login feature' })
       );
       await appendLesson(
         tempDir,
-        createQuickLesson('L002', 'Use Polars for data processing', 'data pipeline')
+        createQuickLesson('L002', 'Use Polars for data processing', { trigger: 'data pipeline' })
       );
 
       const result = await retrieveForPlan(tempDir, 'implement user authentication with JWT');
@@ -82,11 +48,11 @@ describe('plan retrieval', () => {
     });
 
     it.skipIf(!modelAvailable)('respects limit parameter', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Lesson 1', 'trigger 1'));
-      await appendLesson(tempDir, createQuickLesson('L002', 'Lesson 2', 'trigger 2'));
-      await appendLesson(tempDir, createQuickLesson('L003', 'Lesson 3', 'trigger 3'));
-      await appendLesson(tempDir, createQuickLesson('L004', 'Lesson 4', 'trigger 4'));
-      await appendLesson(tempDir, createQuickLesson('L005', 'Lesson 5', 'trigger 5'));
+      await appendLesson(tempDir, createQuickLesson('L001', 'Lesson 1', { trigger: 'trigger 1' }));
+      await appendLesson(tempDir, createQuickLesson('L002', 'Lesson 2', { trigger: 'trigger 2' }));
+      await appendLesson(tempDir, createQuickLesson('L003', 'Lesson 3', { trigger: 'trigger 3' }));
+      await appendLesson(tempDir, createQuickLesson('L004', 'Lesson 4', { trigger: 'trigger 4' }));
+      await appendLesson(tempDir, createQuickLesson('L005', 'Lesson 5', { trigger: 'trigger 5' }));
 
       const result = await retrieveForPlan(tempDir, 'some plan text', 3);
       expect(result.lessons.length).toBeLessThanOrEqual(3);
@@ -95,7 +61,7 @@ describe('plan retrieval', () => {
     it.skipIf(!modelAvailable)('defaults to 5 lessons', async () => {
       // Create 7 lessons
       for (let i = 1; i <= 7; i++) {
-        await appendLesson(tempDir, createQuickLesson(`L00${i}`, `Lesson ${i}`, `trigger ${i}`));
+        await appendLesson(tempDir, createQuickLesson(`L00${i}`, `Lesson ${i}`, { trigger: `trigger ${i}` }));
       }
 
       const result = await retrieveForPlan(tempDir, 'some plan text');
@@ -117,7 +83,7 @@ describe('plan retrieval', () => {
     it.skipIf(!modelAvailable)('includes Lessons Check message', async () => {
       await appendLesson(
         tempDir,
-        createQuickLesson('L001', 'Use secure headers', 'security implementation')
+        createQuickLesson('L001', 'Use secure headers', { trigger: 'security implementation' })
       );
 
       const result = await retrieveForPlan(tempDir, 'implement security middleware');
@@ -135,8 +101,8 @@ describe('plan retrieval', () => {
 
     it('formats lessons with insights', () => {
       const lessons = [
-        { lesson: createQuickLesson('L001', 'Use JWT for auth', 'auth trigger'), score: 0.9 },
-        { lesson: createQuickLesson('L002', 'Validate input always', 'security'), score: 0.8 },
+        { lesson: createQuickLesson('L001', 'Use JWT for auth', { trigger: 'auth trigger' }), score: 0.9 },
+        { lesson: createQuickLesson('L002', 'Validate input always', { trigger: 'security' }), score: 0.8 },
       ];
       const message = formatLessonsCheck(lessons);
       expect(message).toContain('Lessons Check');

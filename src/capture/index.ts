@@ -29,3 +29,14 @@ export type {
   EditHistory,
   TestResult,
 } from './triggers.js';
+
+// Integration (orchestration)
+export { detectAndPropose, parseInputFile } from './integration.js';
+export type {
+  DetectionInput,
+  DetectionResult,
+  DetectionType,
+  SelfDetectionInput,
+  TestDetectionInput,
+  UserDetectionInput,
+} from './integration.js';

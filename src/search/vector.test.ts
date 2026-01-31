@@ -11,7 +11,7 @@ import {
   rebuildIndex,
   setCachedEmbedding,
 } from '../storage/sqlite.js';
-import type { QuickLesson } from '../types.js';
+import { createQuickLesson } from '../test-utils.js';
 
 import { cosineSimilarity, searchVector } from './vector.js';
 
@@ -58,20 +58,6 @@ describe('vector search', () => {
   describe('searchVector', () => {
     let tempDir: string;
 
-    const createLesson = (id: string, insight: string): QuickLesson => ({
-      id,
-      type: 'quick',
-      trigger: `trigger for ${insight}`,
-      insight,
-      tags: ['test'],
-      source: 'manual',
-      context: { tool: 'test', intent: 'testing' },
-      created: new Date().toISOString(),
-      confirmed: true,
-      supersedes: [],
-      related: [],
-    });
-
     beforeEach(async () => {
       tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-vector-'));
     });
@@ -89,9 +75,9 @@ describe('vector search', () => {
 
     it('returns lessons sorted by similarity', async () => {
       // Add lessons
-      await appendLesson(tempDir, createLesson('L001', 'use Polars for data'));
-      await appendLesson(tempDir, createLesson('L002', 'prefer pandas sometimes'));
-      await appendLesson(tempDir, createLesson('L003', 'always test code'));
+      await appendLesson(tempDir, createQuickLesson('L001', 'use Polars for data'));
+      await appendLesson(tempDir, createQuickLesson('L002', 'prefer pandas sometimes'));
+      await appendLesson(tempDir, createQuickLesson('L003', 'always test code'));
       await rebuildIndex(tempDir);
 
       // Mock embedText to return predictable vectors
@@ -114,7 +100,7 @@ describe('vector search', () => {
     it('respects limit parameter', async () => {
       // Add many lessons
       for (let i = 0; i < 5; i++) {
-        await appendLesson(tempDir, createLesson(`L00${i}`, `lesson ${i}`));
+        await appendLesson(tempDir, createQuickLesson(`L00${i}`, `lesson ${i}`));
       }
       await rebuildIndex(tempDir);
 
@@ -127,7 +113,7 @@ describe('vector search', () => {
 
     describe('embedding cache', () => {
       it('uses cached embedding instead of recomputing', async () => {
-        await appendLesson(tempDir, createLesson('L001', 'test lesson'));
+        await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
         await rebuildIndex(tempDir);
 
         // Pre-cache the embedding
@@ -147,7 +133,7 @@ describe('vector search', () => {
       });
 
       it('computes and caches embedding on cache miss', async () => {
-        await appendLesson(tempDir, createLesson('L001', 'test lesson'));
+        await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
         await rebuildIndex(tempDir);
 
         // No cached embedding
@@ -172,7 +158,7 @@ describe('vector search', () => {
       });
 
       it('recomputes embedding when content hash mismatches', async () => {
-        await appendLesson(tempDir, createLesson('L001', 'test lesson'));
+        await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
         await rebuildIndex(tempDir);
 
         // Cache embedding with wrong hash (simulates stale cache)
@@ -193,7 +179,7 @@ describe('vector search', () => {
     it('uses default limit of 10 when no options provided', async () => {
       // Add 15 lessons
       for (let i = 0; i < 15; i++) {
-        await appendLesson(tempDir, createLesson(`L${String(i).padStart(3, '0')}`, `lesson ${i}`));
+        await appendLesson(tempDir, createQuickLesson(`L${String(i).padStart(3, '0')}`, `lesson ${i}`));
       }
       await rebuildIndex(tempDir);
 

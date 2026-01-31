@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import type { FullLesson, QuickLesson } from '../types.js';
+import { createFullLesson, createQuickLesson } from '../test-utils.js';
 
 import { appendLesson, LESSONS_PATH } from './jsonl.js';
 import {
@@ -132,36 +132,6 @@ describe('SQLite schema', () => {
     });
   });
 
-  const createQuickLesson = (id: string, insight: string): QuickLesson => ({
-    id,
-    type: 'quick',
-    trigger: `trigger for ${insight}`,
-    insight,
-    tags: ['test'],
-    source: 'manual',
-    context: { tool: 'test', intent: 'testing' },
-    created: new Date().toISOString(),
-    confirmed: true,
-    supersedes: [],
-    related: [],
-  });
-
-  const createFullLesson = (id: string, insight: string): FullLesson => ({
-    id,
-    type: 'full',
-    trigger: `trigger for ${insight}`,
-    insight,
-    evidence: 'test evidence',
-    severity: 'high',
-    tags: ['important'],
-    source: 'user_correction',
-    context: { tool: 'edit', intent: 'fix code' },
-    created: new Date().toISOString(),
-    confirmed: true,
-    supersedes: [],
-    related: [],
-  });
-
   describe('rebuildIndex', () => {
     it('populates index from JSONL', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'use Polars'));
@@ -197,7 +167,7 @@ describe('SQLite schema', () => {
 
     it('preserves lesson types', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'quick'));
-      await appendLesson(tempDir, createFullLesson('L002', 'full'));
+      await appendLesson(tempDir, createFullLesson('L002', 'full', 'high'));
       await rebuildIndex(tempDir);
 
       const db = openDb(tempDir);
@@ -331,7 +301,7 @@ describe('SQLite schema', () => {
     beforeEach(async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'use Polars for data'));
       await appendLesson(tempDir, createQuickLesson('L002', 'prefer pandas sometimes'));
-      await appendLesson(tempDir, createFullLesson('L003', 'always test code'));
+      await appendLesson(tempDir, createFullLesson('L003', 'always test code', 'high'));
       await rebuildIndex(tempDir);
     });
 
@@ -364,7 +334,7 @@ describe('SQLite schema', () => {
       expect(lesson.type).toBe('full');
       if (lesson.type === 'full') {
         expect(lesson.severity).toBe('high');
-        expect(lesson.evidence).toBe('test evidence');
+        expect(lesson.evidence).toBe('Test evidence');
       }
     });
 
@@ -377,6 +347,62 @@ describe('SQLite schema', () => {
       } finally {
         await rm(emptyDir, { recursive: true, force: true });
       }
+    });
+  });
+
+  describe('lossless roundtrip for optional fields', () => {
+    it('preserves evidence/severity on quick lesson', async () => {
+      // Quick lesson with optional fields set
+      const lesson = {
+        ...createQuickLesson('L001', 'quick with evidence'),
+        evidence: 'Some evidence',
+        severity: 'high' as const,
+      };
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'evidence', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.evidence).toBe('Some evidence');
+      expect(results[0]!.severity).toBe('high');
+    });
+
+    it('returns undefined for missing evidence/severity on full lesson', async () => {
+      // Full lesson WITHOUT evidence/severity
+      const lesson = createFullLesson('L001', 'full without extras', 'medium');
+      // Remove evidence and severity to test undefined handling
+      delete (lesson as Record<string, unknown>).evidence;
+      delete (lesson as Record<string, unknown>).severity;
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'full', 10);
+      expect(results).toHaveLength(1);
+      // Should be undefined, NOT defaulted to '' or 'medium'
+      expect(results[0]!.evidence).toBeUndefined();
+      expect(results[0]!.severity).toBeUndefined();
+    });
+
+    it('preserves evidence/severity exactly on full lesson', async () => {
+      const lesson = createFullLesson('L001', 'full with high severity', 'high');
+      (lesson as Record<string, unknown>).evidence = 'Critical bug';
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'severity', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.evidence).toBe('Critical bug');
+      expect(results[0]!.severity).toBe('high');
+    });
+
+    it('does not mutate low severity to medium', async () => {
+      const lesson = createFullLesson('L001', 'low severity lesson', 'low');
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'low', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.severity).toBe('low');
     });
   });
 

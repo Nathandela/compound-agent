@@ -22,3 +22,17 @@ export {
   syncIfNeeded,
 } from './sqlite.js';
 export type { SyncOptions } from './sqlite.js';
+
+// Compaction (archive + tombstone removal)
+export {
+  archiveOldLessons,
+  ARCHIVE_AGE_DAYS,
+  ARCHIVE_DIR,
+  compact,
+  countTombstones,
+  getArchivePath,
+  needsCompaction,
+  rewriteWithoutTombstones,
+  TOMBSTONE_THRESHOLD,
+} from './compact.js';
+export type { CompactResult } from './compact.js';

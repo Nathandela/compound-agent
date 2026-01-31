@@ -255,10 +255,12 @@ interface LessonRow {
 
 /**
  * Convert a database row to a typed Lesson object.
+ * Maps NULL to undefined for optional fields (lossless roundtrip).
  */
 function rowToLesson(row: LessonRow): Lesson {
-  const base = {
+  const lesson: Lesson = {
     id: row.id,
+    type: row.type as 'quick' | 'full',
     trigger: row.trigger,
     insight: row.insight,
     tags: row.tags ? row.tags.split(',').filter(Boolean) : [],
@@ -268,23 +270,23 @@ function rowToLesson(row: LessonRow): Lesson {
     related: JSON.parse(row.related) as string[],
     created: row.created,
     confirmed: row.confirmed === 1,
-    deleted: row.deleted === 1 ? true : undefined,
-    retrievalCount: row.retrieval_count > 0 ? row.retrieval_count : undefined,
   };
 
-  if (row.type === 'full') {
-    return {
-      ...base,
-      type: 'full',
-      evidence: row.evidence ?? '',
-      severity: (row.severity ?? 'medium') as 'high' | 'medium' | 'low',
-    };
+  // Optional fields: map NULL -> undefined (lossless roundtrip)
+  if (row.evidence !== null) {
+    lesson.evidence = row.evidence;
+  }
+  if (row.severity !== null) {
+    lesson.severity = row.severity as 'high' | 'medium' | 'low';
+  }
+  if (row.deleted === 1) {
+    lesson.deleted = true;
+  }
+  if (row.retrieval_count > 0) {
+    lesson.retrievalCount = row.retrieval_count;
   }
 
-  return {
-    ...base,
-    type: 'quick',
-  };
+  return lesson;
 }
 
 /** Cached embedding with its content hash */
@@ -381,8 +383,8 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
         type: lesson.type,
         trigger: lesson.trigger,
         insight: lesson.insight,
-        evidence: lesson.type === 'full' ? lesson.evidence : null,
-        severity: lesson.type === 'full' ? lesson.severity : null,
+        evidence: lesson.evidence ?? null,
+        severity: lesson.severity ?? null,
         tags: lesson.tags.join(','),
         source: lesson.source,
         context: JSON.stringify(lesson.context),

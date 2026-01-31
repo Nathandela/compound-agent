@@ -5,26 +5,12 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { appendLesson } from '../storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../storage/sqlite.js';
-import type { QuickLesson } from '../types.js';
+import { createQuickLesson } from '../test-utils.js';
 
 import { isActionable, isNovel, isSpecific, shouldPropose } from './quality.js';
 
 describe('quality filters', () => {
   let tempDir: string;
-
-  const createLesson = (id: string, insight: string): QuickLesson => ({
-    id,
-    type: 'quick',
-    trigger: `trigger for ${insight}`,
-    insight,
-    tags: [],
-    source: 'manual',
-    context: { tool: 'test', intent: 'testing' },
-    created: new Date().toISOString(),
-    confirmed: true,
-    supersedes: [],
-    related: [],
-  });
 
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-quality-'));
@@ -42,7 +28,7 @@ describe('quality filters', () => {
     });
 
     it('returns true for new unique insight', async () => {
-      await appendLesson(tempDir, createLesson('L001', 'Use Polars for CSV processing'));
+      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for CSV processing'));
       await rebuildIndex(tempDir);
       closeDb();
 
@@ -51,7 +37,7 @@ describe('quality filters', () => {
     });
 
     it('returns false for exact duplicate insight', async () => {
-      await appendLesson(tempDir, createLesson('L001', 'Use Polars for large files'));
+      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for large files'));
       await rebuildIndex(tempDir);
       closeDb();
 
@@ -62,7 +48,7 @@ describe('quality filters', () => {
     });
 
     it('returns false for highly similar insight', async () => {
-      await appendLesson(tempDir, createLesson('L001', 'Use Polars for large CSV files'));
+      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for large CSV files'));
       await rebuildIndex(tempDir);
       closeDb();
 
@@ -72,7 +58,7 @@ describe('quality filters', () => {
     });
 
     it('allows configurable similarity threshold', async () => {
-      await appendLesson(tempDir, createLesson('L001', 'Use Polars for data'));
+      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for data'));
       await rebuildIndex(tempDir);
       closeDb();
 
@@ -82,7 +68,7 @@ describe('quality filters', () => {
     });
 
     it('returns existing lesson id when duplicate found', async () => {
-      await appendLesson(tempDir, createLesson('L123', 'Always test your code'));
+      await appendLesson(tempDir, createQuickLesson('L123', 'Always test your code'));
       await rebuildIndex(tempDir);
       closeDb();
 
@@ -230,7 +216,7 @@ describe('quality filters', () => {
     });
 
     it('returns false for duplicate insight', async () => {
-      await appendLesson(tempDir, createLesson('L001', 'Use Polars instead of pandas for files'));
+      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars instead of pandas for files'));
       await rebuildIndex(tempDir);
       closeDb();
 

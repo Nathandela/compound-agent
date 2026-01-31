@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-import type { FullLesson, Lesson, QuickLesson } from '../types.js';
+import { createFullLesson, createQuickLesson } from '../test-utils.js';
 
 import { appendLesson, LESSONS_PATH, readLessons } from './jsonl.js';
 import type { ReadLessonsResult } from './jsonl.js';
@@ -17,36 +17,6 @@ describe('JSONL storage', () => {
 
   afterEach(async () => {
     await rm(tempDir, { recursive: true, force: true });
-  });
-
-  const createQuickLesson = (id: string, insight: string): QuickLesson => ({
-    id,
-    type: 'quick',
-    trigger: 'test trigger',
-    insight,
-    tags: ['test'],
-    source: 'manual',
-    context: { tool: 'test', intent: 'testing' },
-    created: new Date().toISOString(),
-    confirmed: true,
-    supersedes: [],
-    related: [],
-  });
-
-  const createFullLesson = (id: string, insight: string): FullLesson => ({
-    id,
-    type: 'full',
-    trigger: 'test trigger',
-    insight,
-    evidence: 'test evidence',
-    severity: 'medium',
-    tags: ['test'],
-    source: 'manual',
-    context: { tool: 'test', intent: 'testing' },
-    created: new Date().toISOString(),
-    confirmed: true,
-    supersedes: [],
-    related: [],
   });
 
   describe('appendLesson', () => {
@@ -76,7 +46,7 @@ describe('JSONL storage', () => {
     it('appends multiple lessons on separate lines', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'first'));
       await appendLesson(tempDir, createQuickLesson('L002', 'second'));
-      await appendLesson(tempDir, createFullLesson('L003', 'third'));
+      await appendLesson(tempDir, createFullLesson('L003', 'third', 'medium'));
 
       const filePath = join(tempDir, LESSONS_PATH);
       const content = await readFile(filePath, 'utf-8');
@@ -143,7 +113,7 @@ describe('JSONL storage', () => {
 
     it('handles mixed quick and full lessons', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'quick'));
-      await appendLesson(tempDir, createFullLesson('L002', 'full'));
+      await appendLesson(tempDir, createFullLesson('L002', 'full', 'medium'));
 
       const result = await readLessons(tempDir);
       expect(result.lessons).toHaveLength(2);
