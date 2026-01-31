@@ -340,6 +340,110 @@ describe('CLI', () => {
     });
   });
 
+  describe('import command', () => {
+    it('imports lessons from a JSONL file', async () => {
+      // Create source file with lessons to import
+      const sourceFile = join(tempDir, 'import-source.jsonl');
+      await writeFile(
+        sourceFile,
+        [
+          JSON.stringify(createQuickLesson('IMP1', 'imported lesson one')),
+          JSON.stringify(createQuickLesson('IMP2', 'imported lesson two')),
+        ].join('\n') + '\n'
+      );
+
+      const { combined } = runCli(`import ${sourceFile}`);
+      expect(combined).toContain('Imported 2 lessons');
+
+      // Verify lessons were added
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      expect(content).toContain('IMP1');
+      expect(content).toContain('IMP2');
+    });
+
+    it('skips lessons with duplicate IDs', async () => {
+      // Add existing lesson
+      await appendLesson(tempDir, createQuickLesson('EXIST1', 'existing lesson'));
+
+      // Create source file with duplicate and new lesson
+      const sourceFile = join(tempDir, 'import-source.jsonl');
+      await writeFile(
+        sourceFile,
+        [
+          JSON.stringify(createQuickLesson('EXIST1', 'duplicate lesson')),
+          JSON.stringify(createQuickLesson('NEW1', 'new lesson')),
+        ].join('\n') + '\n'
+      );
+
+      const { combined } = runCli(`import ${sourceFile}`);
+      expect(combined).toContain('Imported 1 lesson');
+      expect(combined).toContain('1 skipped');
+
+      // Verify original lesson unchanged, new lesson added
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      expect(content).toContain('existing lesson'); // Original preserved
+      expect(content).toContain('NEW1'); // New added
+    });
+
+    it('reports invalid lessons that fail schema validation', async () => {
+      const sourceFile = join(tempDir, 'import-source.jsonl');
+      await writeFile(
+        sourceFile,
+        [
+          JSON.stringify(createQuickLesson('VALID1', 'valid lesson')),
+          '{"id": "BAD1", "missing": "required fields"}',
+          'not even json',
+          JSON.stringify(createQuickLesson('VALID2', 'another valid lesson')),
+        ].join('\n') + '\n'
+      );
+
+      const { combined } = runCli(`import ${sourceFile}`);
+      expect(combined).toContain('Imported 2 lessons');
+      expect(combined).toContain('2 invalid');
+    });
+
+    it('requires file argument', () => {
+      const { combined } = runCli('import');
+      expect(combined.toLowerCase()).toMatch(/missing|required|argument/i);
+    });
+
+    it('handles non-existent file gracefully', () => {
+      const { combined } = runCli('import /nonexistent/file.jsonl');
+      expect(combined.toLowerCase()).toMatch(/error|not found|enoent/i);
+    });
+
+    it('handles empty import file', async () => {
+      const sourceFile = join(tempDir, 'empty.jsonl');
+      await writeFile(sourceFile, '');
+
+      const { combined } = runCli(`import ${sourceFile}`);
+      expect(combined).toContain('Imported 0 lessons');
+    });
+
+    it('shows summary with all counts', async () => {
+      // Add existing lesson
+      await appendLesson(tempDir, createQuickLesson('EXIST1', 'existing'));
+
+      const sourceFile = join(tempDir, 'import-source.jsonl');
+      await writeFile(
+        sourceFile,
+        [
+          JSON.stringify(createQuickLesson('NEW1', 'new lesson')),
+          JSON.stringify(createQuickLesson('EXIST1', 'duplicate')),
+          '{"invalid": "json"}',
+        ].join('\n') + '\n'
+      );
+
+      const { combined } = runCli(`import ${sourceFile}`);
+      // Should show: Imported 1 lesson (1 skipped, 1 invalid)
+      expect(combined).toMatch(/imported.*1.*lesson/i);
+      expect(combined).toMatch(/1.*skipped/i);
+      expect(combined).toMatch(/1.*invalid/i);
+    });
+  });
+
   describe('detect command', () => {
     it('requires --input option', () => {
       const { combined } = runCli('detect');

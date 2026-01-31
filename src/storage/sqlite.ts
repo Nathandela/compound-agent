@@ -37,6 +37,7 @@ const SCHEMA_SQL = `
     confirmed INTEGER NOT NULL DEFAULT 0,
     deleted INTEGER NOT NULL DEFAULT 0,
     retrieval_count INTEGER NOT NULL DEFAULT 0,
+    last_retrieved TEXT,
     embedding BLOB,
     content_hash TEXT
   );
@@ -250,6 +251,7 @@ interface LessonRow {
   confirmed: number;
   deleted: number;
   retrieval_count: number;
+  last_retrieved: string | null;
   embedding: Buffer | null;
 }
 
@@ -314,8 +316,8 @@ function collectCachedEmbeddings(database: DatabaseType): Map<string, CachedEmbe
 
 /** SQL for inserting a lesson row */
 const INSERT_LESSON_SQL = `
-  INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, embedding, content_hash)
-  VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count, @embedding, @content_hash)
+  INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, last_retrieved, embedding, content_hash)
+  VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count, @last_retrieved, @embedding, @content_hash)
 `;
 
 /**
@@ -394,6 +396,7 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
         confirmed: lesson.confirmed ? 1 : 0,
         deleted: lesson.deleted ? 1 : 0,
         retrieval_count: lesson.retrievalCount ?? 0,
+        last_retrieved: null, // Reset on rebuild since we're rebuilding from source
         embedding: hasValidCache ? cached.embedding : null,
         content_hash: hasValidCache ? cached.contentHash : null,
       });
@@ -449,6 +452,7 @@ export async function syncIfNeeded(
 /**
  * Search lessons using FTS5 keyword search.
  * Returns matching lessons up to the specified limit.
+ * Increments retrieval count for all returned lessons.
  */
 export async function searchKeyword(
   repoRoot: string,
@@ -476,5 +480,62 @@ export async function searchKeyword(
     )
     .all(query, limit) as LessonRow[];
 
+  // Increment retrieval count for matched lessons
+  if (rows.length > 0) {
+    incrementRetrievalCount(repoRoot, rows.map((r) => r.id));
+  }
+
   return rows.map(rowToLesson);
+}
+
+/** Retrieval statistics for a lesson */
+export interface RetrievalStat {
+  id: string;
+  count: number;
+  lastRetrieved: string | null;
+}
+
+/**
+ * Increment retrieval count for a list of lesson IDs.
+ * Updates both count and last_retrieved timestamp.
+ * Non-existent IDs are silently ignored.
+ */
+export function incrementRetrievalCount(repoRoot: string, lessonIds: string[]): void {
+  if (lessonIds.length === 0) return;
+
+  const database = openDb(repoRoot);
+  const now = new Date().toISOString();
+
+  const update = database.prepare(`
+    UPDATE lessons
+    SET retrieval_count = retrieval_count + 1,
+        last_retrieved = ?
+    WHERE id = ?
+  `);
+
+  const updateMany = database.transaction((ids: string[]) => {
+    for (const id of ids) {
+      update.run(now, id);
+    }
+  });
+
+  updateMany(lessonIds);
+}
+
+/**
+ * Get retrieval statistics for all lessons.
+ * Returns id, retrieval count, and last retrieved timestamp for each lesson.
+ */
+export function getRetrievalStats(repoRoot: string): RetrievalStat[] {
+  const database = openDb(repoRoot);
+
+  const rows = database
+    .prepare('SELECT id, retrieval_count, last_retrieved FROM lessons')
+    .all() as Array<{ id: string; retrieval_count: number; last_retrieved: string | null }>;
+
+  return rows.map((row) => ({
+    id: row.id,
+    count: row.retrieval_count,
+    lastRetrieved: row.last_retrieved,
+  }));
 }

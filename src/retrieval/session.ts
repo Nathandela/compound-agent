@@ -6,16 +6,19 @@
  */
 
 import { readLessons } from '../storage/jsonl.js';
-import type { FullLesson, Lesson } from '../types.js';
+import type { Lesson, Severity } from '../types.js';
 
 /** Default number of lessons to load at session start */
 const DEFAULT_LIMIT = 5;
+
+/** A full lesson with severity field present */
+type FullLesson = Lesson & { type: 'full'; severity: Severity };
 
 /**
  * Type guard to check if a lesson is a full lesson with severity
  */
 function isFullLesson(lesson: Lesson): lesson is FullLesson {
-  return lesson.type === 'full';
+  return lesson.type === 'full' && lesson.severity !== undefined;
 }
 
 /**

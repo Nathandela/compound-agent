@@ -69,24 +69,6 @@ export const LessonSchema = z.object({
   retrievalCount: z.number().optional(),
 });
 
-/**
- * @deprecated Use LessonSchema instead. Kept for backward compatibility.
- * Quick lessons are now just Lesson with type: 'quick'.
- */
-export const QuickLessonSchema = LessonSchema.refine(
-  (l) => l.type === 'quick',
-  { message: "QuickLesson must have type 'quick'" }
-);
-
-/**
- * @deprecated Use LessonSchema instead. Kept for backward compatibility.
- * Full lessons are now just Lesson with type: 'full'.
- */
-export const FullLessonSchema = LessonSchema.refine(
-  (l) => l.type === 'full',
-  { message: "FullLesson must have type 'full'" }
-);
-
 // Tombstone for deletions (append-only delete marker)
 export const TombstoneSchema = z.object({
   id: z.string(),
@@ -102,16 +84,6 @@ export type Source = z.infer<typeof SourceSchema>;
 export type Severity = z.infer<typeof SeveritySchema>;
 export type Context = z.infer<typeof ContextSchema>;
 export type Pattern = z.infer<typeof PatternSchema>;
-
-/**
- * @deprecated Use Lesson instead. Kept for backward compatibility.
- */
-export type QuickLesson = Lesson & { type: 'quick' };
-
-/**
- * @deprecated Use Lesson instead. Kept for backward compatibility.
- */
-export type FullLesson = Lesson & { type: 'full' };
 
 /**
  * Generate deterministic lesson ID from insight text.

@@ -40,8 +40,6 @@ import {
   // Types
   generateId,
   LessonSchema,
-  QuickLessonSchema,
-  FullLessonSchema,
 } from './index.js';
 
 describe('public API exports', () => {
@@ -159,14 +157,6 @@ describe('public API exports', () => {
 
     it('exports LessonSchema', () => {
       expect(LessonSchema).toBeDefined();
-    });
-
-    it('exports QuickLessonSchema', () => {
-      expect(QuickLessonSchema).toBeDefined();
-    });
-
-    it('exports FullLessonSchema', () => {
-      expect(FullLessonSchema).toBeDefined();
     });
   });
 });

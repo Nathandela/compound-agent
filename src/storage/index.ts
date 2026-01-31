@@ -15,13 +15,15 @@ export {
   contentHash,
   DB_PATH,
   getCachedEmbedding,
+  getRetrievalStats,
+  incrementRetrievalCount,
   openDb,
   rebuildIndex,
   searchKeyword,
   setCachedEmbedding,
   syncIfNeeded,
 } from './sqlite.js';
-export type { SyncOptions } from './sqlite.js';
+export type { RetrievalStat, SyncOptions } from './sqlite.js';
 
 // Compaction (archive + tombstone removal)
 export {

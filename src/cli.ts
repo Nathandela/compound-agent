@@ -17,8 +17,8 @@ import { VERSION } from './index.js';
 import { compact, countTombstones, needsCompaction, TOMBSTONE_THRESHOLD } from './storage/compact.js';
 import { appendLesson, readLessons } from './storage/jsonl.js';
 import { rebuildIndex, searchKeyword, syncIfNeeded } from './storage/sqlite.js';
-import { generateId } from './types.js';
-import type { QuickLesson } from './types.js';
+import { generateId, LessonSchema } from './types.js';
+import type { Lesson } from './types.js';
 
 /** Default limit for search results */
 const DEFAULT_SEARCH_LIMIT = '10';
@@ -67,7 +67,7 @@ program
   .action(async (insight: string, options: { trigger?: string; tags: string; yes?: boolean }) => {
     const repoRoot = getRepoRoot();
 
-    const lesson: QuickLesson = {
+    const lesson: Lesson = {
       id: generateId(insight),
       type: 'quick',
       trigger: options.trigger ?? 'Manual capture',
@@ -206,7 +206,7 @@ program
       console.log(`  Proposed: ${result.proposedInsight}`);
 
       if (options.save) {
-        const lesson: QuickLesson = {
+        const lesson: Lesson = {
           id: generateId(result.proposedInsight),
           type: 'quick',
           trigger: result.trigger,
@@ -293,6 +293,84 @@ program
 
     // Output JSON to stdout (portable format for sharing)
     console.log(JSON.stringify(filtered, null, 2));
+  });
+
+program
+  .command('import <file>')
+  .description('Import lessons from a JSONL file')
+  .action(async (file: string) => {
+    const repoRoot = getRepoRoot();
+
+    // Read input file
+    let content: string;
+    try {
+      const { readFile } = await import('node:fs/promises');
+      content = await readFile(file, 'utf-8');
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'ENOENT') {
+        console.error(`Error: File not found: ${file}`);
+      } else {
+        console.error(`Error reading file: ${(err as Error).message}`);
+      }
+      process.exit(1);
+    }
+
+    // Get existing lesson IDs
+    const { lessons: existingLessons } = await readLessons(repoRoot);
+    const existingIds = new Set(existingLessons.map((l) => l.id));
+
+    // Parse and validate each line
+    const lines = content.split('\n');
+    let imported = 0;
+    let skipped = 0;
+    let invalid = 0;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+
+      // Parse JSON
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(trimmed);
+      } catch {
+        invalid++;
+        continue;
+      }
+
+      // Validate schema
+      const result = LessonSchema.safeParse(parsed);
+      if (!result.success) {
+        invalid++;
+        continue;
+      }
+
+      const lesson: Lesson = result.data;
+
+      // Skip if ID already exists
+      if (existingIds.has(lesson.id)) {
+        skipped++;
+        continue;
+      }
+
+      // Append lesson
+      await appendLesson(repoRoot, lesson);
+      existingIds.add(lesson.id);
+      imported++;
+    }
+
+    // Format summary
+    const lessonWord = imported === 1 ? 'lesson' : 'lessons';
+    const parts: string[] = [];
+    if (skipped > 0) parts.push(`${skipped} skipped`);
+    if (invalid > 0) parts.push(`${invalid} invalid`);
+
+    if (parts.length > 0) {
+      console.log(`Imported ${imported} ${lessonWord} (${parts.join(', ')})`);
+    } else {
+      console.log(`Imported ${imported} ${lessonWord}`);
+    }
   });
 
 program.parse();

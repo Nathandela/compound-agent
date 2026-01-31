@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import type { Lesson, QuickLesson } from '../types.js';
+import type { Lesson } from '../types.js';
 
 import {
   archiveOldLessons,
@@ -45,7 +45,7 @@ describe('Compaction', () => {
     id: string,
     insight: string,
     options: { created?: string; retrievalCount?: number } = {}
-  ): QuickLesson => ({
+  ): Lesson => ({
     id,
     type: 'quick',
     trigger: `trigger for ${insight}`,
@@ -63,7 +63,7 @@ describe('Compaction', () => {
   /**
    * Helper to create an old lesson (>90 days)
    */
-  const createOldLesson = (id: string, insight: string): QuickLesson => {
+  const createOldLesson = (id: string, insight: string): Lesson => {
     const oldDate = new Date();
     oldDate.setDate(oldDate.getDate() - 100); // 100 days ago
     return createLesson(id, insight, { created: oldDate.toISOString() });

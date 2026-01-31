@@ -128,9 +128,6 @@ export {
   LessonSchema,
   LessonTypeSchema,
   TombstoneSchema,
-  // Deprecated - use LessonSchema instead
-  QuickLessonSchema,
-  FullLessonSchema,
 } from './types.js';
 export type {
   Lesson,
@@ -139,7 +136,4 @@ export type {
   Source,
   Severity,
   Context,
-  // Deprecated - use Lesson instead
-  QuickLesson,
-  FullLesson,
 } from './types.js';

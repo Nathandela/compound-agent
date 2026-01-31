@@ -5,7 +5,7 @@
  * Use `createLesson` for full control, or the convenience functions for common cases.
  */
 
-import type { FullLesson, Lesson, QuickLesson, Severity } from './types.js';
+import type { Lesson, Severity } from './types.js';
 
 /**
  * Options for creating lesson fixtures.
@@ -70,7 +70,7 @@ export function createLesson(overrides: Partial<Lesson> = {}): Lesson {
  * @param id - Lesson ID
  * @param insight - Insight text
  * @param options - Additional options
- * @returns A QuickLesson object
+ * @returns A Lesson object with type 'quick'
  *
  * @example
  * ```ts
@@ -82,7 +82,7 @@ export function createQuickLesson(
   id: string,
   insight: string,
   options: LessonOptions = {}
-): QuickLesson {
+): Lesson {
   const created = resolveCreatedDate(options.created);
 
   return {
@@ -108,7 +108,7 @@ export function createQuickLesson(
  * @param insight - Insight text
  * @param severity - Severity level (default: 'medium')
  * @param options - Additional options
- * @returns A FullLesson object
+ * @returns A Lesson object with type 'full'
  *
  * @example
  * ```ts
@@ -121,7 +121,7 @@ export function createFullLesson(
   insight: string,
   severity: Severity = 'medium',
   options: LessonOptions = {}
-): FullLesson {
+): Lesson {
   const created = resolveCreatedDate(options.created);
 
   return {

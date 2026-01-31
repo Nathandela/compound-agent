@@ -11,6 +11,8 @@ import {
   contentHash,
   DB_PATH,
   getCachedEmbedding,
+  getRetrievalStats,
+  incrementRetrievalCount,
   openDb,
   rebuildIndex,
   searchKeyword,
@@ -462,6 +464,163 @@ describe('SQLite schema', () => {
 
       const rebuilt = await syncIfNeeded(tempDir);
       expect(rebuilt).toBe(true);
+    });
+  });
+
+  describe('retrieval count tracking', () => {
+    beforeEach(async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'use Polars'));
+      await appendLesson(tempDir, createQuickLesson('L002', 'prefer uv'));
+      await appendLesson(tempDir, createQuickLesson('L003', 'test first'));
+      await rebuildIndex(tempDir);
+    });
+
+    describe('incrementRetrievalCount', () => {
+      it('increments count for single lesson', async () => {
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+
+        incrementRetrievalCount(tempDir, ['L001']);
+
+        const stats = getRetrievalStats(tempDir);
+        const l001 = stats.find((s) => s.id === 'L001');
+        expect(l001?.count).toBe(1);
+      });
+
+      it('increments count for multiple lessons', async () => {
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+
+        incrementRetrievalCount(tempDir, ['L001', 'L002']);
+
+        const stats = getRetrievalStats(tempDir);
+        expect(stats.find((s) => s.id === 'L001')?.count).toBe(1);
+        expect(stats.find((s) => s.id === 'L002')?.count).toBe(1);
+        expect(stats.find((s) => s.id === 'L003')?.count).toBe(0);
+      });
+
+      it('accumulates counts across multiple calls', async () => {
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+
+        incrementRetrievalCount(tempDir, ['L001']);
+        incrementRetrievalCount(tempDir, ['L001']);
+        incrementRetrievalCount(tempDir, ['L001']);
+
+        const stats = getRetrievalStats(tempDir);
+        expect(stats.find((s) => s.id === 'L001')?.count).toBe(3);
+      });
+
+      it('updates last_retrieved timestamp', async () => {
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+
+        const before = new Date();
+        incrementRetrievalCount(tempDir, ['L001']);
+        const after = new Date();
+
+        const stats = getRetrievalStats(tempDir);
+        const l001 = stats.find((s) => s.id === 'L001');
+        expect(l001?.lastRetrieved).not.toBeNull();
+        const timestamp = new Date(l001!.lastRetrieved!);
+        expect(timestamp.getTime()).toBeGreaterThanOrEqual(before.getTime());
+        expect(timestamp.getTime()).toBeLessThanOrEqual(after.getTime());
+      });
+
+      it('ignores non-existent lesson IDs', async () => {
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+
+        // Should not throw
+        incrementRetrievalCount(tempDir, ['nonexistent', 'L001']);
+
+        const stats = getRetrievalStats(tempDir);
+        expect(stats.find((s) => s.id === 'L001')?.count).toBe(1);
+        expect(stats.find((s) => s.id === 'nonexistent')).toBeUndefined();
+      });
+
+      it('handles empty array without error', async () => {
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+
+        // Should not throw
+        incrementRetrievalCount(tempDir, []);
+
+        const stats = getRetrievalStats(tempDir);
+        expect(stats.every((s) => s.count === 0)).toBe(true);
+      });
+    });
+
+    describe('getRetrievalStats', () => {
+      it('returns stats for all lessons', async () => {
+        const { getRetrievalStats } = await import('./sqlite.js');
+
+        const stats = getRetrievalStats(tempDir);
+        expect(stats).toHaveLength(3);
+      });
+
+      it('returns zero count and null lastRetrieved for never-retrieved lessons', async () => {
+        const { getRetrievalStats } = await import('./sqlite.js');
+
+        const stats = getRetrievalStats(tempDir);
+        for (const stat of stats) {
+          expect(stat.count).toBe(0);
+          expect(stat.lastRetrieved).toBeNull();
+        }
+      });
+
+      it('returns correct structure', async () => {
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+
+        incrementRetrievalCount(tempDir, ['L001']);
+
+        const stats = getRetrievalStats(tempDir);
+        const l001 = stats.find((s) => s.id === 'L001');
+        expect(l001).toMatchObject({
+          id: 'L001',
+          count: 1,
+        });
+        expect(typeof l001?.lastRetrieved).toBe('string');
+      });
+    });
+
+    describe('searchKeyword increments retrieval count', () => {
+      it('increments count for returned lessons', async () => {
+        const { getRetrievalStats } = await import('./sqlite.js');
+
+        // Search should increment count
+        await searchKeyword(tempDir, 'Polars', 10);
+
+        const stats = getRetrievalStats(tempDir);
+        const l001 = stats.find((s) => s.id === 'L001');
+        expect(l001?.count).toBe(1);
+      });
+
+      it('only increments count for matching lessons', async () => {
+        const { getRetrievalStats } = await import('./sqlite.js');
+
+        await searchKeyword(tempDir, 'Polars', 10);
+
+        const stats = getRetrievalStats(tempDir);
+        expect(stats.find((s) => s.id === 'L001')?.count).toBe(1);
+        expect(stats.find((s) => s.id === 'L002')?.count).toBe(0);
+        expect(stats.find((s) => s.id === 'L003')?.count).toBe(0);
+      });
+
+      it('accumulates count across multiple searches', async () => {
+        const { getRetrievalStats } = await import('./sqlite.js');
+
+        await searchKeyword(tempDir, 'trigger', 10); // matches all
+        await searchKeyword(tempDir, 'Polars', 10); // matches L001 only
+
+        const stats = getRetrievalStats(tempDir);
+        expect(stats.find((s) => s.id === 'L001')?.count).toBe(2);
+        expect(stats.find((s) => s.id === 'L002')?.count).toBe(1);
+        expect(stats.find((s) => s.id === 'L003')?.count).toBe(1);
+      });
+
+      it('does not increment count when no matches', async () => {
+        const { getRetrievalStats } = await import('./sqlite.js');
+
+        await searchKeyword(tempDir, 'nonexistent', 10);
+
+        const stats = getRetrievalStats(tempDir);
+        expect(stats.every((s) => s.count === 0)).toBe(true);
+      });
     });
   });
 });
