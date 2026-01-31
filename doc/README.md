@@ -10,6 +10,10 @@ This folder contains all project documentation.
 | [CONTEXT.md](CONTEXT.md) | Research and decisions from design phase |
 | [PLAN.md](PLAN.md) | Day-by-day implementation plan |
 | [verification/](verification/) | TDD workflow and review criteria |
+| [adr/](adr/) | Architectural Decision Records |
+| [specs/](specs/) | Feature specifications (Spec-Driven Development) |
+| [invariants/](invariants/) | Module invariants (data/safety/liveness) |
+| [standards/](standards/) | Coding standards and best practices |
 
 ## Quick Links
 
