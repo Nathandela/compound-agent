@@ -13,6 +13,9 @@ import {
   type Lesson,
 } from './types.js';
 
+// Number of fast-check iterations: 100 in CI, 20 locally for faster feedback
+const FC_RUNS = process.env.CI ? 100 : 20;
+
 describe('LessonSchema (unified)', () => {
   const baseLesson = {
     id: 'L001',
@@ -552,7 +555,7 @@ describe('Property-Based Tests: Type Unification', () => {
   );
 
   describe('Property 1: Backward Compatibility', () => {
-    test.prop([oldQuickLessonArb])(
+    test.prop([oldQuickLessonArb], { numRuns: FC_RUNS })(
       'old QuickLesson format always parses successfully',
       (oldQuick) => {
         const result = LessonSchema.safeParse(oldQuick);
@@ -565,7 +568,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([oldFullLessonArb])(
+    test.prop([oldFullLessonArb], { numRuns: FC_RUNS })(
       'old FullLesson format always parses successfully',
       (oldFull) => {
         const result = LessonSchema.safeParse(oldFull);
@@ -578,7 +581,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([fc.array(fc.oneof(oldQuickLessonArb, oldFullLessonArb), { maxLength: 50 })])(
+    test.prop([fc.array(fc.oneof(oldQuickLessonArb, oldFullLessonArb), { maxLength: 50 })], { numRuns: FC_RUNS })(
       'mixed old format lessons all parse successfully',
       (lessons) => {
         const results = lessons.map((lesson) => LessonSchema.safeParse(lesson));
@@ -588,7 +591,7 @@ describe('Property-Based Tests: Type Unification', () => {
   });
 
   describe('Property 2: ID Determinism', () => {
-    test.prop([fc.string({ minLength: 0, maxLength: 1000 })])(
+    test.prop([fc.string({ minLength: 0, maxLength: 1000 })], { numRuns: FC_RUNS })(
       'generateId is deterministic (same input → same output)',
       (insight) => {
         const id1 = generateId(insight);
@@ -597,7 +600,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([fc.string({ minLength: 0, maxLength: 1000 })])(
+    test.prop([fc.string({ minLength: 0, maxLength: 1000 })], { numRuns: FC_RUNS })(
       'generateId always produces format L[0-9a-f]{8}',
       (insight) => {
         const id = generateId(insight);
@@ -605,7 +608,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([fc.string({ minLength: 0, maxLength: 1000 })])(
+    test.prop([fc.string({ minLength: 0, maxLength: 1000 })], { numRuns: FC_RUNS })(
       'generateId always produces length 9',
       (insight) => {
         const id = generateId(insight);
@@ -618,7 +621,7 @@ describe('Property-Based Tests: Type Unification', () => {
     test.prop([
       fc.string({ minLength: 1, maxLength: 1000 }),
       fc.string({ minLength: 1, maxLength: 1000 }),
-    ])(
+    ], { numRuns: FC_RUNS })(
       'different insights produce different IDs with high probability',
       (insight1, insight2) => {
         // Skip if inputs are identical
@@ -632,7 +635,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([fc.array(fc.string({ minLength: 1, maxLength: 100 }), { minLength: 2, maxLength: 100 })])(
+    test.prop([fc.array(fc.string({ minLength: 1, maxLength: 100 }), { minLength: 2, maxLength: 100 })], { numRuns: FC_RUNS })(
       'batch of unique insights produces unique IDs',
       (insights) => {
         // Filter to unique insights only
@@ -649,7 +652,7 @@ describe('Property-Based Tests: Type Unification', () => {
   });
 
   describe('Property 4: Type Discrimination', () => {
-    test.prop([lessonArb])(
+    test.prop([lessonArb], { numRuns: FC_RUNS })(
       'lesson.type is always "quick" or "full" after parsing',
       (lesson) => {
         const result = LessonSchema.safeParse(lesson);
@@ -660,7 +663,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([quickLessonArb])(
+    test.prop([quickLessonArb], { numRuns: FC_RUNS })(
       'quick lessons satisfy lesson.type === "quick"',
       (quickLesson) => {
         const result = LessonSchema.safeParse(quickLesson);
@@ -672,7 +675,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([fullLessonArb])(
+    test.prop([fullLessonArb], { numRuns: FC_RUNS })(
       'full lessons satisfy lesson.type === "full"',
       (fullLesson) => {
         const result = LessonSchema.safeParse(fullLesson);
@@ -686,7 +689,7 @@ describe('Property-Based Tests: Type Unification', () => {
   });
 
   describe('Property 5: Roundtrip (JSON Serialization)', () => {
-    test.prop([lessonArb])(
+    test.prop([lessonArb], { numRuns: FC_RUNS })(
       'JSON.stringify → parse preserves all fields',
       (lesson) => {
         // Parse to ensure valid lesson
@@ -712,7 +715,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([fc.array(lessonArb, { maxLength: 20 })])(
+    test.prop([fc.array(lessonArb, { maxLength: 20 })], { numRuns: FC_RUNS })(
       'JSONL format (newline-delimited) preserves all lessons',
       (lessons) => {
         // Convert to JSONL format
@@ -730,7 +733,7 @@ describe('Property-Based Tests: Type Unification', () => {
   });
 
   describe('Property 6: Severity Enum Validation', () => {
-    test.prop([baseLessonFieldsArb, fc.constantFrom('high', 'medium', 'low')])(
+    test.prop([baseLessonFieldsArb, fc.constantFrom('high', 'medium', 'low')], { numRuns: FC_RUNS })(
       'all valid severity values are accepted',
       (base, severity) => {
         const fullLesson = {
@@ -753,7 +756,7 @@ describe('Property-Based Tests: Type Unification', () => {
       fc.string({ minLength: 1, maxLength: 20 }).filter(
         (s) => !['high', 'medium', 'low'].includes(s)
       ),
-    ])(
+    ], { numRuns: FC_RUNS })(
       'invalid severity values are rejected',
       (base, invalidSeverity) => {
         const invalidLesson = {
@@ -770,7 +773,7 @@ describe('Property-Based Tests: Type Unification', () => {
   });
 
   describe('Property 7: Optional Fields Handling', () => {
-    test.prop([quickLessonArb])(
+    test.prop([quickLessonArb], { numRuns: FC_RUNS })(
       'quick lessons without optional fields parse successfully',
       (quickLesson) => {
         // Ensure no optional full-lesson fields
@@ -785,7 +788,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([baseLessonFieldsArb, fc.option(fc.string(), { nil: undefined })])(
+    test.prop([baseLessonFieldsArb, fc.option(fc.string(), { nil: undefined })], { numRuns: FC_RUNS })(
       'deleted field is optional and preserved when present',
       (base, deleted) => {
         const lesson = {
@@ -799,7 +802,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([baseLessonFieldsArb, fc.option(fc.nat(100), { nil: undefined })])(
+    test.prop([baseLessonFieldsArb, fc.option(fc.nat(100), { nil: undefined })], { numRuns: FC_RUNS })(
       'retrievalCount field is optional and preserved when present',
       (base, retrievalCount) => {
         const lesson = {
@@ -818,7 +821,7 @@ describe('Property-Based Tests: Type Unification', () => {
   });
 
   describe('Property 8: Invariant Preservation', () => {
-    test.prop([lessonArb])(
+    test.prop([lessonArb], { numRuns: FC_RUNS })(
       'parsed lesson maintains id format',
       (lesson) => {
         const result = LessonSchema.safeParse(lesson);
@@ -829,7 +832,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([lessonArb])(
+    test.prop([lessonArb], { numRuns: FC_RUNS })(
       'parsed lesson maintains ISO8601 created timestamp',
       (lesson) => {
         const result = LessonSchema.safeParse(lesson);
@@ -842,7 +845,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([lessonArb])(
+    test.prop([lessonArb], { numRuns: FC_RUNS })(
       'parsed lesson maintains non-empty trigger and insight',
       (lesson) => {
         const result = LessonSchema.safeParse(lesson);
@@ -854,7 +857,7 @@ describe('Property-Based Tests: Type Unification', () => {
       }
     );
 
-    test.prop([lessonArb])(
+    test.prop([lessonArb], { numRuns: FC_RUNS })(
       'supersedes and related arrays contain only valid lesson IDs',
       (lesson) => {
         const result = LessonSchema.safeParse(lesson);
