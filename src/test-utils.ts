@@ -5,7 +5,7 @@
  * Use `createLesson` for full control, or the convenience functions for common cases.
  */
 
-import type { Lesson, Severity } from './types.js';
+import type { Lesson, Severity, Source } from './types.js';
 
 /**
  * Options for creating lesson fixtures.
@@ -25,6 +25,8 @@ export interface LessonOptions {
   severity?: Severity;
   /** Whether lesson is deleted */
   deleted?: boolean;
+  /** Source of the lesson (default: 'manual') */
+  source?: Source;
 }
 
 /**
@@ -91,7 +93,7 @@ export function createQuickLesson(
     trigger: options.trigger ?? `trigger for ${insight}`,
     insight,
     tags: options.tags ?? [],
-    source: 'manual',
+    source: options.source ?? 'manual',
     context: { tool: 'test', intent: 'testing' },
     created,
     confirmed: options.confirmed ?? true,
@@ -132,7 +134,7 @@ export function createFullLesson(
     evidence: options.evidence ?? 'Test evidence',
     severity,
     tags: options.tags ?? [],
-    source: 'manual',
+    source: options.source ?? 'manual',
     context: { tool: 'test', intent: 'testing' },
     created,
     confirmed: options.confirmed ?? true,

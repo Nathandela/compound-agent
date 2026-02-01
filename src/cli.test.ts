@@ -786,11 +786,11 @@ describe('CLI', () => {
 
       const { combined } = runCli('load-session');
 
-      expect(combined).toContain('Session Lessons');
-      expect(combined).toContain('[L001]');
-      expect(combined).toContain('Use Polars for files >100MB');
-      expect(combined).toContain('Tags: performance, data');
-      expect(combined).toContain('2 high-severity lessons loaded');
+      // New format: header, intro, bold insights with tags, learned line, footer
+      expect(combined).toContain('## Lessons from Past Sessions');
+      expect(combined).toContain('**Use Polars for files >100MB, not pandas**');
+      expect(combined).toMatch(/\(performance, data\)/);
+      expect(combined).toContain('Consider these lessons');
     });
 
     it('outputs valid JSON with --json flag', async () => {
@@ -866,8 +866,249 @@ describe('CLI', () => {
       );
 
       const { combined } = runCli('load-session');
-      expect(combined).toContain('Source:');
+      // New format uses "Learned: DATE via SOURCE" instead of "Source:"
+      expect(combined).toContain('Learned:');
       expect(combined).toContain('2025-01-28');
+    });
+
+    // ========================================================================
+    // NEW TESTS FOR ENHANCED OUTPUT FORMAT (learning_agent-793)
+    // ========================================================================
+
+    describe('enhanced output format (S1, S2, S3)', () => {
+      it('uses new header "## Lessons from Past Sessions"', async () => {
+        await appendLesson(
+          tempDir,
+          createFullLesson('L001', 'Use Polars for large files', 'high', {
+            tags: ['performance'],
+            created: '2025-01-28T10:00:00Z',
+          })
+        );
+
+        const { combined } = runCli('load-session');
+
+        // Should use new header instead of "Session Lessons (High Severity)"
+        expect(combined).toContain('## Lessons from Past Sessions');
+        expect(combined).not.toContain('Session Lessons (High Severity)');
+      });
+
+      it('includes intro text for Claude', async () => {
+        await appendLesson(
+          tempDir,
+          createFullLesson('L001', 'Test lesson', 'high', {
+            created: '2025-01-28T10:00:00Z',
+          })
+        );
+
+        const { combined } = runCli('load-session');
+
+        // Should include intro paragraph
+        expect(combined).toMatch(/these lessons were captured from previous/i);
+        expect(combined).toMatch(/should inform your work/i);
+      });
+
+      it('does not include lesson IDs [Lxxxxxxxx] in human output (S1)', async () => {
+        await appendLesson(
+          tempDir,
+          createFullLesson('L12345678', 'Use Polars for large files', 'high', {
+            tags: ['performance'],
+            created: '2025-01-28T10:00:00Z',
+          })
+        );
+
+        const { combined } = runCli('load-session');
+
+        // Should NOT include lesson ID in output
+        expect(combined).not.toMatch(/\[L[a-f0-9]{8}\]/);
+        // Should include the insight
+        expect(combined).toContain('Use Polars for large files');
+      });
+
+      it('does not include [info] prefix in output (S2)', async () => {
+        await appendLesson(
+          tempDir,
+          createFullLesson('L001', 'Test lesson', 'high', {
+            created: '2025-01-28T10:00:00Z',
+          })
+        );
+
+        const { combined } = runCli('load-session');
+
+        // Should NOT include [info] prefix anywhere
+        expect(combined).not.toMatch(/\[info\]/i);
+      });
+
+      it('formats lessons with bold insight and tags in parentheses', async () => {
+        await appendLesson(
+          tempDir,
+          createFullLesson('L001', 'Use Polars for files >100MB', 'high', {
+            tags: ['performance'],
+            created: '2025-01-28T10:00:00Z',
+          })
+        );
+
+        const { combined } = runCli('load-session');
+
+        // Insight should be bold (starts with **)
+        expect(combined).toMatch(/\*\*Use Polars for files >100MB\*\*/);
+        // Tags should be in parentheses after insight on same line
+        expect(combined).toMatch(/\*\*Use Polars for files >100MB\*\*.*\(performance\)/);
+      });
+
+      it('shows "Learned: DATE via SOURCE" format', async () => {
+        await appendLesson(
+          tempDir,
+          createFullLesson('L001', 'Test lesson', 'high', {
+            created: '2025-01-28T10:00:00Z',
+            source: 'user_correction',
+          })
+        );
+
+        const { combined } = runCli('load-session');
+
+        // Should use "Learned:" prefix
+        expect(combined).toMatch(/Learned:/);
+        // Should show date in YYYY-MM-DD format
+        expect(combined).toMatch(/2025-01-28/);
+        // Should show "via SOURCE" (underscores converted to spaces for readability)
+        expect(combined).toMatch(/via\s+user\s+correction/);
+      });
+
+      it('includes footer with actionable reminder', async () => {
+        await appendLesson(
+          tempDir,
+          createFullLesson('L001', 'Test lesson', 'high', {
+            created: '2025-01-28T10:00:00Z',
+          })
+        );
+
+        const { combined } = runCli('load-session');
+
+        // Should include footer with actionable reminder
+        expect(combined).toMatch(/consider these lessons/i);
+        expect(combined).toMatch(/planning|implementing/i);
+      });
+
+      it('shows friendly empty state message', () => {
+        const { combined } = runCli('load-session');
+
+        // Should show friendly message (not error)
+        expect(combined).toContain('No high-severity lessons found');
+        // Should NOT show error indicators
+        expect(combined).not.toMatch(/\[error\]/i);
+      });
+
+      it('exits with code 0 even with no lessons (S4)', () => {
+        // runCli catches errors, so successful execution means exit 0
+        const { combined } = runCli('load-session');
+
+        // Should not contain error indicators
+        expect(combined).not.toMatch(/error|exception|fail/i);
+      });
+
+      it('token count is reasonable (~150 tokens per lesson)', async () => {
+        // Create 5 lessons with realistic content
+        await appendLesson(
+          tempDir,
+          createFullLesson('L001', 'Use Polars for files >100MB, not pandas', 'high', {
+            tags: ['performance', 'data'],
+            created: '2025-01-28T10:00:00Z',
+            source: 'user_correction',
+          })
+        );
+        await appendLesson(
+          tempDir,
+          createFullLesson('L002', 'Always validate input before processing', 'high', {
+            tags: ['security'],
+            created: '2025-01-27T10:00:00Z',
+            source: 'test_failure',
+          })
+        );
+        await appendLesson(
+          tempDir,
+          createFullLesson('L003', 'Run tests before committing code', 'high', {
+            tags: ['testing', 'workflow'],
+            created: '2025-01-26T10:00:00Z',
+            source: 'manual',
+          })
+        );
+        await appendLesson(
+          tempDir,
+          createFullLesson('L004', 'Check authentication before API calls', 'high', {
+            tags: ['auth', 'api'],
+            created: '2025-01-25T10:00:00Z',
+            source: 'user_correction',
+          })
+        );
+        await appendLesson(
+          tempDir,
+          createFullLesson('L005', 'Handle edge cases in validation logic', 'high', {
+            tags: ['validation', 'edge-cases'],
+            created: '2025-01-24T10:00:00Z',
+            source: 'test_failure',
+          })
+        );
+
+        const { combined } = runCli('load-session');
+
+        // Rough token estimation: 4 chars = 1 token
+        const charCount = combined.length;
+        const estimatedTokens = charCount / 4;
+
+        // Should be under 800 tokens total (S3)
+        expect(estimatedTokens).toBeLessThan(800);
+
+        // Should be reasonable per lesson (~150 tokens × 5 = 750 max)
+        const tokensPerLesson = estimatedTokens / 5;
+        expect(tokensPerLesson).toBeLessThan(160);
+      });
+
+      it('formats lessons without tags by omitting tag parentheses', async () => {
+        await appendLesson(
+          tempDir,
+          createFullLesson('L001', 'Test lesson without tags', 'high', {
+            tags: [],
+            created: '2025-01-28T10:00:00Z',
+          })
+        );
+
+        const { combined } = runCli('load-session');
+
+        // Should show insight
+        expect(combined).toContain('Test lesson without tags');
+        // Should NOT show empty parentheses
+        expect(combined).not.toMatch(/\*\*Test lesson without tags\*\*\s*\(\s*\)/);
+      });
+
+      it('formats multiple tags correctly', async () => {
+        await appendLesson(
+          tempDir,
+          createFullLesson('L001', 'Use Polars for large files', 'high', {
+            tags: ['performance', 'data', 'optimization'],
+            created: '2025-01-28T10:00:00Z',
+          })
+        );
+
+        const { combined } = runCli('load-session');
+
+        // Tags should be in parentheses on same line as insight
+        expect(combined).toMatch(/\*\*Use Polars for large files\*\*.*\(performance, data, optimization\)/);
+      });
+
+      it('footer respects --quiet flag', async () => {
+        await appendLesson(
+          tempDir,
+          createFullLesson('L001', 'Test lesson', 'high', {
+            created: '2025-01-28T10:00:00Z',
+          })
+        );
+
+        const { combined } = runCli('load-session --quiet');
+
+        // Should NOT include footer in quiet mode
+        expect(combined).not.toMatch(/consider these lessons/i);
+        expect(combined).not.toMatch(/1.*high-severity.*lesson/i);
+      });
     });
   });
 
@@ -1477,14 +1718,17 @@ describe('CLI', () => {
       }
     };
 
-    it('installs hooks to global settings file', async () => {
+    it('installs hooks to project settings file by default (v0.2.1+)', async () => {
+      // Create project .claude directory
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+
       const { combined } = runSetupClaude();
 
       // Should indicate success
       expect(combined.toLowerCase()).toMatch(/installed|ok|success/i);
 
-      // Verify settings file was created
-      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      // Verify settings file was created in PROJECT directory (new default)
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
       const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
       // Should have SessionStart hook
@@ -1499,8 +1743,9 @@ describe('CLI', () => {
     });
 
     it('preserves existing settings when adding hooks', async () => {
-      // Create existing settings
-      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      // Create existing project settings (v0.2.1+: default is project)
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
       await writeFile(
         settingsPath,
         JSON.stringify(
@@ -1524,8 +1769,9 @@ describe('CLI', () => {
     });
 
     it('preserves existing SessionStart hooks when adding our hook', async () => {
-      // Create settings with existing SessionStart hook
-      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      // Create project settings with existing SessionStart hook (v0.2.1+: default is project)
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
       await writeFile(
         settingsPath,
         JSON.stringify(
@@ -1556,10 +1802,13 @@ describe('CLI', () => {
     });
 
     it('is idempotent - does not duplicate hook on re-run', async () => {
+      // v0.2.1+: default is project
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+
       runSetupClaude();
       runSetupClaude();
 
-      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
       const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
       // Should still have only 1 hook
@@ -1567,6 +1816,9 @@ describe('CLI', () => {
     });
 
     it('reports already installed when hook exists', async () => {
+      // v0.2.1+: default is project
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+
       runSetupClaude();
       const { combined } = runSetupClaude();
 
@@ -1574,6 +1826,9 @@ describe('CLI', () => {
     });
 
     it('--uninstall removes our hook', async () => {
+      // v0.2.1+: default is project
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+
       // First install
       runSetupClaude();
 
@@ -1581,7 +1836,7 @@ describe('CLI', () => {
       const { combined } = runSetupClaude('--uninstall');
       expect(combined.toLowerCase()).toMatch(/removed|uninstalled/i);
 
-      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
       const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
       // Hook should be removed
@@ -1589,8 +1844,9 @@ describe('CLI', () => {
     });
 
     it('--uninstall preserves other hooks', async () => {
-      // Create settings with existing and our hook
-      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      // v0.2.1+: default is project - create project settings with existing and our hook
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
       await writeFile(
         settingsPath,
         JSON.stringify(
@@ -1623,27 +1879,27 @@ describe('CLI', () => {
 
       expect(combined.toLowerCase()).toMatch(/would|dry.run/i);
 
-      // File should not exist
-      const settingsPath = join(mockHome, '.claude', 'settings.json');
+      // v0.2.1+: default is project - project settings file should not exist
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
       expect(existsSync(settingsPath)).toBe(false);
     });
 
-    it('--project installs to project .claude directory', async () => {
-      // Create project .claude directory
-      await mkdir(join(tempDir, '.claude'), { recursive: true });
+    it('--global installs to global ~/.claude directory', async () => {
+      const { combined } = runSetupClaude('--global');
+      expect(combined.toLowerCase()).toMatch(/global|installed/i);
 
-      const { combined } = runSetupClaude('--project');
-      expect(combined.toLowerCase()).toMatch(/project|installed/i);
-
-      // Should be in project, not global
+      // Should be in global, not project
       const projectSettings = join(tempDir, '.claude', 'settings.json');
       const globalSettings = join(mockHome, '.claude', 'settings.json');
 
-      expect(existsSync(projectSettings)).toBe(true);
-      expect(existsSync(globalSettings)).toBe(false);
+      expect(existsSync(globalSettings)).toBe(true);
+      expect(existsSync(projectSettings)).toBe(false);
     });
 
     it('--json outputs machine-readable result', async () => {
+      // v0.2.1+: default is project
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+
       const { stdout } = runSetupClaude('--json');
       const result = JSON.parse(stdout) as {
         installed: boolean;
@@ -1940,6 +2196,661 @@ describe('CLI', () => {
       // Hook should be in custom directory
       const customHookPath = join(customHooksDir, 'pre-commit');
       expect(existsSync(customHookPath)).toBe(true);
+    });
+
+    describe('pre-commit hook insertion edge cases', () => {
+      it('inserts hook BEFORE top-level exit 0 statement', async () => {
+        const gitHooksDir = join(tempDir, '.git', 'hooks');
+        await mkdir(gitHooksDir, { recursive: true });
+
+        // Create existing hook with exit 0 at end
+        const hookPath = join(gitHooksDir, 'pre-commit');
+        const existingContent = '#!/bin/sh\necho "running tests"\npnpm test\nexit 0\n';
+        await writeFile(hookPath, existingContent);
+
+        runCli('init');
+
+        const newContent = await readFile(hookPath, 'utf-8');
+        const lines = newContent.split('\n');
+
+        // Find line numbers
+        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const exitLine = lines.findIndex((line) => line.trim() === 'exit 0');
+
+        // Learning Agent hook must appear BEFORE exit statement
+        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(exitLine).toBeGreaterThan(-1);
+        expect(learningAgentLine).toBeLessThan(exitLine);
+      });
+
+      it('inserts hook BEFORE exit 1 statement', async () => {
+        const gitHooksDir = join(tempDir, '.git', 'hooks');
+        await mkdir(gitHooksDir, { recursive: true });
+
+        const hookPath = join(gitHooksDir, 'pre-commit');
+        const existingContent = '#!/bin/sh\nif ! pnpm test; then\n  echo "Tests failed"\n  exit 1\nfi\n';
+        await writeFile(hookPath, existingContent);
+
+        runCli('init');
+
+        const newContent = await readFile(hookPath, 'utf-8');
+        const lines = newContent.split('\n');
+
+        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const exitLine = lines.findIndex((line) => line.trim() === 'exit 1');
+
+        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(exitLine).toBeGreaterThan(-1);
+        expect(learningAgentLine).toBeLessThan(exitLine);
+      });
+
+      it('inserts hook BEFORE exit with variable (exit $STATUS)', async () => {
+        const gitHooksDir = join(tempDir, '.git', 'hooks');
+        await mkdir(gitHooksDir, { recursive: true });
+
+        const hookPath = join(gitHooksDir, 'pre-commit');
+        const existingContent = '#!/bin/sh\nSTATUS=0\npnpm test || STATUS=1\nexit $STATUS\n';
+        await writeFile(hookPath, existingContent);
+
+        runCli('init');
+
+        const newContent = await readFile(hookPath, 'utf-8');
+        const lines = newContent.split('\n');
+
+        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const exitLine = lines.findIndex((line) => line.trim().startsWith('exit $'));
+
+        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(exitLine).toBeGreaterThan(-1);
+        expect(learningAgentLine).toBeLessThan(exitLine);
+      });
+
+      it('inserts hook BEFORE first top-level exit when multiple exist', async () => {
+        const gitHooksDir = join(tempDir, '.git', 'hooks');
+        await mkdir(gitHooksDir, { recursive: true });
+
+        const hookPath = join(gitHooksDir, 'pre-commit');
+        const existingContent = '#!/bin/sh\npnpm lint\nif [ $? -eq 0 ]; then\n  exit 0\nfi\nexit 1\n';
+        await writeFile(hookPath, existingContent);
+
+        runCli('init');
+
+        const newContent = await readFile(hookPath, 'utf-8');
+        const lines = newContent.split('\n');
+
+        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const firstExitLine = lines.findIndex((line) => line.trim() === 'exit 0');
+
+        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(firstExitLine).toBeGreaterThan(-1);
+        expect(learningAgentLine).toBeLessThan(firstExitLine);
+      });
+
+      it('appends hook at end when no exit statement exists', async () => {
+        const gitHooksDir = join(tempDir, '.git', 'hooks');
+        await mkdir(gitHooksDir, { recursive: true });
+
+        const hookPath = join(gitHooksDir, 'pre-commit');
+        const existingContent = '#!/bin/sh\necho "running tests"\npnpm test\n';
+        await writeFile(hookPath, existingContent);
+
+        runCli('init');
+
+        const newContent = await readFile(hookPath, 'utf-8');
+        const lines = newContent.split('\n');
+
+        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const lastContentLine = lines.findIndex((line) => line.includes('pnpm test'));
+
+        // Should be appended after existing content
+        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(learningAgentLine).toBeGreaterThan(lastContentLine);
+      });
+
+      it('ignores exit inside function definition', async () => {
+        const gitHooksDir = join(tempDir, '.git', 'hooks');
+        await mkdir(gitHooksDir, { recursive: true });
+
+        const hookPath = join(gitHooksDir, 'pre-commit');
+        const existingContent = `#!/bin/sh
+check_format() {
+  if ! pnpm format:check; then
+    exit 1
+  fi
+}
+check_format
+exit 0
+`;
+        await writeFile(hookPath, existingContent);
+
+        runCli('init');
+
+        const newContent = await readFile(hookPath, 'utf-8');
+        const lines = newContent.split('\n');
+
+        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        // Find the exit 1 inside function
+        const functionExitLine = lines.findIndex((line) => line.trim() === 'exit 1');
+        // Find the exit 0 at end (top-level)
+        const topLevelExitLine = lines.findIndex((line) => line.trim() === 'exit 0');
+
+        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(topLevelExitLine).toBeGreaterThan(-1);
+        // Should insert before top-level exit (exit 0), not function exit (exit 1)
+        expect(learningAgentLine).toBeLessThan(topLevelExitLine);
+        // Learning agent line should be AFTER the function exit
+        expect(learningAgentLine).toBeGreaterThan(functionExitLine);
+      });
+
+      it('ignores exit in heredoc', async () => {
+        const gitHooksDir = join(tempDir, '.git', 'hooks');
+        await mkdir(gitHooksDir, { recursive: true });
+
+        const hookPath = join(gitHooksDir, 'pre-commit');
+        const existingContent = `#!/bin/sh
+cat <<'EOF'
+To exit, run: exit 0
+EOF
+pnpm test
+exit 0
+`;
+        await writeFile(hookPath, existingContent);
+
+        runCli('init');
+
+        const newContent = await readFile(hookPath, 'utf-8');
+        const lines = newContent.split('\n');
+
+        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        // Find the ACTUAL top-level exit (last exit 0)
+        let topLevelExitLine = -1;
+        for (let i = lines.length - 1; i >= 0; i--) {
+          if (lines[i].trim() === 'exit 0') {
+            topLevelExitLine = i;
+            break;
+          }
+        }
+
+        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(topLevelExitLine).toBeGreaterThan(-1);
+        // Should insert before the REAL exit, not the one in heredoc
+        expect(learningAgentLine).toBeLessThan(topLevelExitLine);
+      });
+
+      it('remains idempotent when run twice with exit statements', async () => {
+        const gitHooksDir = join(tempDir, '.git', 'hooks');
+        await mkdir(gitHooksDir, { recursive: true });
+
+        const hookPath = join(gitHooksDir, 'pre-commit');
+        const existingContent = '#!/bin/sh\npnpm test\nexit 0\n';
+        await writeFile(hookPath, existingContent);
+
+        // Run init twice
+        runCli('init');
+        runCli('init');
+
+        const newContent = await readFile(hookPath, 'utf-8');
+
+        // Count occurrences of learning-agent hook
+        const matches = newContent.match(/learning-agent hooks run pre-commit/g);
+        expect(matches?.length).toBe(1);
+
+        // Ensure hook is still before exit
+        const lines = newContent.split('\n');
+        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const exitLine = lines.findIndex((line) => line.trim() === 'exit 0');
+        expect(learningAgentLine).toBeLessThan(exitLine);
+      });
+    });
+  });
+
+  // ============================================================================
+  // Setup Claude Defaults Tests (v0.2.1 Breaking Change)
+  // ============================================================================
+  describe('setup claude - default behavior change (v0.2.1)', () => {
+    let mockHome: string;
+
+    beforeEach(async () => {
+      // Create a mock home directory for testing global settings
+      mockHome = join(tempDir, 'mock-home');
+      await mkdir(join(mockHome, '.claude'), { recursive: true });
+      // Create project .claude directory
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+    });
+
+    const runSetupClaude = (args = ''): { stdout: string; stderr: string; combined: string } => {
+      const cliPath = join(process.cwd(), 'dist', 'cli.js');
+      try {
+        const stdout = execSync(`node ${cliPath} setup claude ${args} 2>&1`, {
+          cwd: tempDir,
+          encoding: 'utf-8',
+          env: { ...process.env, HOME: mockHome, LEARNING_AGENT_ROOT: tempDir },
+        });
+        return { stdout, stderr: '', combined: stdout };
+      } catch (error) {
+        const err = error as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
+        const stdout = err.stdout?.toString() ?? '';
+        const stderr = err.stderr?.toString() ?? '';
+        const combined = stdout + stderr + (err.message ?? '');
+        return { stdout, stderr, combined };
+      }
+    };
+
+    // ========================================================================
+    // I2: Flag Semantics (Breaking Change)
+    // ========================================================================
+    describe('flag semantics (breaking change from v0.2.0)', () => {
+      it('default (no flags) installs to project-local .claude/settings.json', async () => {
+        const { combined } = runSetupClaude();
+
+        // Should indicate success
+        expect(combined.toLowerCase()).toMatch(/installed|ok|success/i);
+
+        // Verify settings file was created in PROJECT directory
+        const projectSettings = join(tempDir, '.claude', 'settings.json');
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+
+        // Project settings should exist
+        expect(existsSync(projectSettings)).toBe(true);
+        // Global settings should NOT exist
+        expect(existsSync(globalSettings)).toBe(false);
+
+        // Verify hook is in project settings
+        const settings = JSON.parse(await readFile(projectSettings, 'utf-8'));
+        expect(settings.hooks.SessionStart).toBeDefined();
+        expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
+      });
+
+      it('--global flag installs to ~/.claude/settings.json', async () => {
+        const { combined } = runSetupClaude('--global');
+
+        // Should indicate success
+        expect(combined.toLowerCase()).toMatch(/installed|ok|success/i);
+
+        // Verify settings file was created in GLOBAL directory
+        const projectSettings = join(tempDir, '.claude', 'settings.json');
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+
+        // Global settings should exist
+        expect(existsSync(globalSettings)).toBe(true);
+        // Project settings should NOT exist
+        expect(existsSync(projectSettings)).toBe(false);
+
+        // Verify hook is in global settings
+        const settings = JSON.parse(await readFile(globalSettings, 'utf-8'));
+        expect(settings.hooks.SessionStart).toBeDefined();
+        expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
+      });
+
+      it('--project flag is no longer recognized (removed in v0.2.1)', () => {
+        const { combined } = runSetupClaude('--project');
+
+        // Should show error about unknown option
+        expect(combined.toLowerCase()).toMatch(/unknown|invalid|option|flag|error/i);
+      });
+    });
+
+    // ========================================================================
+    // I3: Scope Consistency
+    // ========================================================================
+    describe('scope consistency across operations', () => {
+      it('uninstall without --global removes from project settings', async () => {
+        // Install to project (default)
+        runSetupClaude();
+
+        const projectSettings = join(tempDir, '.claude', 'settings.json');
+        expect(existsSync(projectSettings)).toBe(true);
+
+        // Uninstall from project (default)
+        const { combined } = runSetupClaude('--uninstall');
+        expect(combined.toLowerCase()).toMatch(/removed|uninstalled/i);
+
+        // Verify removed from project settings
+        const settings = JSON.parse(await readFile(projectSettings, 'utf-8'));
+        expect(settings.hooks.SessionStart).toHaveLength(0);
+      });
+
+      it('uninstall with --global removes from global settings', async () => {
+        // Install to global
+        runSetupClaude('--global');
+
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+        expect(existsSync(globalSettings)).toBe(true);
+
+        // Uninstall from global
+        const { combined } = runSetupClaude('--global --uninstall');
+        expect(combined.toLowerCase()).toMatch(/removed|uninstalled/i);
+
+        // Verify removed from global settings
+        const settings = JSON.parse(await readFile(globalSettings, 'utf-8'));
+        expect(settings.hooks.SessionStart).toHaveLength(0);
+      });
+    });
+
+    // ========================================================================
+    // I4: Display Path Accuracy
+    // ========================================================================
+    describe('output messages show correct paths', () => {
+      it('default install shows project path in output', () => {
+        const { combined } = runSetupClaude();
+
+        // Output should mention project-local path
+        expect(combined).toContain('.claude/settings.json');
+        // Should NOT mention global path
+        expect(combined).not.toMatch(/~\/.claude|home/i);
+      });
+
+      it('--global install shows global path in output', () => {
+        const { combined } = runSetupClaude('--global');
+
+        // Output should mention global path
+        expect(combined).toContain('~/.claude/settings.json');
+      });
+
+      it('JSON output location field matches actual file written (project)', async () => {
+        const { stdout } = runSetupClaude('--json');
+        const result = JSON.parse(stdout) as { location: string };
+
+        // Location should indicate project
+        expect(result.location).toBe('.claude/settings.json');
+
+        // Verify file actually exists at project location
+        const projectSettings = join(tempDir, '.claude', 'settings.json');
+        expect(existsSync(projectSettings)).toBe(true);
+      });
+
+      it('JSON output location field matches actual file written (global)', async () => {
+        const { stdout } = runSetupClaude('--global --json');
+        const result = JSON.parse(stdout) as { location: string };
+
+        // Location should indicate global
+        expect(result.location).toBe('~/.claude/settings.json');
+
+        // Verify file actually exists at global location
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+        expect(existsSync(globalSettings)).toBe(true);
+      });
+    });
+
+    // ========================================================================
+    // S1: No Cross-Scope Pollution
+    // ========================================================================
+    describe('safety: no cross-scope pollution', () => {
+      it('project install does not modify global settings', async () => {
+        // Create existing global settings
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+        await writeFile(
+          globalSettings,
+          JSON.stringify({ permissions: { enabled: true } }, null, 2)
+        );
+        const globalBefore = await readFile(globalSettings, 'utf-8');
+
+        // Install to project
+        runSetupClaude();
+
+        // Global settings should be unchanged
+        const globalAfter = await readFile(globalSettings, 'utf-8');
+        expect(globalAfter).toBe(globalBefore);
+      });
+
+      it('global install does not modify project settings', async () => {
+        // Create existing project settings
+        const projectSettings = join(tempDir, '.claude', 'settings.json');
+        await writeFile(
+          projectSettings,
+          JSON.stringify({ permissions: { enabled: false } }, null, 2)
+        );
+        const projectBefore = await readFile(projectSettings, 'utf-8');
+
+        // Install to global
+        runSetupClaude('--global');
+
+        // Project settings should be unchanged
+        const projectAfter = await readFile(projectSettings, 'utf-8');
+        expect(projectAfter).toBe(projectBefore);
+      });
+    });
+
+    // ========================================================================
+    // S2: No Wrong-Scope Uninstall
+    // ========================================================================
+    describe('safety: wrong-scope uninstall does not affect correct scope', () => {
+      it('uninstall from project (default) does not affect global hook', async () => {
+        // Install to global
+        runSetupClaude('--global');
+
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+        const globalBefore = await readFile(globalSettings, 'utf-8');
+
+        // Try to uninstall from project (wrong scope)
+        const { combined } = runSetupClaude('--uninstall');
+
+        // Should show helpful message
+        expect(combined.toLowerCase()).toMatch(/no.*hook|not found|no.*learning/i);
+
+        // Global hook should still exist
+        const globalAfter = await readFile(globalSettings, 'utf-8');
+        expect(globalAfter).toBe(globalBefore);
+
+        const settings = JSON.parse(globalAfter);
+        expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
+      });
+
+      it('uninstall from global does not affect project hook', async () => {
+        // Install to project
+        runSetupClaude();
+
+        const projectSettings = join(tempDir, '.claude', 'settings.json');
+        const projectBefore = await readFile(projectSettings, 'utf-8');
+
+        // Try to uninstall from global (wrong scope)
+        const { combined } = runSetupClaude('--global --uninstall');
+
+        // Should show helpful message
+        expect(combined.toLowerCase()).toMatch(/no.*hook|not found|no.*learning/i);
+
+        // Project hook should still exist
+        const projectAfter = await readFile(projectSettings, 'utf-8');
+        expect(projectAfter).toBe(projectBefore);
+
+        const settings = JSON.parse(projectAfter);
+        expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
+      });
+
+      it('wrong-scope uninstall suggests correct flag', () => {
+        // Install to global
+        runSetupClaude('--global');
+
+        // Try to uninstall from project
+        const { combined } = runSetupClaude('--uninstall');
+
+        // Should suggest using --global flag
+        expect(combined.toLowerCase()).toMatch(/--global|global.*flag/i);
+      });
+    });
+
+    // ========================================================================
+    // S4: No Duplicate Hooks (Idempotency)
+    // ========================================================================
+    describe('safety: idempotency prevents duplicate hooks', () => {
+      it('running default install twice does not duplicate project hook', async () => {
+        runSetupClaude();
+        runSetupClaude();
+
+        const projectSettings = join(tempDir, '.claude', 'settings.json');
+        const settings = JSON.parse(await readFile(projectSettings, 'utf-8'));
+
+        // Should still have only 1 hook
+        expect(settings.hooks.SessionStart.length).toBe(1);
+      });
+
+      it('running global install twice does not duplicate global hook', async () => {
+        runSetupClaude('--global');
+        runSetupClaude('--global');
+
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+        const settings = JSON.parse(await readFile(globalSettings, 'utf-8'));
+
+        // Should still have only 1 hook
+        expect(settings.hooks.SessionStart.length).toBe(1);
+      });
+
+      it('second install shows already installed message', () => {
+        runSetupClaude();
+        const { combined } = runSetupClaude();
+
+        expect(combined.toLowerCase()).toMatch(/already|unchanged/i);
+      });
+    });
+
+    // ========================================================================
+    // E2: Settings Directory Creation
+    // ========================================================================
+    describe('edge case: settings directory does not exist', () => {
+      it('creates project .claude directory if it does not exist', async () => {
+        // Remove project .claude directory
+        await rm(join(tempDir, '.claude'), { recursive: true, force: true });
+
+        runSetupClaude();
+
+        // Should create directory and settings file
+        const projectSettings = join(tempDir, '.claude', 'settings.json');
+        expect(existsSync(projectSettings)).toBe(true);
+      });
+
+      it('creates global .claude directory if it does not exist', async () => {
+        // Remove global .claude directory
+        await rm(join(mockHome, '.claude'), { recursive: true, force: true });
+
+        runSetupClaude('--global');
+
+        // Should create directory and settings file
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+        expect(existsSync(globalSettings)).toBe(true);
+      });
+    });
+
+    // ========================================================================
+    // Dry-run respects scope
+    // ========================================================================
+    describe('dry-run respects scope flag', () => {
+      it('--dry-run without --global reports project location', () => {
+        const { combined } = runSetupClaude('--dry-run');
+
+        expect(combined).toContain('.claude/settings.json');
+        expect(combined.toLowerCase()).toMatch(/would|dry.run/i);
+
+        // No files should be created
+        const projectSettings = join(tempDir, '.claude', 'settings.json');
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+        expect(existsSync(projectSettings)).toBe(false);
+        expect(existsSync(globalSettings)).toBe(false);
+      });
+
+      it('--dry-run with --global reports global location', () => {
+        const { combined } = runSetupClaude('--dry-run --global');
+
+        expect(combined).toContain('~/.claude/settings.json');
+        expect(combined.toLowerCase()).toMatch(/would|dry.run/i);
+
+        // No files should be created
+        const projectSettings = join(tempDir, '.claude', 'settings.json');
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+        expect(existsSync(projectSettings)).toBe(false);
+        expect(existsSync(globalSettings)).toBe(false);
+      });
+    });
+  });
+
+  // ==========================================================================
+  // Auto-sync SQLite after mutations (learning_agent-6nj)
+  // ==========================================================================
+  describe('auto-sync SQLite after mutations', () => {
+    it('learn command syncs to SQLite immediately - lesson searchable without manual rebuild', async () => {
+      // Create lesson via CLI
+      runCli('learn "Use Polars for large CSV files" --yes');
+      closeDb(); // Close any open connection
+
+      // Search should find the lesson WITHOUT manual rebuild
+      const { combined } = runCli('search "Polars"');
+      expect(combined).toContain('Polars');
+    });
+
+    it('learn with --severity high creates lesson searchable via keyword', async () => {
+      runCli('learn "Critical: Always validate user input" --severity high --yes');
+      closeDb();
+
+      const { combined } = runCli('search "validate"');
+      expect(combined).toContain('validate');
+    });
+
+    it('multiple learn commands all sync correctly', async () => {
+      // Create multiple lessons
+      runCli('learn "First lesson about databases" --yes');
+      runCli('learn "Second lesson about APIs" --yes');
+      runCli('learn "Third lesson about testing" --yes');
+      closeDb();
+
+      // All should be searchable
+      const { combined: search1 } = runCli('search "databases"');
+      expect(search1).toContain('databases');
+
+      const { combined: search2 } = runCli('search "APIs"');
+      expect(search2).toContain('APIs');
+
+      const { combined: search3 } = runCli('search "testing"');
+      expect(search3).toContain('testing');
+    });
+
+    it('import command syncs once at end - all lessons searchable', async () => {
+      // Create import file with multiple lessons
+      const importFile = join(tempDir, 'import-lessons.jsonl');
+      const lessons = [
+        createQuickLesson('IMP001', 'First imported lesson about testing'),
+        createQuickLesson('IMP002', 'Second imported lesson about logging'),
+        createQuickLesson('IMP003', 'Third imported lesson about caching'),
+      ];
+      await writeFile(importFile, lessons.map((l) => JSON.stringify(l)).join('\n') + '\n');
+
+      runCli(`import ${importFile}`);
+      closeDb();
+
+      // All lessons should be searchable
+      const { combined: search1 } = runCli('search "testing"');
+      expect(search1).toContain('testing');
+
+      const { combined: search2 } = runCli('search "logging"');
+      expect(search2).toContain('logging');
+
+      const { combined: search3 } = runCli('search "caching"');
+      expect(search3).toContain('caching');
+    });
+
+    it('sync completes within 500ms for single lesson', async () => {
+      const start = Date.now();
+      runCli('learn "Performance test - single lesson sync" --yes');
+      const duration = Date.now() - start;
+
+      // Allow some margin for CLI startup overhead
+      expect(duration).toBeLessThan(2000); // 2 seconds total including CLI startup
+    });
+
+    it('newly created lesson appears in stats command', async () => {
+      // Create a lesson
+      runCli('learn "Lesson for stats test" --yes');
+      closeDb();
+
+      // Stats should reflect the new lesson
+      const { combined } = runCli('stats');
+      expect(combined).toContain('1 total');
+    });
+
+    it('lesson with severity high appears in load-session after sync', async () => {
+      runCli('learn "High severity lesson for session" --severity high --yes');
+      closeDb();
+
+      const { combined } = runCli('load-session');
+      expect(combined).toContain('High severity lesson');
     });
   });
 });

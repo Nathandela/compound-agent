@@ -269,27 +269,33 @@ function outputCheckPlanHuman(lessons: Array<{ lesson: Lesson; score: number }>,
 // ============================================================================
 
 /**
+ * Format source string for human-readable display.
+ * Converts snake_case to space-separated words.
+ */
+function formatSource(source: string): string {
+  return source.replace(/_/g, ' ');
+}
+
+/**
  * Output load-session results in human-readable format.
+ * Optimized for Claude's context window - no IDs, clear structure.
  */
 function outputSessionLessonsHuman(lessons: Lesson[], quiet: boolean): void {
-  console.log('## Session Lessons (High Severity)\n');
+  console.log('## Lessons from Past Sessions\n');
+  console.log('These lessons were captured from previous corrections and should inform your work:\n');
 
   lessons.forEach((lesson, i) => {
     const num = i + 1;
     const date = lesson.created.slice(0, ISO_DATE_PREFIX_LENGTH);
+    const tagsDisplay = lesson.tags.length > 0 ? ` (${lesson.tags.join(', ')})` : '';
 
-    console.log(`${num}. ${chalk.bold(`[${lesson.id}]`)} ${lesson.insight}`);
-    console.log(`   - Source: ${lesson.source} (${date})`);
-    if (lesson.tags.length > 0) {
-      console.log(`   - Tags: ${lesson.tags.join(', ')}`);
-    }
+    console.log(`${num}. **${lesson.insight}**${tagsDisplay}`);
+    console.log(`   Learned: ${date} via ${formatSource(lesson.source)}`);
     console.log();
   });
 
-  const lessonWord = lessons.length === 1 ? 'lesson' : 'lessons';
   if (!quiet) {
-    console.log('---');
-    console.log(`${lessons.length} high-severity ${lessonWord} loaded.`);
+    console.log('Consider these lessons when planning and implementing tasks.');
   }
 }
 
@@ -454,11 +460,65 @@ async function getGitHooksDir(repoRoot: string): Promise<string | null> {
   return existsSync(defaultHooksDir) ? defaultHooksDir : null;
 }
 
-/** Block to append to existing hooks */
+/** Block to insert into existing hooks */
 const LEARNING_AGENT_HOOK_BLOCK = `
 # Learning Agent pre-commit hook (appended)
 npx learning-agent hooks run pre-commit
 `;
+
+/**
+ * Find the line index of the first top-level exit statement in a shell script.
+ *
+ * Top-level means not inside:
+ * - Function definitions (between { and })
+ * - Heredocs (between <<EOF and EOF)
+ *
+ * Returns -1 if no top-level exit found.
+ */
+function findFirstTopLevelExitLine(lines: string[]): number {
+  let insideFunction = 0; // Brace nesting depth
+  let heredocDelimiter: string | null = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    const trimmed = line.trim();
+
+    // Check for heredoc end
+    if (heredocDelimiter !== null) {
+      if (trimmed === heredocDelimiter) {
+        heredocDelimiter = null;
+      }
+      continue;
+    }
+
+    // Check for heredoc start: <<EOF, <<'EOF', <<"EOF", <<-EOF
+    const heredocMatch = /<<-?\s*['"]?(\w+)['"]?/.exec(line);
+    if (heredocMatch?.[1]) {
+      heredocDelimiter = heredocMatch[1];
+      continue;
+    }
+
+    // Track function braces (simple heuristic)
+    // Count opening and closing braces
+    for (const char of line) {
+      if (char === '{') insideFunction++;
+      if (char === '}') insideFunction = Math.max(0, insideFunction - 1);
+    }
+
+    // Skip if inside function
+    if (insideFunction > 0) {
+      continue;
+    }
+
+    // Check for top-level exit: exit followed by number, $var, or $?
+    // Pattern: start of line, optional whitespace, exit, space, code, end
+    if (/^\s*exit\s+(\d+|\$\w+|\$\?)\s*$/.test(trimmed)) {
+      return i;
+    }
+  }
+
+  return -1;
+}
 
 /**
  * Install pre-commit hook, respecting core.hooksPath and existing hooks.
@@ -487,8 +547,21 @@ async function installPreCommitHook(repoRoot: string): Promise<boolean> {
       return false; // Already installed
     }
 
-    // Append our block to existing hook (non-destructive)
-    const newContent = content.trimEnd() + '\n' + LEARNING_AGENT_HOOK_BLOCK;
+    // Find insertion point: before first top-level exit, or at end
+    const lines = content.split('\n');
+    const exitLineIndex = findFirstTopLevelExitLine(lines);
+
+    let newContent: string;
+    if (exitLineIndex === -1) {
+      // No top-level exit found - append to end
+      newContent = content.trimEnd() + '\n' + LEARNING_AGENT_HOOK_BLOCK;
+    } else {
+      // Insert before the exit line
+      const before = lines.slice(0, exitLineIndex);
+      const after = lines.slice(exitLineIndex);
+      newContent = before.join('\n') + LEARNING_AGENT_HOOK_BLOCK + after.join('\n');
+    }
+
     await writeFile(hookPath, newContent, 'utf-8');
     chmodSync(hookPath, HOOK_FILE_MODE);
     return true;
@@ -613,13 +686,16 @@ hooksCommand
 
 /**
  * Get the path to Claude Code settings file.
+ *
+ * @param global - If true, return global path (~/.claude/settings.json).
+ *                 If false (default), return project-local path (.claude/settings.json).
  */
-function getClaudeSettingsPath(project: boolean): string {
-  if (project) {
-    const repoRoot = getRepoRoot();
-    return join(repoRoot, '.claude', 'settings.json');
+function getClaudeSettingsPath(global: boolean): string {
+  if (global) {
+    return join(homedir(), '.claude', 'settings.json');
   }
-  return join(homedir(), '.claude', 'settings.json');
+  const repoRoot = getRepoRoot();
+  return join(repoRoot, '.claude', 'settings.json');
 }
 
 /**
@@ -694,13 +770,13 @@ const setupCommand = program.command('setup').description('Setup integrations');
 setupCommand
   .command('claude')
   .description('Install Claude Code SessionStart hooks')
-  .option('--project', 'Install to project .claude directory instead of global')
+  .option('--global', 'Install to global ~/.claude/ instead of project')
   .option('--uninstall', 'Remove learning-agent hooks')
   .option('--dry-run', 'Show what would change without writing')
   .option('--json', 'Output as JSON')
-  .action(async (options: { project?: boolean; uninstall?: boolean; dryRun?: boolean; json?: boolean }) => {
-    const settingsPath = getClaudeSettingsPath(options.project ?? false);
-    const displayPath = options.project ? '.claude/settings.json' : '~/.claude/settings.json';
+  .action(async (options: { global?: boolean; uninstall?: boolean; dryRun?: boolean; json?: boolean }) => {
+    const settingsPath = getClaudeSettingsPath(options.global ?? false);
+    const displayPath = options.global ? '~/.claude/settings.json' : '.claude/settings.json';
 
     let settings: Record<string, unknown>;
     try {
@@ -745,6 +821,12 @@ setupCommand
           console.log(JSON.stringify({ installed: false, location: displayPath, action: 'unchanged' }));
         } else {
           out.info('No learning agent hooks to remove');
+          // Suggest the other scope if no hooks found
+          if (options.global) {
+            console.log('  Hint: Try without --global to check project settings.');
+          } else {
+            console.log('  Hint: Try with --global flag to check global settings.');
+          }
         }
       }
       return;
@@ -792,12 +874,12 @@ setupCommand
         action: fileExists ? 'updated' : 'created',
       }));
     } else {
-      out.success(options.project ? 'Claude Code hooks installed (project-level)' : 'Claude Code hooks installed');
+      out.success(options.global ? 'Claude Code hooks installed (global)' : 'Claude Code hooks installed (project-level)');
       console.log(`  Location: ${displayPath}`);
       console.log('  Hook: SessionStart (startup|resume|compact)');
       console.log('');
       console.log('Lessons will be loaded automatically at session start.');
-      if (options.project) {
+      if (!options.global) {
         console.log('');
         console.log('Note: Project hooks override global hooks.');
       }
