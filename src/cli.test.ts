@@ -83,6 +83,162 @@ describe('CLI', () => {
       const lesson = JSON.parse(content.trim()) as { confirmed: boolean };
       expect(lesson.confirmed).toBe(true);
     });
+
+    // --severity flag tests (Data Invariants)
+    describe('--severity flag', () => {
+      it('creates full lesson with severity=high when --severity high is used', async () => {
+        runCli('learn "Use Polars for files >100MB" --severity high --yes');
+
+        const filePath = join(tempDir, LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
+
+        expect(lesson.type).toBe('full');
+        expect(lesson.severity).toBe('high');
+      });
+
+      it('creates full lesson with severity=medium when --severity medium is used', async () => {
+        runCli('learn "Validate input before processing" --severity medium --yes');
+
+        const filePath = join(tempDir, LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
+
+        expect(lesson.type).toBe('full');
+        expect(lesson.severity).toBe('medium');
+      });
+
+      it('creates full lesson with severity=low when --severity low is used', async () => {
+        runCli('learn "Consider adding comments" --severity low --yes');
+
+        const filePath = join(tempDir, LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
+
+        expect(lesson.type).toBe('full');
+        expect(lesson.severity).toBe('low');
+      });
+
+      it('automatically sets type=full when --severity flag is provided', async () => {
+        runCli('learn "High severity lesson" --severity high --yes');
+
+        const filePath = join(tempDir, LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
+
+        // Coupling invariant: severity !== undefined implies type === 'full'
+        expect(lesson.type).toBe('full');
+        expect(lesson.severity).toBe('high');
+      });
+
+      // Safety Property S1: Invalid severity values rejected with clear error
+      it('rejects invalid severity value with clear error message', () => {
+        const { combined } = runCli('learn "Test lesson" --severity invalid --yes');
+
+        expect(combined.toLowerCase()).toMatch(/error|invalid/i);
+        expect(combined).toMatch(/severity/i);
+        expect(combined).toMatch(/high/i);
+        expect(combined).toMatch(/medium/i);
+        expect(combined).toMatch(/low/i);
+      });
+
+      it('rejects case-incorrect severity value (case-sensitive)', () => {
+        const { combined } = runCli('learn "Test lesson" --severity High --yes');
+
+        expect(combined.toLowerCase()).toMatch(/error|invalid/i);
+        expect(combined).toMatch(/severity/i);
+      });
+
+      it('rejects empty severity string', () => {
+        const { combined } = runCli('learn "Test lesson" --severity "" --yes');
+
+        expect(combined.toLowerCase()).toMatch(/error|invalid/i);
+        expect(combined).toMatch(/severity/i);
+      });
+
+      // Safety Property S5: JSONL must not be corrupted by invalid input
+      it('does not corrupt JSONL when invalid severity is provided', async () => {
+        // Create a valid lesson first
+        runCli('learn "Valid lesson" --yes');
+
+        const filePathBefore = join(tempDir, LESSONS_PATH);
+        const contentBefore = await readFile(filePathBefore, 'utf-8');
+
+        // Try to create lesson with invalid severity
+        runCli('learn "Invalid severity lesson" --severity bad --yes');
+
+        const filePathAfter = join(tempDir, LESSONS_PATH);
+        const contentAfter = await readFile(filePathAfter, 'utf-8');
+
+        // JSONL should be unchanged (no new lesson added)
+        expect(contentAfter).toBe(contentBefore);
+        expect(contentAfter).not.toContain('Invalid severity lesson');
+      });
+
+      // Backward compatibility: No --severity flag creates quick lesson
+      it('creates quick lesson with no severity when --severity flag is omitted', async () => {
+        runCli('learn "Quick capture lesson" --yes');
+
+        const filePath = join(tempDir, LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
+
+        expect(lesson.type).toBe('quick');
+        expect(lesson.severity).toBeUndefined();
+      });
+
+      // Safety Property S3: High-severity lessons must be retrievable by loadSessionLessons
+      it('creates high-severity lesson that is retrievable by loadSessionLessons', async () => {
+        runCli('learn "Critical security lesson" --severity high --yes');
+
+        const filePath = join(tempDir, LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const lesson = JSON.parse(content.trim()) as { type: string; severity?: string; confirmed: boolean };
+
+        // Verify all required fields for loadSessionLessons filter
+        expect(lesson.type).toBe('full');
+        expect(lesson.severity).toBe('high');
+        expect(lesson.confirmed).toBe(true);
+      });
+
+      it('works with all other flags combined', async () => {
+        runCli('learn "Complex lesson" --severity high --trigger "bug occurred" --tags "security,auth" --yes');
+
+        const filePath = join(tempDir, LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const lesson = JSON.parse(content.trim()) as {
+          type: string;
+          severity?: string;
+          trigger: string;
+          tags: string[];
+        };
+
+        expect(lesson.type).toBe('full');
+        expect(lesson.severity).toBe('high');
+        expect(lesson.trigger).toBe('bug occurred');
+        expect(lesson.tags).toContain('security');
+        expect(lesson.tags).toContain('auth');
+      });
+
+      // Liveness Property L1: CLI completes within 500ms
+      it('completes within 500ms for severity flag', async () => {
+        const start = Date.now();
+        runCli('learn "Performance test" --severity high --yes');
+        const duration = Date.now() - start;
+
+        expect(duration).toBeLessThan(500);
+      });
+
+      // Liveness Property L2: Clear error messages list valid values
+      it('shows clear error message listing valid severity values', () => {
+        const { combined } = runCli('learn "Test" --severity wrong --yes');
+
+        // Error message must list all valid values
+        expect(combined).toMatch(/high/i);
+        expect(combined).toMatch(/medium/i);
+        expect(combined).toMatch(/low/i);
+      });
+    });
   });
 
   describe('list command', () => {
@@ -712,6 +868,180 @@ describe('CLI', () => {
       const { combined } = runCli('load-session');
       expect(combined).toContain('Source:');
       expect(combined).toContain('2025-01-28');
+    });
+  });
+
+  describe('download-model command', () => {
+    it('command is registered and recognized', () => {
+      const { combined } = runCli('download-model --help');
+      // Command should be recognized and show help
+      expect(combined).toContain('download-model');
+      expect(combined).not.toMatch(/unknown command|not found/i);
+    });
+
+    it('shows success message when model downloads successfully', () => {
+      const { combined } = runCli('download-model');
+      // Should show download progress and success
+      expect(combined).toMatch(/downloading|model|success/i);
+    });
+
+    it('shows model path and size after successful download', () => {
+      const { combined } = runCli('download-model');
+      // Should display the path to the downloaded model
+      expect(combined).toMatch(/path/i);
+      expect(combined).toMatch(/\.gguf/i);
+      // Should show size in human-readable format (MB)
+      expect(combined).toMatch(/\d+\s*MB/i);
+    });
+
+    it('is idempotent - skips download if model already exists', () => {
+      // Run download twice
+      runCli('download-model');
+      const { combined } = runCli('download-model');
+
+      // Second run should indicate model already exists
+      expect(combined).toMatch(/already\s+(downloaded|exists|available)/i);
+      expect(combined).not.toMatch(/downloading/i);
+    });
+
+    it('second download completes instantly (no re-download)', () => {
+      // First download
+      runCli('download-model');
+
+      // Second run should be instant (no actual download)
+      const start = Date.now();
+      runCli('download-model');
+      const duration = Date.now() - start;
+
+      // Should complete in less than 2 seconds (way faster than 278MB download)
+      expect(duration).toBeLessThan(2000);
+    });
+
+    it('isModelAvailable returns true after successful download', () => {
+      // Download model (may already exist)
+      runCli('download-model');
+
+      // After download, model should be available
+      const afterAvailable = isModelAvailable();
+
+      // Invariant: after running download-model, isModelAvailable() must be true
+      expect(afterAvailable).toBe(true);
+    });
+
+    it('outputs valid JSON with --json flag', () => {
+      const { stdout } = runCli('download-model --json');
+
+      // Extract JSON from output (may have other output from node-llama-cpp)
+      const jsonLine = stdout.split('\n').find((line) => line.trim().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+
+      const result = JSON.parse(jsonLine!) as {
+        success: boolean;
+        path: string;
+        size: number;
+        alreadyExisted: boolean;
+      };
+
+      expect(result.success).toBe(true);
+      expect(result.path).toMatch(/\.gguf$/);
+      expect(result.size).toBeGreaterThan(0);
+      expect(typeof result.alreadyExisted).toBe('boolean');
+    });
+
+    it('JSON output shows alreadyExisted field accurately reflects model state', () => {
+      // First check if model exists
+      const modelExistsBefore = isModelAvailable();
+
+      const { stdout } = runCli('download-model --json');
+
+      const jsonLine = stdout.split('\n').find((line) => line.trim().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+
+      const result = JSON.parse(jsonLine!) as { alreadyExisted: boolean };
+      // alreadyExisted should match whether model existed before this run
+      expect(result.alreadyExisted).toBe(modelExistsBefore);
+    });
+
+    it('JSON output shows alreadyExisted: true on subsequent download', () => {
+      // First download
+      runCli('download-model');
+
+      // Second download
+      const { stdout } = runCli('download-model --json');
+
+      const jsonLine = stdout.split('\n').find((line) => line.trim().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+
+      const result = JSON.parse(jsonLine!) as { alreadyExisted: boolean };
+      expect(result.alreadyExisted).toBe(true);
+    });
+
+    it('uses absolute path for model location', () => {
+      const { stdout } = runCli('download-model --json');
+
+      const jsonLine = stdout.split('\n').find((line) => line.trim().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+
+      const result = JSON.parse(jsonLine!) as { path: string };
+
+      // Path should be absolute (starts with /)
+      expect(result.path).toMatch(/^\//);
+      // Path should include home directory
+      expect(result.path).toContain('.node-llama-cpp');
+    });
+
+    it('uses consistent model filename', () => {
+      const { stdout } = runCli('download-model --json');
+
+      const jsonLine = stdout.split('\n').find((line) => line.trim().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+
+      const result = JSON.parse(jsonLine!) as { path: string };
+
+      // Should use MODEL_FILENAME constant (hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf)
+      expect(result.path).toContain('hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf');
+    });
+
+    it('downloaded model file has valid size (approximately 278MB)', () => {
+      const { stdout } = runCli('download-model --json');
+
+      const jsonLine = stdout.split('\n').find((line) => line.trim().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+
+      const result = JSON.parse(jsonLine!) as { size: number };
+
+      // Size should be approximately 278MB (277,852,359 bytes ±5%)
+      const expectedSize = 277852359;
+      const tolerance = expectedSize * 0.05; // 5% tolerance for model variations
+
+      expect(result.size).toBeGreaterThan(expectedSize - tolerance);
+      expect(result.size).toBeLessThan(expectedSize + tolerance);
+    });
+
+    it('command name matches error messages in check-plan', () => {
+      // Create temp dir with no model
+      const { combined } = runCli('check-plan --plan "test plan"');
+
+      // Error message should reference the same command name
+      if (combined.includes('download-model')) {
+        expect(combined).toContain('npx learning-agent download-model');
+      }
+    });
+
+    it('check-plan works immediately after download-model', async () => {
+      // Create a test lesson
+      await appendLesson(tempDir, createQuickLesson('L001', 'Test lesson for search'));
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      // Download model
+      runCli('download-model');
+
+      // check-plan should work immediately (no race condition)
+      const { combined } = runCli('check-plan --plan "test search"');
+
+      // Should not show "model not available" error
+      expect(combined).not.toMatch(/model not available|download.*model/i);
     });
   });
 

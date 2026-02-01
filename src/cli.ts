@@ -63,7 +63,7 @@ const HOOK_MARKER = '# Learning Agent pre-commit hook';
 import { detectAndPropose, parseInputFile } from './capture/index.js';
 import type { DetectionResult } from './capture/index.js';
 import { formatBytes, getRepoRoot, parseLimit } from './cli-utils.js';
-import { isModelAvailable, loadSessionLessons, retrieveForPlan, VERSION } from './index.js';
+import { isModelAvailable, loadSessionLessons, MODEL_FILENAME, resolveModel, retrieveForPlan, VERSION } from './index.js';
 import {
   appendLesson,
   compact,
@@ -78,8 +78,8 @@ import {
   syncIfNeeded,
   TOMBSTONE_THRESHOLD,
 } from './storage/index.js';
-import { generateId, LessonSchema } from './types.js';
-import type { Lesson } from './types.js';
+import { generateId, LessonSchema, SeveritySchema } from './types.js';
+import type { Lesson, Severity } from './types.js';
 
 // ============================================================================
 // Output Formatting Helpers
@@ -809,14 +809,29 @@ program
   .description('Capture a new lesson')
   .option('-t, --trigger <text>', 'What triggered this lesson')
   .option('--tags <tags>', 'Comma-separated tags', '')
+  .option('-s, --severity <level>', 'Lesson severity: high, medium, low')
   .option('-y, --yes', 'Skip confirmation')
-  .action(async function (this: Command, insight: string, options: { trigger?: string; tags: string; yes?: boolean }) {
+  .action(async function (this: Command, insight: string, options: { trigger?: string; tags: string; severity?: string; yes?: boolean }) {
     const repoRoot = getRepoRoot();
     const { quiet } = getGlobalOpts(this);
 
+    // Validate severity if provided
+    let severity: Severity | undefined;
+    if (options.severity !== undefined) {
+      const result = SeveritySchema.safeParse(options.severity);
+      if (!result.success) {
+        out.error(`Invalid severity value: "${options.severity}". Valid values are: high, medium, low`);
+        process.exit(1);
+      }
+      severity = result.data;
+    }
+
+    // Data coupling invariant: severity !== undefined => type === 'full'
+    const lessonType = severity !== undefined ? 'full' : 'quick';
+
     const lesson: Lesson = {
       id: generateId(insight),
-      type: 'quick',
+      type: lessonType,
       trigger: options.trigger ?? 'Manual capture',
       insight,
       tags: options.tags ? options.tags.split(',').map((t) => t.trim()) : [],
@@ -829,6 +844,7 @@ program
       confirmed: true,  // learn command is explicit confirmation
       supersedes: [],
       related: [],
+      ...(severity !== undefined && { severity }),
     };
 
     await appendLesson(repoRoot, lesson);
@@ -939,6 +955,54 @@ program
       } else {
         console.log('Index is up to date.');
       }
+    }
+  });
+
+/**
+ * Download-model command - Download the embedding model for semantic search.
+ *
+ * Downloads the EmbeddingGemma model required for check-plan semantic search.
+ * Idempotent: skips download if model already exists.
+ *
+ * @example npx learning-agent download-model
+ * @example npx learning-agent download-model --json
+ */
+program
+  .command('download-model')
+  .description('Download the embedding model for semantic search')
+  .option('--json', 'Output as JSON')
+  .action(async (options: { json?: boolean }) => {
+    const alreadyExisted = isModelAvailable();
+
+    if (alreadyExisted) {
+      // Model already exists - get path and size
+      const modelPath = join(homedir(), '.node-llama-cpp', 'models', MODEL_FILENAME);
+      const size = statSync(modelPath).size;
+
+      if (options.json) {
+        console.log(JSON.stringify({ success: true, path: modelPath, size, alreadyExisted: true }));
+      } else {
+        console.log('Model already exists.');
+        console.log(`Path: ${modelPath}`);
+        console.log(`Size: ${formatBytes(size)}`);
+      }
+      return;
+    }
+
+    // Download the model
+    if (!options.json) {
+      console.log('Downloading embedding model...');
+    }
+
+    const modelPath = await resolveModel({ cli: !options.json });
+    const size = statSync(modelPath).size;
+
+    if (options.json) {
+      console.log(JSON.stringify({ success: true, path: modelPath, size, alreadyExisted: false }));
+    } else {
+      console.log(`\nModel downloaded successfully!`);
+      console.log(`Path: ${modelPath}`);
+      console.log(`Size: ${formatBytes(size)}`);
     }
   });
 
