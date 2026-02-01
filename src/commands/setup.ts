@@ -63,11 +63,45 @@ const HOOK_MARKER = '# Learning Agent pre-commit hook';
 /** Section header to check for idempotency */
 const LEARNING_AGENT_SECTION_HEADER = '## Learning Agent Integration';
 
+// ============================================================================
+// CLAUDE.md Reference Constants (lfy)
+// ============================================================================
+
+/** Start marker for CLAUDE.md reference section */
+const CLAUDE_REF_START_MARKER = '<!-- learning-agent:claude-ref:start -->';
+
+/** End marker for CLAUDE.md reference section */
+const CLAUDE_REF_END_MARKER = '<!-- learning-agent:claude-ref:end -->';
+
+/** Reference content to add to CLAUDE.md */
+const CLAUDE_MD_REFERENCE = `
+${CLAUDE_REF_START_MARKER}
+## Learning Agent
+See AGENTS.md for lesson capture workflow.
+${CLAUDE_REF_END_MARKER}
+`;
+
 /** Template content for AGENTS.md */
 const AGENTS_MD_TEMPLATE = `
 ## Learning Agent Integration
 
 This project uses learning-agent for session memory.
+
+### CRITICAL RULES
+
+**NEVER edit .claude/lessons/index.jsonl directly.**
+
+The JSONL file is the source of truth and requires:
+- Proper ID generation
+- Schema validation
+- SQLite index sync
+
+Always use CLI commands:
+- \`npx lna learn "insight"\` - Add a lesson
+- \`npx lna update <id> --insight "new"\` - Modify a lesson
+- \`npx lna delete <id>\` - Remove a lesson
+
+Direct edits will cause schema validation failures and SQLite desync.
 
 ### Retrieval Points
 
@@ -91,6 +125,33 @@ Display results as a **Lessons Check** section after your plan:
 \`\`\`
 
 Consider each lesson while implementing.
+
+### When to Capture Lessons (Detection Triggers)
+
+Watch for these patterns and propose \`lna learn\`:
+
+**User correction**: User says "no", "wrong", "actually..."
+- Action: Propose a lesson capturing the correct approach
+
+**Self-correction**: You fix after multiple attempts (edit -> fail -> re-edit)
+- Action: Propose a lesson about what finally worked
+
+**Test failure fix**: Test fails -> you diagnose -> fix -> passes
+- Action: Propose a lesson about the root cause and solution
+
+### Auto-Invoke Trigger Phrases
+
+**Capture triggers** (propose \`lna learn\`):
+- "that worked" - User confirms a solution worked
+- "fixed it" - Problem was resolved
+- "my mistake" - User acknowledges an error
+- "actually use X" - User specifies a preference
+
+**Retrieval triggers** (run \`lna check-plan\` or \`lna search\`):
+- "similar issue" - User recalls a past problem
+- "we had this before" - Reference to previous experience
+- "seen this" - Pattern recognition
+- "remember when" - Memory recall request
 
 ### Proposing Lessons
 
@@ -122,6 +183,7 @@ Before closing a session, reflect on lessons learned:
 \`\`\`bash
 npx lna load-session --json  # Session start
 npx lna check-plan --plan "..." --json  # Before implementing
+npx lna learn "insight"  # Capture a lesson
 npx lna capture --trigger "..." --insight "..." --yes
 \`\`\`
 
@@ -133,6 +195,44 @@ See [AGENTS.md](https://github.com/Nathandela/learning_agent/blob/main/AGENTS.md
  */
 function hasLearningAgentSection(content: string): boolean {
   return content.includes(LEARNING_AGENT_SECTION_HEADER);
+}
+
+/**
+ * Check if CLAUDE.md already has the Learning Agent reference.
+ */
+function hasClaudeMdReference(content: string): boolean {
+  return content.includes('Learning Agent') || content.includes(CLAUDE_REF_START_MARKER);
+}
+
+/**
+ * Ensure CLAUDE.md has a reference to AGENTS.md for Learning Agent workflow.
+ * Creates CLAUDE.md if it doesn't exist, appends reference if not present.
+ * Uses markers for clean uninstall support.
+ */
+async function ensureClaudeMdReference(repoRoot: string): Promise<boolean> {
+  const claudeMdPath = join(repoRoot, '.claude', 'CLAUDE.md');
+
+  // Ensure .claude directory exists
+  await mkdir(join(repoRoot, '.claude'), { recursive: true });
+
+  if (!existsSync(claudeMdPath)) {
+    // Create new CLAUDE.md with reference
+    const content = `# Project Instructions
+${CLAUDE_MD_REFERENCE}`;
+    await writeFile(claudeMdPath, content, 'utf-8');
+    return true;
+  }
+
+  // File exists - check if reference is already present
+  const content = await readFile(claudeMdPath, 'utf-8');
+  if (hasClaudeMdReference(content)) {
+    return false; // Already has reference
+  }
+
+  // Append reference
+  const newContent = content.trimEnd() + '\n' + CLAUDE_MD_REFERENCE;
+  await writeFile(claudeMdPath, newContent, 'utf-8');
+  return true;
 }
 
 /**
@@ -173,6 +273,69 @@ async function updateAgentsMd(repoRoot: string): Promise<boolean> {
   const newContent = existed ? content.trimEnd() + '\n' + AGENTS_MD_TEMPLATE : AGENTS_MD_TEMPLATE.trim() + '\n';
   await writeFile(agentsPath, newContent, 'utf-8');
   return true;
+}
+
+// ============================================================================
+// Slash Commands (8lp, 6nw)
+// ============================================================================
+
+/** Slash command templates for .claude/commands/ */
+const SLASH_COMMANDS = {
+  'learn.md': `Capture a lesson from this session.
+
+Usage: /learn <insight>
+
+Examples:
+- /learn "Always use Polars for large CSV files"
+- /learn "API requires X-Request-ID header"
+
+\`\`\`bash
+npx lna learn "$ARGUMENTS"
+\`\`\`
+`,
+  'check-plan.md': `Retrieve relevant lessons for a plan before implementing.
+
+Usage: /check-plan <plan description>
+
+\`\`\`bash
+npx lna check-plan --plan "$ARGUMENTS" --json
+\`\`\`
+`,
+  'list.md': `Show all stored lessons.
+
+\`\`\`bash
+npx lna list
+\`\`\`
+`,
+  'prime.md': `Load learning-agent workflow context after compaction or context loss.
+
+\`\`\`bash
+npx lna prime
+\`\`\`
+`,
+};
+
+/**
+ * Create slash commands in .claude/commands/ directory.
+ * Idempotent: does not overwrite existing files.
+ *
+ * @returns true if any commands were created
+ */
+async function createSlashCommands(repoRoot: string): Promise<boolean> {
+  const commandsDir = join(repoRoot, '.claude', 'commands');
+  await mkdir(commandsDir, { recursive: true });
+
+  let created = false;
+
+  for (const [filename, content] of Object.entries(SLASH_COMMANDS)) {
+    const filePath = join(commandsDir, filename);
+    if (!existsSync(filePath)) {
+      await writeFile(filePath, content, 'utf-8');
+      created = true;
+    }
+  }
+
+  return created;
 }
 
 // ============================================================================
@@ -454,6 +617,17 @@ export function registerSetupCommands(program: Command): void {
         agentsMdUpdated = await updateAgentsMd(repoRoot);
       }
 
+      // Ensure CLAUDE.md has reference to AGENTS.md (lfy)
+      if (!options.skipAgents) {
+        await ensureClaudeMdReference(repoRoot);
+      }
+
+      // Create slash commands unless skipped (8lp, 6nw)
+      let slashCommandsCreated = false;
+      if (!options.skipAgents) {
+        slashCommandsCreated = await createSlashCommands(repoRoot);
+      }
+
       // Install hooks unless skipped
       let hooksInstalled = false;
       if (!options.skipHooks) {
@@ -466,6 +640,7 @@ export function registerSetupCommands(program: Command): void {
           initialized: true,
           lessonsDir,
           agentsMd: agentsMdUpdated,
+          slashCommands: slashCommandsCreated || !options.skipAgents,
           hooks: hooksInstalled,
         }));
       } else if (!quiet) {
@@ -477,6 +652,13 @@ export function registerSetupCommands(program: Command): void {
           console.log('  AGENTS.md: Skipped (--skip-agents)');
         } else {
           console.log('  AGENTS.md: Already has Learning Agent section');
+        }
+        if (slashCommandsCreated) {
+          console.log('  Slash commands: Created (/learn, /check-plan, /list, /prime)');
+        } else if (options.skipAgents) {
+          console.log('  Slash commands: Skipped (--skip-agents)');
+        } else {
+          console.log('  Slash commands: Already exist');
         }
         if (hooksInstalled) {
           console.log('  Git hooks: pre-commit hook installed');

@@ -253,6 +253,76 @@ describe('Setup Commands', () => {
       expect(newContent).toBe(contentWithMarker);
     });
 
+    // ========================================================================
+    // Slash Commands Creation (8lp, 6nw)
+    // ========================================================================
+
+    it('creates .claude/commands directory with slash commands', async () => {
+      runCli('init');
+
+      const commandsDir = join(getTempDir(), '.claude', 'commands');
+      const dirs = await readdir(join(getTempDir(), '.claude'));
+      expect(dirs).toContain('commands');
+    });
+
+    it('creates /learn slash command file', async () => {
+      runCli('init');
+
+      const learnPath = join(getTempDir(), '.claude', 'commands', 'learn.md');
+      const content = await readFile(learnPath, 'utf-8');
+      expect(content).toContain('lna learn');
+      expect(content).toContain('insight');
+    });
+
+    it('creates /check-plan slash command file', async () => {
+      runCli('init');
+
+      const checkPlanPath = join(getTempDir(), '.claude', 'commands', 'check-plan.md');
+      const content = await readFile(checkPlanPath, 'utf-8');
+      expect(content).toContain('lna check-plan');
+      expect(content).toContain('plan');
+    });
+
+    it('creates /list slash command file', async () => {
+      runCli('init');
+
+      const listPath = join(getTempDir(), '.claude', 'commands', 'list.md');
+      const content = await readFile(listPath, 'utf-8');
+      expect(content).toContain('lna list');
+    });
+
+    it('creates /prime slash command file', async () => {
+      runCli('init');
+
+      const primePath = join(getTempDir(), '.claude', 'commands', 'prime.md');
+      const content = await readFile(primePath, 'utf-8');
+      expect(content).toContain('lna prime');
+    });
+
+    it('slash commands are idempotent - do not duplicate on re-run', async () => {
+      runCli('init');
+      runCli('init');
+
+      const learnPath = join(getTempDir(), '.claude', 'commands', 'learn.md');
+      const content = await readFile(learnPath, 'utf-8');
+      // Should only contain one 'lna learn' command
+      const matches = content.match(/lna learn/g);
+      expect(matches?.length).toBeLessThanOrEqual(2); // May have in description + command
+    });
+
+    it('--skip-agents also skips slash commands', async () => {
+      runCli('init --skip-agents');
+
+      const commandsDir = join(getTempDir(), '.claude', 'commands');
+      expect(existsSync(commandsDir)).toBe(false);
+    });
+
+    it('JSON output includes slashCommands field', async () => {
+      const { stdout } = runCli('init --json');
+      const result = JSON.parse(stdout) as { slashCommands: boolean };
+      expect(result.slashCommands).toBe(true);
+    });
+
     it('respects core.hooksPath configuration', async () => {
       // Create custom hooks directory
       const customHooksDir = join(getTempDir(), 'custom-hooks');
@@ -727,6 +797,203 @@ exit 0
 
       expect(result.dryRun).toBe(true);
       expect(result.wouldInstall).toBe(true);
+    });
+  });
+
+  /**
+   * Tests for 0p5: AGENTS.md must prohibit direct JSONL edits
+   */
+  describe('AGENTS.md prohibits direct JSONL edits (0p5)', () => {
+    it('includes "NEVER edit" rule in CRITICAL RULES section', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Must have CRITICAL RULES section
+      expect(content).toContain('CRITICAL RULES');
+      // Must explicitly prohibit direct edits
+      expect(content).toMatch(/never\s+edit.*index\.jsonl/i);
+    });
+
+    it('lists CLI alternatives for JSONL operations', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Must list CLI commands as alternatives
+      expect(content).toContain('lna learn');
+      expect(content).toContain('lna update');
+      expect(content).toContain('lna delete');
+    });
+
+    it('CRITICAL RULES section appears near top of Learning Agent section', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Find positions
+      const sectionStart = content.indexOf('## Learning Agent Integration');
+      const criticalRules = content.indexOf('CRITICAL RULES');
+      const retrievalSection = content.indexOf('### Retrieval Points');
+
+      // CRITICAL RULES must appear before Retrieval Points section
+      expect(sectionStart).toBeGreaterThan(-1);
+      expect(criticalRules).toBeGreaterThan(sectionStart);
+      expect(criticalRules).toBeLessThan(retrievalSection);
+    });
+
+    it('explains consequences of direct edits', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Should explain why direct edits are bad
+      expect(content).toMatch(/schema|validation|sync|desync/i);
+    });
+  });
+
+  /**
+   * Tests for lfy: CLAUDE.md reference to AGENTS.md
+   */
+  describe('CLAUDE.md reference to AGENTS.md (lfy)', () => {
+    it('creates CLAUDE.md with reference if it does not exist', async () => {
+      runCli('init');
+
+      const claudeMdPath = join(getTempDir(), '.claude', 'CLAUDE.md');
+      const content = await readFile(claudeMdPath, 'utf-8');
+
+      expect(content).toContain('Learning Agent');
+      expect(content).toMatch(/AGENTS\.md|agents\.md/i);
+    });
+
+    it('appends reference to existing CLAUDE.md', async () => {
+      // Create existing CLAUDE.md
+      const claudeDir = join(getTempDir(), '.claude');
+      await mkdir(claudeDir, { recursive: true });
+      const claudeMdPath = join(claudeDir, 'CLAUDE.md');
+      await writeFile(claudeMdPath, '# Existing Project Instructions\n\nSome rules here.\n');
+
+      runCli('init');
+
+      const content = await readFile(claudeMdPath, 'utf-8');
+      // Should preserve existing content
+      expect(content).toContain('Existing Project Instructions');
+      // Should add reference
+      expect(content).toMatch(/AGENTS\.md|agents\.md/i);
+    });
+
+    it('does not duplicate reference if already present', async () => {
+      // Create CLAUDE.md with existing reference
+      const claudeDir = join(getTempDir(), '.claude');
+      await mkdir(claudeDir, { recursive: true });
+      const claudeMdPath = join(claudeDir, 'CLAUDE.md');
+      await writeFile(claudeMdPath, '# Project\n\n## Learning Agent\nSee AGENTS.md for workflow.\n');
+
+      runCli('init');
+      runCli('init'); // Run twice
+
+      const content = await readFile(claudeMdPath, 'utf-8');
+      // Should have only one Learning Agent section
+      const matches = content.match(/Learning Agent/g);
+      expect(matches?.length).toBe(1);
+    });
+
+    it('uses markers for clean uninstall support', async () => {
+      runCli('init');
+
+      const claudeMdPath = join(getTempDir(), '.claude', 'CLAUDE.md');
+      const content = await readFile(claudeMdPath, 'utf-8');
+
+      // Should have start and end markers
+      expect(content).toContain('<!-- learning-agent:');
+      expect(content).toMatch(/learning-agent:[^>]*start/);
+      expect(content).toMatch(/learning-agent:[^>]*end/);
+    });
+  });
+
+  /**
+   * Tests for 501: Detection triggers in AGENTS.md
+   */
+  describe('Detection triggers in AGENTS.md (501)', () => {
+    it('includes user correction detection pattern', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Should mention user correction triggers
+      expect(content).toMatch(/user\s+(correction|corrects)/i);
+      expect(content).toMatch(/"no"|"wrong"|"actually"/i);
+    });
+
+    it('includes self-correction detection pattern', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Should mention self-correction
+      expect(content).toMatch(/self.correct/i);
+      expect(content).toMatch(/multiple\s+attempts|edit.*fail.*re-edit|iteration/i);
+    });
+
+    it('includes test failure detection pattern', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Should mention test failure -> fix pattern
+      expect(content).toMatch(/test.*fail.*fix|test.*failure/i);
+    });
+
+    it('detection triggers section has actionable instructions', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Should tell Claude what to do when pattern detected
+      expect(content).toMatch(/propose.*learn|lna learn|capture/i);
+    });
+  });
+
+  /**
+   * Tests for 2jp: Auto-invoke triggers for lesson capture
+   */
+  describe('Auto-invoke triggers in AGENTS.md (2jp)', () => {
+    it('documents capture trigger phrases', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Should include common trigger phrases
+      expect(content).toMatch(/that worked|fixed it|my mistake|actually use/i);
+    });
+
+    it('documents retrieval trigger phrases', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Should include retrieval triggers
+      expect(content).toMatch(/similar issue|we had this before|seen this|remember/i);
+    });
+
+    it('specifies action for each trigger type', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Capture triggers should map to lna learn
+      expect(content).toMatch(/capture.*trigger.*learn|trigger.*capture/i);
     });
   });
 

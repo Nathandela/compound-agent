@@ -801,4 +801,49 @@ describe('Management Commands', () => {
       expect(combined).toMatch(/rebuild|index/i);
     });
   });
+
+  // ==========================================================================
+  // Prime Command (Context Recovery)
+  // ==========================================================================
+
+  describe('prime command', () => {
+    it('outputs workflow context for Claude Code', () => {
+      const { stdout } = runCli('prime');
+      // Should contain the header
+      expect(stdout).toContain('Learning Agent Workflow');
+    });
+
+    it('includes core rules (NEVER edit JSONL directly)', () => {
+      const { stdout } = runCli('prime');
+      expect(stdout).toMatch(/NEVER.*edit.*jsonl/i);
+      expect(stdout).toMatch(/lna learn|lna list|lna show/i);
+    });
+
+    it('includes when to capture lessons', () => {
+      const { stdout } = runCli('prime');
+      expect(stdout).toMatch(/correct|wrong|actually/i);
+      expect(stdout).toMatch(/self-correct|multiple attempts/i);
+      expect(stdout).toMatch(/test fail/i);
+    });
+
+    it('includes CLI commands reference', () => {
+      const { stdout } = runCli('prime');
+      expect(stdout).toContain('lna learn');
+      expect(stdout).toContain('lna list');
+      expect(stdout).toContain('lna check-plan');
+      expect(stdout).toContain('lna stats');
+    });
+
+    it('includes quality gate (novel, specific, actionable)', () => {
+      const { stdout } = runCli('prime');
+      expect(stdout.toLowerCase()).toContain('novel');
+      expect(stdout.toLowerCase()).toContain('specific');
+      expect(stdout.toLowerCase()).toContain('actionable');
+    });
+
+    it('outputs nothing to stderr on success', () => {
+      const { stderr } = runCli('prime');
+      expect(stderr).toBe('');
+    });
+  });
 });
