@@ -313,7 +313,83 @@ npx lna list
 npx lna prime
 \`\`\`
 `,
+  'show.md': `Show details of a specific lesson.
+
+Usage: /show <lesson-id>
+
+\`\`\`bash
+npx lna show "$ARGUMENTS"
+\`\`\`
+`,
+  'wrong.md': `Mark a lesson as incorrect or invalid.
+
+Usage: /wrong <lesson-id>
+
+\`\`\`bash
+npx lna wrong "$ARGUMENTS"
+\`\`\`
+`,
+  'stats.md': `Show learning-agent database statistics and health.
+
+\`\`\`bash
+npx lna stats
+\`\`\`
+`,
 };
+
+// ============================================================================
+// Plugin Configuration (ctv)
+// ============================================================================
+
+/** Plugin manifest for .claude/plugin.json */
+const PLUGIN_MANIFEST = {
+  name: 'learning-agent',
+  description: 'Session memory for Claude Code - capture and retrieve lessons',
+  version: '0.2.3',
+  author: {
+    name: 'Nathan Delacrétaz',
+    url: 'https://github.com/Nathandela',
+  },
+  repository: 'https://github.com/Nathandela/learning_agent',
+  license: 'MIT',
+  hooks: {
+    SessionStart: [
+      {
+        matcher: '',
+        hooks: [
+          { type: 'command', command: 'npx lna prime 2>/dev/null || true' },
+          { type: 'command', command: 'npx lna load-session 2>/dev/null || true' },
+        ],
+      },
+    ],
+    PreCompact: [
+      {
+        matcher: '',
+        hooks: [{ type: 'command', command: 'npx lna prime 2>/dev/null || true' }],
+      },
+    ],
+  },
+};
+
+/**
+ * Create plugin.json in .claude/ directory.
+ * Idempotent: does not overwrite existing file.
+ *
+ * @returns true if plugin.json was created
+ */
+async function createPluginManifest(repoRoot: string): Promise<boolean> {
+  const pluginPath = join(repoRoot, '.claude', 'plugin.json');
+
+  // Ensure .claude directory exists
+  await mkdir(join(repoRoot, '.claude'), { recursive: true });
+
+  if (existsSync(pluginPath)) {
+    return false; // Already exists
+  }
+
+  await writeFile(pluginPath, JSON.stringify(PLUGIN_MANIFEST, null, 2) + '\n', 'utf-8');
+  return true;
+}
 
 /**
  * Create slash commands in .claude/commands/ directory.
@@ -626,6 +702,11 @@ export function registerSetupCommands(program: Command): void {
       let slashCommandsCreated = false;
       if (!options.skipAgents) {
         slashCommandsCreated = await createSlashCommands(repoRoot);
+      }
+
+      // Create plugin manifest (ctv)
+      if (!options.skipAgents) {
+        await createPluginManifest(repoRoot);
       }
 
       // Install hooks unless skipped

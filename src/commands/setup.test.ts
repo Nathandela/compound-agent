@@ -801,6 +801,106 @@ exit 0
   });
 
   /**
+   * Tests for ctv: Claude Plugin structure
+   */
+  describe('Claude Plugin structure (ctv)', () => {
+    it('creates plugin.json in .claude directory', async () => {
+      runCli('init');
+
+      const pluginPath = join(getTempDir(), '.claude', 'plugin.json');
+      expect(existsSync(pluginPath)).toBe(true);
+    });
+
+    it('plugin.json has correct metadata', async () => {
+      runCli('init');
+
+      const pluginPath = join(getTempDir(), '.claude', 'plugin.json');
+      const content = JSON.parse(await readFile(pluginPath, 'utf-8')) as {
+        name: string;
+        description: string;
+        version: string;
+      };
+
+      expect(content.name).toBe('learning-agent');
+      expect(content.description).toContain('lesson');
+      expect(content.version).toMatch(/^\d+\.\d+\.\d+$/);
+    });
+
+    it('plugin.json includes SessionStart hook', async () => {
+      runCli('init');
+
+      const pluginPath = join(getTempDir(), '.claude', 'plugin.json');
+      const content = JSON.parse(await readFile(pluginPath, 'utf-8')) as {
+        hooks: { SessionStart: Array<{ hooks: Array<{ command: string }> }> };
+      };
+
+      expect(content.hooks).toBeDefined();
+      expect(content.hooks.SessionStart).toBeDefined();
+      expect(content.hooks.SessionStart.length).toBeGreaterThan(0);
+
+      // Should include load-session command
+      const commands = content.hooks.SessionStart.flatMap((h) => h.hooks.map((hh) => hh.command));
+      expect(commands.some((c) => c.includes('load-session'))).toBe(true);
+    });
+
+    it('plugin.json includes PreCompact hook with prime', async () => {
+      runCli('init');
+
+      const pluginPath = join(getTempDir(), '.claude', 'plugin.json');
+      const content = JSON.parse(await readFile(pluginPath, 'utf-8')) as {
+        hooks: { PreCompact?: Array<{ hooks: Array<{ command: string }> }> };
+      };
+
+      expect(content.hooks.PreCompact).toBeDefined();
+      const commands = content.hooks.PreCompact!.flatMap((h) => h.hooks.map((hh) => hh.command));
+      expect(commands.some((c) => c.includes('prime'))).toBe(true);
+    });
+
+    it('creates additional slash commands (show, wrong, stats)', async () => {
+      runCli('init');
+
+      const commandsDir = join(getTempDir(), '.claude', 'commands');
+
+      // Check for additional commands
+      expect(existsSync(join(commandsDir, 'show.md'))).toBe(true);
+      expect(existsSync(join(commandsDir, 'wrong.md'))).toBe(true);
+      expect(existsSync(join(commandsDir, 'stats.md'))).toBe(true);
+    });
+
+    it('slash commands reference correct CLI commands', async () => {
+      runCli('init');
+
+      const commandsDir = join(getTempDir(), '.claude', 'commands');
+
+      const showContent = await readFile(join(commandsDir, 'show.md'), 'utf-8');
+      expect(showContent).toContain('lna show');
+
+      const wrongContent = await readFile(join(commandsDir, 'wrong.md'), 'utf-8');
+      expect(wrongContent).toContain('lna wrong');
+
+      const statsContent = await readFile(join(commandsDir, 'stats.md'), 'utf-8');
+      expect(statsContent).toContain('lna stats');
+    });
+
+    it('plugin.json is idempotent - not duplicated on re-run', async () => {
+      runCli('init');
+      runCli('init');
+
+      const pluginPath = join(getTempDir(), '.claude', 'plugin.json');
+      // Should still be valid JSON (not corrupted by double write)
+      const content = JSON.parse(await readFile(pluginPath, 'utf-8'));
+      expect(content.name).toBe('learning-agent');
+    });
+
+    it('--skip-agents also skips plugin.json', async () => {
+      runCli('init --skip-agents');
+
+      const pluginPath = join(getTempDir(), '.claude', 'plugin.json');
+      expect(existsSync(pluginPath)).toBe(false);
+    });
+  });
+
+  /**
    * Tests for 0p5: AGENTS.md must prohibit direct JSONL edits
    */
   describe('AGENTS.md prohibits direct JSONL edits (0p5)', () => {
