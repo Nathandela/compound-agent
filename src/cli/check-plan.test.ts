@@ -1,0 +1,142 @@
+/**
+ * CLI tests for the check-plan command.
+ */
+
+import { execSync } from 'node:child_process';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { isModelAvailable } from '../embeddings/nomic.js';
+import { appendLesson } from '../storage/jsonl.js';
+import { closeDb, rebuildIndex } from '../storage/sqlite.js';
+import { createQuickLesson } from '../test-utils.js';
+import { cleanupCliTestDir, runCli, setupCliTestDir } from './cli-test-utils.js';
+
+// Check model availability at module load time for conditional tests
+const modelAvailable = isModelAvailable();
+
+describe('CLI', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await setupCliTestDir();
+  });
+
+  afterEach(async () => {
+    await cleanupCliTestDir(tempDir);
+  });
+
+  describe('check-plan command', () => {
+    beforeEach(async () => {
+      await appendLesson(
+        tempDir,
+        createQuickLesson('L001', 'Always run tests before committing', {
+          trigger: 'test failure after commit',
+          tags: ['testing'],
+        })
+      );
+      await appendLesson(
+        tempDir,
+        createQuickLesson('L002', 'Use Polars for large file processing', {
+          trigger: 'pandas was slow',
+          tags: ['performance'],
+        })
+      );
+      await appendLesson(
+        tempDir,
+        createQuickLesson('L003', 'Check authentication before API calls', {
+          trigger: 'unauthorized error',
+          tags: ['auth', 'api'],
+        })
+      );
+      await rebuildIndex(tempDir);
+      closeDb();
+    });
+
+    it('retrieves relevant lessons with --plan flag', () => {
+      const { combined } = runCli('check-plan --plan "implement testing workflow"', tempDir);
+      expect(combined).toMatch(/lessons|relevant/i);
+    });
+
+    it('outputs valid JSON with --json flag', () => {
+      const { stdout } = runCli('check-plan --json --plan "testing workflow"', tempDir);
+      const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as { lessons: unknown[]; count: number };
+      expect(result).toHaveProperty('lessons');
+      expect(result).toHaveProperty('count');
+      expect(Array.isArray(result.lessons)).toBe(true);
+    });
+
+    it('reads plan from stdin', () => {
+      const cliPath = join(process.cwd(), 'dist', 'cli.js');
+      const stdout = execSync(`echo "test workflow" | node ${cliPath} check-plan`, {
+        cwd: tempDir,
+        encoding: 'utf-8',
+        env: { ...process.env, LEARNING_AGENT_ROOT: tempDir },
+      });
+      expect(stdout).toMatch(/lessons|relevant|no.*found/i);
+    });
+
+    it('respects --limit option', () => {
+      const { stdout } = runCli('check-plan --json --limit 1 --plan "testing and authentication"', tempDir);
+      const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as { lessons: unknown[]; count: number };
+      expect(result.lessons.length).toBeLessThanOrEqual(1);
+    });
+
+    it('shows user-friendly message when no relevant lessons found', async () => {
+      const emptyDir = await mkdtemp(join(tmpdir(), 'learning-agent-empty-'));
+      try {
+        const cliPath = join(process.cwd(), 'dist', 'cli.js');
+        const stdout = execSync(`node ${cliPath} check-plan --plan "something completely unrelated xyz123"`, {
+          cwd: emptyDir,
+          encoding: 'utf-8',
+          env: { ...process.env, LEARNING_AGENT_ROOT: emptyDir },
+        });
+        expect(stdout).toMatch(/no.*lessons|no.*relevant|no.*found/i);
+      } finally {
+        await rm(emptyDir, { recursive: true, force: true });
+      }
+    });
+
+    it('requires plan text from --plan or stdin', () => {
+      const { combined } = runCli('check-plan', tempDir);
+      expect(combined.toLowerCase()).toMatch(/no plan|required|error/i);
+    });
+
+    it('includes relevance score in JSON output', () => {
+      const { stdout } = runCli('check-plan --json --plan "testing workflow"', tempDir);
+      const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as { lessons: Array<{ relevance?: number }> };
+      if (result.lessons.length > 0) {
+        expect(result.lessons[0]).toHaveProperty('relevance');
+        expect(typeof result.lessons[0].relevance).toBe('number');
+      }
+    });
+
+    it('includes lesson ID in JSON output', () => {
+      const { stdout } = runCli('check-plan --json --plan "testing workflow"', tempDir);
+      const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as { lessons: Array<{ id?: string }> };
+      if (result.lessons.length > 0) {
+        expect(result.lessons[0]).toHaveProperty('id');
+        expect(typeof result.lessons[0].id).toBe('string');
+      }
+    });
+
+    it.skipIf(!modelAvailable)('returns lessons array when model is available', () => {
+      const { stdout } = runCli('check-plan --json --plan "testing workflow"', tempDir);
+      const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as { lessons?: unknown[]; error?: string };
+      expect(result.lessons).toBeDefined();
+      expect(result.error).toBeUndefined();
+    });
+  });
+});
