@@ -53,10 +53,10 @@ describe('CLI', { tags: ['integration'] }, () => {
 
     describe('Claude-facing strings use npx lna', () => {
       it('AGENTS_MD_TEMPLATE uses npx lna (not npx learning-agent)', async () => {
-        const cliPath = join(process.cwd(), 'src', 'cli.ts');
-        const cliContent = await readFile(cliPath, 'utf8');
+        const setupPath = join(process.cwd(), 'src', 'commands', 'setup.ts');
+        const setupContent = await readFile(setupPath, 'utf8');
 
-        const templateMatch = cliContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/);
+        const templateMatch = setupContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/);
         expect(templateMatch).toBeTruthy();
 
         const templateContent = templateMatch![1];
@@ -67,10 +67,10 @@ describe('CLI', { tags: ['integration'] }, () => {
       });
 
       it('PRE_COMMIT_MESSAGE uses npx lna capture', async () => {
-        const cliPath = join(process.cwd(), 'src', 'cli.ts');
-        const cliContent = await readFile(cliPath, 'utf8');
+        const setupPath = join(process.cwd(), 'src', 'commands', 'setup.ts');
+        const setupContent = await readFile(setupPath, 'utf8');
 
-        const messageMatch = cliContent.match(/const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/);
+        const messageMatch = setupContent.match(/const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/);
         expect(messageMatch).toBeTruthy();
 
         const messageContent = messageMatch![1];
@@ -81,10 +81,10 @@ describe('CLI', { tags: ['integration'] }, () => {
       });
 
       it('CLAUDE_HOOK_CONFIG uses npx lna load-session', async () => {
-        const cliPath = join(process.cwd(), 'src', 'cli.ts');
-        const cliContent = await readFile(cliPath, 'utf8');
+        const setupPath = join(process.cwd(), 'src', 'commands', 'setup.ts');
+        const setupContent = await readFile(setupPath, 'utf8');
 
-        const hookMatch = cliContent.match(/const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/);
+        const hookMatch = setupContent.match(/const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/);
         expect(hookMatch).toBeTruthy();
 
         const hookContent = hookMatch![1];
@@ -95,10 +95,10 @@ describe('CLI', { tags: ['integration'] }, () => {
       });
 
       it('check-plan error message suggests npx lna download-model', async () => {
-        const cliPath = join(process.cwd(), 'src', 'cli.ts');
-        const cliContent = await readFile(cliPath, 'utf8');
+        const retrievalPath = join(process.cwd(), 'src', 'commands', 'retrieval.ts');
+        const retrievalContent = await readFile(retrievalPath, 'utf8');
 
-        const errorMatches = cliContent.match(/Run: npx [\w-]+ download-model/g);
+        const errorMatches = retrievalContent.match(/Run: npx [\w-]+ download-model/g);
         expect(errorMatches).toBeTruthy();
         expect(errorMatches!.length).toBeGreaterThan(0);
 
@@ -117,12 +117,12 @@ describe('CLI', { tags: ['integration'] }, () => {
 
     describe('documentation consistency', () => {
       it('no random mixing of lna and learning-agent in templates', async () => {
-        const cliPath = join(process.cwd(), 'src', 'cli.ts');
-        const cliContent = await readFile(cliPath, 'utf8');
+        const setupPath = join(process.cwd(), 'src', 'commands', 'setup.ts');
+        const setupContent = await readFile(setupPath, 'utf8');
 
-        const agentsTemplate = cliContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
-        const preCommitMsg = cliContent.match(/const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/)?.[1] ?? '';
-        const claudeHook = cliContent.match(/const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/)?.[1] ?? '';
+        const agentsTemplate = setupContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
+        const preCommitMsg = setupContent.match(/const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/)?.[1] ?? '';
+        const claudeHook = setupContent.match(/const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/)?.[1] ?? '';
 
         const combinedTemplates = agentsTemplate + preCommitMsg + claudeHook;
 
@@ -139,9 +139,9 @@ describe('CLI', { tags: ['integration'] }, () => {
     let agentsTemplate: string;
 
     beforeAll(async () => {
-      const cliPath = join(process.cwd(), 'src', 'cli.ts');
-      const cliContent = await readFile(cliPath, 'utf8');
-      agentsTemplate = cliContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
+      const setupPath = join(process.cwd(), 'src', 'commands', 'setup.ts');
+      const setupContent = await readFile(setupPath, 'utf8');
+      agentsTemplate = setupContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
     });
 
     it('contains "Never Edit JSONL Directly" section header', () => {

@@ -215,6 +215,62 @@ import {
 
 See [examples/](examples/) for usage examples.
 
+## Lesson Schema
+
+Lessons are stored as JSONL records with the following schema:
+
+### Required Fields
+
+All lessons must have these fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique identifier (e.g., "L12345678") |
+| `type` | "quick" \| "full" | Lesson complexity level |
+| `trigger` | string | What caused the lesson (context/situation) |
+| `insight` | string | What was learned (the takeaway) |
+| `tags` | string[] | Categorization tags |
+| `source` | string | How it was captured (user_correction, self_correction, test_failure, manual) |
+| `context` | object | Tool/intent context |
+| `created` | ISO string | Creation timestamp |
+| `confirmed` | boolean | Whether user confirmed the lesson |
+
+### Optional Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `evidence` | string | Supporting evidence (full lessons only) |
+| `severity` | "high" \| "medium" \| "low" | Importance level (separate from type) |
+| `citation` | object | File/line reference (file, line, commit) |
+
+**Note**: The `severity` field is separate from `type`. A quick lesson can have high severity, and a full lesson can have low severity.
+
+### Session-Start Loading
+
+At session start, lessons are loaded based on:
+- **High severity** lessons are always loaded
+- **Confirmed** lessons are prioritized
+- Only non-invalidated lessons are included
+
+### Complete JSON Example
+
+```json
+{
+  "id": "L12345678",
+  "type": "full",
+  "trigger": "API returned 401 despite valid JWT token",
+  "insight": "Auth API requires X-Request-ID header in all requests",
+  "evidence": "Traced in network tab, discovered missing header requirement",
+  "severity": "high",
+  "tags": ["api", "auth", "headers"],
+  "source": "test_failure",
+  "context": { "tool": "fetch", "intent": "API authentication" },
+  "created": "2024-01-15T10:30:00.000Z",
+  "confirmed": true,
+  "citation": { "file": "src/api/client.ts", "line": 42 }
+}
+```
+
 ## Lesson Types
 
 ### Quick Lesson (fast capture)

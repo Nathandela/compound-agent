@@ -39,8 +39,8 @@ npx lna hooks run pre-commit
 // Claude Code Hooks Configuration
 // ============================================================================
 
-/** Marker to identify our hook in Claude Code settings */
-const CLAUDE_HOOK_MARKER = 'lna load-session';
+/** Markers to identify our hook in Claude Code settings (current and legacy) */
+const CLAUDE_HOOK_MARKERS = ['lna load-session', 'learning-agent load-session'];
 
 /** Claude Code SessionStart hook configuration */
 const CLAUDE_HOOK_CONFIG = {
@@ -89,7 +89,9 @@ This project uses learning-agent for session memory.
 
 ### CRITICAL RULES
 
-**NEVER edit .claude/lessons/index.jsonl directly.**
+#### Never Edit JSONL Directly
+
+**WARNING: NEVER edit .claude/lessons/index.jsonl directly.**
 
 The JSONL file is the source of truth and requires:
 - Proper ID generation
@@ -101,7 +103,7 @@ Always use CLI commands:
 - \`npx lna update <id> --insight "new"\` - Modify a lesson
 - \`npx lna delete <id>\` - Remove a lesson
 
-Direct edits will cause schema validation failures and SQLite desync.
+Manual edits will break validation and corrupt the SQLite sync.
 
 ### Retrieval Points
 
@@ -601,6 +603,7 @@ async function readClaudeSettings(settingsPath: string): Promise<Record<string, 
 
 /**
  * Check if our hook is already installed.
+ * Checks for both current (lna) and legacy (learning-agent) markers.
  */
 function hasClaudeHook(settings: Record<string, unknown>): boolean {
   const hooks = settings.hooks as Record<string, unknown[]> | undefined;
@@ -608,7 +611,9 @@ function hasClaudeHook(settings: Record<string, unknown>): boolean {
 
   return hooks.SessionStart.some((entry) => {
     const hookEntry = entry as { hooks?: Array<{ command?: string }> };
-    return hookEntry.hooks?.some((h) => h.command?.includes(CLAUDE_HOOK_MARKER));
+    return hookEntry.hooks?.some((h) =>
+      CLAUDE_HOOK_MARKERS.some((marker) => h.command?.includes(marker))
+    );
   });
 }
 
@@ -628,6 +633,7 @@ function addLearningAgentHook(settings: Record<string, unknown>): void {
 
 /**
  * Remove our hook from SessionStart array.
+ * Removes both current (lna) and legacy (learning-agent) hooks.
  */
 function removeLearningAgentHook(settings: Record<string, unknown>): boolean {
   const hooks = settings.hooks as Record<string, unknown[]> | undefined;
@@ -636,7 +642,9 @@ function removeLearningAgentHook(settings: Record<string, unknown>): boolean {
   const originalLength = hooks.SessionStart.length;
   hooks.SessionStart = hooks.SessionStart.filter((entry) => {
     const hookEntry = entry as { hooks?: Array<{ command?: string }> };
-    return !hookEntry.hooks?.some((h) => h.command?.includes(CLAUDE_HOOK_MARKER));
+    return !hookEntry.hooks?.some((h) =>
+      CLAUDE_HOOK_MARKERS.some((marker) => h.command?.includes(marker))
+    );
   });
 
   return hooks.SessionStart.length < originalLength;
@@ -653,6 +661,45 @@ async function writeClaudeSettings(settingsPath: string, settings: Record<string
   const tempPath = settingsPath + '.tmp';
   await writeFile(tempPath, JSON.stringify(settings, null, 2) + '\n', 'utf-8');
   await rename(tempPath, settingsPath);
+}
+
+/** Result of Claude hooks installation attempt */
+export interface ClaudeHooksResult {
+  /** Whether hooks are now installed */
+  installed: boolean;
+  /** Action taken: 'installed', 'already_installed', 'error' */
+  action: 'installed' | 'already_installed' | 'error';
+  /** Error message if action is 'error' */
+  error?: string;
+}
+
+/**
+ * Install Claude hooks for init command.
+ * Handles errors gracefully - returns error info instead of throwing.
+ * @param repoRoot - Repository root path
+ * @returns Result indicating success/failure
+ */
+async function installClaudeHooksForInit(repoRoot: string): Promise<ClaudeHooksResult> {
+  const settingsPath = join(repoRoot, '.claude', 'settings.json');
+
+  let settings: Record<string, unknown>;
+  try {
+    settings = await readClaudeSettings(settingsPath);
+  } catch {
+    return { installed: false, action: 'error', error: 'Failed to parse settings.json' };
+  }
+
+  if (hasClaudeHook(settings)) {
+    return { installed: true, action: 'already_installed' };
+  }
+
+  try {
+    addLearningAgentHook(settings);
+    await writeClaudeSettings(settingsPath, settings);
+    return { installed: true, action: 'installed' };
+  } catch (err) {
+    return { installed: false, action: 'error', error: String(err) };
+  }
 }
 
 // ============================================================================
@@ -677,8 +724,9 @@ export function registerSetupCommands(program: Command): void {
     .description('Initialize learning-agent in this repository')
     .option('--skip-agents', 'Skip AGENTS.md modification')
     .option('--skip-hooks', 'Skip git hooks installation')
+    .option('--skip-claude', 'Skip Claude Code hooks installation')
     .option('--json', 'Output result as JSON')
-    .action(async function (this: Command, options: { skipAgents?: boolean; skipHooks?: boolean; json?: boolean }) {
+    .action(async function (this: Command, options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; json?: boolean }) {
       const repoRoot = getRepoRoot();
       const { quiet } = getGlobalOpts(this);
 
@@ -709,20 +757,29 @@ export function registerSetupCommands(program: Command): void {
         await createPluginManifest(repoRoot);
       }
 
-      // Install hooks unless skipped
+      // Install git hooks unless skipped
       let hooksInstalled = false;
       if (!options.skipHooks) {
         hooksInstalled = await installPreCommitHook(repoRoot);
       }
 
+      // Install Claude hooks unless skipped (f8a)
+      let claudeHooksResult: ClaudeHooksResult = { installed: false, action: 'error', error: 'skipped' };
+      if (!options.skipClaude) {
+        claudeHooksResult = await installClaudeHooksForInit(repoRoot);
+      }
+
       // Output
       if (options.json) {
+        // claudeHooks: true only if we actually installed (not already_installed)
+        const claudeHooksInstalled = claudeHooksResult.action === 'installed';
         console.log(JSON.stringify({
           initialized: true,
           lessonsDir,
           agentsMd: agentsMdUpdated,
           slashCommands: slashCommandsCreated || !options.skipAgents,
           hooks: hooksInstalled,
+          claudeHooks: claudeHooksInstalled,
         }));
       } else if (!quiet) {
         out.success('Learning agent initialized');
@@ -747,6 +804,16 @@ export function registerSetupCommands(program: Command): void {
           console.log('  Git hooks: Skipped (--skip-hooks)');
         } else {
           console.log('  Git hooks: Already installed or not a git repo');
+        }
+        // Claude hooks status
+        if (options.skipClaude) {
+          console.log('  Claude hooks: Skipped (--skip-claude)');
+        } else if (claudeHooksResult.action === 'installed') {
+          console.log('  Claude hooks: Installed to .claude/settings.json');
+        } else if (claudeHooksResult.action === 'already_installed') {
+          console.log('  Claude hooks: Already installed');
+        } else if (claudeHooksResult.error) {
+          console.log(`  Claude hooks: Error - ${claudeHooksResult.error}`);
         }
       }
     });
