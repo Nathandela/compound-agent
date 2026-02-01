@@ -17,7 +17,7 @@ import { cleanupCliTestDir, runCli, setupCliTestDir } from './cli-test-utils.js'
 // Check model availability at module load time for conditional tests
 const modelAvailable = isModelAvailable();
 
-describe('CLI', () => {
+describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;
 
   beforeEach(async () => {

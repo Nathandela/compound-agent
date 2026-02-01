@@ -11,7 +11,7 @@ import { appendLesson, LESSONS_PATH } from '../storage/jsonl.js';
 import { createQuickLesson, daysAgo } from '../test-utils.js';
 import { cleanupCliTestDir, runCli, setupCliTestDir } from './cli-test-utils.js';
 
-describe('CLI', () => {
+describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;
 
   beforeEach(async () => {

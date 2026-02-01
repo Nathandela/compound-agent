@@ -11,7 +11,7 @@ import { closeDb, rebuildIndex } from '../storage/sqlite.js';
 import { createFullLesson, createQuickLesson } from '../test-utils.js';
 import { cleanupCliTestDir, runCli, setupCliTestDir } from './cli-test-utils.js';
 
-describe('CLI', () => {
+describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;
 
   beforeEach(async () => {

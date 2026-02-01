@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { LESSONS_PATH } from '../storage/jsonl.js';
 import { cleanupCliTestDir, runCli, setupCliTestDir } from './cli-test-utils.js';
 
-describe('CLI', () => {
+describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;
 
   beforeEach(async () => {

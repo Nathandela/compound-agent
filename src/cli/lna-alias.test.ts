@@ -8,7 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { cleanupCliTestDir, runCli, setupCliTestDir } from './cli-test-utils.js';
 
-describe('CLI', () => {
+describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;
 
   beforeEach(async () => {
