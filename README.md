@@ -49,6 +49,27 @@ pnpm test
 pnpm download-model
 ```
 
+## Development
+
+### Test Scripts
+
+| Script | Duration | Tests | Use Case |
+|--------|----------|-------|----------|
+| `pnpm test:fast` | ~6s | 385 | **Rapid feedback during development** |
+| `pnpm test` | ~60s | 653 | Full suite before committing |
+| `pnpm test:changed` | varies | varies | Only tests affected by recent changes |
+| `pnpm test:watch` | - | - | Watch mode for TDD workflow |
+| `pnpm test:all` | ~60s | 653 | Full suite with model download |
+
+**Recommended workflow:**
+1. Use `pnpm test:fast` while coding for rapid feedback
+2. Run `pnpm test` before committing
+3. CI runs the full suite
+
+### Why test:fast is fast
+
+The CLI integration tests spawn Node.js processes (~400ms overhead each) and account for 95% of test time. `test:fast` skips these, running only unit tests that verify all business logic.
+
 ## Architecture
 
 ```
@@ -335,6 +356,32 @@ Version 0.2.1 - Bug fixes and documentation improvements. See [doc/SPEC.md](doc/
 | [doc/PLAN.md](doc/PLAN.md) | Implementation plan |
 | [AGENTS.md](AGENTS.md) | Agent instructions overview |
 | [.claude/CLAUDE.md](.claude/CLAUDE.md) | Claude Code project instructions |
+| [doc/test-optimization-baseline.md](doc/test-optimization-baseline.md) | Test performance metrics |
+
+## Testing
+
+### Test Organization
+
+Tests are organized for parallelization:
+
+```
+src/
+├── *.test.ts           # Unit tests (fast)
+├── cli/                # CLI integration tests (split by command)
+│   ├── cli-test-utils.ts    # Shared utilities
+│   ├── learn.test.ts
+│   ├── search.test.ts
+│   └── ...
+├── storage/            # Storage layer tests
+├── embeddings/         # Embedding model tests (skipped if model unavailable)
+└── ...
+```
+
+### Known Limitations
+
+**Embedding concurrency**: The `node-llama-cpp` native addon may crash under heavy parallel load. This is a known limitation of the underlying C++ library. Tests pass reliably under normal conditions.
+
+**Timing-based tests**: Some tests verify performance thresholds. These use generous limits (5000ms) to avoid flakiness on slow CI machines.
 
 ## License
 
