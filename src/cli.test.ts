@@ -2405,6 +2405,629 @@ exit 0
   });
 
   // ============================================================================
+  // Init Command - Claude Hooks Integration (v0.2.1)
+  // ============================================================================
+  describe('init command - Claude hooks integration (v0.2.1)', () => {
+    /**
+     * Test suite for "init includes setup claude" feature.
+     * Verifies that `init` command automatically sets up Claude hooks by default.
+     *
+     * Invariants Reference: doc/invariants/init-includes-setup-claude.md
+     */
+
+    // ========================================================================
+    // I1: Claude Hooks Default Behavior
+    // ========================================================================
+    describe('Claude hooks default behavior', () => {
+      it('init creates Claude hooks by default in project settings', async () => {
+        // Create .claude directory (simulating repository scope)
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        runCli('init');
+
+        // Verify settings file was created in PROJECT directory
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        expect(existsSync(settingsPath)).toBe(true);
+
+        // Verify hook is present
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+        expect(settings.hooks).toBeDefined();
+        expect(settings.hooks.SessionStart).toBeDefined();
+        expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
+
+        // Hook should contain our command
+        const hookEntry = settings.hooks.SessionStart[0];
+        expect(hookEntry.hooks[0].command).toContain('learning-agent');
+        expect(hookEntry.hooks[0].command).toContain('load-session');
+      });
+
+      it('init creates Claude hooks even if .claude directory does not exist', async () => {
+        // Don't create .claude directory - init should create it
+        runCli('init');
+
+        // Verify .claude directory was created
+        const claudeDir = join(tempDir, '.claude');
+        expect(existsSync(claudeDir)).toBe(true);
+
+        // Verify settings file exists with hook
+        const settingsPath = join(claudeDir, 'settings.json');
+        expect(existsSync(settingsPath)).toBe(true);
+
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+        expect(settings.hooks.SessionStart).toBeDefined();
+        expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
+      });
+
+      it('init uses project-local scope, not global', async () => {
+        // Create mock home directory to verify global settings are NOT touched
+        const mockHome = join(tempDir, 'mock-home');
+        await mkdir(join(mockHome, '.claude'), { recursive: true });
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        // Run init with custom HOME
+        const cliPath = join(process.cwd(), 'dist', 'cli.js');
+        execSync(`node ${cliPath} init 2>&1`, {
+          cwd: tempDir,
+          encoding: 'utf-8',
+          env: { ...process.env, HOME: mockHome, LEARNING_AGENT_ROOT: tempDir },
+        });
+
+        // Project settings should exist
+        const projectSettings = join(tempDir, '.claude', 'settings.json');
+        expect(existsSync(projectSettings)).toBe(true);
+
+        // Global settings should NOT exist
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+        expect(existsSync(globalSettings)).toBe(false);
+      });
+    });
+
+    // ========================================================================
+    // I2: Flag Semantics (--skip-claude)
+    // ========================================================================
+    describe('--skip-claude flag', () => {
+      it('init --skip-claude does NOT create Claude hooks', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        runCli('init --skip-claude');
+
+        // Settings file should NOT exist
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        expect(existsSync(settingsPath)).toBe(false);
+      });
+
+      it('init --skip-claude still creates lessons directory and AGENTS.md', async () => {
+        runCli('init --skip-claude');
+
+        // Lessons directory should exist
+        const lessonsDir = join(tempDir, '.claude', 'lessons');
+        expect(existsSync(lessonsDir)).toBe(true);
+
+        // AGENTS.md should exist
+        const agentsPath = join(tempDir, 'AGENTS.md');
+        expect(existsSync(agentsPath)).toBe(true);
+
+        // But Claude settings should NOT exist
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        expect(existsSync(settingsPath)).toBe(false);
+      });
+    });
+
+    // ========================================================================
+    // I3: Independence of Skip Flags
+    // ========================================================================
+    describe('skip flags independence', () => {
+      it('--skip-agents does not affect Claude hooks', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        runCli('init --skip-agents');
+
+        // AGENTS.md should NOT exist
+        const agentsPath = join(tempDir, 'AGENTS.md');
+        expect(existsSync(agentsPath)).toBe(false);
+
+        // Claude hooks SHOULD exist
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        expect(existsSync(settingsPath)).toBe(true);
+
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+        expect(settings.hooks.SessionStart).toBeDefined();
+      });
+
+      it('--skip-hooks (git) does not affect Claude hooks', async () => {
+        await mkdir(join(tempDir, '.git', 'hooks'), { recursive: true });
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        runCli('init --skip-hooks');
+
+        // Git hook should NOT exist
+        const gitHookPath = join(tempDir, '.git', 'hooks', 'pre-commit');
+        expect(existsSync(gitHookPath)).toBe(false);
+
+        // Claude hooks SHOULD exist
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        expect(existsSync(settingsPath)).toBe(true);
+
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+        expect(settings.hooks.SessionStart).toBeDefined();
+      });
+
+      it('--skip-hooks --skip-claude skips both git and Claude hooks', async () => {
+        await mkdir(join(tempDir, '.git', 'hooks'), { recursive: true });
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        runCli('init --skip-hooks --skip-claude');
+
+        // Git hook should NOT exist
+        const gitHookPath = join(tempDir, '.git', 'hooks', 'pre-commit');
+        expect(existsSync(gitHookPath)).toBe(false);
+
+        // Claude hooks should NOT exist
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        expect(existsSync(settingsPath)).toBe(false);
+
+        // But lessons directory should exist
+        const lessonsDir = join(tempDir, '.claude', 'lessons');
+        expect(existsSync(lessonsDir)).toBe(true);
+      });
+
+      it('all three skip flags can be combined', async () => {
+        runCli('init --skip-agents --skip-hooks --skip-claude');
+
+        // Only lessons directory should exist
+        const lessonsDir = join(tempDir, '.claude', 'lessons');
+        expect(existsSync(lessonsDir)).toBe(true);
+
+        // Nothing else should exist
+        const agentsPath = join(tempDir, 'AGENTS.md');
+        const gitHookPath = join(tempDir, '.git', 'hooks', 'pre-commit');
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+
+        expect(existsSync(agentsPath)).toBe(false);
+        expect(existsSync(gitHookPath)).toBe(false);
+        expect(existsSync(settingsPath)).toBe(false);
+      });
+    });
+
+    // ========================================================================
+    // I4: Output Structure
+    // ========================================================================
+    describe('output structure', () => {
+      it('init output includes Claude hooks status line', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        const { combined } = runCli('init');
+
+        // Output should mention Claude hooks
+        expect(combined.toLowerCase()).toMatch(/claude.*hooks?/i);
+        expect(combined.toLowerCase()).toMatch(/installed|ok|success/i);
+      });
+
+      it('init --skip-claude output shows Claude hooks skipped', () => {
+        const { combined } = runCli('init --skip-claude');
+
+        // Output should mention Claude hooks were skipped
+        expect(combined.toLowerCase()).toMatch(/claude.*hooks?/i);
+        expect(combined.toLowerCase()).toMatch(/skip|not.*installed/i);
+      });
+
+      it('init output shows Claude hooks status even on error', async () => {
+        // Create malformed settings file to cause error
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+        await writeFile(join(tempDir, '.claude', 'settings.json'), 'invalid json{');
+
+        const { combined } = runCli('init');
+
+        // Output should mention Claude hooks error
+        expect(combined.toLowerCase()).toMatch(/claude.*hooks?/i);
+        expect(combined.toLowerCase()).toMatch(/error|fail|corrupt/i);
+      });
+    });
+
+    // ========================================================================
+    // I5: JSON Output Schema
+    // ========================================================================
+    describe('JSON output', () => {
+      it('init --json includes claudeHooks: true field', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        const { stdout } = runCli('init --json');
+        const result = JSON.parse(stdout) as {
+          initialized: boolean;
+          lessonsDir: string;
+          agentsMd: boolean;
+          hooks: boolean;
+          claudeHooks: boolean;
+        };
+
+        expect(result.claudeHooks).toBe(true);
+        expect(typeof result.claudeHooks).toBe('boolean');
+      });
+
+      it('init --skip-claude --json includes claudeHooks: false', () => {
+        const { stdout } = runCli('init --skip-claude --json');
+        const result = JSON.parse(stdout) as { claudeHooks: boolean };
+
+        expect(result.claudeHooks).toBe(false);
+        expect(typeof result.claudeHooks).toBe('boolean');
+      });
+
+      it('JSON output has stable schema with all expected fields', async () => {
+        await mkdir(join(tempDir, '.git', 'hooks'), { recursive: true });
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        const { stdout } = runCli('init --json');
+        const result = JSON.parse(stdout) as Record<string, unknown>;
+
+        // All expected fields should be present
+        expect(result).toHaveProperty('initialized');
+        expect(result).toHaveProperty('lessonsDir');
+        expect(result).toHaveProperty('agentsMd');
+        expect(result).toHaveProperty('hooks');
+        expect(result).toHaveProperty('claudeHooks');
+
+        // All should be correct types
+        expect(typeof result.initialized).toBe('boolean');
+        expect(typeof result.lessonsDir).toBe('string');
+        expect(typeof result.agentsMd).toBe('boolean');
+        expect(typeof result.hooks).toBe('boolean');
+        expect(typeof result.claudeHooks).toBe('boolean');
+      });
+    });
+
+    // ========================================================================
+    // I6: Idempotency
+    // ========================================================================
+    describe('idempotency', () => {
+      it('running init twice does NOT create duplicate Claude hooks', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        // Run init twice
+        runCli('init');
+        runCli('init');
+
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+        // Should have exactly 1 learning-agent hook
+        const learningAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('learning-agent'))
+        );
+
+        expect(learningAgentHooks).toHaveLength(1);
+      });
+
+      it('init after setup claude does NOT duplicate hooks', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        // First run setup claude
+        const cliPath = join(process.cwd(), 'dist', 'cli.js');
+        execSync(`node ${cliPath} setup claude 2>&1`, {
+          cwd: tempDir,
+          encoding: 'utf-8',
+          env: { ...process.env, LEARNING_AGENT_ROOT: tempDir },
+        });
+
+        // Then run init
+        runCli('init');
+
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+        // Should still have exactly 1 learning-agent hook
+        const learningAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('learning-agent'))
+        );
+
+        expect(learningAgentHooks).toHaveLength(1);
+      });
+
+      it('setup claude after init does NOT duplicate hooks', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        // First run init
+        runCli('init');
+
+        // Then run setup claude
+        const cliPath = join(process.cwd(), 'dist', 'cli.js');
+        execSync(`node ${cliPath} setup claude 2>&1`, {
+          cwd: tempDir,
+          encoding: 'utf-8',
+          env: { ...process.env, LEARNING_AGENT_ROOT: tempDir },
+        });
+
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+        // Should still have exactly 1 learning-agent hook
+        const learningAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('learning-agent'))
+        );
+
+        expect(learningAgentHooks).toHaveLength(1);
+      });
+
+      it('second init reports claudeHooks: false when already installed', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        // Run init twice with JSON output
+        runCli('init');
+        const { stdout } = runCli('init --json');
+
+        const result = JSON.parse(stdout) as { claudeHooks: boolean };
+
+        // Second run should report false (already installed, not newly installed)
+        expect(result.claudeHooks).toBe(false);
+      });
+    });
+
+    // ========================================================================
+    // S1: No Duplicate Claude Hooks (Safety)
+    // ========================================================================
+    describe('safety: no duplicate hooks', () => {
+      it('preserves existing OTHER SessionStart hooks', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        // Create settings with existing hook
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        await writeFile(
+          settingsPath,
+          JSON.stringify(
+            {
+              hooks: {
+                SessionStart: [
+                  {
+                    matcher: 'existing',
+                    hooks: [{ type: 'command', command: 'echo "existing hook"' }],
+                  },
+                ],
+              },
+            },
+            null,
+            2
+          )
+        );
+
+        runCli('init');
+
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+        // Should have 2 hooks total: existing + learning-agent
+        expect(settings.hooks.SessionStart).toHaveLength(2);
+
+        // Existing hook should be preserved
+        const existingHook = settings.hooks.SessionStart.find(
+          (entry: { matcher: string }) => entry.matcher === 'existing'
+        );
+        expect(existingHook).toBeDefined();
+        expect(existingHook.hooks[0].command).toBe('echo "existing hook"');
+
+        // Learning-agent hook should be added
+        const learningAgentHook = settings.hooks.SessionStart.find((entry: { hooks: Array<{ command: string }> }) =>
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('learning-agent'))
+        );
+        expect(learningAgentHook).toBeDefined();
+      });
+    });
+
+    // ========================================================================
+    // S2: No Partial Initialization on Error
+    // ========================================================================
+    describe('safety: error handling', () => {
+      it('Claude hooks error does not prevent other components', async () => {
+        // Create malformed settings file
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+        await writeFile(join(tempDir, '.claude', 'settings.json'), 'invalid json{');
+
+        const { combined } = runCli('init');
+
+        // AGENTS.md should still be created
+        const agentsPath = join(tempDir, 'AGENTS.md');
+        expect(existsSync(agentsPath)).toBe(true);
+
+        // Lessons directory should still be created
+        const lessonsDir = join(tempDir, '.claude', 'lessons');
+        expect(existsSync(lessonsDir)).toBe(true);
+
+        // Output should mention error
+        expect(combined.toLowerCase()).toMatch(/error|fail|corrupt/i);
+      });
+
+      it('Claude hooks error shows in JSON output as claudeHooks: false', async () => {
+        // Create malformed settings file
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+        await writeFile(join(tempDir, '.claude', 'settings.json'), 'invalid json{');
+
+        const { stdout } = runCli('init --json');
+        const result = JSON.parse(stdout) as { claudeHooks: boolean };
+
+        expect(result.claudeHooks).toBe(false);
+      });
+    });
+
+    // ========================================================================
+    // S3: No Settings Corruption
+    // ========================================================================
+    describe('safety: settings file integrity', () => {
+      it('malformed settings.json is not modified on error', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        const malformedContent = 'invalid json{';
+        await writeFile(settingsPath, malformedContent);
+
+        runCli('init');
+
+        // File should be unchanged
+        const content = await readFile(settingsPath, 'utf-8');
+        expect(content).toBe(malformedContent);
+      });
+
+      it('preserves all existing settings fields', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        await writeFile(
+          settingsPath,
+          JSON.stringify(
+            {
+              permissions: { enabled: true },
+              mcpServers: { test: { command: 'test' } },
+              other: { custom: 'value' },
+            },
+            null,
+            2
+          )
+        );
+
+        runCli('init');
+
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+        // All existing fields should be preserved
+        expect(settings.permissions).toEqual({ enabled: true });
+        expect(settings.mcpServers).toEqual({ test: { command: 'test' } });
+        expect(settings.other).toEqual({ custom: 'value' });
+
+        // Hook should be added
+        expect(settings.hooks.SessionStart).toBeDefined();
+      });
+    });
+
+    // ========================================================================
+    // S4: No Cross-Scope Pollution
+    // ========================================================================
+    describe('safety: no global side effects', () => {
+      it('init NEVER modifies global Claude settings', async () => {
+        const mockHome = join(tempDir, 'mock-home');
+        await mkdir(join(mockHome, '.claude'), { recursive: true });
+
+        // Create global settings with content
+        const globalSettings = join(mockHome, '.claude', 'settings.json');
+        const globalContent = JSON.stringify({ global: 'config' }, null, 2);
+        await writeFile(globalSettings, globalContent);
+
+        // Create project .claude directory
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        // Run init
+        const cliPath = join(process.cwd(), 'dist', 'cli.js');
+        execSync(`node ${cliPath} init 2>&1`, {
+          cwd: tempDir,
+          encoding: 'utf-8',
+          env: { ...process.env, HOME: mockHome, LEARNING_AGENT_ROOT: tempDir },
+        });
+
+        // Global settings should be unchanged
+        const newGlobalContent = await readFile(globalSettings, 'utf-8');
+        expect(newGlobalContent).toBe(globalContent);
+      });
+    });
+
+    // ========================================================================
+    // Edge Cases
+    // ========================================================================
+    describe('edge cases', () => {
+      it('empty Claude settings file gets hook added', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+        await writeFile(join(tempDir, '.claude', 'settings.json'), '{}');
+
+        runCli('init');
+
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+        expect(settings.hooks.SessionStart).toBeDefined();
+        expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
+      });
+
+      it('settings file with only permissions gets hooks added', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        await writeFile(settingsPath, JSON.stringify({ permissions: { enabled: false } }));
+
+        runCli('init');
+
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+        // Permissions preserved
+        expect(settings.permissions).toEqual({ enabled: false });
+
+        // Hooks added
+        expect(settings.hooks.SessionStart).toBeDefined();
+      });
+
+      it('multiple existing SessionStart hooks are all preserved', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        await writeFile(
+          settingsPath,
+          JSON.stringify({
+            hooks: {
+              SessionStart: [
+                { matcher: 'hook1', hooks: [{ type: 'command', command: 'echo 1' }] },
+                { matcher: 'hook2', hooks: [{ type: 'command', command: 'echo 2' }] },
+                { matcher: 'hook3', hooks: [{ type: 'command', command: 'echo 3' }] },
+              ],
+            },
+          })
+        );
+
+        runCli('init');
+
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+        // Should have 4 hooks total (3 existing + 1 learning-agent)
+        expect(settings.hooks.SessionStart).toHaveLength(4);
+      });
+    });
+
+    // ========================================================================
+    // Integration: Equivalent to setup claude
+    // ========================================================================
+    describe('integration: equivalent to setup claude', () => {
+      it('init produces same Claude settings as setup claude', async () => {
+        // Create two temp directories
+        const dir1 = await mkdtemp(join(tmpdir(), 'learning-agent-test1-'));
+        const dir2 = await mkdtemp(join(tmpdir(), 'learning-agent-test2-'));
+
+        try {
+          await mkdir(join(dir1, '.claude'), { recursive: true });
+          await mkdir(join(dir2, '.claude'), { recursive: true });
+
+          const cliPath = join(process.cwd(), 'dist', 'cli.js');
+
+          // Dir1: init
+          execSync(`node ${cliPath} init 2>&1`, {
+            cwd: dir1,
+            encoding: 'utf-8',
+            env: { ...process.env, LEARNING_AGENT_ROOT: dir1 },
+          });
+
+          // Dir2: setup claude
+          execSync(`node ${cliPath} setup claude 2>&1`, {
+            cwd: dir2,
+            encoding: 'utf-8',
+            env: { ...process.env, LEARNING_AGENT_ROOT: dir2 },
+          });
+
+          // Compare settings files
+          const settings1 = JSON.parse(await readFile(join(dir1, '.claude', 'settings.json'), 'utf-8'));
+          const settings2 = JSON.parse(await readFile(join(dir2, '.claude', 'settings.json'), 'utf-8'));
+
+          // hooks.SessionStart should be identical
+          expect(settings1.hooks.SessionStart).toEqual(settings2.hooks.SessionStart);
+        } finally {
+          await rm(dir1, { recursive: true, force: true });
+          await rm(dir2, { recursive: true, force: true });
+        }
+      });
+    });
+  });
+
+  // ============================================================================
   // Setup Claude Defaults Tests (v0.2.1 Breaking Change)
   // ============================================================================
   describe('setup claude - default behavior change (v0.2.1)', () => {
@@ -2851,6 +3474,299 @@ exit 0
 
       const { combined } = runCli('load-session');
       expect(combined).toContain('High severity lesson');
+    });
+  });
+
+  describe('show command', () => {
+    beforeEach(async () => {
+      await appendLesson(
+        tempDir,
+        createFullLesson('SHOW001', 'API requires X-Request-ID header', 'high', {
+          trigger: 'API returned 401 despite valid token',
+          evidence: 'Traced in network tab, header missing',
+          tags: ['api', 'auth'],
+        })
+      );
+      await appendLesson(
+        tempDir,
+        createQuickLesson('SHOW002', 'Use Polars for large files', {
+          tags: ['python', 'performance'],
+        })
+      );
+    });
+
+    it('show <id> displays lesson in human-readable format', () => {
+      const { combined } = runCli('show SHOW001');
+      expect(combined).toContain('SHOW001');
+      expect(combined).toContain('API requires X-Request-ID header');
+      expect(combined).toContain('API returned 401 despite valid token');
+      expect(combined).toContain('high');
+      expect(combined).toContain('api');
+      expect(combined).toContain('auth');
+    });
+
+    it('show <id> --json outputs JSON', () => {
+      const { stdout } = runCli('show SHOW001 --json');
+      const lesson = JSON.parse(stdout) as { id: string; insight: string; severity: string };
+      expect(lesson.id).toBe('SHOW001');
+      expect(lesson.insight).toBe('API requires X-Request-ID header');
+      expect(lesson.severity).toBe('high');
+    });
+
+    it('show non-existent ID returns error', () => {
+      const { combined } = runCli('show L99999999');
+      expect(combined.toLowerCase()).toMatch(/not found|does not exist/i);
+      expect(combined).toContain('L99999999');
+    });
+
+    it('show deleted lesson shows deleted status', async () => {
+      // Create a tombstone for deleted lesson
+      await appendLesson(tempDir, { id: 'SHOW003', deleted: true, deletedAt: new Date().toISOString() } as any);
+
+      const { combined } = runCli('show SHOW003');
+      expect(combined.toLowerCase()).toMatch(/not found|deleted/i);
+    });
+
+    it('show includes all lesson fields (insight, trigger, severity, tags, etc.)', () => {
+      const { combined } = runCli('show SHOW001');
+      expect(combined).toContain('SHOW001'); // ID
+      expect(combined).toContain('API requires X-Request-ID header'); // Insight
+      expect(combined).toContain('API returned 401 despite valid token'); // Trigger
+      expect(combined).toContain('high'); // Severity
+      expect(combined).toContain('Traced in network tab'); // Evidence
+      expect(combined).toContain('api'); // Tags
+      expect(combined).toContain('auth'); // Tags
+    });
+  });
+
+  describe('update command', () => {
+    beforeEach(async () => {
+      await appendLesson(
+        tempDir,
+        createFullLesson('UPD001', 'Original insight', 'medium', {
+          trigger: 'Original trigger',
+          evidence: 'Original evidence',
+          tags: ['original', 'tag'],
+        })
+      );
+      await appendLesson(
+        tempDir,
+        createQuickLesson('UPD002', 'Quick lesson insight', {
+          tags: ['quick'],
+        })
+      );
+    });
+
+    it('update <id> --insight "new" changes insight', async () => {
+      runCli('update UPD001 --insight "Updated insight text"');
+
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+
+      // Last line should be the updated lesson
+      const updatedLesson = JSON.parse(lines[lines.length - 1]) as { id: string; insight: string };
+      expect(updatedLesson.id).toBe('UPD001');
+      expect(updatedLesson.insight).toBe('Updated insight text');
+    });
+
+    it('update <id> --severity high changes severity', async () => {
+      runCli('update UPD001 --severity high');
+
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+
+      const updatedLesson = JSON.parse(lines[lines.length - 1]) as { id: string; severity: string };
+      expect(updatedLesson.id).toBe('UPD001');
+      expect(updatedLesson.severity).toBe('high');
+    });
+
+    it('update <id> --tags "a,b" sets tags array', async () => {
+      runCli('update UPD001 --tags "api,auth,security"');
+
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+
+      const updatedLesson = JSON.parse(lines[lines.length - 1]) as { id: string; tags: string[] };
+      expect(updatedLesson.id).toBe('UPD001');
+      expect(updatedLesson.tags).toEqual(['api', 'auth', 'security']);
+    });
+
+    it('update <id> --confirmed true sets confirmed', async () => {
+      // First create an unconfirmed lesson
+      await appendLesson(
+        tempDir,
+        createQuickLesson('UPD003', 'Unconfirmed lesson', { confirmed: false })
+      );
+
+      runCli('update UPD003 --confirmed true');
+
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+
+      const updatedLesson = JSON.parse(lines[lines.length - 1]) as { id: string; confirmed: boolean };
+      expect(updatedLesson.id).toBe('UPD003');
+      expect(updatedLesson.confirmed).toBe(true);
+    });
+
+    it('update <id> --json outputs JSON', () => {
+      const { stdout } = runCli('update UPD001 --insight "New insight" --json');
+      const lesson = JSON.parse(stdout) as { id: string; insight: string };
+      expect(lesson.id).toBe('UPD001');
+      expect(lesson.insight).toBe('New insight');
+    });
+
+    it('update non-existent ID returns error', () => {
+      const { combined } = runCli('update L99999999 --insight "test"');
+      expect(combined.toLowerCase()).toMatch(/not found|does not exist/i);
+      expect(combined).toContain('L99999999');
+    });
+
+    it('update with invalid severity returns error with valid options', () => {
+      const { combined } = runCli('update UPD001 --severity invalid');
+      expect(combined.toLowerCase()).toMatch(/invalid|must be/i);
+      expect(combined).toMatch(/high|medium|low/i);
+    });
+
+    it('update deleted lesson returns error', async () => {
+      // Create a deleted lesson
+      await appendLesson(tempDir, { id: 'UPD004', deleted: true, deletedAt: new Date().toISOString() } as any);
+
+      const { combined } = runCli('update UPD004 --insight "Cannot update deleted"');
+      expect(combined.toLowerCase()).toMatch(/deleted|not found/i);
+    });
+
+    it('update preserves other fields not being updated', async () => {
+      runCli('update UPD001 --insight "New insight only"');
+
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+
+      const updatedLesson = JSON.parse(lines[lines.length - 1]) as {
+        id: string;
+        insight: string;
+        trigger: string;
+        evidence: string;
+        tags: string[];
+        severity: string;
+      };
+
+      expect(updatedLesson.id).toBe('UPD001');
+      expect(updatedLesson.insight).toBe('New insight only');
+      // Other fields preserved
+      expect(updatedLesson.trigger).toBe('Original trigger');
+      expect(updatedLesson.evidence).toBe('Original evidence');
+      expect(updatedLesson.tags).toEqual(['original', 'tag']);
+      expect(updatedLesson.severity).toBe('medium');
+    });
+
+    it('update auto-syncs to SQLite (lesson searchable after)', async () => {
+      // Update the insight to something searchable
+      runCli('update UPD001 --insight "Use PostgreSQL for structured data"');
+      closeDb();
+
+      // Search should find updated content
+      const { combined } = runCli('search "PostgreSQL"');
+      expect(combined).toContain('PostgreSQL');
+    });
+  });
+
+  describe('delete command', () => {
+    beforeEach(async () => {
+      await appendLesson(tempDir, createQuickLesson('DEL001', 'First lesson to delete'));
+      await appendLesson(tempDir, createQuickLesson('DEL002', 'Second lesson to delete'));
+      await appendLesson(tempDir, createQuickLesson('DEL003', 'Third lesson to delete'));
+    });
+
+    it('delete <id> creates tombstone record', async () => {
+      runCli('delete DEL001');
+
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+
+      // Last line should be tombstone
+      const tombstone = JSON.parse(lines[lines.length - 1]) as {
+        id: string;
+        deleted: boolean;
+        deletedAt: string;
+      };
+
+      expect(tombstone.id).toBe('DEL001');
+      expect(tombstone.deleted).toBe(true);
+      expect(tombstone.deletedAt).toBeDefined();
+      expect(new Date(tombstone.deletedAt).getTime()).toBeGreaterThan(0); // Valid ISO date
+    });
+
+    it('delete <id> --json outputs JSON', () => {
+      const { stdout } = runCli('delete DEL001 --json');
+      const result = JSON.parse(stdout) as { deleted: string[] };
+      expect(result.deleted).toContain('DEL001');
+    });
+
+    it('delete L001 L002 deletes multiple', async () => {
+      runCli('delete DEL001 DEL002');
+
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+
+      // Last two lines should be tombstones
+      const secondToLast = JSON.parse(lines[lines.length - 2]) as { id: string; deleted: boolean };
+      const last = JSON.parse(lines[lines.length - 1]) as { id: string; deleted: boolean };
+
+      expect([secondToLast.id, last.id]).toContain('DEL001');
+      expect([secondToLast.id, last.id]).toContain('DEL002');
+      expect(secondToLast.deleted).toBe(true);
+      expect(last.deleted).toBe(true);
+    });
+
+    it('delete non-existent ID returns error', () => {
+      const { combined } = runCli('delete L99999999');
+      expect(combined.toLowerCase()).toMatch(/not found|does not exist/i);
+      expect(combined).toContain('L99999999');
+    });
+
+    it('delete already-deleted ID is graceful no-op', async () => {
+      // Delete once
+      runCli('delete DEL001');
+
+      // Try to delete again
+      const { combined } = runCli('delete DEL001');
+      expect(combined.toLowerCase()).toMatch(/not found|already deleted/i);
+
+      // Verify only one tombstone in JSONL
+      const filePath = join(tempDir, LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+      const tombstones = lines.filter((line) => {
+        const record = JSON.parse(line) as { id: string; deleted?: boolean };
+        return record.id === 'DEL001' && record.deleted === true;
+      });
+      expect(tombstones.length).toBe(1);
+    });
+
+    it('deleted lesson excluded from list output', () => {
+      runCli('delete DEL001');
+
+      const { combined } = runCli('list');
+      expect(combined).not.toContain('First lesson to delete');
+      expect(combined).toContain('Second lesson to delete'); // Other lessons still visible
+    });
+
+    it('deleted lesson excluded from search results', async () => {
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      runCli('delete DEL001');
+      closeDb();
+
+      const { combined } = runCli('search "First lesson"');
+      expect(combined).not.toContain('First lesson to delete');
     });
   });
 });

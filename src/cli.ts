@@ -600,8 +600,9 @@ program
   .description('Initialize learning-agent in this repository')
   .option('--skip-agents', 'Skip AGENTS.md modification')
   .option('--skip-hooks', 'Skip git hooks installation')
+  .option('--skip-claude', 'Skip Claude Code hooks installation')
   .option('--json', 'Output result as JSON')
-  .action(async function (this: Command, options: { skipAgents?: boolean; skipHooks?: boolean; json?: boolean }) {
+  .action(async function (this: Command, options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; json?: boolean }) {
     const repoRoot = getRepoRoot();
     const { quiet } = getGlobalOpts(this);
 
@@ -622,6 +623,24 @@ program
       hooksInstalled = await installPreCommitHook(repoRoot);
     }
 
+    // Install Claude Code hooks unless skipped (project-local scope)
+    let claudeHooksInstalled = false;
+    let claudeHooksError: string | null = null;
+    if (!options.skipClaude) {
+      try {
+        const settingsPath = getClaudeSettingsPath(false); // project-local
+        const settings = await readClaudeSettings(settingsPath);
+        if (!hasClaudeHook(settings)) {
+          addLearningAgentHook(settings);
+          await writeClaudeSettings(settingsPath, settings);
+          claudeHooksInstalled = true;
+        }
+        // If hook already exists, claudeHooksInstalled stays false (not newly installed)
+      } catch (err) {
+        claudeHooksError = err instanceof Error ? err.message : 'Unknown error';
+      }
+    }
+
     // Output
     if (options.json) {
       console.log(JSON.stringify({
@@ -629,6 +648,7 @@ program
         lessonsDir,
         agentsMd: agentsMdUpdated,
         hooks: hooksInstalled,
+        claudeHooks: claudeHooksInstalled,
       }));
     } else if (!quiet) {
       out.success('Learning agent initialized');
@@ -646,6 +666,15 @@ program
         console.log('  Git hooks: Skipped (--skip-hooks)');
       } else {
         console.log('  Git hooks: Already installed or not a git repo');
+      }
+      if (claudeHooksInstalled) {
+        console.log('  Claude Code hooks: Installed to .claude/settings.json');
+      } else if (options.skipClaude) {
+        console.log('  Claude Code hooks: Skipped (--skip-claude)');
+      } else if (claudeHooksError) {
+        console.log(`  Claude Code hooks: Error - ${claudeHooksError}`);
+      } else {
+        console.log('  Claude Code hooks: Already installed');
       }
     }
   });
@@ -1512,6 +1541,339 @@ program
         out.error(`Failed to check plan: ${message}`);
       }
       process.exit(1);
+    }
+  });
+
+// ============================================================================
+// CRUD Commands: show, update, delete
+// ============================================================================
+
+/** JSON indentation for show output */
+const SHOW_JSON_INDENT = 2;
+
+/**
+ * Format lesson for human-readable display.
+ */
+function formatLessonHuman(lesson: Lesson): string {
+  const lines: string[] = [];
+
+  lines.push(`ID: ${lesson.id}`);
+  lines.push(`Type: ${lesson.type}`);
+  lines.push(`Trigger: ${lesson.trigger}`);
+  lines.push(`Insight: ${lesson.insight}`);
+
+  if (lesson.evidence) {
+    lines.push(`Evidence: ${lesson.evidence}`);
+  }
+
+  if (lesson.severity) {
+    lines.push(`Severity: ${lesson.severity}`);
+  }
+
+  lines.push(`Tags: ${lesson.tags.length > 0 ? lesson.tags.join(', ') : '(none)'}`);
+  lines.push(`Source: ${lesson.source}`);
+
+  if (lesson.context) {
+    lines.push(`Context: ${lesson.context.tool} - ${lesson.context.intent}`);
+  }
+
+  lines.push(`Created: ${lesson.created}`);
+  lines.push(`Confirmed: ${lesson.confirmed ? 'yes' : 'no'}`);
+
+  if (lesson.supersedes && lesson.supersedes.length > 0) {
+    lines.push(`Supersedes: ${lesson.supersedes.join(', ')}`);
+  }
+
+  if (lesson.related && lesson.related.length > 0) {
+    lines.push(`Related: ${lesson.related.join(', ')}`);
+  }
+
+  if (lesson.pattern) {
+    lines.push('Pattern:');
+    lines.push(`  Bad:  ${lesson.pattern.bad}`);
+    lines.push(`  Good: ${lesson.pattern.good}`);
+  }
+
+  return lines.join('\n');
+}
+
+/**
+ * Show command - Display details of a specific lesson.
+ *
+ * @example npx learning-agent show L12345678
+ * @example npx learning-agent show L12345678 --json
+ */
+program
+  .command('show <id>')
+  .description('Show details of a specific lesson')
+  .option('--json', 'Output as JSON')
+  .action(async (id: string, options: { json?: boolean }) => {
+    const repoRoot = getRepoRoot();
+
+    const { lessons } = await readLessons(repoRoot);
+    const lesson = lessons.find((l) => l.id === id);
+
+    if (!lesson) {
+      // Check if lesson was deleted (tombstone)
+      const filePath = join(repoRoot, LESSONS_PATH);
+      let wasDeleted = false;
+      try {
+        const content = await readFile(filePath, 'utf-8');
+        const lines = content.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const record = JSON.parse(trimmed) as { id: string; deleted?: boolean };
+            if (record.id === id && record.deleted === true) {
+              wasDeleted = true;
+              break;
+            }
+          } catch {
+            // Skip invalid lines
+          }
+        }
+      } catch {
+        // File doesn't exist
+      }
+
+      if (options.json) {
+        console.log(JSON.stringify({ error: wasDeleted ? `Lesson ${id} not found (deleted)` : `Lesson ${id} not found` }));
+      } else {
+        out.error(wasDeleted ? `Lesson ${id} not found (deleted)` : `Lesson ${id} not found`);
+      }
+      process.exit(1);
+    }
+
+    if (options.json) {
+      console.log(JSON.stringify(lesson, null, SHOW_JSON_INDENT));
+    } else {
+      console.log(formatLessonHuman(lesson));
+    }
+  });
+
+/**
+ * Update command - Update a lesson's mutable fields.
+ *
+ * @example npx learning-agent update L12345678 --insight "New insight"
+ * @example npx learning-agent update L12345678 --severity high --tags "api,auth"
+ */
+program
+  .command('update <id>')
+  .description('Update a lesson')
+  .option('--insight <text>', 'Update insight')
+  .option('--trigger <text>', 'Update trigger')
+  .option('--evidence <text>', 'Update evidence')
+  .option('--severity <level>', 'Update severity (low/medium/high)')
+  .option('--tags <tags>', 'Update tags (comma-separated)')
+  .option('--confirmed <bool>', 'Update confirmed status (true/false)')
+  .option('--json', 'Output as JSON')
+  .action(async (id: string, options: {
+    insight?: string;
+    trigger?: string;
+    evidence?: string;
+    severity?: string;
+    tags?: string;
+    confirmed?: string;
+    json?: boolean;
+  }) => {
+    const repoRoot = getRepoRoot();
+
+    // Check if any update options provided
+    const hasUpdates = options.insight !== undefined
+      || options.trigger !== undefined
+      || options.evidence !== undefined
+      || options.severity !== undefined
+      || options.tags !== undefined
+      || options.confirmed !== undefined;
+
+    if (!hasUpdates) {
+      if (options.json) {
+        console.log(JSON.stringify({ error: 'No fields to update (specify at least one: --insight, --tags, --severity, ...)' }));
+      } else {
+        out.error('No fields to update (specify at least one: --insight, --tags, --severity, ...)');
+      }
+      process.exit(1);
+    }
+
+    // Read current lessons
+    const { lessons } = await readLessons(repoRoot);
+    const lesson = lessons.find((l) => l.id === id);
+
+    if (!lesson) {
+      // Check if deleted
+      const filePath = join(repoRoot, LESSONS_PATH);
+      let wasDeleted = false;
+      try {
+        const content = await readFile(filePath, 'utf-8');
+        const lines = content.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed) continue;
+          try {
+            const record = JSON.parse(trimmed) as { id: string; deleted?: boolean };
+            if (record.id === id && record.deleted === true) {
+              wasDeleted = true;
+              break;
+            }
+          } catch {
+            // Skip invalid lines
+          }
+        }
+      } catch {
+        // File doesn't exist
+      }
+
+      if (options.json) {
+        console.log(JSON.stringify({ error: wasDeleted ? `Lesson ${id} is deleted` : `Lesson ${id} not found` }));
+      } else {
+        out.error(wasDeleted ? `Lesson ${id} is deleted` : `Lesson ${id} not found`);
+      }
+      process.exit(1);
+    }
+
+    // Validate severity if provided
+    if (options.severity !== undefined) {
+      const result = SeveritySchema.safeParse(options.severity);
+      if (!result.success) {
+        if (options.json) {
+          console.log(JSON.stringify({ error: `Invalid severity '${options.severity}' (must be: high, medium, low)` }));
+        } else {
+          out.error(`Invalid severity '${options.severity}' (must be: high, medium, low)`);
+        }
+        process.exit(1);
+      }
+    }
+
+    // Build updated lesson
+    const updatedLesson: Lesson = {
+      ...lesson,
+      ...(options.insight !== undefined && { insight: options.insight }),
+      ...(options.trigger !== undefined && { trigger: options.trigger }),
+      ...(options.evidence !== undefined && { evidence: options.evidence }),
+      ...(options.severity !== undefined && { severity: options.severity as Severity }),
+      ...(options.tags !== undefined && {
+        tags: [...new Set(
+          options.tags
+            .split(',')
+            .map((t) => t.trim())
+            .filter((t) => t.length > 0)
+        )],
+      }),
+      ...(options.confirmed !== undefined && { confirmed: options.confirmed === 'true' }),
+    };
+
+    // Validate updated lesson against schema
+    const validationResult = LessonSchema.safeParse(updatedLesson);
+    if (!validationResult.success) {
+      if (options.json) {
+        console.log(JSON.stringify({ error: `Schema validation failed: ${validationResult.error.message}` }));
+      } else {
+        out.error(`Schema validation failed: ${validationResult.error.message}`);
+      }
+      process.exit(1);
+    }
+
+    // Append updated lesson (last-write-wins)
+    await appendLesson(repoRoot, updatedLesson);
+    await syncIfNeeded(repoRoot);
+
+    if (options.json) {
+      console.log(JSON.stringify(updatedLesson, null, SHOW_JSON_INDENT));
+    } else {
+      out.success(`Updated lesson ${id}`);
+    }
+  });
+
+/**
+ * Check if a lesson ID has been deleted (has a tombstone).
+ */
+async function wasLessonDeleted(repoRoot: string, id: string): Promise<boolean> {
+  const filePath = join(repoRoot, LESSONS_PATH);
+  try {
+    const content = await readFile(filePath, 'utf-8');
+    const lines = content.split('\n');
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        const record = JSON.parse(trimmed) as { id: string; deleted?: boolean };
+        if (record.id === id && record.deleted === true) {
+          return true;
+        }
+      } catch {
+        // Skip invalid lines
+      }
+    }
+  } catch {
+    // File doesn't exist
+  }
+  return false;
+}
+
+/**
+ * Delete command - Soft delete lessons by creating tombstone records.
+ *
+ * Creates a full lesson copy with `deleted: true` added so that
+ * readLessons properly excludes the deleted lesson.
+ *
+ * @example npx learning-agent delete L12345678
+ * @example npx learning-agent delete L001 L002 L003
+ */
+program
+  .command('delete <ids...>')
+  .description('Soft delete lessons (creates tombstone)')
+  .option('--json', 'Output as JSON')
+  .action(async (ids: string[], options: { json?: boolean }) => {
+    const repoRoot = getRepoRoot();
+
+    const { lessons } = await readLessons(repoRoot);
+    const lessonMap = new Map(lessons.map((l) => [l.id, l]));
+
+    const deleted: string[] = [];
+    const warnings: Array<{ id: string; message: string }> = [];
+
+    for (const id of ids) {
+      const lesson = lessonMap.get(id);
+
+      if (!lesson) {
+        // Check if already deleted or never existed
+        const wasDeleted = await wasLessonDeleted(repoRoot, id);
+        warnings.push({ id, message: wasDeleted ? 'already deleted' : 'not found' });
+        continue;
+      }
+
+      // Create tombstone as full lesson copy with deleted: true and deletedAt
+      // This ensures it passes schema validation in readLessons
+      const tombstone: Lesson & { deleted: true; deletedAt: string } = {
+        ...lesson,
+        deleted: true,
+        deletedAt: new Date().toISOString(),
+      };
+
+      // Append tombstone using appendLesson (casts to handle the deleted field)
+      await appendLesson(repoRoot, tombstone as unknown as Lesson);
+
+      deleted.push(id);
+    }
+
+    // Sync once at end
+    if (deleted.length > 0) {
+      await syncIfNeeded(repoRoot);
+    }
+
+    if (options.json) {
+      console.log(JSON.stringify({ deleted, warnings }));
+    } else {
+      if (deleted.length > 0) {
+        out.success(`Deleted ${deleted.length} lesson(s): ${deleted.join(', ')}`);
+      }
+      for (const warning of warnings) {
+        out.warn(`${warning.id}: ${warning.message}`);
+      }
+      if (deleted.length === 0 && warnings.length > 0) {
+        process.exit(1);
+      }
     }
   });
 
