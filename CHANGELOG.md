@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-02-01
+
+### Added
+
+- **SQLite Graceful Degradation** (2f0)
+  - Works as dev dependency without native bindings failing
+  - JSONL-only mode when SQLite unavailable
+  - Keyword search falls back gracefully
+  - Warning displayed in degraded mode
+
+- **Claude Code Integration** (ctv, 8lp, 6nw, 501, 2jp, lfy)
+  - Claude Plugin structure (`.claude-plugin/`) with manifest and commands
+  - `/learn` slash command for quick lesson capture
+  - `/check-plan` slash command for plan-time retrieval
+  - Auto-invoke triggers for lesson capture patterns
+  - Detection triggers wired to Claude Code workflow
+  - AGENTS.md includes reference to CLAUDE.md
+
+- **Context Recovery** (gpv)
+  - `lna prime` command for context recovery after compaction/clear
+  - Outputs workflow rules, commands, and quality gates
+
+- **Diagnostics** (qi0)
+  - `setup claude --status` shows integration health
+  - Displays settings file, hook status, slash command availability
+  - JSON output with `--json` flag
+
+### Changed
+
+- **Architecture Refactoring** (e73, zpl)
+  - Split sqlite.ts (644 lines) into focused modules (<200 lines each)
+  - Module imports now use barrel exports (Parnas principles)
+  - Cleaner internal boundaries and improved maintainability
+
+- **CLI Improvements** (79k, e2r)
+  - CLI releases database resources on SIGINT/SIGTERM signals
+  - `setup claude --uninstall` removes AGENTS.md section and CLAUDE.md reference
+  - Clean uninstall preserves other content
+
+### Fixed
+
+- Claude now uses CLI commands instead of editing JSONL directly (0p5)
+- Plan-time lessons now appear via check-plan hook integration (6nw)
+
 ## [0.2.2] - 2026-02-01
 
 ### Added
@@ -186,7 +230,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/Nathandela/learning_agent/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/Nathandela/learning_agent/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Nathandela/learning_agent/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Nathandela/learning_agent/compare/v0.1.0...v0.2.0
