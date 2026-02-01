@@ -11,7 +11,7 @@ export type { ParseError, ReadLessonsOptions, ReadLessonsResult } from './jsonl.
 
 // SQLite storage (rebuildable index)
 // Note: _resetSqliteState and _setForceUnavailable are test-only APIs
-// and should be imported directly from './sqlite.js' in tests
+// and should be imported directly from './sqlite/index.js' in tests
 export {
   closeDb,
   contentHash,
@@ -25,8 +25,8 @@ export {
   searchKeyword,
   setCachedEmbedding,
   syncIfNeeded,
-} from './sqlite.js';
-export type { DbOptions, RetrievalStat, SyncOptions } from './sqlite.js';
+} from './sqlite/index.js';
+export type { DbOptions, RetrievalStat, SyncOptions } from './sqlite/index.js';
 
 // Compaction (archive + tombstone removal)
 export {
