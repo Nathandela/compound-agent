@@ -50,8 +50,8 @@ export function registerManagementCommands(program: Command): void {
    * Appends an invalidatedAt timestamp and optional reason to the lesson.
    * Invalidated lessons are excluded from retrieval but remain in storage.
    *
-   * @example npx learning-agent wrong L12345678
-   * @example npx learning-agent wrong L12345678 --reason "This advice was incorrect"
+   * @example npx lna wrong L12345678
+   * @example npx lna wrong L12345678 --reason "This advice was incorrect"
    */
   program
     .command('wrong <id>')
@@ -96,7 +96,7 @@ export function registerManagementCommands(program: Command): void {
    *
    * Re-enables a previously invalidated lesson for retrieval.
    *
-   * @example npx learning-agent validate L12345678
+   * @example npx lna validate L12345678
    */
   program
     .command('validate <id>')
@@ -153,9 +153,9 @@ export function registerManagementCommands(program: Command): void {
   /**
    * Compact command - Archive old lessons and remove tombstones.
    *
-   * @example npx learning-agent compact
-   * @example npx learning-agent compact --force
-   * @example npx learning-agent compact --dry-run
+   * @example npx lna compact
+   * @example npx lna compact --force
+   * @example npx lna compact --dry-run
    */
   program
     .command('compact')
@@ -197,8 +197,8 @@ export function registerManagementCommands(program: Command): void {
   /**
    * Rebuild command - Rebuild SQLite index from JSONL.
    *
-   * @example npx learning-agent rebuild
-   * @example npx learning-agent rebuild --force
+   * @example npx lna rebuild
+   * @example npx lna rebuild --force
    */
   program
     .command('rebuild')
@@ -223,7 +223,7 @@ export function registerManagementCommands(program: Command): void {
   /**
    * Stats command - Show database health and statistics.
    *
-   * @example npx learning-agent stats
+   * @example npx lna stats
    */
   program
     .command('stats')
@@ -301,9 +301,9 @@ export function registerManagementCommands(program: Command): void {
   /**
    * Export command - Export lessons as JSON to stdout.
    *
-   * @example npx learning-agent export
-   * @example npx learning-agent export --since 2024-01-15
-   * @example npx learning-agent export --tags typescript,testing
+   * @example npx lna export
+   * @example npx lna export --since 2024-01-15
+   * @example npx lna export --tags typescript,testing
    */
   program
     .command('export')
@@ -340,7 +340,7 @@ export function registerManagementCommands(program: Command): void {
   /**
    * Import command - Import lessons from a JSONL file.
    *
-   * @example npx learning-agent import lessons.jsonl
+   * @example npx lna import lessons.jsonl
    */
   program
     .command('import <file>')
@@ -429,8 +429,8 @@ export function registerManagementCommands(program: Command): void {
   /**
    * Show command - Display details of a specific lesson.
    *
-   * @example npx learning-agent show L12345678
-   * @example npx learning-agent show L12345678 --json
+   * @example npx lna show L12345678
+   * @example npx lna show L12345678 --json
    */
   program
     .command('show <id>')
@@ -484,8 +484,8 @@ export function registerManagementCommands(program: Command): void {
   /**
    * Update command - Update a lesson's mutable fields.
    *
-   * @example npx learning-agent update L12345678 --insight "New insight"
-   * @example npx learning-agent update L12345678 --severity high --tags "api,auth"
+   * @example npx lna update L12345678 --insight "New insight"
+   * @example npx lna update L12345678 --severity high --tags "api,auth"
    */
   program
     .command('update <id>')
@@ -620,8 +620,8 @@ export function registerManagementCommands(program: Command): void {
    * Creates a full lesson copy with `deleted: true` added so that
    * readLessons properly excludes the deleted lesson.
    *
-   * @example npx learning-agent delete L12345678
-   * @example npx learning-agent delete L001 L002 L003
+   * @example npx lna delete L12345678
+   * @example npx lna delete L001 L002 L003
    */
   program
     .command('delete <ids...>')

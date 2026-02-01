@@ -25,14 +25,14 @@ const PRE_COMMIT_MESSAGE = `Before committing, have you captured any valuable le
 Consider: corrections, mistakes, or insights worth remembering.
 
 To capture a lesson:
-  npx learning-agent capture --trigger "what happened" --insight "what to do" --yes`;
+  npx lna capture --trigger "what happened" --insight "what to do" --yes`;
 
 /** Pre-commit hook shell script template */
 const PRE_COMMIT_HOOK_TEMPLATE = `#!/bin/sh
 # Learning Agent pre-commit hook
 # Reminds Claude to consider capturing lessons before commits
 
-npx learning-agent hooks run pre-commit
+npx lna hooks run pre-commit
 `;
 
 // ============================================================================
@@ -40,7 +40,7 @@ npx learning-agent hooks run pre-commit
 // ============================================================================
 
 /** Marker to identify our hook in Claude Code settings */
-const CLAUDE_HOOK_MARKER = 'learning-agent load-session';
+const CLAUDE_HOOK_MARKER = 'lna load-session';
 
 /** Claude Code SessionStart hook configuration */
 const CLAUDE_HOOK_CONFIG = {
@@ -48,7 +48,7 @@ const CLAUDE_HOOK_CONFIG = {
   hooks: [
     {
       type: 'command',
-      command: 'npx learning-agent load-session 2>/dev/null || true',
+      command: 'npx lna load-session 2>/dev/null || true',
     },
   ],
 };
@@ -79,7 +79,7 @@ This project uses learning-agent for session memory.
 **BEFORE implementing any plan**, run:
 
 \`\`\`bash
-npx learning-agent check-plan --plan "your plan description" --json
+npx lna check-plan --plan "your plan description" --json
 \`\`\`
 
 Display results as a **Lessons Check** section after your plan:
@@ -115,14 +115,14 @@ Before closing a session, reflect on lessons learned:
 1. **Review**: What mistakes or corrections happened?
 2. **Quality gate**: Is it novel, specific, actionable?
 3. **Propose**: "Learned: [insight]. Save? [y/n]"
-4. **Capture**: \`npx learning-agent capture --trigger "..." --insight "..." --yes\`
+4. **Capture**: \`npx lna capture --trigger "..." --insight "..." --yes\`
 
 ### CLI Commands
 
 \`\`\`bash
-npx learning-agent load-session --json  # Session start
-npx learning-agent check-plan --plan "..." --json  # Before implementing
-npx learning-agent capture --trigger "..." --insight "..." --yes
+npx lna load-session --json  # Session start
+npx lna check-plan --plan "..." --json  # Before implementing
+npx lna capture --trigger "..." --insight "..." --yes
 \`\`\`
 
 See [AGENTS.md](https://github.com/Nathandela/learning_agent/blob/main/AGENTS.md) for full documentation.
@@ -220,7 +220,7 @@ async function getGitHooksDir(repoRoot: string): Promise<string | null> {
 /** Block to insert into existing hooks */
 const LEARNING_AGENT_HOOK_BLOCK = `
 # Learning Agent pre-commit hook (appended)
-npx learning-agent hooks run pre-commit
+npx lna hooks run pre-commit
 `;
 
 /**
@@ -430,8 +430,8 @@ export function registerSetupCommands(program: Command): void {
    * Creates the lessons directory structure and optionally injects
    * the Learning Agent Integration section into AGENTS.md.
    *
-   * @example npx learning-agent init
-   * @example npx learning-agent init --skip-agents
+   * @example npx lna init
+   * @example npx lna init --skip-agents
    */
   program
     .command('init')
@@ -493,7 +493,7 @@ export function registerSetupCommands(program: Command): void {
    *
    * Called by git hooks to output prompts/reminders.
    *
-   * @example npx learning-agent hooks run pre-commit
+   * @example npx lna hooks run pre-commit
    */
   const hooksCommand = program.command('hooks').description('Git hooks management');
 
@@ -648,8 +648,8 @@ export function registerSetupCommands(program: Command): void {
    * Downloads the EmbeddingGemma model required for check-plan semantic search.
    * Idempotent: skips download if model already exists.
    *
-   * @example npx learning-agent download-model
-   * @example npx learning-agent download-model --json
+   * @example npx lna download-model
+   * @example npx lna download-model --json
    */
   program
     .command('download-model')

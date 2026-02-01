@@ -127,8 +127,8 @@ export function registerRetrievalCommands(program: Command): void {
   /**
    * Search command - Search lessons by keyword.
    *
-   * @example npx learning-agent search "Polars"
-   * @example npx learning-agent search "authentication" --limit 5
+   * @example npx lna search "Polars"
+   * @example npx lna search "authentication" --limit 5
    */
   program
     .command('search <query>')
@@ -169,9 +169,9 @@ export function registerRetrievalCommands(program: Command): void {
   /**
    * List command - List all lessons.
    *
-   * @example npx learning-agent list
-   * @example npx learning-agent list --limit 10
-   * @example npx learning-agent list --invalidated
+   * @example npx lna list
+   * @example npx lna list --limit 10
+   * @example npx lna list --invalidated
    */
   program
     .command('list')
@@ -245,7 +245,7 @@ export function registerRetrievalCommands(program: Command): void {
    * Used by Claude Code hooks to inject critical lessons at session start.
    * Returns lessons sorted by severity/recency for immediate context.
    *
-   * @example npx learning-agent load-session --json
+   * @example npx lna load-session --json
    */
   program
     .command('load-session')
@@ -292,8 +292,8 @@ export function registerRetrievalCommands(program: Command): void {
    * Used by Claude Code hooks during plan mode to retrieve lessons
    * that are semantically relevant to the proposed implementation.
    *
-   * @example echo "Add authentication" | npx learning-agent check-plan --json
-   * @example npx learning-agent check-plan --plan "Refactor the API"
+   * @example echo "Add authentication" | npx lna check-plan --json
+   * @example npx lna check-plan --plan "Refactor the API"
    */
   program
     .command('check-plan')
@@ -319,12 +319,12 @@ export function registerRetrievalCommands(program: Command): void {
         if (options.json) {
           console.log(JSON.stringify({
             error: 'Embedding model not available',
-            action: 'Run: npx learning-agent download-model',
+            action: 'Run: npx lna download-model',
           }));
         } else {
           out.error('Embedding model not available');
           console.log('');
-          console.log('Run: npx learning-agent download-model');
+          console.log('Run: npx lna download-model');
         }
         process.exit(1);
       }

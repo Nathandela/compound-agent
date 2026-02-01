@@ -55,7 +55,7 @@ describe('Setup Commands', () => {
       // Must include explicit instruction to run check-plan BEFORE implementing
       expect(content).toMatch(/before\s+(implementing|starting|coding)/i);
       // Must mention running check-plan command
-      expect(content).toContain('npx learning-agent check-plan');
+      expect(content).toContain('npx lna check-plan');
       // Must explain what to do with results
       expect(content).toMatch(/lessons?\s*check/i);
     });
@@ -160,7 +160,7 @@ describe('Setup Commands', () => {
       expect(stats.mode & 0o111).toBeGreaterThan(0);
     });
 
-    it('pre-commit hook calls learning-agent hooks run', async () => {
+    it('pre-commit hook calls lna hooks run', async () => {
       const gitHooksDir = join(getTempDir(), '.git', 'hooks');
       await mkdir(gitHooksDir, { recursive: true });
 
@@ -168,7 +168,7 @@ describe('Setup Commands', () => {
 
       const hookPath = join(gitHooksDir, 'pre-commit');
       const content = await readFile(hookPath, 'utf-8');
-      expect(content).toContain('learning-agent');
+      expect(content).toContain('lna');
       expect(content).toContain('hooks run pre-commit');
     });
 
@@ -234,7 +234,7 @@ describe('Setup Commands', () => {
       expect(newContent).toContain('pnpm test');
       // Should also have our marker
       expect(newContent).toContain('Learning Agent');
-      expect(newContent).toContain('learning-agent hooks run');
+      expect(newContent).toContain('lna hooks run');
     });
 
     it('does not modify hook that already has Learning Agent marker', async () => {
@@ -243,7 +243,7 @@ describe('Setup Commands', () => {
 
       // Create existing hook with our marker
       const hookPath = join(gitHooksDir, 'pre-commit');
-      const contentWithMarker = '#!/bin/sh\n# Learning Agent pre-commit hook\nnpx learning-agent hooks run pre-commit\n';
+      const contentWithMarker = '#!/bin/sh\n# Learning Agent pre-commit hook\nnpx lna hooks run pre-commit\n';
       await writeFile(hookPath, contentWithMarker);
 
       runCli('init');
@@ -304,7 +304,7 @@ describe('Setup Commands', () => {
         const lines = newContent.split('\n');
 
         // Find line numbers
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const exitLine = lines.findIndex((line) => line.trim() === 'exit 0');
 
         // Learning Agent hook must appear BEFORE exit statement
@@ -326,7 +326,7 @@ describe('Setup Commands', () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const exitLine = lines.findIndex((line) => line.trim() === 'exit 1');
 
         expect(learningAgentLine).toBeGreaterThan(-1);
@@ -347,7 +347,7 @@ describe('Setup Commands', () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const exitLine = lines.findIndex((line) => line.trim().startsWith('exit $'));
 
         expect(learningAgentLine).toBeGreaterThan(-1);
@@ -368,7 +368,7 @@ describe('Setup Commands', () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const firstExitLine = lines.findIndex((line) => line.trim() === 'exit 0');
 
         expect(learningAgentLine).toBeGreaterThan(-1);
@@ -389,7 +389,7 @@ describe('Setup Commands', () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const lastContentLine = lines.findIndex((line) => line.includes('pnpm test'));
 
         // Should be appended after existing content
@@ -418,7 +418,7 @@ exit 0
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         // Find the exit 1 inside function
         const functionExitLine = lines.findIndex((line) => line.trim() === 'exit 1');
         // Find the exit 0 at end (top-level)
@@ -451,7 +451,7 @@ exit 0
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         // Find the ACTUAL top-level exit (last exit 0)
         let topLevelExitLine = -1;
         for (let i = lines.length - 1; i >= 0; i--) {
@@ -482,12 +482,12 @@ exit 0
         const newContent = await readFile(hookPath, 'utf-8');
 
         // Count occurrences of learning-agent hook
-        const matches = newContent.match(/learning-agent hooks run pre-commit/g);
+        const matches = newContent.match(/lna hooks run pre-commit/g);
         expect(matches?.length).toBe(1);
 
         // Ensure hook is still before exit
         const lines = newContent.split('\n');
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const exitLine = lines.findIndex((line) => line.trim() === 'exit 0');
         expect(learningAgentLine).toBeLessThan(exitLine);
       });
@@ -541,7 +541,7 @@ exit 0
 
       // Hook should contain our command
       const hookEntry = settings.hooks.SessionStart[0];
-      expect(hookEntry.hooks[0].command).toContain('learning-agent');
+      expect(hookEntry.hooks[0].command).toContain('lna');
       expect(hookEntry.hooks[0].command).toContain('load-session');
     });
 
@@ -601,7 +601,7 @@ exit 0
       // First should be existing
       expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('echo "existing hook"');
       // Second should be ours
-      expect(settings.hooks.SessionStart[1].hooks[0].command).toContain('learning-agent');
+      expect(settings.hooks.SessionStart[1].hooks[0].command).toContain('lna');
     });
 
     it('is idempotent - does not duplicate hook on re-run', async () => {
@@ -659,7 +659,7 @@ exit 0
                 { matcher: 'startup', hooks: [{ type: 'command', command: 'echo "keep me"' }] },
                 {
                   matcher: 'startup|resume|compact',
-                  hooks: [{ type: 'command', command: 'npx learning-agent load-session 2>/dev/null || true' }],
+                  hooks: [{ type: 'command', command: 'npx lna load-session 2>/dev/null || true' }],
                 },
               ],
             },
@@ -884,7 +884,7 @@ exit 0
 
       // Error message should reference the same command name
       if (combined.includes('download-model')) {
-        expect(combined).toContain('npx learning-agent download-model');
+        expect(combined).toContain('npx lna download-model');
       }
     });
 

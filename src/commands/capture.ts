@@ -103,8 +103,8 @@ export function registerCaptureCommands(program: Command): void {
   /**
    * Learn command - Quick lesson capture.
    *
-   * @example npx learning-agent learn "Use Polars for large files"
-   * @example npx learning-agent learn "Use Polars" --severity high --trigger "pandas was slow"
+   * @example npx lna learn "Use Polars for large files"
+   * @example npx lna learn "Use Polars" --severity high --trigger "pandas was slow"
    */
   program
     .command('learn <insight>')
@@ -181,8 +181,8 @@ export function registerCaptureCommands(program: Command): void {
   /**
    * Detect command - Detect learning triggers from input.
    *
-   * @example npx learning-agent detect --input conversation.json
-   * @example npx learning-agent detect --input session.json --save --yes
+   * @example npx lna detect --input conversation.json
+   * @example npx lna detect --input session.json --save --yes
    */
   program
     .command('detect')
@@ -256,8 +256,8 @@ export function registerCaptureCommands(program: Command): void {
    * - Explicit: --trigger "what happened" --insight "what to do"
    * - From file: --input conversation.json (auto-detect trigger)
    *
-   * @example npx learning-agent capture --trigger "Wrong API" --insight "Use v2" --yes
-   * @example npx learning-agent capture --input session.json --json
+   * @example npx lna capture --trigger "Wrong API" --insight "Use v2" --yes
+   * @example npx lna capture --input session.json --json
    */
   program
     .command('capture')
