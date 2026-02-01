@@ -11,6 +11,7 @@ import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises
 import { dirname, join } from 'node:path';
 
 import type { Lesson } from '../types.js';
+import { getLessonAgeDays } from '../utils.js';
 
 import { LESSONS_PATH, readLessons } from './jsonl.js';
 
@@ -22,9 +23,6 @@ export const TOMBSTONE_THRESHOLD = 100;
 
 /** Age threshold for archiving (in days) */
 export const ARCHIVE_AGE_DAYS = 90;
-
-/** Milliseconds per day for time calculations */
-const MS_PER_DAY = 1000 * 60 * 60 * 24;
 
 /** Month offset for JavaScript's 0-indexed months */
 const MONTH_INDEX_OFFSET = 1;
@@ -138,13 +136,10 @@ export async function rewriteWithoutTombstones(repoRoot: string): Promise<number
  * Lessons are archived if older than ARCHIVE_AGE_DAYS and never retrieved.
  *
  * @param lesson - The lesson to evaluate
- * @param now - Current date for age calculation
  * @returns true if lesson should be archived
  */
-function shouldArchive(lesson: Lesson, now: Date): boolean {
-  const created = new Date(lesson.created);
-  const ageMs = now.getTime() - created.getTime();
-  const ageDays = ageMs / MS_PER_DAY;
+function shouldArchive(lesson: Lesson): boolean {
+  const ageDays = getLessonAgeDays(lesson);
 
   // Archive if: older than threshold AND never retrieved
   return ageDays > ARCHIVE_AGE_DAYS && (lesson.retrievalCount === undefined || lesson.retrievalCount === 0);
@@ -157,13 +152,12 @@ function shouldArchive(lesson: Lesson, now: Date): boolean {
  */
 export async function archiveOldLessons(repoRoot: string): Promise<number> {
   const { lessons } = await readLessons(repoRoot);
-  const now = new Date();
 
   const toArchive: Lesson[] = [];
   const toKeep: Lesson[] = [];
 
   for (const lesson of lessons) {
-    if (shouldArchive(lesson, now)) {
+    if (shouldArchive(lesson)) {
       toArchive.push(lesson);
     } else {
       toKeep.push(lesson);

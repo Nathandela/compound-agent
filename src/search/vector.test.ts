@@ -196,5 +196,64 @@ describe('vector search', () => {
       const results = await searchVector(tempDir, 'test');
       expect(results.length).toBe(10);
     });
+
+    describe('filters invalidated lessons', () => {
+      it('excludes lessons with invalidatedAt set', async () => {
+        // Create a valid lesson
+        await appendLesson(tempDir, createQuickLesson('L001', 'valid lesson'));
+        // Create an invalidated lesson
+        await appendLesson(tempDir, {
+          ...createQuickLesson('L002', 'invalidated lesson'),
+          invalidatedAt: '2026-01-15T10:30:00.000Z',
+          invalidationReason: 'This approach was wrong',
+        });
+        await rebuildIndex(tempDir);
+
+        // Mock embedText
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+
+        const results = await searchVector(tempDir, 'lesson', { limit: 10 });
+        expect(results).toHaveLength(1);
+        expect(results[0]!.lesson.id).toBe('L001');
+      });
+
+      it('returns empty when all lessons are invalidated', async () => {
+        await appendLesson(tempDir, {
+          ...createQuickLesson('L001', 'invalidated one'),
+          invalidatedAt: '2026-01-15T10:30:00.000Z',
+        });
+        await appendLesson(tempDir, {
+          ...createQuickLesson('L002', 'invalidated two'),
+          invalidatedAt: '2026-01-16T10:30:00.000Z',
+        });
+        await rebuildIndex(tempDir);
+
+        // Mock embedText
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+
+        const results = await searchVector(tempDir, 'test query', { limit: 10 });
+        expect(results).toEqual([]);
+      });
+
+      it('does not compute embeddings for invalidated lessons', async () => {
+        await appendLesson(tempDir, createQuickLesson('L001', 'valid lesson'));
+        await appendLesson(tempDir, {
+          ...createQuickLesson('L002', 'invalidated lesson'),
+          invalidatedAt: '2026-01-15T10:30:00.000Z',
+        });
+        await rebuildIndex(tempDir);
+
+        // Mock embedText to track calls
+        const embedMock = vi.fn().mockResolvedValue([1, 0, 0]);
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
+
+        await searchVector(tempDir, 'test query', { limit: 10 });
+
+        // Should only call embedText for query + valid lesson (not invalidated one)
+        expect(embedMock).toHaveBeenCalledTimes(2);
+        expect(embedMock).toHaveBeenCalledWith('test query');
+        expect(embedMock).toHaveBeenCalledWith('trigger for valid lesson valid lesson');
+      });
+    });
   });
 });

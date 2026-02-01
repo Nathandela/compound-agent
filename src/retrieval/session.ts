@@ -38,10 +38,13 @@ export async function loadSessionLessons(
 ): Promise<FullLesson[]> {
   const { lessons: allLessons } = await readLessons(repoRoot);
 
-  // Filter for high-severity, confirmed, full lessons
+  // Filter for high-severity, confirmed, full lessons (excluding invalidated)
   const highSeverityLessons = allLessons.filter(
     (lesson): lesson is FullLesson =>
-      isFullLesson(lesson) && lesson.severity === 'high' && lesson.confirmed
+      isFullLesson(lesson) &&
+      lesson.severity === 'high' &&
+      lesson.confirmed &&
+      !lesson.invalidatedAt
   );
 
   // Sort by recency (most recent first)

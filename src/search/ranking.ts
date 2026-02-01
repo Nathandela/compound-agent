@@ -8,6 +8,7 @@
  */
 
 import type { Lesson } from '../types.js';
+import { getLessonAgeDays } from '../utils.js';
 
 import type { ScoredLesson } from './vector.js';
 
@@ -45,11 +46,7 @@ export function severityBoost(lesson: Lesson): number {
  * Lessons ≤30 days old get 1.2, older get 1.0.
  */
 export function recencyBoost(lesson: Lesson): number {
-  const created = new Date(lesson.created);
-  const now = new Date();
-  const ageMs = now.getTime() - created.getTime();
-  const ageDays = Math.floor(ageMs / (1000 * 60 * 60 * 24));
-
+  const ageDays = getLessonAgeDays(lesson);
   return ageDays <= RECENCY_THRESHOLD_DAYS ? RECENCY_BOOST : 1.0;
 }
 

@@ -39,7 +39,15 @@ const SCHEMA_SQL = `
     retrieval_count INTEGER NOT NULL DEFAULT 0,
     last_retrieved TEXT,
     embedding BLOB,
-    content_hash TEXT
+    content_hash TEXT,
+    -- v0.2.2 fields
+    invalidated_at TEXT,
+    invalidation_reason TEXT,
+    citation_file TEXT,
+    citation_line INTEGER,
+    citation_commit TEXT,
+    compaction_level INTEGER DEFAULT 0,
+    compacted_at TEXT
   );
 
   -- FTS5 virtual table for full-text search
@@ -253,6 +261,14 @@ interface LessonRow {
   retrieval_count: number;
   last_retrieved: string | null;
   embedding: Buffer | null;
+  // v0.2.2 fields
+  invalidated_at: string | null;
+  invalidation_reason: string | null;
+  citation_file: string | null;
+  citation_line: number | null;
+  citation_commit: string | null;
+  compaction_level: number | null;
+  compacted_at: string | null;
 }
 
 /**
@@ -288,6 +304,30 @@ function rowToLesson(row: LessonRow): Lesson {
     lesson.retrievalCount = row.retrieval_count;
   }
 
+  // v0.2.2 fields
+  if (row.invalidated_at !== null) {
+    lesson.invalidatedAt = row.invalidated_at;
+  }
+  if (row.invalidation_reason !== null) {
+    lesson.invalidationReason = row.invalidation_reason;
+  }
+  if (row.citation_file !== null) {
+    lesson.citation = {
+      file: row.citation_file,
+      ...(row.citation_line !== null && { line: row.citation_line }),
+      ...(row.citation_commit !== null && { commit: row.citation_commit }),
+    };
+  }
+  if (row.compaction_level !== null && row.compaction_level !== 0) {
+    lesson.compactionLevel = row.compaction_level as 0 | 1 | 2;
+  }
+  if (row.compacted_at !== null) {
+    lesson.compactedAt = row.compacted_at;
+  }
+  if (row.last_retrieved !== null) {
+    lesson.lastRetrieved = row.last_retrieved;
+  }
+
   return lesson;
 }
 
@@ -316,8 +356,8 @@ function collectCachedEmbeddings(database: DatabaseType): Map<string, CachedEmbe
 
 /** SQL for inserting a lesson row */
 const INSERT_LESSON_SQL = `
-  INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, last_retrieved, embedding, content_hash)
-  VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count, @last_retrieved, @embedding, @content_hash)
+  INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, last_retrieved, embedding, content_hash, invalidated_at, invalidation_reason, citation_file, citation_line, citation_commit, compaction_level, compacted_at)
+  VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count, @last_retrieved, @embedding, @content_hash, @invalidated_at, @invalidation_reason, @citation_file, @citation_line, @citation_commit, @compaction_level, @compacted_at)
 `;
 
 /**
@@ -396,9 +436,17 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
         confirmed: lesson.confirmed ? 1 : 0,
         deleted: lesson.deleted ? 1 : 0,
         retrieval_count: lesson.retrievalCount ?? 0,
-        last_retrieved: null, // Reset on rebuild since we're rebuilding from source
+        last_retrieved: lesson.lastRetrieved ?? null,
         embedding: hasValidCache ? cached.embedding : null,
         content_hash: hasValidCache ? cached.contentHash : null,
+        // v0.2.2 fields
+        invalidated_at: lesson.invalidatedAt ?? null,
+        invalidation_reason: lesson.invalidationReason ?? null,
+        citation_file: lesson.citation?.file ?? null,
+        citation_line: lesson.citation?.line ?? null,
+        citation_commit: lesson.citation?.commit ?? null,
+        compaction_level: lesson.compactionLevel ?? 0,
+        compacted_at: lesson.compactedAt ?? null,
       });
     }
   });
@@ -467,7 +515,7 @@ export async function searchKeyword(
   };
   if (countResult.cnt === 0) return [];
 
-  // Use FTS5 MATCH for search
+  // Use FTS5 MATCH for search, excluding invalidated lessons
   const rows = database
     .prepare(
       `
@@ -475,6 +523,7 @@ export async function searchKeyword(
       FROM lessons l
       JOIN lessons_fts fts ON l.rowid = fts.rowid
       WHERE lessons_fts MATCH ?
+        AND l.invalidated_at IS NULL
       LIMIT ?
     `
     )
