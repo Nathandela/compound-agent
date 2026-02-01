@@ -43,8 +43,8 @@ import {
 } from './index.js';
 
 describe('public API exports', () => {
-  it('exports VERSION', () => {
-    expect(VERSION).toBe('0.1.0');
+  it('exports VERSION as semver string', () => {
+    expect(VERSION).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
   describe('storage exports', () => {

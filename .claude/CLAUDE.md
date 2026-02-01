@@ -388,17 +388,19 @@ pnpm build      # Build with tsup
 
 ### Test
 ```bash
-pnpm test          # Full suite (~60s, 653 tests)
-pnpm test:fast     # Skip CLI integration (~6s, 385 tests) - USE FOR RAPID FEEDBACK
+pnpm test          # Full suite (1-2 minutes, comprehensive coverage)
+pnpm test:fast     # Skip CLI integration tests - faster feedback loop
 pnpm test:changed  # Only tests affected by recent changes
 pnpm test:watch    # Watch mode
 pnpm test:all      # Full suite with model download
 ```
 
 **Recommended workflow:**
-1. Use `pnpm test:fast` during development for rapid feedback
+1. Use `pnpm test:fast` during development for faster iteration
 2. Run `pnpm test` before committing to verify everything passes
 3. CI runs full suite with `pnpm test`
+
+**Note:** Test suite is comprehensive (~1000 tests). Set tool timeouts accordingly (2+ minutes for full suite).
 
 ### Run
 ```bash

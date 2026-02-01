@@ -432,3 +432,43 @@ From neutral reviewer:
 4. Integrate nomic embeddings
 5. Build CLI for manual capture
 6. Add Claude Code hooks
+
+---
+
+## Version Notes
+
+This section documents changes since the original spec (v0.1.0).
+
+### v0.2.2 (2026-02-01) - Hardening & Quality Gates
+
+**Schema Extensions:**
+- `citation` field (optional) - Track source file, line number, commit hash
+- `compactionLevel` (0|1|2) - Age-based validity tracking (active/flagged/archived)
+- `compactedAt`, `lastRetrieved` - Temporal tracking for lifecycle management
+- `invalidatedAt`, `invalidationReason` - Manual invalidation support
+
+**New CLI Commands:**
+- `wrong <id>` - Mark lesson as invalid with optional reason
+- `validate <id>` - Re-enable previously invalidated lesson
+- `list --invalidated` - Show invalidated lessons
+- `stats` - Database health with age distribution and count warnings
+
+**File Structure Refactoring:**
+- `src/commands/` now modular: `capture.ts`, `retrieval.ts`, `management/`, `setup/`
+- `src/commands/management/` split: `crud.ts`, `invalidation.ts`, `io.ts`, `maintenance.ts`, `prime.ts`
+- `src/commands/setup/` split: `init.ts`, `claude.ts`, `hooks.ts`, `download-model.ts`, `templates.ts`
+
+**Quality Improvements:**
+- Age-based warnings in `load-session` for lessons > 30/60/90 days
+- Count warning when lesson count exceeds 20
+- Comprehensive test suite (~1000 tests)
+
+### v0.2.3 (In Progress) - Agent Awareness
+
+**Focus Areas:**
+- SQLite graceful degradation (fallback to JSONL-only)
+- Claude Code hooks integration (`setup claude` command)
+- Slash commands for Claude Code (`/learn`, `/check-plan`, `/prime`)
+- Plugin manifest for Claude Code ecosystem
+
+See `doc/v0.2.3-PLAN.md` for current implementation status.

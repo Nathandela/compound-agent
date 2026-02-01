@@ -84,7 +84,11 @@
  * @module learning-agent
  */
 
-export const VERSION = '0.1.0';
+/**
+ * Package version - must match package.json.
+ * Update this when releasing a new version.
+ */
+export const VERSION = '0.2.2';
 
 // Storage API (JSONL source of truth + SQLite index)
 export {
