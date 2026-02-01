@@ -32,6 +32,7 @@
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:changed": "vitest run --changed HEAD~1",
     "test:all": "pnpm download-model && vitest run",
     "lint": "tsc --noEmit",
     "download-model": "node ./dist/cli.js download-model",
