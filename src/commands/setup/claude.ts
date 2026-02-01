@@ -3,6 +3,7 @@
  */
 
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { Command } from 'commander';
 
 import { out } from '../shared.js';
@@ -18,6 +19,19 @@ import {
   writeClaudeSettings,
 } from './claude-helpers.js';
 
+/** Status check result */
+interface StatusResult {
+  settingsFile: string;
+  exists: boolean;
+  validJson: boolean;
+  hookInstalled: boolean;
+  slashCommands: {
+    learn: boolean;
+    checkPlan: boolean;
+  };
+  status: 'connected' | 'partial' | 'disconnected';
+}
+
 /**
  * Register the setup claude command on the program.
  */
@@ -29,9 +43,10 @@ export function registerClaudeCommand(program: Command): void {
     .description('Install Claude Code SessionStart hooks')
     .option('--global', 'Install to global ~/.claude/ instead of project')
     .option('--uninstall', 'Remove learning-agent hooks')
+    .option('--status', 'Check status of Claude Code integration')
     .option('--dry-run', 'Show what would change without writing')
     .option('--json', 'Output as JSON')
-    .action(async (options: { global?: boolean; uninstall?: boolean; dryRun?: boolean; json?: boolean }) => {
+    .action(async (options: { global?: boolean; uninstall?: boolean; status?: boolean; dryRun?: boolean; json?: boolean }) => {
       const settingsPath = getClaudeSettingsPath(options.global ?? false);
       const displayPath = options.global ? '~/.claude/settings.json' : '.claude/settings.json';
 
@@ -48,6 +63,68 @@ export function registerClaudeCommand(program: Command): void {
       }
 
       const alreadyInstalled = hasClaudeHook(settings);
+
+      // Handle status check
+      if (options.status) {
+        const repoRoot = getRepoRoot();
+        const learnMdPath = join(repoRoot, '.claude', 'commands', 'learn.md');
+        const checkPlanMdPath = join(repoRoot, '.claude', 'commands', 'check-plan.md');
+
+        const learnExists = existsSync(learnMdPath);
+        const checkPlanExists = existsSync(checkPlanMdPath);
+
+        // Determine overall status
+        let status: 'connected' | 'partial' | 'disconnected';
+        if (alreadyInstalled && learnExists && checkPlanExists) {
+          status = 'connected';
+        } else if (alreadyInstalled || learnExists || checkPlanExists) {
+          status = 'partial';
+        } else {
+          status = 'disconnected';
+        }
+
+        const result: StatusResult = {
+          settingsFile: displayPath,
+          exists: existsSync(settingsPath),
+          validJson: true, // We already parsed it above
+          hookInstalled: alreadyInstalled,
+          slashCommands: {
+            learn: learnExists,
+            checkPlan: checkPlanExists,
+          },
+          status,
+        };
+
+        if (options.json) {
+          console.log(JSON.stringify(result, null, 2));
+        } else {
+          console.log('Claude Code Integration Status');
+          console.log('─'.repeat(40));
+          console.log('');
+          console.log(`Settings file: ${displayPath}`);
+          console.log(`  ${result.exists ? '[ok]' : '[missing]'} File exists`);
+          console.log(`  ${result.validJson ? '[ok]' : '[error]'} Valid JSON`);
+          console.log(`  ${result.hookInstalled ? '[ok]' : '[warn]'} SessionStart hook installed`);
+          console.log('');
+          console.log('Slash commands:');
+          console.log(`  ${learnExists ? '[ok]' : '[warn]'} /learn command`);
+          console.log(`  ${checkPlanExists ? '[ok]' : '[warn]'} /check-plan command`);
+          console.log('');
+
+          if (status === 'connected') {
+            out.success('All checks passed. Integration is connected.');
+          } else if (status === 'partial') {
+            out.warn('Partial setup detected.');
+            console.log('');
+            console.log("Run 'npx lna init' to complete setup.");
+          } else {
+            out.error('Not connected.');
+            console.log('');
+            console.log("Run 'npx lna init' to set up Learning Agent.");
+          }
+        }
+        return;
+      }
 
       // Handle uninstall
       if (options.uninstall) {
