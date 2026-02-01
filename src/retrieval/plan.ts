@@ -60,7 +60,7 @@ export async function retrieveForPlan(
  * @returns Formatted message string
  */
 export function formatLessonsCheck(lessons: ScoredLesson[]): string {
-  const header = '📚 Lessons Check\n' + '─'.repeat(40);
+  const header = 'Lessons Check\n' + '─'.repeat(40);
 
   if (lessons.length === 0) {
     return `${header}\nNo relevant lessons found for this plan.`;
