@@ -1,10 +1,24 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // Caching (Vite-level config)
+  cacheDir: 'node_modules/.vitest',
+
   test: {
     globals: true,
     environment: 'node',
     include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
+
+    // Parallelization
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        minThreads: 2,
+        maxThreads: 4,
+      },
+    },
+    isolate: true,
+
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
