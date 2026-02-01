@@ -10,6 +10,8 @@ export { appendLesson, readLessons, LESSONS_PATH } from './jsonl.js';
 export type { ParseError, ReadLessonsOptions, ReadLessonsResult } from './jsonl.js';
 
 // SQLite storage (rebuildable index)
+// Note: _resetSqliteState and _setForceUnavailable are test-only APIs
+// and should be imported directly from './sqlite.js' in tests
 export {
   closeDb,
   contentHash,
@@ -17,6 +19,7 @@ export {
   getCachedEmbedding,
   getRetrievalStats,
   incrementRetrievalCount,
+  isSqliteMode,
   openDb,
   rebuildIndex,
   searchKeyword,
