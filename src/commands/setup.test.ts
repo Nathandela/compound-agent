@@ -798,6 +798,70 @@ exit 0
       expect(result.dryRun).toBe(true);
       expect(result.wouldInstall).toBe(true);
     });
+
+    it('--uninstall removes AGENTS.md section', async () => {
+      // First init to create AGENTS.md with markers
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const beforeContent = await readFile(agentsPath, 'utf-8');
+      expect(beforeContent).toContain('Learning Agent Integration');
+
+      // Then uninstall
+      runSetupClaude('--uninstall');
+
+      // AGENTS.md should have the section removed
+      const afterContent = await readFile(agentsPath, 'utf-8');
+      expect(afterContent).not.toContain('Learning Agent Integration');
+    });
+
+    it('--uninstall preserves other content in AGENTS.md', async () => {
+      // Create AGENTS.md with existing content
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      await writeFile(agentsPath, '# My Project Agents\n\nExisting content about agents.\n');
+
+      // Init adds Learning Agent section
+      runCli('init');
+
+      const afterInit = await readFile(agentsPath, 'utf-8');
+      expect(afterInit).toContain('My Project Agents');
+      expect(afterInit).toContain('Learning Agent Integration');
+
+      // Uninstall should remove only the Learning Agent section
+      runSetupClaude('--uninstall');
+
+      const afterUninstall = await readFile(agentsPath, 'utf-8');
+      expect(afterUninstall).toContain('My Project Agents');
+      expect(afterUninstall).toContain('Existing content');
+      expect(afterUninstall).not.toContain('Learning Agent Integration');
+    });
+
+    it('--uninstall removes CLAUDE.md reference section', async () => {
+      // First init to create CLAUDE.md reference
+      runCli('init');
+
+      const claudeMdPath = join(getTempDir(), '.claude', 'CLAUDE.md');
+      const beforeContent = await readFile(claudeMdPath, 'utf-8');
+      expect(beforeContent).toContain('Learning Agent');
+
+      // Then uninstall
+      runSetupClaude('--uninstall');
+
+      // CLAUDE.md should have the reference removed
+      const afterContent = await readFile(claudeMdPath, 'utf-8');
+      expect(afterContent).not.toContain('Learning Agent');
+    });
+
+    it('AGENTS.md has markers after init for clean uninstall', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Should have start and end markers
+      expect(content).toContain('<!-- learning-agent:start -->');
+      expect(content).toContain('<!-- learning-agent:end -->');
+    });
   });
 
   /**

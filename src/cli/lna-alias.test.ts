@@ -53,10 +53,10 @@ describe('CLI', { tags: ['integration'] }, () => {
 
     describe('Claude-facing strings use npx lna', () => {
       it('AGENTS_MD_TEMPLATE uses npx lna (not npx learning-agent)', async () => {
-        const setupPath = join(process.cwd(), 'src', 'commands', 'setup.ts');
-        const setupContent = await readFile(setupPath, 'utf8');
+        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
+        const templatesContent = await readFile(templatesPath, 'utf8');
 
-        const templateMatch = setupContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/);
+        const templateMatch = templatesContent.match(/export const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/);
         expect(templateMatch).toBeTruthy();
 
         const templateContent = templateMatch![1];
@@ -67,10 +67,10 @@ describe('CLI', { tags: ['integration'] }, () => {
       });
 
       it('PRE_COMMIT_MESSAGE uses npx lna capture', async () => {
-        const setupPath = join(process.cwd(), 'src', 'commands', 'setup.ts');
-        const setupContent = await readFile(setupPath, 'utf8');
+        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
+        const templatesContent = await readFile(templatesPath, 'utf8');
 
-        const messageMatch = setupContent.match(/const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/);
+        const messageMatch = templatesContent.match(/export const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/);
         expect(messageMatch).toBeTruthy();
 
         const messageContent = messageMatch![1];
@@ -81,10 +81,10 @@ describe('CLI', { tags: ['integration'] }, () => {
       });
 
       it('CLAUDE_HOOK_CONFIG uses npx lna load-session', async () => {
-        const setupPath = join(process.cwd(), 'src', 'commands', 'setup.ts');
-        const setupContent = await readFile(setupPath, 'utf8');
+        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
+        const templatesContent = await readFile(templatesPath, 'utf8');
 
-        const hookMatch = setupContent.match(/const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/);
+        const hookMatch = templatesContent.match(/export const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/);
         expect(hookMatch).toBeTruthy();
 
         const hookContent = hookMatch![1];
@@ -117,12 +117,12 @@ describe('CLI', { tags: ['integration'] }, () => {
 
     describe('documentation consistency', () => {
       it('no random mixing of lna and learning-agent in templates', async () => {
-        const setupPath = join(process.cwd(), 'src', 'commands', 'setup.ts');
-        const setupContent = await readFile(setupPath, 'utf8');
+        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
+        const templatesContent = await readFile(templatesPath, 'utf8');
 
-        const agentsTemplate = setupContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
-        const preCommitMsg = setupContent.match(/const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/)?.[1] ?? '';
-        const claudeHook = setupContent.match(/const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/)?.[1] ?? '';
+        const agentsTemplate = templatesContent.match(/export const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
+        const preCommitMsg = templatesContent.match(/export const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/)?.[1] ?? '';
+        const claudeHook = templatesContent.match(/export const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/)?.[1] ?? '';
 
         const combinedTemplates = agentsTemplate + preCommitMsg + claudeHook;
 
@@ -139,9 +139,9 @@ describe('CLI', { tags: ['integration'] }, () => {
     let agentsTemplate: string;
 
     beforeAll(async () => {
-      const setupPath = join(process.cwd(), 'src', 'commands', 'setup.ts');
-      const setupContent = await readFile(setupPath, 'utf8');
-      agentsTemplate = setupContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
+      const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
+      const templatesContent = await readFile(templatesPath, 'utf8');
+      agentsTemplate = templatesContent.match(/export const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
     });
 
     it('contains "Never Edit JSONL Directly" section header', () => {
