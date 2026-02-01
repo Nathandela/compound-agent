@@ -5,7 +5,7 @@
  * No vector search - just filter by severity and recency.
  */
 
-import { readLessons } from '../storage/jsonl.js';
+import { readLessons } from '../storage/index.js';
 import type { Lesson, Severity } from '../types.js';
 
 /** Default number of lessons to load at session start */

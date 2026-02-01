@@ -7,7 +7,7 @@
  * - Actionable (contains action words)
  */
 
-import { searchKeyword, syncIfNeeded } from '../storage/sqlite.js';
+import { searchKeyword, syncIfNeeded } from '../storage/index.js';
 
 /** Default similarity threshold for duplicate detection */
 const DEFAULT_SIMILARITY_THRESHOLD = 0.8;

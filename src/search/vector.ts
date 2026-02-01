@@ -5,9 +5,8 @@
  * Uses SQLite cache to avoid recomputing embeddings.
  */
 
-import { embedText } from '../embeddings/nomic.js';
-import { contentHash, getCachedEmbedding, setCachedEmbedding } from '../storage/sqlite.js';
-import { readLessons } from '../storage/jsonl.js';
+import { embedText } from '../embeddings/index.js';
+import { contentHash, getCachedEmbedding, readLessons, setCachedEmbedding } from '../storage/index.js';
 import type { Lesson } from '../types.js';
 
 /**

@@ -86,41 +86,70 @@
 
 export const VERSION = '0.1.0';
 
-// Storage API
-export { appendLesson, readLessons, LESSONS_PATH } from './storage/jsonl.js';
-export type { ReadLessonsOptions, ReadLessonsResult, ParseError } from './storage/jsonl.js';
-export { rebuildIndex, searchKeyword, closeDb, DB_PATH } from './storage/sqlite.js';
+// Storage API (JSONL source of truth + SQLite index)
+export {
+  appendLesson,
+  closeDb,
+  DB_PATH,
+  LESSONS_PATH,
+  readLessons,
+  rebuildIndex,
+  searchKeyword,
+} from './storage/index.js';
+export type { ParseError, ReadLessonsOptions, ReadLessonsResult } from './storage/index.js';
 
 // Embeddings API
-export { embedText, embedTexts, getEmbedding, isModelAvailable, unloadEmbedding } from './embeddings/nomic.js';
-export { MODEL_FILENAME, MODEL_URI, resolveModel } from './embeddings/model.js';
+export {
+  embedText,
+  embedTexts,
+  getEmbedding,
+  isModelAvailable,
+  MODEL_FILENAME,
+  MODEL_URI,
+  resolveModel,
+  unloadEmbedding,
+} from './embeddings/index.js';
 
-// Search API
-export { searchVector, cosineSimilarity } from './search/vector.js';
-export type { ScoredLesson, SearchVectorOptions } from './search/vector.js';
-export { rankLessons, calculateScore, severityBoost, recencyBoost, confirmationBoost } from './search/ranking.js';
-export type { RankedLesson } from './search/ranking.js';
+// Search API (vector similarity + ranking)
+export {
+  calculateScore,
+  confirmationBoost,
+  cosineSimilarity,
+  rankLessons,
+  recencyBoost,
+  searchVector,
+  severityBoost,
+} from './search/index.js';
+export type { RankedLesson, ScoredLesson, SearchVectorOptions } from './search/index.js';
 
-// Capture API - Quality filters
-export { shouldPropose, isNovel, isSpecific, isActionable } from './capture/quality.js';
-export type { NoveltyResult, NoveltyOptions, SpecificityResult, ActionabilityResult, ProposeResult } from './capture/quality.js';
-
-// Capture API - Triggers
-export { detectUserCorrection, detectSelfCorrection, detectTestFailure } from './capture/triggers.js';
+// Capture API (quality filters + trigger detection)
+export {
+  detectSelfCorrection,
+  detectTestFailure,
+  detectUserCorrection,
+  isActionable,
+  isNovel,
+  isSpecific,
+  shouldPropose,
+} from './capture/index.js';
 export type {
+  ActionabilityResult,
   CorrectionSignal,
   DetectedCorrection,
-  EditHistory,
-  EditEntry,
   DetectedSelfCorrection,
-  TestResult,
   DetectedTestFailure,
-} from './capture/triggers.js';
+  EditEntry,
+  EditHistory,
+  NoveltyOptions,
+  NoveltyResult,
+  ProposeResult,
+  SpecificityResult,
+  TestResult,
+} from './capture/index.js';
 
-// Retrieval API
-export { loadSessionLessons } from './retrieval/session.js';
-export { retrieveForPlan, formatLessonsCheck } from './retrieval/plan.js';
-export type { PlanRetrievalResult } from './retrieval/plan.js';
+// Retrieval API (session + plan time)
+export { formatLessonsCheck, loadSessionLessons, retrieveForPlan } from './retrieval/index.js';
+export type { PlanRetrievalResult } from './retrieval/index.js';
 
 // Types and schemas
 export {

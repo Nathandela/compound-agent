@@ -5,8 +5,7 @@
  * Uses vector search to find semantically similar lessons.
  */
 
-import { searchVector, type ScoredLesson } from '../search/vector.js';
-import { rankLessons, type RankedLesson } from '../search/ranking.js';
+import { rankLessons, searchVector, type RankedLesson, type ScoredLesson } from '../search/index.js';
 
 /** Default number of lessons to retrieve */
 const DEFAULT_LIMIT = 5;
