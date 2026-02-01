@@ -723,4 +723,240 @@ describe('SQLite schema', () => {
       });
     });
   });
+
+  describe('v0.2.2 fields roundtrip', () => {
+    it('stores and retrieves invalidatedAt and invalidationReason', async () => {
+      const lesson = {
+        ...createQuickLesson('L001', 'invalidated lesson'),
+        invalidatedAt: '2026-01-15T10:30:00.000Z',
+        invalidationReason: 'Superseded by newer approach',
+      };
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      // Query directly since searchKeyword filters out invalidated lessons
+      const db = openDb(tempDir);
+      const row = db.prepare('SELECT invalidated_at, invalidation_reason FROM lessons WHERE id = ?').get('L001') as {
+        invalidated_at: string | null;
+        invalidation_reason: string | null;
+      };
+      expect(row.invalidated_at).toBe('2026-01-15T10:30:00.000Z');
+      expect(row.invalidation_reason).toBe('Superseded by newer approach');
+    });
+
+    it('stores and retrieves citation with all fields', async () => {
+      const lesson = {
+        ...createQuickLesson('L001', 'lesson with citation'),
+        citation: {
+          file: 'src/storage/sqlite.ts',
+          line: 42,
+          commit: 'abc123def',
+        },
+      };
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'citation', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.citation).toEqual({
+        file: 'src/storage/sqlite.ts',
+        line: 42,
+        commit: 'abc123def',
+      });
+    });
+
+    it('stores and retrieves citation with only file', async () => {
+      const lesson = {
+        ...createQuickLesson('L001', 'lesson with file only'),
+        citation: {
+          file: 'README.md',
+        },
+      };
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'file only', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.citation).toEqual({ file: 'README.md' });
+    });
+
+    it('stores and retrieves compactionLevel and compactedAt', async () => {
+      const lesson = {
+        ...createQuickLesson('L001', 'compacted lesson'),
+        compactionLevel: 1 as const,
+        compactedAt: '2026-01-20T12:00:00.000Z',
+      };
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'compacted', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.compactionLevel).toBe(1);
+      expect(results[0]!.compactedAt).toBe('2026-01-20T12:00:00.000Z');
+    });
+
+    it('stores and retrieves lastRetrieved', async () => {
+      const lesson = {
+        ...createQuickLesson('L001', 'recently retrieved'),
+        lastRetrieved: '2026-01-25T08:00:00.000Z',
+      };
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'retrieved', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.lastRetrieved).toBe('2026-01-25T08:00:00.000Z');
+    });
+
+    it('omits undefined v0.2.2 fields from returned lesson', async () => {
+      const lesson = createQuickLesson('L001', 'basic lesson');
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'basic', 10);
+      expect(results).toHaveLength(1);
+      // Fields should be undefined, not null or empty
+      expect(results[0]!.invalidatedAt).toBeUndefined();
+      expect(results[0]!.invalidationReason).toBeUndefined();
+      expect(results[0]!.citation).toBeUndefined();
+      expect(results[0]!.compactionLevel).toBeUndefined();
+      expect(results[0]!.compactedAt).toBeUndefined();
+      expect(results[0]!.lastRetrieved).toBeUndefined();
+    });
+
+    it('preserves compactionLevel 0 as undefined (default)', async () => {
+      const lesson = {
+        ...createQuickLesson('L001', 'active lesson'),
+        compactionLevel: 0 as const,
+      };
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'active', 10);
+      expect(results).toHaveLength(1);
+      // compactionLevel 0 is the default, so it should be undefined
+      expect(results[0]!.compactionLevel).toBeUndefined();
+    });
+
+    it('preserves compactionLevel 2 (archived)', async () => {
+      const lesson = {
+        ...createQuickLesson('L001', 'archived lesson'),
+        compactionLevel: 2 as const,
+        compactedAt: '2026-01-01T00:00:00.000Z',
+      };
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'archived', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.compactionLevel).toBe(2);
+    });
+
+    it('roundtrips lesson with all v0.2.2 fields set', async () => {
+      const lesson = {
+        ...createFullLesson('L001', 'complete v0.2.2 lesson', 'high'),
+        invalidatedAt: '2026-01-10T00:00:00.000Z',
+        invalidationReason: 'Deprecated',
+        citation: { file: 'test.ts', line: 100, commit: 'deadbeef' },
+        compactionLevel: 1 as const,
+        compactedAt: '2026-01-15T00:00:00.000Z',
+        lastRetrieved: '2026-01-20T00:00:00.000Z',
+      };
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+
+      // Query directly since searchKeyword filters out invalidated lessons
+      const db = openDb(tempDir);
+      const row = db
+        .prepare(
+          `SELECT invalidated_at, invalidation_reason, citation_file, citation_line,
+                  citation_commit, compaction_level, compacted_at, last_retrieved
+           FROM lessons WHERE id = ?`
+        )
+        .get('L001') as {
+        invalidated_at: string | null;
+        invalidation_reason: string | null;
+        citation_file: string | null;
+        citation_line: number | null;
+        citation_commit: string | null;
+        compaction_level: number | null;
+        compacted_at: string | null;
+        last_retrieved: string | null;
+      };
+      expect(row.invalidated_at).toBe('2026-01-10T00:00:00.000Z');
+      expect(row.invalidation_reason).toBe('Deprecated');
+      expect(row.citation_file).toBe('test.ts');
+      expect(row.citation_line).toBe(100);
+      expect(row.citation_commit).toBe('deadbeef');
+      expect(row.compaction_level).toBe(1);
+      expect(row.compacted_at).toBe('2026-01-15T00:00:00.000Z');
+      expect(row.last_retrieved).toBe('2026-01-20T00:00:00.000Z');
+    });
+  });
+
+  describe('v0.2.2 schema columns', () => {
+    it('lessons table has v0.2.2 columns', () => {
+      const db = openDb(tempDir);
+      const columns = db
+        .prepare("PRAGMA table_info('lessons')")
+        .all() as Array<{ name: string; type: string }>;
+
+      const columnNames = columns.map((c) => c.name);
+      expect(columnNames).toContain('invalidated_at');
+      expect(columnNames).toContain('invalidation_reason');
+      expect(columnNames).toContain('citation_file');
+      expect(columnNames).toContain('citation_line');
+      expect(columnNames).toContain('citation_commit');
+      expect(columnNames).toContain('compaction_level');
+      expect(columnNames).toContain('compacted_at');
+    });
+  });
+
+  describe('searchKeyword filters invalidated lessons', () => {
+    it('excludes lessons with invalidatedAt set', async () => {
+      // Create a valid lesson
+      await appendLesson(tempDir, createQuickLesson('L001', 'valid lesson'));
+      // Create an invalidated lesson
+      await appendLesson(tempDir, {
+        ...createQuickLesson('L002', 'invalidated lesson'),
+        invalidatedAt: '2026-01-15T10:30:00.000Z',
+        invalidationReason: 'This approach was wrong',
+      });
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'lesson', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.id).toBe('L001');
+    });
+
+    it('returns empty when all matching lessons are invalidated', async () => {
+      await appendLesson(tempDir, {
+        ...createQuickLesson('L001', 'invalidated one'),
+        invalidatedAt: '2026-01-15T10:30:00.000Z',
+      });
+      await appendLesson(tempDir, {
+        ...createQuickLesson('L002', 'invalidated two'),
+        invalidatedAt: '2026-01-16T10:30:00.000Z',
+      });
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'invalidated', 10);
+      expect(results).toEqual([]);
+    });
+
+    it('does not increment retrieval count for excluded invalidated lessons', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'valid lesson'));
+      await appendLesson(tempDir, {
+        ...createQuickLesson('L002', 'invalid lesson'),
+        invalidatedAt: '2026-01-15T10:30:00.000Z',
+      });
+      await rebuildIndex(tempDir);
+
+      await searchKeyword(tempDir, 'lesson', 10);
+
+      const stats = getRetrievalStats(tempDir);
+      expect(stats.find((s) => s.id === 'L001')?.count).toBe(1);
+      expect(stats.find((s) => s.id === 'L002')?.count).toBe(0);
+    });
+  });
 });

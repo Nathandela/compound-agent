@@ -68,9 +68,12 @@ export async function searchVector(
   // Embed the query
   const queryVector = await embedText(query);
 
-  // Score each lesson
+  // Score each lesson, skipping invalidated ones
   const scored: ScoredLesson[] = [];
   for (const lesson of lessons) {
+    // Skip invalidated lessons
+    if (lesson.invalidatedAt) continue;
+
     const lessonText = `${lesson.trigger} ${lesson.insight}`;
     const hash = contentHash(lesson.trigger, lesson.insight);
 

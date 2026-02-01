@@ -872,3 +872,172 @@ describe('Property-Based Tests: Type Unification', () => {
     );
   });
 });
+
+describe('CitationSchema', () => {
+  const baseLesson = {
+    id: 'L001',
+    type: 'quick',
+    trigger: 'Test trigger',
+    insight: 'Test insight',
+    tags: [],
+    source: 'manual' as const,
+    context: { tool: 'test', intent: 'test' },
+    created: '2026-01-30T12:00:00Z',
+    confirmed: true,
+    supersedes: [],
+    related: [],
+  };
+
+  it('accepts lesson without citation (backward compatible)', () => {
+    const result = LessonSchema.safeParse(baseLesson);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts citation with file only', () => {
+    const lesson = {
+      ...baseLesson,
+      citation: { file: 'src/api/client.ts' },
+    };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts citation with file and line', () => {
+    const lesson = {
+      ...baseLesson,
+      citation: { file: 'src/api/client.ts', line: 42 },
+    };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts citation with file, line, and commit', () => {
+    const lesson = {
+      ...baseLesson,
+      citation: { file: 'src/api/client.ts', line: 42, commit: 'abc1234' },
+    };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects citation with empty file', () => {
+    const lesson = {
+      ...baseLesson,
+      citation: { file: '' },
+    };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects citation with negative line number', () => {
+    const lesson = {
+      ...baseLesson,
+      citation: { file: 'src/test.ts', line: -1 },
+    };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects citation with zero line number', () => {
+    const lesson = {
+      ...baseLesson,
+      citation: { file: 'src/test.ts', line: 0 },
+    };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(false);
+  });
+});
+
+describe('Age-based validity fields', () => {
+  const baseLesson = {
+    id: 'L001',
+    type: 'quick',
+    trigger: 'Test trigger',
+    insight: 'Test insight',
+    tags: [],
+    source: 'manual' as const,
+    context: { tool: 'test', intent: 'test' },
+    created: '2026-01-30T12:00:00Z',
+    confirmed: true,
+    supersedes: [],
+    related: [],
+  };
+
+  it('accepts lesson without age fields (backward compatible)', () => {
+    const result = LessonSchema.safeParse(baseLesson);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts compactionLevel 0 (active)', () => {
+    const lesson = { ...baseLesson, compactionLevel: 0 };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts compactionLevel 1 (flagged)', () => {
+    const lesson = { ...baseLesson, compactionLevel: 1 };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts compactionLevel 2 (archived)', () => {
+    const lesson = { ...baseLesson, compactionLevel: 2 };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects invalid compactionLevel', () => {
+    const lesson = { ...baseLesson, compactionLevel: 3 };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts compactedAt timestamp', () => {
+    const lesson = { ...baseLesson, compactedAt: '2026-01-30T12:00:00Z' };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts lastRetrieved timestamp', () => {
+    const lesson = { ...baseLesson, lastRetrieved: '2026-01-30T12:00:00Z' };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(true);
+  });
+});
+
+describe('Invalidation fields', () => {
+  const baseLesson = {
+    id: 'L001',
+    type: 'quick',
+    trigger: 'Test trigger',
+    insight: 'Test insight',
+    tags: [],
+    source: 'manual' as const,
+    context: { tool: 'test', intent: 'test' },
+    created: '2026-01-30T12:00:00Z',
+    confirmed: true,
+    supersedes: [],
+    related: [],
+  };
+
+  it('accepts lesson without invalidation fields (backward compatible)', () => {
+    const result = LessonSchema.safeParse(baseLesson);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts invalidatedAt timestamp', () => {
+    const lesson = { ...baseLesson, invalidatedAt: '2026-01-30T12:00:00Z' };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts invalidationReason', () => {
+    const lesson = {
+      ...baseLesson,
+      invalidatedAt: '2026-01-30T12:00:00Z',
+      invalidationReason: 'This lesson was found to be incorrect',
+    };
+    const result = LessonSchema.safeParse(lesson);
+    expect(result.success).toBe(true);
+  });
+});

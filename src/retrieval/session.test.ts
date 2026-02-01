@@ -95,5 +95,51 @@ describe('session retrieval', () => {
       // Should return the lesson - actual token filtering is done by caller
       expect(lessons).toHaveLength(1);
     });
+
+    describe('filters invalidated lessons', () => {
+      it('excludes lessons with invalidatedAt set', async () => {
+        // Create a valid high-severity lesson
+        await appendLesson(tempDir, createFullLesson('L001', 'valid lesson', 'high'));
+        // Create an invalidated high-severity lesson
+        await appendLesson(tempDir, {
+          ...createFullLesson('L002', 'invalidated lesson', 'high'),
+          invalidatedAt: '2026-01-15T10:30:00.000Z',
+          invalidationReason: 'This approach was wrong',
+        });
+
+        const lessons = await loadSessionLessons(tempDir);
+        expect(lessons).toHaveLength(1);
+        expect(lessons[0]!.id).toBe('L001');
+      });
+
+      it('returns empty when all high-severity lessons are invalidated', async () => {
+        await appendLesson(tempDir, {
+          ...createFullLesson('L001', 'invalidated one', 'high'),
+          invalidatedAt: '2026-01-15T10:30:00.000Z',
+        });
+        await appendLesson(tempDir, {
+          ...createFullLesson('L002', 'invalidated two', 'high'),
+          invalidatedAt: '2026-01-16T10:30:00.000Z',
+        });
+
+        const lessons = await loadSessionLessons(tempDir);
+        expect(lessons).toEqual([]);
+      });
+
+      it('filters invalidated from sorted results', async () => {
+        // Create lessons with different dates
+        await appendLesson(tempDir, createFullLesson('L001', 'oldest valid', 'high', { created: 10 }));
+        await appendLesson(tempDir, {
+          ...createFullLesson('L002', 'invalidated recent', 'high', { created: 1 }),
+          invalidatedAt: '2026-01-15T10:30:00.000Z',
+        });
+        await appendLesson(tempDir, createFullLesson('L003', 'newest valid', 'high', { created: 5 }));
+
+        const lessons = await loadSessionLessons(tempDir);
+        expect(lessons).toHaveLength(2);
+        // Should be sorted by recency, without the invalidated lesson
+        expect(lessons.map((l) => l.insight)).toEqual(['newest valid', 'oldest valid']);
+      });
+    });
   });
 });

@@ -25,8 +25,22 @@ export const PatternSchema = z.object({
   good: z.string(),
 });
 
+// Citation for lesson provenance tracking
+export const CitationSchema = z.object({
+  file: z.string().min(1),           // Source file path (required, non-empty)
+  line: z.number().int().positive().optional(), // Line number (optional, must be positive)
+  commit: z.string().optional(),     // Git commit hash (optional)
+});
+
 // Severity levels for lessons
 export const SeveritySchema = z.enum(['high', 'medium', 'low']);
+
+// Compaction levels for age-based validity
+export const CompactionLevelSchema = z.union([
+  z.literal(0), // Active
+  z.literal(1), // Flagged (>90 days)
+  z.literal(2), // Archived
+]);
 
 // Lesson type - semantic marker for lesson quality tier
 export const LessonTypeSchema = z.enum(['quick', 'full']);
@@ -67,6 +81,18 @@ export const LessonSchema = z.object({
   // Lifecycle fields (optional)
   deleted: z.boolean().optional(),
   retrievalCount: z.number().optional(),
+
+  // Provenance tracking (optional)
+  citation: CitationSchema.optional(),
+
+  // Age-based validity fields (optional)
+  compactionLevel: CompactionLevelSchema.optional(), // 0=active, 1=flagged, 2=archived
+  compactedAt: z.string().optional(),    // ISO8601 when compaction happened
+  lastRetrieved: z.string().optional(),  // ISO8601 last retrieval time
+
+  // Invalidation fields (optional - for marking lessons as wrong)
+  invalidatedAt: z.string().optional(), // ISO8601
+  invalidationReason: z.string().optional(),
 });
 
 // Tombstone for deletions (append-only delete marker)
@@ -84,6 +110,8 @@ export type Source = z.infer<typeof SourceSchema>;
 export type Severity = z.infer<typeof SeveritySchema>;
 export type Context = z.infer<typeof ContextSchema>;
 export type Pattern = z.infer<typeof PatternSchema>;
+export type Citation = z.infer<typeof CitationSchema>;
+export type CompactionLevel = z.infer<typeof CompactionLevelSchema>;
 
 /**
  * Generate deterministic lesson ID from insight text.

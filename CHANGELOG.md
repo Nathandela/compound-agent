@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-02-01
+
+### Added
+
+- **Age-based Temporal Validity** (LANDSCAPE.md: eik)
+  - `CompactionLevelSchema` for lesson lifecycle (0=active, 1=flagged, 2=archived)
+  - Age distribution display in `stats` command (<30d, 30-90d, >90d)
+  - Age warnings in `load-session` for lessons older than 90 days
+  - New schema fields: `compactionLevel`, `compactedAt`, `lastRetrieved`
+
+- **Manual Invalidation** (LANDSCAPE.md: mov)
+  - `learning-agent wrong <id>` - Mark a lesson as invalid/wrong
+  - `learning-agent validate <id>` - Re-enable a previously invalidated lesson
+  - `list --invalidated` flag to show only invalidated lessons
+  - New schema fields: `invalidatedAt`, `invalidationReason`
+
+- **Optional Citation Field** (LANDSCAPE.md: tn3)
+  - `CitationSchema` for lesson provenance tracking
+  - Store file path, line number, and git commit with lessons
+  - `learn --citation <file:line>` and `--citation-commit <hash>` flags
+
+- **Count Warning** (LANDSCAPE.md: qp9)
+  - Warning in `stats` when lesson count exceeds 20 (context pollution prevention)
+  - Note in `load-session` when total lessons may degrade retrieval quality
+
+### Changed
+
+- Lesson schema now includes optional fields for citation, age-tracking, and invalidation
+- `list` command shows `[INVALID]` marker for invalidated lessons
+- `load-session` JSON output includes `totalCount` field
+- CLI refactored into command modules (`src/commands/`) for maintainability
+- Age calculation logic centralized in `src/utils.ts`
+
+### Fixed
+
+- **SQLite schema now stores v0.2.2 fields** (x9y)
+  - Added columns: `invalidated_at`, `invalidation_reason`, `citation_*`, `compaction_level`, `compacted_at`
+  - `rebuildIndex` preserves all v0.2.2 fields during cache rebuild
+  - `rowToLesson` correctly maps all fields back to Lesson objects
+
+- **Retrieval paths filter out invalidated lessons** (z8k)
+  - `searchKeyword` excludes lessons with `invalidated_at` set
+  - `searchVector` skips invalidated lessons during scoring
+  - `loadSessionLessons` filters out invalidated high-severity lessons
+
 ## [0.2.1] - 2026-02-01
 
 ### Added
@@ -141,7 +186,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/Nathandela/learning_agent/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Nathandela/learning_agent/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/Nathandela/learning_agent/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Nathandela/learning_agent/releases/tag/v0.1.0
