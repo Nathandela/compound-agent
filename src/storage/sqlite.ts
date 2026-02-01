@@ -18,6 +18,12 @@ import { LESSONS_PATH, readLessons } from './jsonl.js';
 /** Relative path to database file from repo root */
 export const DB_PATH = '.claude/.cache/lessons.sqlite';
 
+/** Options for database initialization */
+export interface DbOptions {
+  /** Use in-memory database instead of file-based (useful for testing) */
+  inMemory?: boolean;
+}
+
 /** SQL schema for lessons database */
 const SCHEMA_SQL = `
   -- Main lessons table
@@ -92,6 +98,7 @@ function createSchema(database: DatabaseType): void {
 }
 
 let db: DatabaseType | null = null;
+let dbIsInMemory = false;
 
 /**
  * Compute deterministic content hash for embedding cache validation.
@@ -109,30 +116,44 @@ export function contentHash(trigger: string, insight: string): string {
  *
  * **Resource lifecycle:**
  * - First call creates the database file (if needed) and opens a connection
- * - Connection uses WAL mode for better concurrent access
+ * - Connection uses WAL mode for better concurrent access (file-based only)
  * - Connection remains open until `closeDb()` is called
  *
  * **Note:** Most code should not call this directly. Higher-level functions
  * like `searchKeyword` and `rebuildIndex` call it internally.
  *
  * @param repoRoot - Path to repository root (database stored at `.claude/.cache/lessons.sqlite`)
+ * @param options - Optional settings for database initialization
  * @returns The singleton database connection
  *
  * @see {@link closeDb} for releasing resources
  */
-export function openDb(repoRoot: string): DatabaseType {
-  if (db) return db;
+export function openDb(repoRoot: string, options: DbOptions = {}): DatabaseType {
+  const { inMemory = false } = options;
 
-  const dbPath = join(repoRoot, DB_PATH);
+  // If we have an existing connection, check if it matches the requested mode
+  if (db) {
+    // If modes don't match, close the existing connection first
+    if (inMemory !== dbIsInMemory) {
+      closeDb();
+    } else {
+      return db;
+    }
+  }
 
-  // Create directory synchronously (better-sqlite3 is sync)
-  const dir = dirname(dbPath);
-  mkdirSync(dir, { recursive: true });
-
-  db = new Database(dbPath);
-
-  // Enable WAL mode for better concurrent access
-  db.pragma('journal_mode = WAL');
+  if (inMemory) {
+    db = new Database(':memory:');
+    dbIsInMemory = true;
+  } else {
+    const dbPath = join(repoRoot, DB_PATH);
+    // Create directory synchronously (better-sqlite3 is sync)
+    const dir = dirname(dbPath);
+    mkdirSync(dir, { recursive: true });
+    db = new Database(dbPath);
+    dbIsInMemory = false;
+    // Enable WAL mode for better concurrent access (file-based only)
+    db.pragma('journal_mode = WAL');
+  }
 
   createSchema(db);
 
@@ -179,6 +200,7 @@ export function closeDb(): void {
   if (db) {
     db.close();
     db = null;
+    dbIsInMemory = false;
   }
 }
 

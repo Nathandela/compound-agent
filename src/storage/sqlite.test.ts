@@ -20,6 +20,75 @@ import {
   syncIfNeeded,
 } from './sqlite.js';
 
+/** Helper to open in-memory database for fast tests */
+function openInMemoryDb() {
+  return openDb('', { inMemory: true });
+}
+
+describe('SQLite in-memory mode', () => {
+  afterEach(() => {
+    closeDb();
+  });
+
+  it('creates schema in memory without file I/O', () => {
+    const db = openInMemoryDb();
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lessons'")
+      .get() as { name: string } | undefined;
+    expect(tables?.name).toBe('lessons');
+  });
+
+  it('creates FTS5 in memory', () => {
+    const db = openInMemoryDb();
+    const tables = db
+      .prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='lessons_fts'")
+      .get() as { name: string } | undefined;
+    expect(tables?.name).toBe('lessons_fts');
+  });
+
+  it('returns singleton for same mode', () => {
+    const db1 = openInMemoryDb();
+    const db2 = openInMemoryDb();
+    expect(db1).toBe(db2);
+  });
+
+  it('switches between in-memory and file-based modes', async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-mode-switch-'));
+    try {
+      // Start with in-memory
+      const memDb = openInMemoryDb();
+      memDb.prepare(`
+        INSERT INTO lessons (id, type, trigger, insight, tags, source, context, created, confirmed)
+        VALUES ('MEM001', 'quick', 'memory test', 'memory insight', '', 'manual', '{}', '2026-01-30', 1)
+      `).run();
+
+      // Switch to file-based (should close in-memory and open file)
+      const fileDb = openDb(tempDir);
+      // The in-memory data should be gone
+      const row = fileDb.prepare('SELECT id FROM lessons WHERE id = ?').get('MEM001');
+      expect(row).toBeUndefined();
+    } finally {
+      closeDb();
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
+
+  it('FTS triggers work in memory', () => {
+    const db = openInMemoryDb();
+
+    db.prepare(`
+      INSERT INTO lessons (id, type, trigger, insight, tags, source, context, created, confirmed)
+      VALUES ('L001', 'quick', 'test trigger', 'test insight', 'tag1', 'manual', '{}', '2026-01-30', 1)
+    `).run();
+
+    const results = db
+      .prepare("SELECT id FROM lessons_fts WHERE lessons_fts MATCH 'test'")
+      .all() as Array<{ id: string }>;
+    expect(results).toHaveLength(1);
+    expect(results[0]!.id).toBe('L001');
+  });
+});
+
 describe('SQLite schema', () => {
   let tempDir: string;
 

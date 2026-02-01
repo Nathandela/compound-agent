@@ -23,7 +23,7 @@ export {
   setCachedEmbedding,
   syncIfNeeded,
 } from './sqlite.js';
-export type { RetrievalStat, SyncOptions } from './sqlite.js';
+export type { DbOptions, RetrievalStat, SyncOptions } from './sqlite.js';
 
 // Compaction (archive + tombstone removal)
 export {
