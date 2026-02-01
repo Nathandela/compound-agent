@@ -182,31 +182,118 @@ import {
 
 See [examples/](examples/) for usage examples.
 
-## Lesson Types
+## Lesson Schema
 
-### Quick Lesson (fast capture)
+Lessons are stored in JSONL format with Zod validation. Understanding the schema is critical for correct usage.
+
+### Required Fields
+
+Every lesson **must** have these fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique identifier (e.g., "L1a2b3c4d") |
+| `type` | "quick" \| "full" | Lesson quality tier (see below) |
+| `trigger` | string | What caused this lesson to be learned |
+| `insight` | string | The actual lesson content |
+| `tags` | string[] | Categorization tags (can be empty) |
+| `source` | enum | How it was captured: "user_correction", "self_correction", "test_failure", "manual" |
+| `context` | object | `{ tool: string, intent: string }` - what was happening |
+| `created` | string | ISO8601 timestamp |
+| `confirmed` | boolean | Whether user confirmed this lesson |
+| `supersedes` | string[] | IDs of lessons this replaces (can be empty) |
+| `related` | string[] | IDs of related lessons (can be empty) |
+
+### Optional Fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `evidence` | string | Supporting evidence (typically for "full" type) |
+| `severity` | "high" \| "medium" \| "low" | Importance level |
+| `pattern` | object | `{ bad: string, good: string }` - code pattern |
+| `deleted` | boolean | Tombstone marker for deletions |
+| `retrievalCount` | number | Times this lesson was retrieved |
+
+### Type vs Severity (Important!)
+
+**`type`** and **`severity`** are **separate** fields:
+
+- **`type`**: Quality tier of the lesson
+  - `"quick"` - Minimal capture, fast to create
+  - `"full"` - Detailed lesson with evidence/patterns
+
+- **`severity`**: Importance level (optional field)
+  - `"high"` - Critical, loaded at every session start
+  - `"medium"` - Important, retrieved when relevant
+  - `"low"` - Minor, lower retrieval priority
+
+**Common mistake**: Using `type: "high"` instead of `type: "full"` with `severity: "high"`.
+
+### Session-Start Loading
+
+High-severity lessons are automatically loaded at session start. For a lesson to load:
+
+1. `type` must be `"full"`
+2. `severity` must be `"high"`
+3. `confirmed` must be `true`
+
+### Complete Examples
+
+#### Quick Lesson (minimal)
+
 ```json
 {
-  "id": "L001",
+  "id": "L1a2b3c4d",
   "type": "quick",
   "trigger": "Used pandas for 500MB file",
-  "insight": "Polars 10x faster",
+  "insight": "Polars is 10x faster for large files",
   "tags": ["performance", "polars"],
-  "source": "user_correction"
+  "source": "user_correction",
+  "context": { "tool": "edit", "intent": "optimize CSV processing" },
+  "created": "2025-01-30T14:00:00Z",
+  "confirmed": true,
+  "supersedes": [],
+  "related": []
 }
 ```
 
-### Full Lesson (detailed, high-severity)
+#### Full Lesson with High Severity (loads at session start)
+
 ```json
 {
-  "id": "L002",
+  "id": "L5e6f7g8h",
   "type": "full",
   "trigger": "Auth API returned 401 despite valid token",
   "insight": "API requires X-Request-ID header",
-  "evidence": "Traced in network tab, header missing",
+  "evidence": "Traced in network tab, header was missing",
+  "tags": ["api", "auth"],
   "severity": "high",
-  "source": "test_failure"
+  "source": "test_failure",
+  "context": { "tool": "bash", "intent": "run auth integration tests" },
+  "created": "2025-01-30T15:30:00Z",
+  "confirmed": true,
+  "supersedes": [],
+  "related": ["L1a2b3c4d"],
+  "pattern": {
+    "bad": "requests.get(url, headers={'Authorization': token})",
+    "good": "requests.get(url, headers={'Authorization': token, 'X-Request-ID': uuid4()})"
+  }
 }
+```
+
+### Creating Lessons via CLI
+
+Always use the CLI to create lessons (never edit JSONL directly):
+
+```bash
+# Quick lesson
+npx lna learn "Use Polars for large files"
+
+# Full lesson with high severity (loads at session start)
+npx lna learn "API requires X-Request-ID header" --severity high
+
+# With trigger context
+npx lna learn "Use uv not pip" --trigger "pip was slow" --severity medium
 ```
 
 ## Technology Stack
@@ -237,7 +324,7 @@ pnpm lint
 
 ## Project Status
 
-Version 0.2.0 - Claude Code hooks integration complete. See [doc/SPEC.md](doc/SPEC.md) for the full specification and [CHANGELOG.md](CHANGELOG.md) for recent changes.
+Version 0.2.1 - Bug fixes and documentation improvements. See [doc/SPEC.md](doc/SPEC.md) for the full specification and [CHANGELOG.md](CHANGELOG.md) for recent changes.
 
 ## Documentation
 

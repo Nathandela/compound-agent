@@ -29,22 +29,25 @@ const PRE_COMMIT_MESSAGE = `Before committing, have you captured any valuable le
 Consider: corrections, mistakes, or insights worth remembering.
 
 To capture a lesson:
-  npx learning-agent capture --trigger "what happened" --insight "what to do" --yes`;
+  npx lna capture --trigger "what happened" --insight "what to do" --yes`;
 
 /** Pre-commit hook shell script template */
 const PRE_COMMIT_HOOK_TEMPLATE = `#!/bin/sh
 # Learning Agent pre-commit hook
 # Reminds Claude to consider capturing lessons before commits
 
-npx learning-agent hooks run pre-commit
+npx lna hooks run pre-commit
 `;
 
 // ============================================================================
 // Claude Code Hooks Configuration
 // ============================================================================
 
-/** Marker to identify our hook in Claude Code settings */
-const CLAUDE_HOOK_MARKER = 'learning-agent load-session';
+/** Marker to identify our hook in Claude Code settings (v0.2.1+: uses lna alias) */
+const CLAUDE_HOOK_MARKER = 'lna load-session';
+
+/** Legacy marker for backward compatibility with v0.2.0 hooks */
+const CLAUDE_HOOK_MARKER_LEGACY = 'learning-agent load-session';
 
 /** Claude Code SessionStart hook configuration */
 const CLAUDE_HOOK_CONFIG = {
@@ -52,7 +55,7 @@ const CLAUDE_HOOK_CONFIG = {
   hooks: [
     {
       type: 'command',
-      command: 'npx learning-agent load-session 2>/dev/null || true',
+      command: 'npx lna load-session 2>/dev/null || true',
     },
   ],
 };
@@ -312,6 +315,24 @@ const AGENTS_MD_TEMPLATE = `
 
 This project uses learning-agent for session memory.
 
+### ⚠️ IMPORTANT: Never Edit JSONL Directly
+
+**DO NOT** manually edit \`.claude/lessons/index.jsonl\`.
+
+Always use CLI commands:
+
+\`\`\`bash
+npx lna learn "insight" --severity high    # Create lesson
+npx lna update <id> --insight "new text"   # Update lesson
+npx lna delete <id>                        # Delete lesson
+npx lna list                               # List all lessons
+\`\`\`
+
+Manual edits will:
+- **Break SQLite sync** - Index becomes stale, search fails
+- **Bypass schema validation** - Invalid data corrupts the database
+- **Cause silent failures** - Lessons won't load at session start
+
 ### Retrieval Points
 
 - **Session start**: High-severity lessons loaded automatically
@@ -322,7 +343,7 @@ This project uses learning-agent for session memory.
 **BEFORE implementing any plan**, run:
 
 \`\`\`bash
-npx learning-agent check-plan --plan "your plan description" --json
+npx lna check-plan --plan "your plan description" --json
 \`\`\`
 
 Display results as a **Lessons Check** section after your plan:
@@ -358,14 +379,14 @@ Before closing a session, reflect on lessons learned:
 1. **Review**: What mistakes or corrections happened?
 2. **Quality gate**: Is it novel, specific, actionable?
 3. **Propose**: "Learned: [insight]. Save? [y/n]"
-4. **Capture**: \`npx learning-agent capture --trigger "..." --insight "..." --yes\`
+4. **Capture**: \`npx lna capture --trigger "..." --insight "..." --yes\`
 
 ### CLI Commands
 
 \`\`\`bash
-npx learning-agent load-session --json  # Session start
-npx learning-agent check-plan --plan "..." --json  # Before implementing
-npx learning-agent capture --trigger "..." --insight "..." --yes
+npx lna load-session --json  # Session start
+npx lna check-plan --plan "..." --json  # Before implementing
+npx lna capture --trigger "..." --insight "..." --yes
 \`\`\`
 
 See [AGENTS.md](https://github.com/Nathandela/learning_agent/blob/main/AGENTS.md) for full documentation.
@@ -463,7 +484,7 @@ async function getGitHooksDir(repoRoot: string): Promise<string | null> {
 /** Block to insert into existing hooks */
 const LEARNING_AGENT_HOOK_BLOCK = `
 # Learning Agent pre-commit hook (appended)
-npx learning-agent hooks run pre-commit
+npx lna hooks run pre-commit
 `;
 
 /**
@@ -747,7 +768,10 @@ function hasClaudeHook(settings: Record<string, unknown>): boolean {
 
   return hooks.SessionStart.some((entry) => {
     const hookEntry = entry as { hooks?: Array<{ command?: string }> };
-    return hookEntry.hooks?.some((h) => h.command?.includes(CLAUDE_HOOK_MARKER));
+    // Check both current and legacy markers for backward compatibility
+    return hookEntry.hooks?.some((h) =>
+      h.command?.includes(CLAUDE_HOOK_MARKER) || h.command?.includes(CLAUDE_HOOK_MARKER_LEGACY)
+    );
   });
 }
 
@@ -775,7 +799,10 @@ function removeLearningAgentHook(settings: Record<string, unknown>): boolean {
   const originalLength = hooks.SessionStart.length;
   hooks.SessionStart = hooks.SessionStart.filter((entry) => {
     const hookEntry = entry as { hooks?: Array<{ command?: string }> };
-    return !hookEntry.hooks?.some((h) => h.command?.includes(CLAUDE_HOOK_MARKER));
+    // Remove both current and legacy hooks for backward compatibility
+    return !hookEntry.hooks?.some((h) =>
+      h.command?.includes(CLAUDE_HOOK_MARKER) || h.command?.includes(CLAUDE_HOOK_MARKER_LEGACY)
+    );
   });
 
   return hooks.SessionStart.length < originalLength;
@@ -1508,12 +1535,12 @@ program
       if (options.json) {
         console.log(JSON.stringify({
           error: 'Embedding model not available',
-          action: 'Run: npx learning-agent download-model',
+          action: 'Run: npx lna download-model',
         }));
       } else {
         out.error('Embedding model not available');
         console.log('');
-        console.log('Run: npx learning-agent download-model');
+        console.log('Run: npx lna download-model');
       }
       process.exit(1);
     }

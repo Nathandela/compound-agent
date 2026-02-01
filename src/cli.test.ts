@@ -1263,9 +1263,9 @@ describe('CLI', () => {
       // Create temp dir with no model
       const { combined } = runCli('check-plan --plan "test plan"');
 
-      // Error message should reference the same command name
+      // Error message should reference the short alias (v0.2.1+)
       if (combined.includes('download-model')) {
-        expect(combined).toContain('npx learning-agent download-model');
+        expect(combined).toContain('npx lna download-model');
       }
     });
 
@@ -1736,9 +1736,9 @@ describe('CLI', () => {
       expect(settings.hooks.SessionStart).toBeDefined();
       expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
 
-      // Hook should contain our command
+      // Hook should contain our command (v0.2.1+: uses lna alias)
       const hookEntry = settings.hooks.SessionStart[0];
-      expect(hookEntry.hooks[0].command).toContain('learning-agent');
+      expect(hookEntry.hooks[0].command).toContain('lna');
       expect(hookEntry.hooks[0].command).toContain('load-session');
     });
 
@@ -1797,8 +1797,8 @@ describe('CLI', () => {
       expect(settings.hooks.SessionStart.length).toBe(2);
       // First should be existing
       expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('echo "existing hook"');
-      // Second should be ours
-      expect(settings.hooks.SessionStart[1].hooks[0].command).toContain('learning-agent');
+      // Second should be ours (v0.2.1+: uses lna alias)
+      expect(settings.hooks.SessionStart[1].hooks[0].command).toContain('lna');
     });
 
     it('is idempotent - does not duplicate hook on re-run', async () => {
@@ -1964,8 +1964,8 @@ describe('CLI', () => {
 
       // Must include explicit instruction to run check-plan BEFORE implementing
       expect(content).toMatch(/before\s+(implementing|starting|coding)/i);
-      // Must mention running check-plan command
-      expect(content).toContain('npx learning-agent check-plan');
+      // Must mention running check-plan command (v0.2.1+: uses lna alias)
+      expect(content).toContain('npx lna check-plan');
       // Must explain what to do with results
       expect(content).toMatch(/lessons?\s*check/i);
     });
@@ -2070,7 +2070,7 @@ describe('CLI', () => {
       expect(stats.mode & 0o111).toBeGreaterThan(0);
     });
 
-    it('pre-commit hook calls learning-agent hooks run', async () => {
+    it('pre-commit hook calls lna hooks run', async () => {
       const gitHooksDir = join(tempDir, '.git', 'hooks');
       await mkdir(gitHooksDir, { recursive: true });
 
@@ -2078,7 +2078,8 @@ describe('CLI', () => {
 
       const hookPath = join(gitHooksDir, 'pre-commit');
       const content = await readFile(hookPath, 'utf-8');
-      expect(content).toContain('learning-agent');
+      // v0.2.1+: uses lna alias in hooks
+      expect(content).toContain('lna');
       expect(content).toContain('hooks run pre-commit');
     });
 
@@ -2142,9 +2143,9 @@ describe('CLI', () => {
       // Should preserve existing content
       expect(newContent).toContain('existing hook');
       expect(newContent).toContain('pnpm test');
-      // Should also have our marker
+      // Should also have our marker (v0.2.1+: uses lna alias)
       expect(newContent).toContain('Learning Agent');
-      expect(newContent).toContain('learning-agent hooks run');
+      expect(newContent).toContain('lna hooks run');
     });
 
     it('does not modify hook that already has Learning Agent marker', async () => {
@@ -2153,7 +2154,7 @@ describe('CLI', () => {
 
       // Create existing hook with our marker
       const hookPath = join(gitHooksDir, 'pre-commit');
-      const contentWithMarker = '#!/bin/sh\n# Learning Agent pre-commit hook\nnpx learning-agent hooks run pre-commit\n';
+      const contentWithMarker = '#!/bin/sh\n# Learning Agent pre-commit hook\nnpx lna hooks run pre-commit\n';
       await writeFile(hookPath, contentWithMarker);
 
       runCli('init');
@@ -2214,7 +2215,7 @@ describe('CLI', () => {
         const lines = newContent.split('\n');
 
         // Find line numbers
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const exitLine = lines.findIndex((line) => line.trim() === 'exit 0');
 
         // Learning Agent hook must appear BEFORE exit statement
@@ -2236,7 +2237,7 @@ describe('CLI', () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const exitLine = lines.findIndex((line) => line.trim() === 'exit 1');
 
         expect(learningAgentLine).toBeGreaterThan(-1);
@@ -2257,7 +2258,7 @@ describe('CLI', () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const exitLine = lines.findIndex((line) => line.trim().startsWith('exit $'));
 
         expect(learningAgentLine).toBeGreaterThan(-1);
@@ -2278,7 +2279,7 @@ describe('CLI', () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const firstExitLine = lines.findIndex((line) => line.trim() === 'exit 0');
 
         expect(learningAgentLine).toBeGreaterThan(-1);
@@ -2299,7 +2300,7 @@ describe('CLI', () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const lastContentLine = lines.findIndex((line) => line.includes('pnpm test'));
 
         // Should be appended after existing content
@@ -2328,7 +2329,7 @@ exit 0
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         // Find the exit 1 inside function
         const functionExitLine = lines.findIndex((line) => line.trim() === 'exit 1');
         // Find the exit 0 at end (top-level)
@@ -2361,7 +2362,7 @@ exit 0
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         // Find the ACTUAL top-level exit (last exit 0)
         let topLevelExitLine = -1;
         for (let i = lines.length - 1; i >= 0; i--) {
@@ -2391,13 +2392,13 @@ exit 0
 
         const newContent = await readFile(hookPath, 'utf-8');
 
-        // Count occurrences of learning-agent hook
-        const matches = newContent.match(/learning-agent hooks run pre-commit/g);
+        // Count occurrences of learning-agent hook (v0.2.1+: uses lna alias)
+        const matches = newContent.match(/lna hooks run pre-commit/g);
         expect(matches?.length).toBe(1);
 
         // Ensure hook is still before exit
         const lines = newContent.split('\n');
-        const learningAgentLine = lines.findIndex((line) => line.includes('learning-agent hooks run'));
+        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
         const exitLine = lines.findIndex((line) => line.trim() === 'exit 0');
         expect(learningAgentLine).toBeLessThan(exitLine);
       });
@@ -2435,9 +2436,9 @@ exit 0
         expect(settings.hooks.SessionStart).toBeDefined();
         expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
 
-        // Hook should contain our command
+        // Hook should contain our command (v0.2.1+: uses lna alias)
         const hookEntry = settings.hooks.SessionStart[0];
-        expect(hookEntry.hooks[0].command).toContain('learning-agent');
+        expect(hookEntry.hooks[0].command).toContain('lna');
         expect(hookEntry.hooks[0].command).toContain('load-session');
       });
 
@@ -2689,9 +2690,9 @@ exit 0
         const settingsPath = join(tempDir, '.claude', 'settings.json');
         const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
-        // Should have exactly 1 learning-agent hook
+        // Should have exactly 1 learning-agent hook (v0.2.1+: uses lna alias)
         const learningAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
-          entry.hooks.some((hook: { command: string }) => hook.command.includes('learning-agent'))
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('lna'))
         );
 
         expect(learningAgentHooks).toHaveLength(1);
@@ -2714,9 +2715,9 @@ exit 0
         const settingsPath = join(tempDir, '.claude', 'settings.json');
         const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
-        // Should still have exactly 1 learning-agent hook
+        // Should still have exactly 1 learning-agent hook (v0.2.1+: uses lna alias)
         const learningAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
-          entry.hooks.some((hook: { command: string }) => hook.command.includes('learning-agent'))
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('lna'))
         );
 
         expect(learningAgentHooks).toHaveLength(1);
@@ -2739,9 +2740,9 @@ exit 0
         const settingsPath = join(tempDir, '.claude', 'settings.json');
         const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
-        // Should still have exactly 1 learning-agent hook
+        // Should still have exactly 1 learning-agent hook (v0.2.1+: uses lna alias)
         const learningAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
-          entry.hooks.some((hook: { command: string }) => hook.command.includes('learning-agent'))
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('lna'))
         );
 
         expect(learningAgentHooks).toHaveLength(1);
@@ -2802,9 +2803,9 @@ exit 0
         expect(existingHook).toBeDefined();
         expect(existingHook.hooks[0].command).toBe('echo "existing hook"');
 
-        // Learning-agent hook should be added
+        // Learning-agent hook should be added (v0.2.1+: uses lna alias)
         const learningAgentHook = settings.hooks.SessionStart.find((entry: { hooks: Array<{ command: string }> }) =>
-          entry.hooks.some((hook: { command: string }) => hook.command.includes('learning-agent'))
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('lna'))
         );
         expect(learningAgentHook).toBeDefined();
       });
@@ -3903,6 +3904,91 @@ exit 0
         expect(lnaCount).toBeGreaterThan(0);
         expect(learningAgentCount).toBe(0);
       });
+    });
+  });
+
+  // ============================================================================
+  // v0.2.1 Documentation Requirements (TDD)
+  // ============================================================================
+
+  describe('AGENTS_MD_TEMPLATE - no manual editing warning (v0.2.1)', () => {
+    let agentsTemplate: string;
+
+    beforeAll(async () => {
+      const cliPath = join(process.cwd(), 'src', 'cli.ts');
+      const cliContent = await readFile(cliPath, 'utf8');
+      agentsTemplate = cliContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
+    });
+
+    it('contains "Never Edit JSONL Directly" section header', () => {
+      expect(agentsTemplate).toContain('Never Edit JSONL Directly');
+    });
+
+    it('warns about manual editing consequences', () => {
+      expect(agentsTemplate).toMatch(/manual.*edit|directly.*edit/i);
+      expect(agentsTemplate).toMatch(/break|corrupt|bypass/i);
+    });
+
+    it('lists CLI commands as the correct way to modify lessons', () => {
+      expect(agentsTemplate).toContain('npx lna learn');
+      expect(agentsTemplate).toContain('npx lna update');
+      expect(agentsTemplate).toContain('npx lna delete');
+    });
+
+    it('mentions SQLite sync issues from manual edits', () => {
+      expect(agentsTemplate).toMatch(/sqlite.*sync|sync.*sqlite/i);
+    });
+
+    it('warning section is prominent (uses emoji or strong marker)', () => {
+      // Warning should be visually prominent
+      expect(agentsTemplate).toMatch(/⚠️|WARNING|IMPORTANT|DO NOT/i);
+    });
+  });
+
+  describe('README - lesson format documentation (v0.2.1)', () => {
+    let readmeContent: string;
+
+    beforeAll(async () => {
+      const readmePath = join(process.cwd(), 'README.md');
+      readmeContent = await readFile(readmePath, 'utf8');
+    });
+
+    it('documents required fields for lessons', () => {
+      // Must explain what fields are required
+      expect(readmeContent).toMatch(/required.*field|field.*required/i);
+    });
+
+    it('explains difference between type=quick and type=full', () => {
+      expect(readmeContent).toContain('type');
+      expect(readmeContent).toContain('quick');
+      expect(readmeContent).toContain('full');
+    });
+
+    it('documents that severity is a SEPARATE field from type', () => {
+      // Must clarify severity vs type distinction
+      expect(readmeContent).toContain('severity');
+      expect(readmeContent).toMatch(/severity.*field|high.*medium.*low/i);
+    });
+
+    it('documents session-start loading requirements', () => {
+      // Must explain: type=full + severity=high + confirmed=true
+      expect(readmeContent).toMatch(/session.*start|high.*severity.*load/i);
+      expect(readmeContent).toContain('confirmed');
+    });
+
+    it('shows complete JSON example with all required fields', () => {
+      // Example should show: id, type, trigger, insight, tags, source, context, created, confirmed, supersedes, related
+      expect(readmeContent).toContain('"id"');
+      expect(readmeContent).toContain('"type"');
+      expect(readmeContent).toContain('"trigger"');
+      expect(readmeContent).toContain('"insight"');
+      expect(readmeContent).toContain('"tags"');
+      expect(readmeContent).toContain('"source"');
+      expect(readmeContent).toContain('"confirmed"');
+    });
+
+    it('has a dedicated Lesson Schema section', () => {
+      expect(readmeContent).toMatch(/##.*lesson.*schema|##.*lesson.*format/i);
     });
   });
 });

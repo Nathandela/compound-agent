@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-02-01
+
+### Added
+
+- **CLI Commands**
+  - `lna` short alias for `learning-agent` CLI
+  - `show <id>` - Display lesson details
+  - `update <id>` - Modify lesson fields (insight, severity, tags, confirmed)
+  - `delete <id>` - Create tombstone for lesson removal
+  - `download-model` - Download embedding model (~278MB)
+  - `--severity` flag for `learn` command to set lesson severity
+
+- **Documentation**
+  - Complete lesson schema documentation in README
+  - Required vs optional fields explained
+  - Session-start loading requirements (type=full + severity=high + confirmed=true)
+  - "Never Edit JSONL Directly" warning in AGENTS.md template
+
+### Changed
+
+- `setup claude` now defaults to project-local (was global)
+- `setup claude --global` required for global installation
+- `init` now includes `setup claude` step by default
+- Auto-sync SQLite after every CLI mutation (learn, update, delete, import)
+
+### Fixed
+
+- Pre-commit hook now inserted before exit statements (not appended after)
+- JSONL edits properly sync to SQLite index
+- High-severity lessons load correctly at session start
+
 ## [0.2.0] - 2026-01-31
 
 ### Added
@@ -110,5 +141,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/nathanbraun/learning_agent/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/nathanbraun/learning_agent/releases/tag/v0.1.0
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Nathandela/learning_agent/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/Nathandela/learning_agent/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/Nathandela/learning_agent/releases/tag/v0.1.0

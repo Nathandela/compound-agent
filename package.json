@@ -1,13 +1,13 @@
 {
   "name": "learning-agent",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Repository-scoped learning system for Claude Code",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
     "learning-agent": "./dist/cli.js",
-    "learn": "./dist/cli.js"
+    "lna": "./dist/cli.js"
   },
   "exports": {
     ".": {
