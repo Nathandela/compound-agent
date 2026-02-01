@@ -3769,4 +3769,140 @@ exit 0
       expect(combined).not.toContain('First lesson to delete');
     });
   });
+
+  // ============================================================================
+  // LNA CLI Alias Tests (v0.2.1)
+  // ============================================================================
+
+  describe('lna CLI alias (v0.2.1)', () => {
+    describe('package.json bin configuration', () => {
+      it('has both learning-agent and lna bin entries', async () => {
+        const pkgPath = join(process.cwd(), 'package.json');
+        const pkgContent = await readFile(pkgPath, 'utf8');
+        const pkg = JSON.parse(pkgContent) as { bin?: Record<string, string> };
+
+        expect(pkg.bin).toBeDefined();
+        expect(pkg.bin!['learning-agent']).toBe('./dist/cli.js');
+        expect(pkg.bin!['lna']).toBe('./dist/cli.js');
+      });
+
+      it('both bin entries point to identical path', async () => {
+        const pkgPath = join(process.cwd(), 'package.json');
+        const pkgContent = await readFile(pkgPath, 'utf8');
+        const pkg = JSON.parse(pkgContent) as { bin?: Record<string, string> };
+
+        expect(pkg.bin!['lna']).toBe(pkg.bin!['learning-agent']);
+      });
+
+      it('has exactly 2 bin entries (lna and learning-agent)', async () => {
+        const pkgPath = join(process.cwd(), 'package.json');
+        const pkgContent = await readFile(pkgPath, 'utf8');
+        const pkg = JSON.parse(pkgContent) as { bin?: Record<string, string> };
+
+        const binKeys = Object.keys(pkg.bin ?? {});
+        expect(binKeys).toHaveLength(2);
+        expect(binKeys).toContain('lna');
+        expect(binKeys).toContain('learning-agent');
+      });
+    });
+
+    describe('Claude-facing strings use npx lna', () => {
+      it('AGENTS_MD_TEMPLATE uses npx lna (not npx learning-agent)', async () => {
+        const cliPath = join(process.cwd(), 'src', 'cli.ts');
+        const cliContent = await readFile(cliPath, 'utf8');
+
+        // Extract AGENTS_MD_TEMPLATE content (between const AGENTS_MD_TEMPLATE = ` and next const)
+        const templateMatch = cliContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/);
+        expect(templateMatch).toBeTruthy();
+
+        const templateContent = templateMatch![1];
+
+        // Should use npx lna
+        expect(templateContent).toContain('npx lna check-plan');
+
+        // Should NOT use npx learning-agent
+        expect(templateContent).not.toContain('npx learning-agent');
+      });
+
+      it('PRE_COMMIT_MESSAGE uses npx lna capture', async () => {
+        const cliPath = join(process.cwd(), 'src', 'cli.ts');
+        const cliContent = await readFile(cliPath, 'utf8');
+
+        // Extract PRE_COMMIT_MESSAGE content
+        const messageMatch = cliContent.match(/const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/);
+        expect(messageMatch).toBeTruthy();
+
+        const messageContent = messageMatch![1];
+
+        // Should use npx lna capture
+        expect(messageContent).toContain('npx lna capture');
+
+        // Should NOT use npx learning-agent
+        expect(messageContent).not.toContain('npx learning-agent');
+      });
+
+      it('CLAUDE_HOOK_CONFIG uses npx lna load-session', async () => {
+        const cliPath = join(process.cwd(), 'src', 'cli.ts');
+        const cliContent = await readFile(cliPath, 'utf8');
+
+        // Extract CLAUDE_HOOK_CONFIG content
+        const hookMatch = cliContent.match(/const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/);
+        expect(hookMatch).toBeTruthy();
+
+        const hookContent = hookMatch![1];
+
+        // Should use npx lna load-session
+        expect(hookContent).toContain('npx lna load-session');
+
+        // Should NOT use npx learning-agent
+        expect(hookContent).not.toContain('npx learning-agent');
+      });
+
+      it('check-plan error message suggests npx lna download-model', async () => {
+        const cliPath = join(process.cwd(), 'src', 'cli.ts');
+        const cliContent = await readFile(cliPath, 'utf8');
+
+        // Find the error messages that mention download-model
+        const errorMatches = cliContent.match(/Run: npx [\w-]+ download-model/g);
+        expect(errorMatches).toBeTruthy();
+        expect(errorMatches!.length).toBeGreaterThan(0);
+
+        // All should use npx lna
+        errorMatches!.forEach((match) => {
+          expect(match).toBe('Run: npx lna download-model');
+        });
+      });
+    });
+
+    describe('backwards compatibility', () => {
+      it('learning-agent command still works for basic commands', () => {
+        // Existing tests already cover this by using `learning-agent` in runCli
+        // This test just validates that we still have tests using the old name
+        const { combined } = runCli('--version');
+        expect(combined).toMatch(/\d+\.\d+\.\d+/);
+      });
+    });
+
+    describe('documentation consistency', () => {
+      it('no random mixing of lna and learning-agent in templates', async () => {
+        const cliPath = join(process.cwd(), 'src', 'cli.ts');
+        const cliContent = await readFile(cliPath, 'utf8');
+
+        // Extract all three main templates
+        const agentsTemplate = cliContent.match(/const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
+        const preCommitMsg = cliContent.match(/const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/)?.[1] ?? '';
+        const claudeHook = cliContent.match(/const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/)?.[1] ?? '';
+
+        // Count npx lna vs npx learning-agent in Claude-facing content
+        const combinedTemplates = agentsTemplate + preCommitMsg + claudeHook;
+
+        const lnaCount = (combinedTemplates.match(/npx lna/g) || []).length;
+        const learningAgentCount = (combinedTemplates.match(/npx learning-agent/g) || []).length;
+
+        // Claude-facing templates should use lna exclusively
+        expect(lnaCount).toBeGreaterThan(0);
+        expect(learningAgentCount).toBe(0);
+      });
+    });
+  });
 });
