@@ -21,6 +21,10 @@ pnpm add -D learning-agent
 npm install --save-dev learning-agent
 ```
 
+> **Warning**: Do NOT install from GitHub URL (e.g., `pnpm add github:user/learning-agent`).
+> GitHub installs don't include the compiled `dist/` folder, which will cause all CLI
+> commands and hooks to fail. Always install from npm registry as shown above.
+
 After installation, download the embedding model (~278MB, one-time):
 
 ```bash
