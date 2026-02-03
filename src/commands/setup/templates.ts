@@ -35,17 +35,47 @@ npx lna hooks run pre-commit
 // ============================================================================
 
 /** Markers to identify our hook in Claude Code settings (current and legacy) */
-export const CLAUDE_HOOK_MARKERS = ['lna load-session', 'learning-agent load-session'];
+export const CLAUDE_HOOK_MARKERS = ['lna prime', 'lna load-session', 'learning-agent load-session'];
 
-/** Claude Code SessionStart hook configuration */
+/** Claude Code SessionStart hook configuration (v0.2.4: uses prime for trust language) */
 export const CLAUDE_HOOK_CONFIG = {
-  matcher: 'startup|resume|compact',
+  matcher: '',
   hooks: [
     {
       type: 'command',
-      command: 'npx lna load-session 2>/dev/null || true',
+      command: 'npx lna prime 2>/dev/null || true',
     },
   ],
+};
+
+/** Claude Code PreCompact hook configuration */
+export const CLAUDE_PRECOMPACT_HOOK_CONFIG = {
+  matcher: '',
+  hooks: [
+    {
+      type: 'command',
+      command: 'npx lna prime 2>/dev/null || true',
+    },
+  ],
+};
+
+/** Claude Code PreCommit hook configuration (v0.2.4: capture reminder) */
+export const CLAUDE_PRECOMMIT_HOOK_CONFIG = {
+  matcher: '',
+  hooks: [
+    {
+      type: 'command',
+      command: 'npx lna remind-capture 2>/dev/null || true',
+    },
+  ],
+};
+
+/** MCP server configuration for Claude Code settings */
+export const MCP_SERVER_CONFIG = {
+  'learning-agent': {
+    command: 'npx',
+    args: ['learning-agent-mcp'],
+  },
 };
 
 // ============================================================================
@@ -88,7 +118,7 @@ export const AGENTS_MD_TEMPLATE = `
 ${AGENTS_SECTION_START_MARKER}
 ## Learning Agent Integration
 
-This project uses learning-agent for session memory.
+This project uses learning-agent for session memory with MCP tools.
 
 ### CRITICAL RULES
 
@@ -101,98 +131,55 @@ The JSONL file is the source of truth and requires:
 - Schema validation
 - SQLite index sync
 
-Always use CLI commands:
+Always use the \`lesson_capture\` tool or CLI commands:
 - \`npx lna learn "insight"\` - Add a lesson
 - \`npx lna update <id> --insight "new"\` - Modify a lesson
 - \`npx lna delete <id>\` - Remove a lesson
 
 Manual edits will break validation and corrupt the SQLite sync.
 
-### Retrieval Points
+### Mandatory Recall
 
-- **Session start**: High-severity lessons loaded automatically
-- **Plan-time**: BEFORE implementing a plan, run check-plan to retrieve relevant lessons
+You MUST use \`lesson_search\` tool BEFORE:
+- Architectural decisions or complex planning
+- Patterns you've implemented before in this repo
+- After user corrections ("actually...", "wrong", "use X instead")
 
-### Plan-Time Retrieval (Explicit Step)
+**NEVER skip lesson search for complex decisions.** Past mistakes will repeat.
 
-**BEFORE implementing any plan**, run:
+### Capture Protocol
 
-\`\`\`bash
-npx lna check-plan --plan "your plan description" --json
-\`\`\`
+Use \`lesson_capture\` tool AFTER:
+- User corrects you
+- Test fail → fix → pass cycles
+- You discover project-specific knowledge
 
-Display results as a **Lessons Check** section after your plan:
+**Workflow**: Search BEFORE deciding, capture AFTER learning.
 
-\`\`\`
-## Lessons Check
-1. [insight from lesson 1] (relevance: 0.85)
-2. [insight from lesson 2] (relevance: 0.72)
-\`\`\`
+### MCP Tools
 
-Consider each lesson while implementing.
+| Tool | When to Use |
+|------|-------------|
+| \`lesson_search\` | Before architectural decisions, after corrections |
+| \`lesson_capture\` | After mistakes, corrections, or discoveries |
 
-### When to Capture Lessons (Detection Triggers)
-
-Watch for these patterns and propose \`lna learn\`:
-
-**User correction**: User says "no", "wrong", "actually..."
-- Action: Propose a lesson capturing the correct approach
-
-**Self-correction**: You fix after multiple attempts (edit -> fail -> re-edit)
-- Action: Propose a lesson about what finally worked
-
-**Test failure fix**: Test fails -> you diagnose -> fix -> passes
-- Action: Propose a lesson about the root cause and solution
-
-### Auto-Invoke Trigger Phrases
-
-**Capture triggers** (propose \`lna learn\`):
-- "that worked" - User confirms a solution worked
-- "fixed it" - Problem was resolved
-- "my mistake" - User acknowledges an error
-- "actually use X" - User specifies a preference
-
-**Retrieval triggers** (run \`lna check-plan\` or \`lna search\`):
-- "similar issue" - User recalls a past problem
-- "we had this before" - Reference to previous experience
-- "seen this" - Pattern recognition
-- "remember when" - Memory recall request
-
-### Proposing Lessons
-
-Propose when: user correction, self-correction, test failure fix, or manual request.
-
-**Quality gate (ALL must pass):**
-
-- Novel (not already stored)
-- Specific (clear guidance)
-- Actionable (obvious what to do)
-
-**Confirmation format:**
-
-\`\`\`
-Learned: [insight]. Save? [y/n]
-\`\`\`
-
-### Session-End Protocol
-
-Before closing a session, reflect on lessons learned:
-
-1. **Review**: What mistakes or corrections happened?
-2. **Quality gate**: Is it novel, specific, actionable?
-3. **Propose**: "Learned: [insight]. Save? [y/n]"
-4. **Capture**: \`npx lna capture --trigger "..." --insight "..." --yes\`
-
-### CLI Commands
+### CLI Commands (manual use)
 
 \`\`\`bash
-npx lna load-session --json  # Session start
-npx lna check-plan --plan "..." --json  # Before implementing
+npx lna search "query"  # Find relevant lessons
 npx lna learn "insight"  # Capture a lesson
-npx lna capture --trigger "..." --insight "..." --yes
+npx lna list  # Show recent lessons
+npx lna stats  # Database health
 \`\`\`
 
-See [AGENTS.md](https://github.com/Nathandela/learning_agent/blob/main/AGENTS.md) for full documentation.
+### Quality Gate
+
+Before capturing, verify the lesson is:
+- **Novel** - Not already stored
+- **Specific** - Clear guidance
+- **Actionable** - Obvious what to do
+
+See [documentation](https://github.com/Nathandela/learning_agent) for more details.
 ${AGENTS_SECTION_END_MARKER}
 `;
 
@@ -214,13 +201,19 @@ Examples:
 npx lna learn "$ARGUMENTS"
 \`\`\`
 `,
-  'check-plan.md': `Retrieve relevant lessons for a plan before implementing.
+  'search.md': `Search lessons for relevant context.
 
-Usage: /check-plan <plan description>
+Usage: /search <query>
+
+Examples:
+- /search "API authentication"
+- /search "data processing patterns"
 
 \`\`\`bash
-npx lna check-plan --plan "$ARGUMENTS" --json
+npx lna search "$ARGUMENTS"
 \`\`\`
+
+Note: You can also use the \`lesson_search\` MCP tool directly.
 `,
   'list.md': `Show all stored lessons.
 
@@ -266,7 +259,7 @@ npx lna stats
 export const PLUGIN_MANIFEST = {
   name: 'learning-agent',
   description: 'Session memory for Claude Code - capture and retrieve lessons',
-  version: '0.2.2',
+  version: '0.2.4',
   author: {
     name: 'Nathan Delacrétaz',
     url: 'https://github.com/Nathandela',
@@ -279,7 +272,6 @@ export const PLUGIN_MANIFEST = {
         matcher: '',
         hooks: [
           { type: 'command', command: 'npx lna prime 2>/dev/null || true' },
-          { type: 'command', command: 'npx lna load-session 2>/dev/null || true' },
         ],
       },
     ],
@@ -287,6 +279,12 @@ export const PLUGIN_MANIFEST = {
       {
         matcher: '',
         hooks: [{ type: 'command', command: 'npx lna prime 2>/dev/null || true' }],
+      },
+    ],
+    PreCommit: [
+      {
+        matcher: '',
+        hooks: [{ type: 'command', command: 'npx lna remind-capture 2>/dev/null || true' }],
       },
     ],
   },

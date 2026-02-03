@@ -1,6 +1,6 @@
 {
   "name": "learning-agent",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Repository-scoped learning system for Claude Code",
   "type": "module",
   "main": "./dist/index.js",

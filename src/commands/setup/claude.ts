@@ -33,11 +33,9 @@ interface StatusResult {
 }
 
 /**
- * Register the setup claude command on the program.
+ * Register the claude subcommand on an existing setup command.
  */
-export function registerClaudeCommand(program: Command): void {
-  const setupCommand = program.command('setup').description('Setup integrations');
-
+export function registerClaudeSubcommand(setupCommand: Command): void {
   setupCommand
     .command('claude')
     .description('Install Claude Code SessionStart hooks')

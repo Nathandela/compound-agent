@@ -47,9 +47,9 @@ describe('CLI', { tags: ['integration'] }, () => {
       const agentsPath = join(tempDir, 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
       expect(content).toContain('Learning Agent Integration');
-      expect(content).toContain('load-session');
-      expect(content).toContain('check-plan');
-      expect(content).toContain('capture');
+      // v0.2.4: uses MCP tools instead of CLI commands
+      expect(content).toContain('lesson_search');
+      expect(content).toContain('lesson_capture');
     });
 
     it('AGENTS.md template includes explicit plan-time instructions', async () => {
@@ -58,9 +58,10 @@ describe('CLI', { tags: ['integration'] }, () => {
       const agentsPath = join(tempDir, 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      expect(content).toMatch(/before\s+(implementing|starting|coding)/i);
-      expect(content).toContain('npx lna check-plan');
-      expect(content).toMatch(/lessons?\s*check/i);
+      // v0.2.4: uses Mandatory Recall section and MCP tools
+      expect(content).toContain('Mandatory Recall');
+      expect(content).toContain('lesson_search');
+      expect(content).toMatch(/MUST\s+use/i);
     });
 
     it('appends to existing AGENTS.md without duplicating', async () => {
@@ -475,7 +476,8 @@ exit 0
 
         const hookEntry = settings.hooks.SessionStart[0];
         expect(hookEntry.hooks[0].command).toContain('lna');
-        expect(hookEntry.hooks[0].command).toContain('load-session');
+        // v0.2.4: uses prime instead of load-session
+        expect(hookEntry.hooks[0].command).toContain('prime');
       });
 
       it('init creates Claude hooks even if .claude directory does not exist', async () => {

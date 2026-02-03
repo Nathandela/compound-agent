@@ -14,36 +14,12 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
-import { loadSessionLessons } from './retrieval/index.js';
+import { getPrimeContext } from './commands/management/prime.js';
+import { VERSION } from './index.js';
 import { searchVector } from './search/index.js';
 import { appendLesson } from './storage/index.js';
 import { generateId } from './types.js';
 import type { Lesson } from './types.js';
-
-/** Workflow context for prime resource */
-const PRIME_WORKFLOW_CONTEXT = `# Learning Agent Workflow
-
-## Core Rules
-- **NEVER** edit .claude/lessons/index.jsonl directly
-- Use CLI commands: \`lna learn\`, \`lna list\`, \`lna show\`
-- Lessons load automatically at session start
-
-## When to Capture Lessons
-- User corrects you ("no", "wrong", "actually...")
-- You self-correct after multiple attempts
-- Test fails then you fix it
-
-## Commands
-- \`lna learn "insight"\` - Capture a lesson
-- \`lna list\` - Show all lessons
-- \`lna check-plan --plan "..."\` - Get relevant lessons for plan
-- \`lna stats\` - Show database health
-
-## Quality Gate (ALL must pass before proposing)
-- Novel (not already stored)
-- Specific (clear guidance)
-- Actionable (obvious what to do)
-`;
 
 /** Default max results for search */
 const DEFAULT_MAX_RESULTS = 5;
@@ -103,7 +79,7 @@ export interface LearningAgentMcpServer {
 export function createMcpServer(repoRoot: string): LearningAgentMcpServer {
   const server = new McpServer({
     name: 'learning-agent',
-    version: '0.2.3',
+    version: VERSION,
   });
 
   // Store tool handlers for direct invocation in tests
@@ -237,20 +213,8 @@ Saves immediately and shows what was captured.`,
       mimeType: 'text/plain',
     },
     async (uri) => {
-      let content = PRIME_WORKFLOW_CONTEXT;
-
-      try {
-        const lessons = await loadSessionLessons(repoRoot, 5);
-        if (lessons.length > 0) {
-          content += '\n## High-Severity Lessons\n\n';
-          for (const lesson of lessons) {
-            content += `- **${lesson.insight}** (${lesson.trigger})\n`;
-          }
-        }
-      } catch {
-        // Graceful degradation - return workflow context even if lessons fail
-      }
-
+      // Delegate to the single source of truth for prime context
+      const content = await getPrimeContext(repoRoot);
       return {
         contents: [{ uri: uri.href, text: content }],
       };
@@ -259,20 +223,7 @@ Saves immediately and shows what was captured.`,
 
   // Store handler for direct invocation
   resourceHandlers['lessons://prime'] = async () => {
-    let content = PRIME_WORKFLOW_CONTEXT;
-
-    try {
-      const lessons = await loadSessionLessons(repoRoot, 5);
-      if (lessons.length > 0) {
-        content += '\n## High-Severity Lessons\n\n';
-        for (const lesson of lessons) {
-          content += `- **${lesson.insight}** (${lesson.trigger})\n`;
-        }
-      }
-    } catch {
-      // Graceful degradation
-    }
-
+    const content = await getPrimeContext(repoRoot);
     return { content };
   };
 

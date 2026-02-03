@@ -7,6 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-02-03
+
+### Added
+
+- **MCP Server Integration**
+  - Native Claude tools via Model Context Protocol (MCP)
+  - `lesson_search` tool for semantic lesson retrieval
+  - `lesson_capture` tool for capturing new lessons
+  - Auto-registered in Claude Code settings during setup
+
+- **One-Shot Setup Command**
+  - `lna setup` combines init, hooks, MCP, and model download
+  - `--skip-model` flag to skip embedding model download
+  - Idempotent: safe to run multiple times
+
+- **Three-Hook System**
+  - `SessionStart`: Loads workflow context via `lna prime`
+  - `PreCompact`: Reloads context before compaction via `lna prime`
+  - `PreCommit`: Reminds to capture lessons via `lna remind-capture`
+
+- **Remind-Capture Command**
+  - `lna remind-capture` prompts for lesson capture before commits
+  - Checks for uncommitted corrections that could become lessons
+
+### Changed
+
+- **Hook Configuration**
+  - Hooks now use `lna prime` instead of `load-session` for trust language
+  - Removed `check-plan` hook in favor of `lesson_search` MCP tool
+  - Updated AGENTS.md with "Mandatory Recall" section for compliance
+
+- **AGENTS.md Template**
+  - Now focuses on MCP tools (`lesson_search`, `lesson_capture`)
+  - Trust language patterns: "MUST", "NEVER", "Mandatory Recall"
+  - Clearer workflow instructions for Claude integration
+
+- **Slash Commands**
+  - Replaced `/check-plan` with `/search` for lesson search
+  - Added `/prime` for context recovery
+
+### Removed
+
+- `check-plan` command (replaced by `lesson_search` MCP tool)
+- Auto-invoke triggers (replaced by MCP-based workflow)
+
 ## [0.2.3] - 2026-02-01
 
 ### Added
@@ -230,7 +275,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/Nathandela/learning_agent/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/Nathandela/learning_agent/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/Nathandela/learning_agent/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/Nathandela/learning_agent/compare/v0.2.0...v0.2.1

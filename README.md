@@ -25,10 +25,25 @@ npm install --save-dev learning-agent
 > GitHub installs don't include the compiled `dist/` folder, which will cause all CLI
 > commands and hooks to fail. Always install from npm registry as shown above.
 
-After installation, download the embedding model (~278MB, one-time):
+### One-Shot Setup (Recommended)
+
+After installation, run the setup command to configure everything:
 
 ```bash
-npx learning-agent download-model
+npx lna setup
+```
+
+This single command:
+- Creates `.claude/lessons/` directory
+- Adds AGENTS.md with workflow instructions
+- Installs Claude Code hooks (SessionStart, PreCompact, PreCommit)
+- Registers the MCP server for `lesson_search` and `lesson_capture` tools
+- Downloads the embedding model (~278MB)
+
+To skip the model download (if you'll do it later):
+
+```bash
+npx lna setup --skip-model
 ```
 
 ### Requirements
@@ -105,12 +120,13 @@ The CLI integration tests spawn Node.js processes (~400ms overhead each) and acc
 
 ## Features
 
-- **Lesson Capture**: Detects user corrections, self-corrections, and test failure fixes
+- **MCP Integration**: Native Claude tools (`lesson_search`, `lesson_capture`) via MCP server
+- **Lesson Capture**: Capture lessons after user corrections, self-corrections, or discoveries
 - **Quality Filter**: Prevents vague or obvious lessons (must be novel, specific, actionable)
 - **Vector Search**: Local semantic search using nomic-embed-text-v1.5 via node-llama-cpp
 - **Hybrid Storage**: JSONL source of truth (git-tracked) with SQLite FTS5 index (rebuildable)
 - **Offline First**: No external API dependencies; works completely offline
-- **Retrieval Timing**: High-severity lessons at session start; relevant lessons at plan time
+- **Hook System**: SessionStart loads context, PreCommit reminds to capture lessons
 
 ## CLI Usage
 
@@ -150,50 +166,85 @@ learning-agent compact
 
 ### Automatic Setup (Recommended)
 
+The `lna setup` command configures everything automatically:
+
 ```bash
-# Install hooks into Claude Code settings (global)
-npx learning-agent setup claude
-
-# Install to project only
-npx learning-agent setup claude --project
-
-# Preview what would change
-npx learning-agent setup claude --dry-run
-
-# Remove hooks
-npx learning-agent setup claude --uninstall
+npx lna setup
 ```
 
-This installs a SessionStart hook that automatically loads lessons when Claude starts, resumes, or compacts context.
+This installs:
+- **MCP Server**: Exposes `lesson_search` and `lesson_capture` as native Claude tools
+- **SessionStart hook**: Loads workflow context when Claude starts
+- **PreCompact hook**: Reloads context before compaction
+- **PreCommit hook**: Reminds to capture lessons before commits
 
-### Manual Setup
+### Manual Hook Configuration
 
-Add to your `~/.claude/settings.json`:
+If you prefer to configure hooks manually, add to `.claude/settings.json`:
 
 ```json
 {
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "startup|resume|compact",
+        "matcher": "",
         "hooks": [
-          {
-            "type": "command",
-            "command": "npx learning-agent load-session 2>/dev/null || true"
-          }
+          { "type": "command", "command": "npx lna prime 2>/dev/null || true" }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "npx lna prime 2>/dev/null || true" }
+        ]
+      }
+    ],
+    "PreCommit": [
+      {
+        "matcher": "",
+        "hooks": [
+          { "type": "command", "command": "npx lna remind-capture 2>/dev/null || true" }
         ]
       }
     ]
+  },
+  "mcpServers": {
+    "learning-agent": {
+      "command": "npx",
+      "args": ["learning-agent-mcp"]
+    }
   }
 }
 ```
+
+### MCP Tools
+
+| Tool | Purpose |
+|------|---------|
+| `lesson_search` | Search lessons before architectural decisions |
+| `lesson_capture` | Capture lessons after corrections or discoveries |
 
 ### Hook Commands
 
 | Command | Purpose |
 |---------|---------|
-| `load-session` | Load high-severity lessons at session start |
-| `check-plan --plan "..."` | Retrieve relevant lessons when planning |
+| `prime` | Load workflow context and high-severity lessons |
+| `remind-capture` | Prompt to capture lessons before commit |
+
+### Managing Hooks
+
+```bash
+# Check integration status
+npx lna setup claude --status
+
+# Remove hooks
+npx lna setup claude --uninstall
+
+# Preview changes
+npx lna setup claude --dry-run
+```
 
 ## API Reference
 
@@ -330,7 +381,13 @@ pnpm lint
 
 ## Project Status
 
-Version 0.2.2 - Hardening release with quality gates based on [LANDSCAPE.md](doc/LANDSCAPE.md) reviewer feedback. Adds age-based validity warnings, manual invalidation commands, optional citation tracking, and context pollution warnings. See [CHANGELOG.md](CHANGELOG.md) for details.
+Version 0.2.4 - Hybrid Memory System release. Combines Beads-style trusted hook injection with MCP tools for native Claude integration. Key features:
+- **MCP Server**: `lesson_search` and `lesson_capture` as native Claude tools
+- **One-shot setup**: `lna setup` configures hooks, MCP, and downloads model
+- **Trust language**: Updated AGENTS.md with mandatory recall patterns
+- **Three-hook system**: SessionStart, PreCompact, PreCommit for complete coverage
+
+See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Documentation
 

@@ -15,8 +15,11 @@ import {
   AGENTS_SECTION_START_MARKER,
   CLAUDE_HOOK_CONFIG,
   CLAUDE_HOOK_MARKERS,
+  CLAUDE_PRECOMMIT_HOOK_CONFIG,
+  CLAUDE_PRECOMPACT_HOOK_CONFIG,
   CLAUDE_REF_END_MARKER,
   CLAUDE_REF_START_MARKER,
+  MCP_SERVER_CONFIG,
 } from './templates.js';
 import type { ClaudeHooksResult } from './types.js';
 
@@ -73,6 +76,87 @@ export function addLearningAgentHook(settings: Record<string, unknown>): void {
     hooks.SessionStart = [];
   }
   hooks.SessionStart.push(CLAUDE_HOOK_CONFIG);
+}
+
+/**
+ * Add all v0.2.4 hooks: SessionStart, PreCompact, PreCommit.
+ */
+export function addAllLearningAgentHooks(settings: Record<string, unknown>): void {
+  if (!settings.hooks) {
+    settings.hooks = {};
+  }
+  const hooks = settings.hooks as Record<string, unknown[]>;
+
+  // SessionStart - prime context
+  if (!hooks.SessionStart) {
+    hooks.SessionStart = [];
+  }
+  if (!hasHookType(hooks.SessionStart, 'lna prime')) {
+    hooks.SessionStart.push(CLAUDE_HOOK_CONFIG);
+  }
+
+  // PreCompact - re-inject prime before compaction
+  if (!hooks.PreCompact) {
+    hooks.PreCompact = [];
+  }
+  if (!hasHookType(hooks.PreCompact, 'lna prime')) {
+    hooks.PreCompact.push(CLAUDE_PRECOMPACT_HOOK_CONFIG);
+  }
+
+  // PreCommit - capture reminder
+  if (!hooks.PreCommit) {
+    hooks.PreCommit = [];
+  }
+  if (!hasHookType(hooks.PreCommit, 'lna remind-capture')) {
+    hooks.PreCommit.push(CLAUDE_PRECOMMIT_HOOK_CONFIG);
+  }
+}
+
+/**
+ * Check if a hook type already has a command containing the marker.
+ */
+function hasHookType(hookArray: unknown[], marker: string): boolean {
+  return hookArray.some((entry) => {
+    const hookEntry = entry as { hooks?: Array<{ command?: string }> };
+    return hookEntry.hooks?.some((h) => h.command?.includes(marker));
+  });
+}
+
+/**
+ * Add MCP server configuration to settings.
+ */
+export function addMcpServer(settings: Record<string, unknown>): boolean {
+  if (!settings.mcpServers) {
+    settings.mcpServers = {};
+  }
+  const mcpServers = settings.mcpServers as Record<string, unknown>;
+
+  if (mcpServers['learning-agent']) {
+    return false; // Already configured
+  }
+
+  Object.assign(mcpServers, MCP_SERVER_CONFIG);
+  return true;
+}
+
+/**
+ * Check if MCP server is already configured.
+ */
+export function hasMcpServer(settings: Record<string, unknown>): boolean {
+  const mcpServers = settings.mcpServers as Record<string, unknown> | undefined;
+  return !!mcpServers?.['learning-agent'];
+}
+
+/**
+ * Remove MCP server configuration from settings.
+ */
+export function removeMcpServer(settings: Record<string, unknown>): boolean {
+  const mcpServers = settings.mcpServers as Record<string, unknown> | undefined;
+  if (!mcpServers?.['learning-agent']) {
+    return false;
+  }
+  delete mcpServers['learning-agent'];
+  return true;
 }
 
 /**

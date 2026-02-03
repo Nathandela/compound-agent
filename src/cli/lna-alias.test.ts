@@ -62,7 +62,9 @@ describe('CLI', { tags: ['integration'] }, () => {
 
         const templateContent = templateMatch![1];
 
-        expect(templateContent).toContain('npx lna check-plan');
+        // v0.2.4: uses lesson_search MCP tool, CLI commands still use lna prefix
+        expect(templateContent).toContain('npx lna search');
+        expect(templateContent).toContain('npx lna learn');
 
         expect(templateContent).not.toContain('npx learning-agent');
       });
@@ -81,7 +83,7 @@ describe('CLI', { tags: ['integration'] }, () => {
         expect(messageContent).not.toContain('npx learning-agent');
       });
 
-      it('CLAUDE_HOOK_CONFIG uses npx lna load-session', async () => {
+      it('CLAUDE_HOOK_CONFIG uses npx lna prime (v0.2.4)', async () => {
         const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
@@ -90,7 +92,8 @@ describe('CLI', { tags: ['integration'] }, () => {
 
         const hookContent = hookMatch![1];
 
-        expect(hookContent).toContain('npx lna load-session');
+        // v0.2.4: uses prime instead of load-session for trust language
+        expect(hookContent).toContain('npx lna prime');
 
         expect(hookContent).not.toContain('npx learning-agent');
       });

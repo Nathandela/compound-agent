@@ -1,0 +1,254 @@
+/**
+ * One-shot setup command - Configure everything for learning-agent.
+ *
+ * Combines: init + Claude hooks + MCP server + optionally model download.
+ */
+
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import type { Command } from 'commander';
+
+import { getRepoRoot } from '../../cli-utils.js';
+import { isModelAvailable, resolveModel } from '../../embeddings/model.js';
+import { LESSONS_PATH } from '../../storage/index.js';
+import { out } from '../shared.js';
+import {
+  addAllLearningAgentHooks,
+  addMcpServer,
+  getClaudeSettingsPath,
+  hasClaudeHook,
+  hasMcpServer,
+  readClaudeSettings,
+  writeClaudeSettings,
+} from './claude-helpers.js';
+import {
+  AGENTS_MD_TEMPLATE,
+  CLAUDE_MD_REFERENCE,
+  CLAUDE_REF_START_MARKER,
+  LEARNING_AGENT_SECTION_HEADER,
+  PLUGIN_MANIFEST,
+  SLASH_COMMANDS,
+} from './templates.js';
+
+/** Result of one-shot setup */
+interface SetupResult {
+  lessonsDir: string;
+  agentsMd: boolean;
+  hooks: boolean;
+  mcpServer: boolean;
+  model: boolean | 'skipped';
+}
+
+/**
+ * Check if AGENTS.md already has the Learning Agent section.
+ */
+function hasLearningAgentSection(content: string): boolean {
+  return content.includes(LEARNING_AGENT_SECTION_HEADER);
+}
+
+/**
+ * Check if CLAUDE.md already has the Learning Agent reference.
+ */
+function hasClaudeMdReference(content: string): boolean {
+  return content.includes('Learning Agent') || content.includes(CLAUDE_REF_START_MARKER);
+}
+
+/**
+ * Ensure lessons directory and index file exist.
+ */
+async function ensureLessonsDirectory(repoRoot: string): Promise<string> {
+  const lessonsDir = dirname(join(repoRoot, LESSONS_PATH));
+  await mkdir(lessonsDir, { recursive: true });
+
+  const indexPath = join(repoRoot, LESSONS_PATH);
+  if (!existsSync(indexPath)) {
+    await writeFile(indexPath, '', 'utf-8');
+  }
+
+  return lessonsDir;
+}
+
+/**
+ * Create or update AGENTS.md with Learning Agent section.
+ */
+async function updateAgentsMd(repoRoot: string): Promise<boolean> {
+  const agentsPath = join(repoRoot, 'AGENTS.md');
+  let content = '';
+  let existed = false;
+
+  if (existsSync(agentsPath)) {
+    content = await readFile(agentsPath, 'utf-8');
+    existed = true;
+    if (hasLearningAgentSection(content)) {
+      return false; // Already has section
+    }
+  }
+
+  const newContent = existed
+    ? content.trimEnd() + '\n' + AGENTS_MD_TEMPLATE
+    : AGENTS_MD_TEMPLATE.trim() + '\n';
+  await writeFile(agentsPath, newContent, 'utf-8');
+  return true;
+}
+
+/**
+ * Ensure CLAUDE.md has reference to AGENTS.md.
+ */
+async function ensureClaudeMdReference(repoRoot: string): Promise<boolean> {
+  const claudeMdPath = join(repoRoot, '.claude', 'CLAUDE.md');
+  await mkdir(join(repoRoot, '.claude'), { recursive: true });
+
+  if (!existsSync(claudeMdPath)) {
+    const content = `# Project Instructions
+${CLAUDE_MD_REFERENCE}`;
+    await writeFile(claudeMdPath, content, 'utf-8');
+    return true;
+  }
+
+  const content = await readFile(claudeMdPath, 'utf-8');
+  if (hasClaudeMdReference(content)) {
+    return false;
+  }
+
+  const newContent = content.trimEnd() + '\n' + CLAUDE_MD_REFERENCE;
+  await writeFile(claudeMdPath, newContent, 'utf-8');
+  return true;
+}
+
+/**
+ * Create plugin manifest.
+ */
+async function createPluginManifest(repoRoot: string): Promise<boolean> {
+  const pluginPath = join(repoRoot, '.claude', 'plugin.json');
+  await mkdir(join(repoRoot, '.claude'), { recursive: true });
+
+  if (existsSync(pluginPath)) {
+    return false;
+  }
+
+  await writeFile(pluginPath, JSON.stringify(PLUGIN_MANIFEST, null, 2) + '\n', 'utf-8');
+  return true;
+}
+
+/**
+ * Create slash commands.
+ */
+async function createSlashCommands(repoRoot: string): Promise<boolean> {
+  const commandsDir = join(repoRoot, '.claude', 'commands');
+  await mkdir(commandsDir, { recursive: true });
+
+  let created = false;
+  for (const [filename, content] of Object.entries(SLASH_COMMANDS)) {
+    const filePath = join(commandsDir, filename);
+    if (!existsSync(filePath)) {
+      await writeFile(filePath, content, 'utf-8');
+      created = true;
+    }
+  }
+
+  return created;
+}
+
+/**
+ * Configure Claude Code settings: hooks + MCP server.
+ */
+async function configureClaudeSettings(): Promise<{ hooks: boolean; mcpServer: boolean }> {
+  const settingsPath = getClaudeSettingsPath(false); // Project-local
+
+  let settings: Record<string, unknown>;
+  try {
+    settings = await readClaudeSettings(settingsPath);
+  } catch {
+    settings = {};
+  }
+
+  const hadHooks = hasClaudeHook(settings);
+  const hadMcp = hasMcpServer(settings);
+
+  addAllLearningAgentHooks(settings);
+  addMcpServer(settings);
+
+  await writeClaudeSettings(settingsPath, settings);
+
+  return {
+    hooks: !hadHooks,
+    mcpServer: !hadMcp,
+  };
+}
+
+/**
+ * Run one-shot setup.
+ */
+export async function runSetup(options: { skipModel?: boolean }): Promise<SetupResult> {
+  const repoRoot = getRepoRoot();
+
+  // 1. Initialize lessons directory
+  const lessonsDir = await ensureLessonsDirectory(repoRoot);
+
+  // 2. Update AGENTS.md
+  const agentsMdUpdated = await updateAgentsMd(repoRoot);
+
+  // 3. Ensure CLAUDE.md reference
+  await ensureClaudeMdReference(repoRoot);
+
+  // 4. Create plugin manifest
+  await createPluginManifest(repoRoot);
+
+  // 5. Create slash commands
+  await createSlashCommands(repoRoot);
+
+  // 6. Configure Claude settings (hooks + MCP)
+  const { hooks, mcpServer } = await configureClaudeSettings();
+
+  // 7. Download model (unless skipped)
+  let modelDownloaded: boolean | 'skipped' = 'skipped';
+  if (!options.skipModel) {
+    try {
+      const alreadyExisted = isModelAvailable();
+      if (!alreadyExisted) {
+        await resolveModel({ cli: false });
+      }
+      modelDownloaded = !alreadyExisted;
+    } catch {
+      modelDownloaded = false;
+    }
+  }
+
+  return {
+    lessonsDir,
+    agentsMd: agentsMdUpdated,
+    hooks,
+    mcpServer,
+    model: modelDownloaded,
+  };
+}
+
+/**
+ * Register the one-shot setup action on the setup command.
+ * Note: Does not use --json to avoid conflicts with subcommand options.
+ */
+export function registerSetupAllCommand(setupCommand: Command): void {
+  setupCommand
+    .description('One-shot setup: init + hooks + MCP server + model')
+    .option('--skip-model', 'Skip embedding model download')
+    .action(async (options: { skipModel?: boolean }) => {
+      const result = await runSetup({ skipModel: options.skipModel });
+
+      // Always human-readable output for one-shot setup
+      out.success('Learning agent setup complete');
+      console.log(`  Lessons directory: ${result.lessonsDir}`);
+      console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
+      console.log(`  Claude hooks: ${result.hooks ? 'Installed' : 'Already configured'}`);
+      console.log(`  MCP server: ${result.mcpServer ? 'Registered' : 'Already configured'}`);
+      if (result.model === 'skipped') {
+        console.log('  Model: Skipped (--skip-model)');
+      } else {
+        console.log(`  Model: ${result.model ? 'Downloaded' : 'Already exists'}`);
+      }
+      console.log('');
+      console.log('Next steps:');
+      console.log('  1. Restart Claude Code to load MCP tools');
+      console.log('  2. Use `lesson_search` and `lesson_capture` tools');
+    });
+}

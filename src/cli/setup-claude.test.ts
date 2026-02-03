@@ -59,7 +59,8 @@ describe('CLI', { tags: ['integration'] }, () => {
 
       const hookEntry = settings.hooks.SessionStart[0];
       expect(hookEntry.hooks[0].command).toContain('lna');
-      expect(hookEntry.hooks[0].command).toContain('load-session');
+      // v0.2.4: uses prime instead of load-session
+      expect(hookEntry.hooks[0].command).toContain('prime');
     });
 
     it('preserves existing settings when adding hooks', async () => {

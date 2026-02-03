@@ -41,23 +41,23 @@ describe('Setup Commands', () => {
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
       expect(content).toContain('Learning Agent Integration');
-      expect(content).toContain('load-session');
-      expect(content).toContain('check-plan');
-      expect(content).toContain('capture');
+      expect(content).toContain('lesson_search');
+      expect(content).toContain('lesson_capture');
     });
 
-    it('AGENTS.md template includes explicit plan-time instructions', async () => {
+    it('AGENTS.md template includes mandatory recall instructions', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Must include explicit instruction to run check-plan BEFORE implementing
-      expect(content).toMatch(/before\s+(implementing|starting|coding)/i);
-      // Must mention running check-plan command
-      expect(content).toContain('npx lna check-plan');
-      // Must explain what to do with results
-      expect(content).toMatch(/lessons?\s*check/i);
+      // Must include Mandatory Recall section with MUST language
+      expect(content).toContain('Mandatory Recall');
+      expect(content).toContain('MUST');
+      // Must mention using lesson_search MCP tool
+      expect(content).toContain('lesson_search');
+      // Must explain workflow
+      expect(content).toContain('Search BEFORE deciding');
     });
 
     it('appends to existing AGENTS.md without duplicating', async () => {
@@ -274,13 +274,13 @@ describe('Setup Commands', () => {
       expect(content).toContain('insight');
     });
 
-    it('creates /check-plan slash command file', async () => {
+    it('creates /search slash command file', async () => {
       runCli('init');
 
-      const checkPlanPath = join(getTempDir(), '.claude', 'commands', 'check-plan.md');
-      const content = await readFile(checkPlanPath, 'utf-8');
-      expect(content).toContain('lna check-plan');
-      expect(content).toContain('plan');
+      const searchPath = join(getTempDir(), '.claude', 'commands', 'search.md');
+      const content = await readFile(searchPath, 'utf-8');
+      expect(content).toContain('lna search');
+      expect(content).toContain('lesson_search');
     });
 
     it('creates /list slash command file', async () => {
@@ -609,10 +609,10 @@ exit 0
       expect(settings.hooks.SessionStart).toBeDefined();
       expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
 
-      // Hook should contain our command
+      // Hook should contain our command (v0.2.4: uses prime instead of load-session)
       const hookEntry = settings.hooks.SessionStart[0];
       expect(hookEntry.hooks[0].command).toContain('lna');
-      expect(hookEntry.hooks[0].command).toContain('load-session');
+      expect(hookEntry.hooks[0].command).toContain('prime');
     });
 
     it('preserves existing settings when adding hooks', async () => {
@@ -902,9 +902,9 @@ exit 0
       expect(content.hooks.SessionStart).toBeDefined();
       expect(content.hooks.SessionStart.length).toBeGreaterThan(0);
 
-      // Should include load-session command
+      // Should include prime command (v0.2.4: uses prime instead of load-session)
       const commands = content.hooks.SessionStart.flatMap((h) => h.hooks.map((hh) => hh.command));
-      expect(commands.some((c) => c.includes('load-session'))).toBe(true);
+      expect(commands.some((c) => c.includes('prime'))).toBe(true);
     });
 
     it('plugin.json includes PreCompact hook with prime', async () => {
@@ -1001,12 +1001,12 @@ exit 0
       // Find positions
       const sectionStart = content.indexOf('## Learning Agent Integration');
       const criticalRules = content.indexOf('CRITICAL RULES');
-      const retrievalSection = content.indexOf('### Retrieval Points');
+      const mandatoryRecall = content.indexOf('### Mandatory Recall');
 
-      // CRITICAL RULES must appear before Retrieval Points section
+      // CRITICAL RULES must appear before Mandatory Recall section (v0.2.4 structure)
       expect(sectionStart).toBeGreaterThan(-1);
       expect(criticalRules).toBeGreaterThan(sectionStart);
-      expect(criticalRules).toBeLessThan(retrievalSection);
+      expect(criticalRules).toBeLessThan(mandatoryRecall);
     });
 
     it('explains consequences of direct edits', async () => {
@@ -1094,17 +1094,6 @@ exit 0
       expect(content).toMatch(/"no"|"wrong"|"actually"/i);
     });
 
-    it('includes self-correction detection pattern', async () => {
-      runCli('init');
-
-      const agentsPath = join(getTempDir(), 'AGENTS.md');
-      const content = await readFile(agentsPath, 'utf-8');
-
-      // Should mention self-correction
-      expect(content).toMatch(/self.correct/i);
-      expect(content).toMatch(/multiple\s+attempts|edit.*fail.*re-edit|iteration/i);
-    });
-
     it('includes test failure detection pattern', async () => {
       runCli('init');
 
@@ -1112,7 +1101,7 @@ exit 0
       const content = await readFile(agentsPath, 'utf-8');
 
       // Should mention test failure -> fix pattern
-      expect(content).toMatch(/test.*fail.*fix|test.*failure/i);
+      expect(content).toMatch(/test.*fail/i);
     });
 
     it('detection triggers section has actionable instructions', async () => {
@@ -1121,43 +1110,46 @@ exit 0
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Should tell Claude what to do when pattern detected
-      expect(content).toMatch(/propose.*learn|lna learn|capture/i);
+      // Should tell Claude what to do when pattern detected (v0.2.4: uses MCP tools)
+      expect(content).toMatch(/lesson_capture|lna learn/i);
     });
   });
 
   /**
-   * Tests for 2jp: Auto-invoke triggers for lesson capture
+   * Tests for v0.2.4: MCP-based capture and retrieval
    */
-  describe('Auto-invoke triggers in AGENTS.md (2jp)', () => {
-    it('documents capture trigger phrases', async () => {
+  describe('MCP tools documentation in AGENTS.md (v0.2.4)', () => {
+    it('documents lesson_search tool', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Should include common trigger phrases
-      expect(content).toMatch(/that worked|fixed it|my mistake|actually use/i);
+      // Should document lesson_search MCP tool
+      expect(content).toContain('lesson_search');
+      expect(content).toMatch(/before.*architectural|architectural.*decisions/i);
     });
 
-    it('documents retrieval trigger phrases', async () => {
+    it('documents lesson_capture tool', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Should include retrieval triggers
-      expect(content).toMatch(/similar issue|we had this before|seen this|remember/i);
+      // Should document lesson_capture MCP tool
+      expect(content).toContain('lesson_capture');
+      expect(content).toMatch(/user corrects|mistakes|corrections/i);
     });
 
-    it('specifies action for each trigger type', async () => {
+    it('includes MCP tools table', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Capture triggers should map to lna learn
-      expect(content).toMatch(/capture.*trigger.*learn|trigger.*capture/i);
+      // Should have MCP Tools section
+      expect(content).toContain('MCP Tools');
+      expect(content).toContain('When to Use');
     });
   });
 

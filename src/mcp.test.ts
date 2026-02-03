@@ -770,7 +770,8 @@ describe('MCP Server', () => {
 
       // Property: Content always includes the Learning Agent workflow context
       expect(result.content).toContain('Learning Agent');
-      expect(result.content).toContain('Core Rules');
+      // v0.2.4: prime.ts uses "Core Constraints" (Beads-style trust language)
+      expect(result.content).toContain('Core Constraints');
     });
 
     test.prop([fc.constant(null)])('lessons://prime: never throws even if .claude missing', async () => {
