@@ -5,7 +5,8 @@
  */
 
 export { registerCaptureCommands } from './capture.js';
-export { registerManagementCommands } from './management/index.js';
+export { getPrimeContext, registerManagementCommands } from './management/index.js';
+export { registerRemindCaptureCommand } from './remind-capture.js';
 export { registerRetrievalCommands } from './retrieval.js';
 export { registerSetupCommands } from './setup/index.js';
 export type { ClaudeHooksResult } from './setup/index.js';

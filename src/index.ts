@@ -155,6 +155,9 @@ export type {
 export { formatLessonsCheck, loadSessionLessons, retrieveForPlan } from './retrieval/index.js';
 export type { PlanRetrievalResult } from './retrieval/index.js';
 
+// Context recovery API (for MCP server integration)
+export { getPrimeContext } from './commands/index.js';
+
 // Types and schemas
 export {
   generateId,

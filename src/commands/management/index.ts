@@ -16,6 +16,9 @@ import { registerPrimeCommand } from './prime.js';
 // Re-export helpers for use by other modules
 export { formatLessonHuman, wasLessonDeleted } from './helpers.js';
 
+// Export getPrimeContext for MCP server integration
+export { getPrimeContext } from './prime.js';
+
 /**
  * Register all management commands on the program.
  */
