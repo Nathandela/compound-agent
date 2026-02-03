@@ -39,15 +39,16 @@ describe('CLI', { tags: ['integration'] }, () => {
         expect(pkg.bin!['lna']).toBe(pkg.bin!['learning-agent']);
       });
 
-      it('has exactly 2 bin entries (lna and learning-agent)', async () => {
+      it('has required bin entries (lna, learning-agent, learning-agent-mcp)', async () => {
         const pkgPath = join(process.cwd(), 'package.json');
         const pkgContent = await readFile(pkgPath, 'utf8');
         const pkg = JSON.parse(pkgContent) as { bin?: Record<string, string> };
 
         const binKeys = Object.keys(pkg.bin ?? {});
-        expect(binKeys).toHaveLength(2);
+        expect(binKeys).toHaveLength(3);
         expect(binKeys).toContain('lna');
         expect(binKeys).toContain('learning-agent');
+        expect(binKeys).toContain('learning-agent-mcp');
       });
     });
 
