@@ -27,7 +27,7 @@ interface StatusResult {
   hookInstalled: boolean;
   slashCommands: {
     learn: boolean;
-    checkPlan: boolean;
+    search: boolean;
   };
   status: 'connected' | 'partial' | 'disconnected';
 }
@@ -66,16 +66,17 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
       if (options.status) {
         const repoRoot = getRepoRoot();
         const learnMdPath = join(repoRoot, '.claude', 'commands', 'learn.md');
-        const checkPlanMdPath = join(repoRoot, '.claude', 'commands', 'check-plan.md');
+        // v0.2.4: check-plan replaced by search
+        const searchMdPath = join(repoRoot, '.claude', 'commands', 'search.md');
 
         const learnExists = existsSync(learnMdPath);
-        const checkPlanExists = existsSync(checkPlanMdPath);
+        const searchExists = existsSync(searchMdPath);
 
         // Determine overall status
         let status: 'connected' | 'partial' | 'disconnected';
-        if (alreadyInstalled && learnExists && checkPlanExists) {
+        if (alreadyInstalled && learnExists && searchExists) {
           status = 'connected';
-        } else if (alreadyInstalled || learnExists || checkPlanExists) {
+        } else if (alreadyInstalled || learnExists || searchExists) {
           status = 'partial';
         } else {
           status = 'disconnected';
@@ -88,7 +89,8 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
           hookInstalled: alreadyInstalled,
           slashCommands: {
             learn: learnExists,
-            checkPlan: checkPlanExists,
+            // v0.2.4: renamed from checkPlan to search
+            search: searchExists,
           },
           status,
         };
@@ -106,7 +108,7 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
           console.log('');
           console.log('Slash commands:');
           console.log(`  ${learnExists ? '[ok]' : '[warn]'} /learn command`);
-          console.log(`  ${checkPlanExists ? '[ok]' : '[warn]'} /check-plan command`);
+          console.log(`  ${searchExists ? '[ok]' : '[warn]'} /search command`);
           console.log('');
 
           if (status === 'connected') {

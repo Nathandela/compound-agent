@@ -15,7 +15,6 @@ import {
   AGENTS_SECTION_START_MARKER,
   CLAUDE_HOOK_CONFIG,
   CLAUDE_HOOK_MARKERS,
-  CLAUDE_PRECOMMIT_HOOK_CONFIG,
   CLAUDE_PRECOMPACT_HOOK_CONFIG,
   CLAUDE_REF_END_MARKER,
   CLAUDE_REF_START_MARKER,
@@ -79,7 +78,8 @@ export function addLearningAgentHook(settings: Record<string, unknown>): void {
 }
 
 /**
- * Add all v0.2.4 hooks: SessionStart, PreCompact, PreCommit.
+ * Add all v0.2.4 hooks: SessionStart, PreCompact.
+ * Note: PreCommit is handled by git hooks, not Claude Code hooks.
  */
 export function addAllLearningAgentHooks(settings: Record<string, unknown>): void {
   if (!settings.hooks) {
@@ -103,13 +103,8 @@ export function addAllLearningAgentHooks(settings: Record<string, unknown>): voi
     hooks.PreCompact.push(CLAUDE_PRECOMPACT_HOOK_CONFIG);
   }
 
-  // PreCommit - capture reminder
-  if (!hooks.PreCommit) {
-    hooks.PreCommit = [];
-  }
-  if (!hasHookType(hooks.PreCommit, 'lna remind-capture')) {
-    hooks.PreCommit.push(CLAUDE_PRECOMMIT_HOOK_CONFIG);
-  }
+  // Note: remind-capture functionality is handled by git pre-commit hooks
+  // (see installPreCommitHook in hooks.ts), not Claude Code hooks
 }
 
 /**

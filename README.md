@@ -126,7 +126,7 @@ The CLI integration tests spawn Node.js processes (~400ms overhead each) and acc
 - **Vector Search**: Local semantic search using nomic-embed-text-v1.5 via node-llama-cpp
 - **Hybrid Storage**: JSONL source of truth (git-tracked) with SQLite FTS5 index (rebuildable)
 - **Offline First**: No external API dependencies; works completely offline
-- **Hook System**: SessionStart loads context, PreCommit reminds to capture lessons
+- **Hook System**: SessionStart/PreCompact load context, git pre-commit reminds to capture
 
 ## CLI Usage
 
@@ -176,7 +176,7 @@ This installs:
 - **MCP Server**: Exposes `lesson_search` and `lesson_capture` as native Claude tools
 - **SessionStart hook**: Loads workflow context when Claude starts
 - **PreCompact hook**: Reloads context before compaction
-- **PreCommit hook**: Reminds to capture lessons before commits
+- **Git pre-commit hook**: Reminds to capture lessons before commits
 
 ### Manual Hook Configuration
 
@@ -200,14 +200,6 @@ If you prefer to configure hooks manually, add to `.claude/settings.json`:
           { "type": "command", "command": "npx lna prime 2>/dev/null || true" }
         ]
       }
-    ],
-    "PreCommit": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "npx lna remind-capture 2>/dev/null || true" }
-        ]
-      }
     ]
   },
   "mcpServers": {
@@ -217,6 +209,9 @@ If you prefer to configure hooks manually, add to `.claude/settings.json`:
     }
   }
 }
+```
+
+The git pre-commit hook is installed separately via `npx lna init` and runs `lna remind-capture` before commits.
 ```
 
 ### MCP Tools
@@ -385,7 +380,7 @@ Version 0.2.4 - Hybrid Memory System release. Combines Beads-style trusted hook 
 - **MCP Server**: `lesson_search` and `lesson_capture` as native Claude tools
 - **One-shot setup**: `lna setup` configures hooks, MCP, and downloads model
 - **Trust language**: Updated AGENTS.md with mandatory recall patterns
-- **Three-hook system**: SessionStart, PreCompact, PreCommit for complete coverage
+- **Hook system**: SessionStart + PreCompact (Claude Code) + git pre-commit
 
 See [CHANGELOG.md](CHANGELOG.md) for details.
 

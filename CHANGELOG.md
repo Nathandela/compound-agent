@@ -22,10 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `--skip-model` flag to skip embedding model download
   - Idempotent: safe to run multiple times
 
-- **Three-Hook System**
+- **Two-Hook System** (Claude Code hooks)
   - `SessionStart`: Loads workflow context via `lna prime`
   - `PreCompact`: Reloads context before compaction via `lna prime`
-  - `PreCommit`: Reminds to capture lessons via `lna remind-capture`
+  - Git pre-commit hook: Reminds to capture lessons via `lna remind-capture`
 
 - **Remind-Capture Command**
   - `lna remind-capture` prompts for lesson capture before commits

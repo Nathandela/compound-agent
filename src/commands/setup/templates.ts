@@ -59,16 +59,9 @@ export const CLAUDE_PRECOMPACT_HOOK_CONFIG = {
   ],
 };
 
-/** Claude Code PreCommit hook configuration (v0.2.4: capture reminder) */
-export const CLAUDE_PRECOMMIT_HOOK_CONFIG = {
-  matcher: '',
-  hooks: [
-    {
-      type: 'command',
-      command: 'npx lna remind-capture 2>/dev/null || true',
-    },
-  ],
-};
+// Note: PreCommit is NOT a valid Claude Code hook type.
+// The remind-capture functionality is handled by git pre-commit hooks instead.
+// See installPreCommitHook() in hooks.ts for git hook installation.
 
 /** MCP server configuration for Claude Code settings */
 export const MCP_SERVER_CONFIG = {
@@ -281,11 +274,6 @@ export const PLUGIN_MANIFEST = {
         hooks: [{ type: 'command', command: 'npx lna prime 2>/dev/null || true' }],
       },
     ],
-    PreCommit: [
-      {
-        matcher: '',
-        hooks: [{ type: 'command', command: 'npx lna remind-capture 2>/dev/null || true' }],
-      },
-    ],
+    // Note: PreCommit is handled by git hooks, not Claude Code hooks
   },
 };
