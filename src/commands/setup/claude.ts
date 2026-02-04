@@ -11,20 +11,25 @@ import { getRepoRoot } from '../../cli-utils.js';
 import {
   addLearningAgentHook,
   getClaudeSettingsPath,
+  getMcpJsonPath,
   hasClaudeHook,
+  hasMcpServerInMcpJson,
   readClaudeSettings,
   removeAgentsSection,
   removeClaudeMdReference,
   removeLearningAgentHook,
+  removeMcpServerFromMcpJson,
   writeClaudeSettings,
 } from './claude-helpers.js';
 
 /** Status check result */
 interface StatusResult {
   settingsFile: string;
+  mcpFile: string;
   exists: boolean;
   validJson: boolean;
   hookInstalled: boolean;
+  mcpInstalled: boolean;
   slashCommands: {
     learn: boolean;
     search: boolean;
@@ -68,15 +73,18 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
         const learnMdPath = join(repoRoot, '.claude', 'commands', 'learn.md');
         // v0.2.4: check-plan replaced by search
         const searchMdPath = join(repoRoot, '.claude', 'commands', 'search.md');
+        const mcpPath = getMcpJsonPath(repoRoot);
 
         const learnExists = existsSync(learnMdPath);
         const searchExists = existsSync(searchMdPath);
+        const mcpExists = existsSync(mcpPath);
+        const mcpInstalled = mcpExists && await hasMcpServerInMcpJson(repoRoot);
 
-        // Determine overall status
+        // Determine overall status (hooks + MCP + slash commands)
         let status: 'connected' | 'partial' | 'disconnected';
-        if (alreadyInstalled && learnExists && searchExists) {
+        if (alreadyInstalled && mcpInstalled && learnExists && searchExists) {
           status = 'connected';
-        } else if (alreadyInstalled || learnExists || searchExists) {
+        } else if (alreadyInstalled || mcpInstalled || learnExists || searchExists) {
           status = 'partial';
         } else {
           status = 'disconnected';
@@ -84,12 +92,13 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
 
         const result: StatusResult = {
           settingsFile: displayPath,
+          mcpFile: '.mcp.json',
           exists: existsSync(settingsPath),
           validJson: true, // We already parsed it above
           hookInstalled: alreadyInstalled,
+          mcpInstalled,
           slashCommands: {
             learn: learnExists,
-            // v0.2.4: renamed from checkPlan to search
             search: searchExists,
           },
           status,
@@ -101,10 +110,14 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
           console.log('Claude Code Integration Status');
           console.log('─'.repeat(40));
           console.log('');
-          console.log(`Settings file: ${displayPath}`);
+          console.log(`Hooks file: ${displayPath}`);
           console.log(`  ${result.exists ? '[ok]' : '[missing]'} File exists`);
           console.log(`  ${result.validJson ? '[ok]' : '[error]'} Valid JSON`);
           console.log(`  ${result.hookInstalled ? '[ok]' : '[warn]'} SessionStart hook installed`);
+          console.log('');
+          console.log('MCP config: .mcp.json');
+          console.log(`  ${mcpExists ? '[ok]' : '[missing]'} File exists`);
+          console.log(`  ${mcpInstalled ? '[ok]' : '[warn]'} learning-agent MCP server`);
           console.log('');
           console.log('Slash commands:');
           console.log(`  ${learnExists ? '[ok]' : '[warn]'} /learn command`);
@@ -116,11 +129,11 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
           } else if (status === 'partial') {
             out.warn('Partial setup detected.');
             console.log('');
-            console.log("Run 'npx lna init' to complete setup.");
+            console.log("Run 'npx lna setup' to complete setup.");
           } else {
             out.error('Not connected.');
             console.log('');
-            console.log("Run 'npx lna init' to set up Learning Agent.");
+            console.log("Run 'npx lna setup' to set up Learning Agent.");
           }
         }
         return;
@@ -148,11 +161,14 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
           await writeClaudeSettings(settingsPath, settings);
         }
 
+        // Also remove MCP from .mcp.json
+        const removedMcp = await removeMcpServerFromMcpJson(repoRoot);
+
         // Also remove AGENTS.md section and CLAUDE.md reference (e2r)
         const removedAgents = await removeAgentsSection(repoRoot);
         const removedClaudeMd = await removeClaudeMdReference(repoRoot);
 
-        const anyRemoved = removedHook || removedAgents || removedClaudeMd;
+        const anyRemoved = removedHook || removedMcp || removedAgents || removedClaudeMd;
 
         if (anyRemoved) {
           if (options.json) {
@@ -160,13 +176,17 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
               installed: false,
               location: displayPath,
               action: 'removed',
+              mcpRemoved: removedMcp,
               agentsMdRemoved: removedAgents,
               claudeMdRemoved: removedClaudeMd,
             }));
           } else {
-            out.success('Learning agent hooks removed');
+            out.success('Learning agent removed');
             if (removedHook) {
-              console.log(`  Settings: ${displayPath}`);
+              console.log(`  Hooks: ${displayPath}`);
+            }
+            if (removedMcp) {
+              console.log('  MCP: .mcp.json');
             }
             if (removedAgents) {
               console.log('  AGENTS.md: Learning Agent section removed');

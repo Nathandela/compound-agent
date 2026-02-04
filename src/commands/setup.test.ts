@@ -968,31 +968,30 @@ exit 0
    * Tests for 0p5: AGENTS.md must prohibit direct JSONL edits
    */
   describe('AGENTS.md prohibits direct JSONL edits (0p5)', () => {
-    it('includes "NEVER edit" rule in CRITICAL RULES section', async () => {
+    it('includes "NEVER edit" rule', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Must have CRITICAL RULES section
-      expect(content).toContain('CRITICAL RULES');
+      // Must have Never Edit JSONL section
+      expect(content).toContain('Never Edit JSONL');
       // Must explicitly prohibit direct edits
       expect(content).toMatch(/never\s+edit.*index\.jsonl/i);
     });
 
-    it('lists CLI alternatives for JSONL operations', async () => {
+    it('mentions MCP and CLI alternatives for JSONL operations', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Must list CLI commands as alternatives
+      // Must mention MCP tool and CLI as alternatives
+      expect(content).toContain('lesson_capture');
       expect(content).toContain('lna learn');
-      expect(content).toContain('lna update');
-      expect(content).toContain('lna delete');
     });
 
-    it('CRITICAL RULES section appears near top of Learning Agent section', async () => {
+    it('MCP Tools section appears near top of Learning Agent section', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
@@ -1000,13 +999,13 @@ exit 0
 
       // Find positions
       const sectionStart = content.indexOf('## Learning Agent Integration');
-      const criticalRules = content.indexOf('CRITICAL RULES');
+      const mcpTools = content.indexOf('### MCP Tools');
       const mandatoryRecall = content.indexOf('### Mandatory Recall');
 
-      // CRITICAL RULES must appear before Mandatory Recall section (v0.2.4 structure)
+      // MCP Tools must appear before Mandatory Recall section (v0.2.6 structure)
       expect(sectionStart).toBeGreaterThan(-1);
-      expect(criticalRules).toBeGreaterThan(sectionStart);
-      expect(criticalRules).toBeLessThan(mandatoryRecall);
+      expect(mcpTools).toBeGreaterThan(sectionStart);
+      expect(mcpTools).toBeLessThan(mandatoryRecall);
     });
 
     it('explains consequences of direct edits', async () => {
@@ -1016,7 +1015,7 @@ exit 0
       const content = await readFile(agentsPath, 'utf-8');
 
       // Should explain why direct edits are bad
-      expect(content).toMatch(/schema|validation|sync|desync/i);
+      expect(content).toMatch(/schema|validation|sync/i);
     });
   });
 
@@ -1147,9 +1146,9 @@ exit 0
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Should have MCP Tools section
+      // Should have MCP Tools section with table
       expect(content).toContain('MCP Tools');
-      expect(content).toContain('When to Use');
+      expect(content).toContain('| Tool | Purpose |');
     });
   });
 

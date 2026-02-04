@@ -117,8 +117,93 @@ function hasHookType(hookArray: unknown[], marker: string): boolean {
   });
 }
 
+// ============================================================================
+// MCP Configuration (.mcp.json - project scope)
+// ============================================================================
+
 /**
- * Add MCP server configuration to settings.
+ * Get the path to .mcp.json (project-scope MCP config).
+ * This is the correct location for MCP servers per Claude Code docs.
+ */
+export function getMcpJsonPath(repoRoot?: string): string {
+  const root = repoRoot ?? getRepoRoot();
+  return join(root, '.mcp.json');
+}
+
+/**
+ * Read and parse .mcp.json.
+ */
+export async function readMcpJson(mcpPath: string): Promise<Record<string, unknown>> {
+  if (!existsSync(mcpPath)) {
+    return {};
+  }
+  const content = await readFile(mcpPath, 'utf-8');
+  return JSON.parse(content) as Record<string, unknown>;
+}
+
+/**
+ * Write .mcp.json atomically.
+ */
+export async function writeMcpJson(mcpPath: string, config: Record<string, unknown>): Promise<void> {
+  const tempPath = mcpPath + '.tmp';
+  await writeFile(tempPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
+  await rename(tempPath, mcpPath);
+}
+
+/**
+ * Add MCP server configuration to .mcp.json.
+ * Returns true if added, false if already exists.
+ */
+export async function addMcpServerToMcpJson(repoRoot?: string): Promise<boolean> {
+  const mcpPath = getMcpJsonPath(repoRoot);
+  const config = await readMcpJson(mcpPath);
+
+  if (!config.mcpServers) {
+    config.mcpServers = {};
+  }
+  const mcpServers = config.mcpServers as Record<string, unknown>;
+
+  if (mcpServers['learning-agent']) {
+    return false; // Already configured
+  }
+
+  Object.assign(mcpServers, MCP_SERVER_CONFIG);
+  await writeMcpJson(mcpPath, config);
+  return true;
+}
+
+/**
+ * Check if MCP server is configured in .mcp.json.
+ */
+export async function hasMcpServerInMcpJson(repoRoot?: string): Promise<boolean> {
+  const mcpPath = getMcpJsonPath(repoRoot);
+  const config = await readMcpJson(mcpPath);
+  const mcpServers = config.mcpServers as Record<string, unknown> | undefined;
+  return !!mcpServers?.['learning-agent'];
+}
+
+/**
+ * Remove MCP server from .mcp.json.
+ */
+export async function removeMcpServerFromMcpJson(repoRoot?: string): Promise<boolean> {
+  const mcpPath = getMcpJsonPath(repoRoot);
+  const config = await readMcpJson(mcpPath);
+  const mcpServers = config.mcpServers as Record<string, unknown> | undefined;
+
+  if (!mcpServers?.['learning-agent']) {
+    return false;
+  }
+
+  delete mcpServers['learning-agent'];
+  await writeMcpJson(mcpPath, config);
+  return true;
+}
+
+// Legacy functions for backwards compatibility (settings.json)
+// These are deprecated - use the McpJson functions above
+
+/**
+ * @deprecated Use addMcpServerToMcpJson instead
  */
 export function addMcpServer(settings: Record<string, unknown>): boolean {
   if (!settings.mcpServers) {
@@ -135,7 +220,7 @@ export function addMcpServer(settings: Record<string, unknown>): boolean {
 }
 
 /**
- * Check if MCP server is already configured.
+ * @deprecated Use hasMcpServerInMcpJson instead
  */
 export function hasMcpServer(settings: Record<string, unknown>): boolean {
   const mcpServers = settings.mcpServers as Record<string, unknown> | undefined;
@@ -143,7 +228,7 @@ export function hasMcpServer(settings: Record<string, unknown>): boolean {
 }
 
 /**
- * Remove MCP server configuration from settings.
+ * @deprecated Use removeMcpServerFromMcpJson instead
  */
 export function removeMcpServer(settings: Record<string, unknown>): boolean {
   const mcpServers = settings.mcpServers as Record<string, unknown> | undefined;

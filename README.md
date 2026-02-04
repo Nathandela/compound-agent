@@ -35,9 +35,10 @@ npx lna setup
 
 This single command:
 - Creates `.claude/lessons/` directory
-- Adds AGENTS.md with workflow instructions
-- Installs Claude Code hooks (SessionStart, PreCompact, PreCommit)
-- Registers the MCP server for `lesson_search` and `lesson_capture` tools
+- Adds AGENTS.md with workflow instructions (prioritizes MCP over CLI)
+- Installs Claude Code hooks (SessionStart, PreCompact) in `.claude/settings.json`
+- Registers MCP server in `.mcp.json` for `lesson_search` and `lesson_capture` tools
+- Installs git pre-commit hook for lesson reminders
 - Downloads the embedding model (~278MB)
 
 To skip the model download (if you'll do it later):
@@ -92,13 +93,17 @@ The CLI integration tests spawn Node.js processes (~400ms overhead each) and acc
 ## Architecture
 
 ```
-.claude/                        (repository scope)
-|-- CLAUDE.md                   <- Always loaded (permanent rules)
-|-- lessons/
-|   |-- index.jsonl             <- Source of truth (git-tracked)
-|   +-- archive/                <- Old lessons (compacted)
-+-- .cache/
-    +-- lessons.sqlite          <- Rebuildable index (.gitignore)
+project_root/
+|-- .mcp.json                   <- MCP server config (project scope)
+|-- AGENTS.md                   <- Workflow instructions for Claude
++-- .claude/
+    |-- settings.json           <- Claude Code hooks (SessionStart, PreCompact)
+    |-- CLAUDE.md               <- Always loaded (permanent rules)
+    |-- lessons/
+    |   |-- index.jsonl         <- Source of truth (git-tracked)
+    |   +-- archive/            <- Old lessons (compacted)
+    +-- .cache/
+        +-- lessons.sqlite      <- Rebuildable index (.gitignore)
 ```
 
 ### Data Flow

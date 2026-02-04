@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-02-04
+
+### Fixed
+
+- **MCP Config Location**: Write to `.mcp.json` (project scope) instead of `.claude/settings.json`
+  - Per Claude Code docs, MCP servers should be in `.mcp.json` at project root
+  - Hooks remain correctly in `.claude/settings.json`
+  - `setup claude --status` now checks both files
+
+- **AGENTS.md MCP Priority**: Updated template to clearly prioritize MCP tools
+  - "MCP Tools (ALWAYS USE THESE)" section at top
+  - CLI commands clearly marked as "fallback only"
+  - Claude will now prefer `lesson_search`/`lesson_capture` over CLI
+
+### Changed
+
+- Architecture diagram in README updated to show `.mcp.json` location
+- Simplified AGENTS.md structure: MCP tools first, mandatory recall, capture protocol
+
 ## [0.2.5] - 2026-02-03
 
 ### Fixed

@@ -15,10 +15,10 @@ import { LESSONS_PATH } from '../../storage/index.js';
 import { out } from '../shared.js';
 import {
   addAllLearningAgentHooks,
-  addMcpServer,
+  addMcpServerToMcpJson,
   getClaudeSettingsPath,
   hasClaudeHook,
-  hasMcpServer,
+  hasMcpServerInMcpJson,
   readClaudeSettings,
   writeClaudeSettings,
 } from './claude-helpers.js';
@@ -151,11 +151,12 @@ async function createSlashCommands(repoRoot: string): Promise<boolean> {
 }
 
 /**
- * Configure Claude Code settings: hooks + MCP server.
+ * Configure Claude Code settings: hooks in settings.json, MCP in .mcp.json.
+ * Per Claude Code docs, hooks go in .claude/settings.json, MCP goes in .mcp.json.
  */
-async function configureClaudeSettings(): Promise<{ hooks: boolean; mcpServer: boolean }> {
-  const settingsPath = getClaudeSettingsPath(false); // Project-local
-
+async function configureClaudeSettings(repoRoot: string): Promise<{ hooks: boolean; mcpServer: boolean }> {
+  // 1. Configure hooks in .claude/settings.json
+  const settingsPath = getClaudeSettingsPath(false);
   let settings: Record<string, unknown>;
   try {
     settings = await readClaudeSettings(settingsPath);
@@ -164,16 +165,16 @@ async function configureClaudeSettings(): Promise<{ hooks: boolean; mcpServer: b
   }
 
   const hadHooks = hasClaudeHook(settings);
-  const hadMcp = hasMcpServer(settings);
-
   addAllLearningAgentHooks(settings);
-  addMcpServer(settings);
-
   await writeClaudeSettings(settingsPath, settings);
+
+  // 2. Configure MCP in .mcp.json (project scope, shareable)
+  const hadMcp = await hasMcpServerInMcpJson(repoRoot);
+  const mcpAdded = await addMcpServerToMcpJson(repoRoot);
 
   return {
     hooks: !hadHooks,
-    mcpServer: !hadMcp,
+    mcpServer: mcpAdded && !hadMcp,
   };
 }
 
@@ -198,8 +199,8 @@ export async function runSetup(options: { skipModel?: boolean }): Promise<SetupR
   // 5. Create slash commands
   await createSlashCommands(repoRoot);
 
-  // 6. Configure Claude settings (hooks + MCP)
-  const { hooks, mcpServer } = await configureClaudeSettings();
+  // 6. Configure Claude settings (hooks in settings.json, MCP in .mcp.json)
+  const { hooks, mcpServer } = await configureClaudeSettings(repoRoot);
 
   // 7. Download model (unless skipped)
   let modelDownloaded: boolean | 'skipped' = 'skipped';
@@ -240,7 +241,7 @@ export function registerSetupAllCommand(setupCommand: Command): void {
       console.log(`  Lessons directory: ${result.lessonsDir}`);
       console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
       console.log(`  Claude hooks: ${result.hooks ? 'Installed' : 'Already configured'}`);
-      console.log(`  MCP server: ${result.mcpServer ? 'Registered' : 'Already configured'}`);
+      console.log(`  MCP server: ${result.mcpServer ? 'Registered in .mcp.json' : 'Already configured'}`);
       if (result.model === 'skipped') {
         console.log('  Model: Skipped (--skip-model)');
       } else {

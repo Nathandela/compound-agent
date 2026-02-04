@@ -88,7 +88,7 @@
  * Package version - must match package.json.
  * Update this when releasing a new version.
  */
-export const VERSION = '0.2.5';
+export const VERSION = '0.2.6';
 
 // Storage API (JSONL source of truth + SQLite index)
 export {

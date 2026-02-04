@@ -111,59 +111,34 @@ export const AGENTS_MD_TEMPLATE = `
 ${AGENTS_SECTION_START_MARKER}
 ## Learning Agent Integration
 
-This project uses learning-agent for session memory with MCP tools.
+This project uses learning-agent for session memory via **MCP tools** (preferred).
 
-### CRITICAL RULES
+### MCP Tools (ALWAYS USE THESE)
 
-#### Never Edit JSONL Directly
+**You MUST use MCP tools, NOT CLI commands:**
 
-**WARNING: NEVER edit .claude/lessons/index.jsonl directly.**
-
-The JSONL file is the source of truth and requires:
-- Proper ID generation
-- Schema validation
-- SQLite index sync
-
-Always use the \`lesson_capture\` tool or CLI commands:
-- \`npx lna learn "insight"\` - Add a lesson
-- \`npx lna update <id> --insight "new"\` - Modify a lesson
-- \`npx lna delete <id>\` - Remove a lesson
-
-Manual edits will break validation and corrupt the SQLite sync.
+| Tool | Purpose |
+|------|---------|
+| \`lesson_search\` | Search lessons - use BEFORE architectural decisions |
+| \`lesson_capture\` | Capture lessons - use AFTER corrections or discoveries |
 
 ### Mandatory Recall
 
-You MUST use \`lesson_search\` tool BEFORE:
+You MUST call \`lesson_search\` BEFORE:
 - Architectural decisions or complex planning
 - Patterns you've implemented before in this repo
 - After user corrections ("actually...", "wrong", "use X instead")
 
-**NEVER skip lesson search for complex decisions.** Past mistakes will repeat.
+**NEVER skip lesson_search for complex decisions.** Past mistakes will repeat.
 
 ### Capture Protocol
 
-Use \`lesson_capture\` tool AFTER:
+Call \`lesson_capture\` AFTER:
 - User corrects you
 - Test fail → fix → pass cycles
 - You discover project-specific knowledge
 
 **Workflow**: Search BEFORE deciding, capture AFTER learning.
-
-### MCP Tools
-
-| Tool | When to Use |
-|------|-------------|
-| \`lesson_search\` | Before architectural decisions, after corrections |
-| \`lesson_capture\` | After mistakes, corrections, or discoveries |
-
-### CLI Commands (manual use)
-
-\`\`\`bash
-npx lna search "query"  # Find relevant lessons
-npx lna learn "insight"  # Capture a lesson
-npx lna list  # Show recent lessons
-npx lna stats  # Database health
-\`\`\`
 
 ### Quality Gate
 
@@ -171,6 +146,18 @@ Before capturing, verify the lesson is:
 - **Novel** - Not already stored
 - **Specific** - Clear guidance
 - **Actionable** - Obvious what to do
+
+### Never Edit JSONL Directly
+
+**WARNING: NEVER edit .claude/lessons/index.jsonl directly.**
+
+The JSONL file requires proper ID generation, schema validation, and SQLite sync.
+Use \`lesson_capture\` MCP tool or CLI (\`npx lna learn\`) - never manual edits.
+
+### CLI (fallback only)
+
+CLI commands are for manual/terminal use when MCP is unavailable:
+\`npx lna search "query"\`, \`npx lna learn "insight"\`, \`npx lna list\`
 
 See [documentation](https://github.com/Nathandela/learning_agent) for more details.
 ${AGENTS_SECTION_END_MARKER}
@@ -252,7 +239,7 @@ npx lna stats
 export const PLUGIN_MANIFEST = {
   name: 'learning-agent',
   description: 'Session memory for Claude Code - capture and retrieve lessons',
-  version: '0.2.5',
+  version: '0.2.6',
   author: {
     name: 'Nathan Delacrétaz',
     url: 'https://github.com/Nathandela',

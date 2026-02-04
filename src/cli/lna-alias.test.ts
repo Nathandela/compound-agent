@@ -152,19 +152,21 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(agentsTemplate).toContain('Never Edit JSONL Directly');
     });
 
-    it('warns about manual editing consequences', () => {
-      expect(agentsTemplate).toMatch(/manual.*edit|directly.*edit/i);
-      expect(agentsTemplate).toMatch(/break|corrupt|bypass/i);
+    it('warns about direct editing consequences', () => {
+      expect(agentsTemplate).toMatch(/NEVER.*edit.*index\.jsonl/i);
     });
 
-    it('lists CLI commands as the correct way to modify lessons', () => {
+    it('lists MCP tools as primary and CLI as fallback', () => {
+      // MCP tools are primary
+      expect(agentsTemplate).toContain('lesson_capture');
+      expect(agentsTemplate).toContain('lesson_search');
+      // CLI is fallback
+      expect(agentsTemplate).toContain('CLI (fallback only)');
       expect(agentsTemplate).toContain('npx lna learn');
-      expect(agentsTemplate).toContain('npx lna update');
-      expect(agentsTemplate).toContain('npx lna delete');
     });
 
-    it('mentions SQLite sync issues from manual edits', () => {
-      expect(agentsTemplate).toMatch(/sqlite.*sync|sync.*sqlite/i);
+    it('mentions schema/validation/sync issues from manual edits', () => {
+      expect(agentsTemplate).toMatch(/schema|validation|sync/i);
     });
 
     it('warning section is prominent (uses emoji or strong marker)', () => {
