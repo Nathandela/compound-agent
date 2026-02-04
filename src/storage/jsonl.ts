@@ -3,11 +3,19 @@
  *
  * Append-only storage with last-write-wins deduplication.
  * Source of truth - git trackable.
+ *
+ * Record format:
+ * - Lessons: Full lesson objects (LessonSchema)
+ * - Tombstones: Minimal deletion markers (TombstoneSchema)
+ *
+ * The read path accepts both:
+ * - Legacy format: Full lesson with deleted:true field
+ * - Canonical format: Minimal tombstone { id, deleted: true, deletedAt }
  */
 
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { LessonSchema, type Lesson } from '../types.js';
+import { LessonRecordSchema, type Lesson, type LessonRecord } from '../types.js';
 
 /** Relative path to lessons file from repo root */
 export const LESSONS_PATH = '.claude/lessons/index.jsonl';
@@ -38,6 +46,8 @@ export interface ReadLessonsResult {
   skippedCount: number;
 }
 
+import type { Tombstone } from '../types.js';
+
 /**
  * Append a lesson to the JSONL file.
  * Creates directory structure if missing.
@@ -51,15 +61,35 @@ export async function appendLesson(repoRoot: string, lesson: Lesson): Promise<vo
 }
 
 /**
+ * Append a canonical tombstone to the JSONL file.
+ * Creates directory structure if missing.
+ *
+ * Use this for deletions instead of appendLesson with deleted:true.
+ */
+export async function appendTombstone(repoRoot: string, tombstone: Tombstone): Promise<void> {
+  const filePath = join(repoRoot, LESSONS_PATH);
+  await mkdir(dirname(filePath), { recursive: true });
+
+  const line = JSON.stringify(tombstone) + '\n';
+  await appendFile(filePath, line, 'utf-8');
+}
+
+/**
  * Parse and validate a single JSON line.
- * @returns Parsed lesson or null if invalid
+ *
+ * Accepts both:
+ * - Full lessons (LessonSchema)
+ * - Canonical tombstones (TombstoneSchema: { id, deleted: true, deletedAt })
+ * - Legacy tombstones (full lesson with deleted:true)
+ *
+ * @returns Parsed lesson/tombstone record or null if invalid
  */
 function parseJsonLine(
   line: string,
   lineNumber: number,
   strict: boolean,
   onParseError?: (error: ParseError) => void
-): Lesson | null {
+): LessonRecord | null {
   // Try to parse JSON
   let parsed: unknown;
   try {
@@ -77,8 +107,8 @@ function parseJsonLine(
     return null;
   }
 
-  // Validate against schema
-  const result = LessonSchema.safeParse(parsed);
+  // Validate against LessonRecordSchema (accepts both lessons and tombstones)
+  const result = LessonRecordSchema.safeParse(parsed);
   if (!result.success) {
     const parseError: ParseError = {
       line: lineNumber,
@@ -99,6 +129,10 @@ function parseJsonLine(
  * Read all non-deleted lessons from the JSONL file.
  * Applies last-write-wins deduplication by ID.
  * Returns result object with lessons and skippedCount.
+ *
+ * Handles both tombstone formats:
+ * - Canonical: { id, deleted: true, deletedAt }
+ * - Legacy: Full lesson with deleted:true field
  *
  * @param repoRoot - Repository root directory
  * @param options - Optional settings for error handling
@@ -129,16 +163,18 @@ export async function readLessons(
     const trimmed = lines[i]!.trim();
     if (!trimmed) continue;
 
-    const lesson = parseJsonLine(trimmed, i + 1, strict, onParseError);
-    if (!lesson) {
+    const record = parseJsonLine(trimmed, i + 1, strict, onParseError);
+    if (!record) {
       skippedCount++;
       continue;
     }
 
-    if (lesson.deleted) {
-      lessons.delete(lesson.id);
+    // Check if record is a tombstone (canonical or legacy)
+    if (record.deleted === true) {
+      lessons.delete(record.id);
     } else {
-      lessons.set(lesson.id, lesson);
+      // Record is a lesson - cast is safe because deleted !== true
+      lessons.set(record.id, record as Lesson);
     }
   }
 

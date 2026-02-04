@@ -3,14 +3,19 @@ import { z } from 'zod';
 import { fc, test } from '@fast-check/vitest';
 
 import {
-  LessonSchema,
-  TombstoneSchema,
-  SourceSchema,
   ContextSchema,
+  generateId,
+  isLesson,
+  isTombstone,
+  LessonRecordSchema,
+  LessonSchema,
   PatternSchema,
   SeveritySchema,
-  generateId,
+  SourceSchema,
+  TombstoneSchema,
   type Lesson,
+  type LessonRecord,
+  type Tombstone,
 } from './types.js';
 
 // Number of fast-check iterations: 100 in CI, 20 locally for faster feedback
@@ -345,6 +350,174 @@ describe('TombstoneSchema', () => {
     };
     const result = TombstoneSchema.safeParse(invalid);
     expect(result.success).toBe(false);
+  });
+
+  it('validates canonical tombstone (minimal format)', () => {
+    // This is the NEW canonical format for tombstones
+    const canonicalTombstone = {
+      id: 'L001',
+      deleted: true,
+      deletedAt: '2026-01-30T12:00:00Z',
+    };
+    const result = TombstoneSchema.safeParse(canonicalTombstone);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.id).toBe('L001');
+      expect(result.data.deleted).toBe(true);
+      expect(result.data.deletedAt).toBe('2026-01-30T12:00:00Z');
+    }
+  });
+});
+
+describe('LessonRecordSchema', () => {
+  const baseLesson = {
+    id: 'L001',
+    type: 'quick' as const,
+    trigger: 'Test trigger',
+    insight: 'Test insight',
+    tags: [],
+    source: 'manual' as const,
+    context: { tool: 'test', intent: 'testing' },
+    created: '2026-01-30T12:00:00Z',
+    confirmed: true,
+    supersedes: [],
+    related: [],
+  };
+
+  describe('parses lessons', () => {
+    it('accepts quick lesson', () => {
+      const result = LessonRecordSchema.safeParse(baseLesson);
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts full lesson', () => {
+      const fullLesson = {
+        ...baseLesson,
+        type: 'full' as const,
+        evidence: 'Test evidence',
+        severity: 'high' as const,
+      };
+      const result = LessonRecordSchema.safeParse(fullLesson);
+      expect(result.success).toBe(true);
+    });
+
+    it('accepts legacy lesson with deleted:true', () => {
+      const legacyTombstone = {
+        ...baseLesson,
+        deleted: true,
+      };
+      const result = LessonRecordSchema.safeParse(legacyTombstone);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('parses tombstones', () => {
+    it('accepts canonical tombstone (minimal format)', () => {
+      const canonicalTombstone = {
+        id: 'L001',
+        deleted: true,
+        deletedAt: '2026-01-30T12:00:00Z',
+      };
+      const result = LessonRecordSchema.safeParse(canonicalTombstone);
+      expect(result.success).toBe(true);
+    });
+
+    it('canonical tombstone only has id, deleted, deletedAt', () => {
+      const canonicalTombstone = {
+        id: 'L001',
+        deleted: true,
+        deletedAt: '2026-01-30T12:00:00Z',
+      };
+      const result = LessonRecordSchema.safeParse(canonicalTombstone);
+      expect(result.success).toBe(true);
+      if (result.success) {
+        // Only these three fields should be present
+        expect(Object.keys(result.data).sort()).toEqual(['deleted', 'deletedAt', 'id']);
+      }
+    });
+  });
+
+  describe('rejects invalid records', () => {
+    it('rejects record without id', () => {
+      const invalid = {
+        type: 'quick',
+        insight: 'test',
+      };
+      const result = LessonRecordSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+
+    it('rejects tombstone without deletedAt', () => {
+      const invalid = {
+        id: 'L001',
+        deleted: true,
+        // missing deletedAt
+      };
+      const result = LessonRecordSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+  });
+});
+
+describe('Type guards', () => {
+  const baseLesson: Lesson = {
+    id: 'L001',
+    type: 'quick',
+    trigger: 'Test trigger',
+    insight: 'Test insight',
+    tags: [],
+    source: 'manual',
+    context: { tool: 'test', intent: 'testing' },
+    created: '2026-01-30T12:00:00Z',
+    confirmed: true,
+    supersedes: [],
+    related: [],
+  };
+
+  const canonicalTombstone: Tombstone = {
+    id: 'L002',
+    deleted: true,
+    deletedAt: '2026-01-30T12:00:00Z',
+  };
+
+  describe('isTombstone', () => {
+    it('returns true for canonical tombstone', () => {
+      expect(isTombstone(canonicalTombstone)).toBe(true);
+    });
+
+    it('returns true for legacy tombstone (lesson with deleted:true)', () => {
+      const legacyTombstone: LessonRecord = { ...baseLesson, deleted: true };
+      expect(isTombstone(legacyTombstone)).toBe(true);
+    });
+
+    it('returns false for regular lesson', () => {
+      expect(isTombstone(baseLesson)).toBe(false);
+    });
+
+    it('returns false for lesson with deleted:false', () => {
+      const lessonWithDeletedFalse: Lesson = { ...baseLesson, deleted: false };
+      expect(isTombstone(lessonWithDeletedFalse)).toBe(false);
+    });
+  });
+
+  describe('isLesson', () => {
+    it('returns true for regular lesson', () => {
+      expect(isLesson(baseLesson)).toBe(true);
+    });
+
+    it('returns true for lesson with deleted:false', () => {
+      const lessonWithDeletedFalse: Lesson = { ...baseLesson, deleted: false };
+      expect(isLesson(lessonWithDeletedFalse)).toBe(true);
+    });
+
+    it('returns false for canonical tombstone', () => {
+      expect(isLesson(canonicalTombstone)).toBe(false);
+    });
+
+    it('returns false for legacy tombstone', () => {
+      const legacyTombstone: LessonRecord = { ...baseLesson, deleted: true };
+      expect(isLesson(legacyTombstone)).toBe(false);
+    });
   });
 });
 

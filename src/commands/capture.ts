@@ -71,7 +71,7 @@ function outputCapturePreview(lesson: Lesson): void {
   console.log(`  Insight: ${lesson.insight}`);
   console.log(`  Type: ${lesson.type}`);
   console.log(`  Tags: ${lesson.tags.length > 0 ? lesson.tags.join(', ') : '(none)'}`);
-  console.log('\nSave this lesson? [y/n]');
+  console.log('\nTo save: run with --yes flag, or use lesson_capture MCP tool');
 }
 
 /**

@@ -1,5 +1,14 @@
 /**
  * Lesson type definitions using Zod schemas
+ *
+ * Schema hierarchy:
+ * - LessonSchema: Full lesson (all fields, backward compatible)
+ * - TombstoneSchema: Minimal deletion marker { id, deleted: true, deletedAt }
+ * - LessonRecordSchema: Union of Lesson | Tombstone (for reading JSONL)
+ *
+ * Compatibility policy:
+ * - Read path: Accept both legacy (full lesson + deleted:true) and canonical tombstones
+ * - Write path: Emit canonical TombstoneSchema only for deletions
  */
 
 import { createHash } from 'node:crypto';
@@ -54,6 +63,9 @@ export const LessonTypeSchema = z.enum(['quick', 'full']);
  *
  * All fields except core identity are optional for flexibility.
  * Semantic meaning is preserved through convention, not schema enforcement.
+ *
+ * Note: The `deleted` field on lessons is DEPRECATED. New deletions should
+ * use TombstoneSchema. The field is kept for backward compatibility.
  */
 export const LessonSchema = z.object({
   // Core identity (required)
@@ -79,6 +91,7 @@ export const LessonSchema = z.object({
   pattern: PatternSchema.optional(),
 
   // Lifecycle fields (optional)
+  // DEPRECATED: Use TombstoneSchema for deletions. Kept for backward compatibility.
   deleted: z.boolean().optional(),
   retrievalCount: z.number().optional(),
 
@@ -95,17 +108,48 @@ export const LessonSchema = z.object({
   invalidationReason: z.string().optional(),
 });
 
-// Tombstone for deletions (append-only delete marker)
+/**
+ * Canonical Tombstone schema for soft deletions.
+ *
+ * This is the ONLY format that should be written for new deletions.
+ * Contains minimal fields: just enough to mark a lesson as deleted.
+ */
 export const TombstoneSchema = z.object({
   id: z.string(),
   deleted: z.literal(true),
   deletedAt: z.string(), // ISO8601
 });
 
+/**
+ * LessonRecord schema - union for reading JSONL files.
+ *
+ * Accepts either:
+ * 1. A full Lesson (including legacy lessons with deleted:true)
+ * 2. A canonical Tombstone (minimal: { id, deleted: true, deletedAt })
+ *
+ * Use this schema when parsing JSONL records to handle both formats.
+ */
+export const LessonRecordSchema = z.union([LessonSchema, TombstoneSchema]);
+
+/**
+ * Type guard to check if a record is a tombstone (canonical or legacy).
+ */
+export function isTombstone(record: LessonRecord): record is Tombstone {
+  return record.deleted === true;
+}
+
+/**
+ * Type guard to check if a record is a lesson (not deleted).
+ */
+export function isLesson(record: LessonRecord): record is Lesson {
+  return record.deleted !== true;
+}
+
 // Type exports
 export type Lesson = z.infer<typeof LessonSchema>;
 export type LessonType = z.infer<typeof LessonTypeSchema>;
 export type Tombstone = z.infer<typeof TombstoneSchema>;
+export type LessonRecord = z.infer<typeof LessonRecordSchema>;
 export type Source = z.infer<typeof SourceSchema>;
 export type Severity = z.infer<typeof SeveritySchema>;
 export type Context = z.infer<typeof ContextSchema>;

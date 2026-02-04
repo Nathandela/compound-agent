@@ -168,11 +168,14 @@ db.prepare(`SELECT * FROM lessons WHERE id = '${id}'`);
 ### Zod Schemas (src/types.ts)
 
 ```typescript
-// All lesson types validated at runtime
-LessonSchema        // Discriminated union of Quick|Full
-QuickLessonSchema   // Minimal structure for fast capture
-FullLessonSchema    // Complete structure with evidence, severity, pattern
-TombstoneSchema     // Delete marker for append-only storage
+// Record types for JSONL storage
+LessonSchema        // Unified lesson schema (all fields, optional except core)
+TombstoneSchema     // Minimal deletion marker: { id, deleted: true, deletedAt }
+LessonRecordSchema  // Union: LessonSchema | TombstoneSchema (for reading JSONL)
+
+// Type guards
+isLesson(record)    // Check if record is a lesson (not deleted)
+isTombstone(record) // Check if record is a tombstone (deleted)
 ```
 
 ### Public Exports (src/index.ts)
@@ -199,7 +202,8 @@ detectUserCorrection, detectSelfCorrection, detectTestFailure
 loadSessionLessons, retrieveForPlan, formatLessonsCheck
 
 // Types
-generateId, LessonSchema, QuickLessonSchema, FullLessonSchema
+generateId, LessonSchema, TombstoneSchema, LessonRecordSchema
+isLesson, isTombstone  // Type guards
 ```
 
 ### Function Signatures
@@ -382,26 +386,26 @@ Before proposing ANY lesson, verify ALL THREE criteria:
 
 #### Confirmation UX
 
-When proposing a lesson, use this exact format:
+When proposing a lesson, describe what you learned and ask for confirmation:
 
 ```
-Learned: [insight]. Save? [y/n]
+Learned: [insight]. Confirm to save?
 ```
 
 **Examples:**
 ```
-Learned: Use Polars for files >100MB instead of pandas. Save? [y/n]
+Learned: Use Polars for files >100MB instead of pandas. Confirm to save?
 ```
 
 ```
-Learned: API v2 requires X-Request-ID header. Save? [y/n]
+Learned: API v2 requires X-Request-ID header. Confirm to save?
 ```
 
 **Rules:**
 - Keep insight concise (one sentence)
-- User must explicitly confirm with "y" or "yes"
+- User must explicitly confirm with "yes" or similar
 - Silence or other response = do not save
-- Never auto-save lessons
+- After confirmation, use `lesson_capture` MCP tool (preferred) or CLI with `--yes`
 
 #### Capture Command
 
@@ -450,7 +454,7 @@ Only propose lessons that pass the quality filter. Use the standard confirmation
 ```
 Session complete. Reflecting on lessons learned...
 
-Learned: Always verify API version before integration. Save? [y/n]
+Learned: Always verify API version before integration. Confirm to save?
 ```
 
 ---
@@ -543,9 +547,9 @@ IMPLEMENTATION
 │
 TRIGGER DETECTED (user correction)
 ├─ Quality check: Novel? Yes. Specific? Yes. Actionable? Yes.
-├─ Display: "Learned: Use RS256 algorithm for JWT signing. Save? [y/n]"
-├─ User: "y"
-├─ capture --trigger "Used HS256" --insight "Use RS256 for JWT" --yes
+├─ Display: "Learned: Use RS256 algorithm for JWT signing. Confirm to save?"
+├─ User: "yes"
+├─ [Claude calls lesson_capture MCP tool or capture --yes]
 │
 TASK COMPLETE
 ├─ Compound check (parallel reflection)

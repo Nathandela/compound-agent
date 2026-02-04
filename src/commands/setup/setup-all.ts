@@ -5,7 +5,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { Command } from 'commander';
 
@@ -23,13 +23,11 @@ import {
   writeClaudeSettings,
 } from './claude-helpers.js';
 import {
-  AGENTS_MD_TEMPLATE,
-  CLAUDE_MD_REFERENCE,
-  CLAUDE_REF_START_MARKER,
-  LEARNING_AGENT_SECTION_HEADER,
-  PLUGIN_MANIFEST,
-  SLASH_COMMANDS,
-} from './templates.js';
+  createPluginManifest,
+  createSlashCommands,
+  ensureClaudeMdReference,
+  updateAgentsMd,
+} from './setup-primitives.js';
 
 /** Result of one-shot setup */
 interface SetupResult {
@@ -38,20 +36,6 @@ interface SetupResult {
   hooks: boolean;
   mcpServer: boolean;
   model: boolean | 'skipped';
-}
-
-/**
- * Check if AGENTS.md already has the Learning Agent section.
- */
-function hasLearningAgentSection(content: string): boolean {
-  return content.includes(LEARNING_AGENT_SECTION_HEADER);
-}
-
-/**
- * Check if CLAUDE.md already has the Learning Agent reference.
- */
-function hasClaudeMdReference(content: string): boolean {
-  return content.includes('Learning Agent') || content.includes(CLAUDE_REF_START_MARKER);
 }
 
 /**
@@ -67,87 +51,6 @@ async function ensureLessonsDirectory(repoRoot: string): Promise<string> {
   }
 
   return lessonsDir;
-}
-
-/**
- * Create or update AGENTS.md with Learning Agent section.
- */
-async function updateAgentsMd(repoRoot: string): Promise<boolean> {
-  const agentsPath = join(repoRoot, 'AGENTS.md');
-  let content = '';
-  let existed = false;
-
-  if (existsSync(agentsPath)) {
-    content = await readFile(agentsPath, 'utf-8');
-    existed = true;
-    if (hasLearningAgentSection(content)) {
-      return false; // Already has section
-    }
-  }
-
-  const newContent = existed
-    ? content.trimEnd() + '\n' + AGENTS_MD_TEMPLATE
-    : AGENTS_MD_TEMPLATE.trim() + '\n';
-  await writeFile(agentsPath, newContent, 'utf-8');
-  return true;
-}
-
-/**
- * Ensure CLAUDE.md has reference to AGENTS.md.
- */
-async function ensureClaudeMdReference(repoRoot: string): Promise<boolean> {
-  const claudeMdPath = join(repoRoot, '.claude', 'CLAUDE.md');
-  await mkdir(join(repoRoot, '.claude'), { recursive: true });
-
-  if (!existsSync(claudeMdPath)) {
-    const content = `# Project Instructions
-${CLAUDE_MD_REFERENCE}`;
-    await writeFile(claudeMdPath, content, 'utf-8');
-    return true;
-  }
-
-  const content = await readFile(claudeMdPath, 'utf-8');
-  if (hasClaudeMdReference(content)) {
-    return false;
-  }
-
-  const newContent = content.trimEnd() + '\n' + CLAUDE_MD_REFERENCE;
-  await writeFile(claudeMdPath, newContent, 'utf-8');
-  return true;
-}
-
-/**
- * Create plugin manifest.
- */
-async function createPluginManifest(repoRoot: string): Promise<boolean> {
-  const pluginPath = join(repoRoot, '.claude', 'plugin.json');
-  await mkdir(join(repoRoot, '.claude'), { recursive: true });
-
-  if (existsSync(pluginPath)) {
-    return false;
-  }
-
-  await writeFile(pluginPath, JSON.stringify(PLUGIN_MANIFEST, null, 2) + '\n', 'utf-8');
-  return true;
-}
-
-/**
- * Create slash commands.
- */
-async function createSlashCommands(repoRoot: string): Promise<boolean> {
-  const commandsDir = join(repoRoot, '.claude', 'commands');
-  await mkdir(commandsDir, { recursive: true });
-
-  let created = false;
-  for (const [filename, content] of Object.entries(SLASH_COMMANDS)) {
-    const filePath = join(commandsDir, filename);
-    if (!existsSync(filePath)) {
-      await writeFile(filePath, content, 'utf-8');
-      created = true;
-    }
-  }
-
-  return created;
 }
 
 /**

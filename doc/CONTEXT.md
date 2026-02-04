@@ -241,7 +241,7 @@ A neutral Plan agent reviewed the proposed design. Key feedback:
 
 ### Subagent UX
 **Q**: How should lesson-capture interact?
-**A**: Quick confirmation ("Captured: [title]. Correct? [y/n]")
+**A**: Claude proposes, user confirms in chat, then Claude uses MCP tool or --yes flag
 
 ### Storage Format
 **Q**: SQLite vs JSONL?
@@ -324,7 +324,7 @@ A neutral Plan agent reviewed the proposed design. Key feedback:
 **Reason**: Offline capable, no API dependencies, simpler
 
 ### 4. Agent-Initiated + User Confirm
-**Decision**: Claude proposes lessons, user confirms with [y/n]
+**Decision**: Claude proposes lessons, user confirms in chat, Claude uses MCP/--yes to save
 **Reason**: Claude CAN notice some mistakes, but needs validation
 
 ### 5. Tiered Quality

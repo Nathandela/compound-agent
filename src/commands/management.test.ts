@@ -707,7 +707,7 @@ describe('Management Commands', () => {
       await appendLesson(getTempDir(), createQuickLesson('DEL003', 'Third lesson to delete'));
     });
 
-    it('delete <id> creates tombstone record', async () => {
+    it('delete <id> creates canonical tombstone record', async () => {
       runCli('delete DEL001');
 
       const filePath = join(getTempDir(), LESSONS_PATH);
@@ -725,6 +725,8 @@ describe('Management Commands', () => {
       expect(tombstone.deleted).toBe(true);
       expect(tombstone.deletedAt).toBeDefined();
       expect(new Date(tombstone.deletedAt).getTime()).toBeGreaterThan(0); // Valid ISO date
+      // Canonical tombstone should ONLY have id, deleted, deletedAt (not full lesson copy)
+      expect(Object.keys(tombstone).sort()).toEqual(['deleted', 'deletedAt', 'id']);
     });
 
     it('delete <id> --json outputs JSON', () => {
@@ -828,12 +830,24 @@ describe('Management Commands', () => {
       expect(stdout).toMatch(/test fail/i);
     });
 
-    it('includes CLI commands reference', () => {
+    it('includes MCP tools prominently', () => {
       const { stdout } = runCli('prime');
-      expect(stdout).toContain('lna learn');
+      // MCP tools should be mentioned prominently at top
+      expect(stdout).toContain('lesson_search');
+      expect(stdout).toContain('lesson_capture');
+      // Should emphasize MCP over CLI
+      expect(stdout).toMatch(/MUST use MCP/i);
+    });
+
+    it('includes CLI fallback reference (search, learn, list only)', () => {
+      const { stdout } = runCli('prime');
+      // CLI fallback should mention only these three commands
       expect(stdout).toContain('lna search');
-      expect(stdout).toContain('lna check-plan');
-      expect(stdout).toContain('lna stats');
+      expect(stdout).toContain('lna learn');
+      expect(stdout).toContain('lna list');
+      // Should NOT mention check-plan or stats in CLI fallback
+      expect(stdout).not.toContain('check-plan');
+      expect(stdout).not.toContain('lna stats');
     });
 
     it('includes quality gate (novel, specific, actionable)', () => {

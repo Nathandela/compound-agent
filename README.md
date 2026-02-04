@@ -114,8 +114,8 @@ project_root/
 | happens  |    | notices  |    | confirm  |    | lesson   |
 +----------+    +----------+    +----------+    +----------+
                      |              |
-                (or user          [y/n]
-                 corrects)
+                (or user        (MCP or
+                 corrects)      --yes)
 
 +----------+    +----------+    +----------+
 |  Next    |<---| Retrieve |<---| Session  |
@@ -352,6 +352,23 @@ At session start, lessons are loaded based on:
   "source": "test_failure"
 }
 ```
+
+### Tombstone (deletion marker)
+```json
+{
+  "id": "L001",
+  "deleted": true,
+  "deletedAt": "2026-01-30T12:00:00Z"
+}
+```
+
+Tombstones are minimal records that mark a lesson as deleted. The JSONL file uses append-only storage, so deletions are recorded as tombstones rather than modifying existing records.
+
+**Schema types:**
+- `LessonSchema`: Full lesson structure
+- `TombstoneSchema`: Minimal deletion marker (`{ id, deleted: true, deletedAt }`)
+- `LessonRecordSchema`: Union of Lesson | Tombstone (used when reading JSONL)
+- `isLesson()` / `isTombstone()`: Type guards for discriminating records
 
 ## Technology Stack
 

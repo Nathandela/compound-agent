@@ -220,7 +220,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       await appendLesson(tempDir, createQuickLesson('DEL003', 'Third lesson to delete'));
     });
 
-    it('delete <id> creates tombstone record', async () => {
+    it('delete <id> creates canonical tombstone record', async () => {
       runCli('delete DEL001', tempDir);
 
       const filePath = join(tempDir, LESSONS_PATH);
@@ -237,6 +237,8 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(tombstone.deleted).toBe(true);
       expect(tombstone.deletedAt).toBeDefined();
       expect(new Date(tombstone.deletedAt).getTime()).toBeGreaterThan(0);
+      // Canonical tombstone should ONLY have id, deleted, deletedAt
+      expect(Object.keys(tombstone).sort()).toEqual(['deleted', 'deletedAt', 'id']);
     });
 
     it('delete <id> --json outputs JSON', () => {

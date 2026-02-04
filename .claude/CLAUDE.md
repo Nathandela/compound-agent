@@ -201,7 +201,8 @@ The `/implementation-reviewer` validates ALL 6 categories. **Every checkbox must
 
 #### 1. Tests (MUST ALL PASS)
 - [ ] `pnpm test` shows 100% pass rate
-- [ ] No skipped tests
+- [ ] No unconditional test skips (business logic must always run)
+- [ ] Conditional skips (`skipIf`) allowed only for environment-native/hardware tests
 - [ ] No flaky tests
 
 #### 2. No Regressions
@@ -349,6 +350,30 @@ src/                        # Code with inline JSDoc
 
 ---
 
+## Resource Management Policy
+
+### Heavyweight Resources (Singleton Pattern)
+
+This project uses two heavyweight resources that require careful management:
+
+| Resource | Module | Lifecycle |
+|----------|--------|-----------|
+| SQLite database | `src/storage/sqlite.ts` | Lazy init, one instance per process |
+| Embedding model | `src/embeddings/model.ts` | Lazy init, ~150MB RAM, one instance |
+
+**Policy:**
+- **Singleton pattern required**: One instance per process via module-level state
+- **Lazy initialization**: Resources acquired on first use, not at import
+- **Explicit cleanup**: Call `closeDb()` and `unloadEmbedding()` before process exit
+- **No global variables**: Singletons are internal implementation details
+
+**Why singletons here:**
+- SQLite: Multiple connections cause locking issues
+- Embedding model: ~150MB RAM, loading is slow (~2-3s)
+- Both are process-scoped by design
+
+---
+
 ## Verification Subagents
 
 ### 🔴 Mandatory Sequence
@@ -445,6 +470,25 @@ The remaining 385 tests cover all business logic and run in ~6 seconds.
 - This is a known limitation of the underlying C++ library
 - Tests pass reliably when run serially or under moderate parallelism
 - The embedding tests use `skipIf(!modelAvailable)` to gracefully skip when model isn't installed
+
+### CI Strategy
+
+**Two test gates for release:**
+
+| Gate | Command | Purpose | When to Run |
+|------|---------|---------|-------------|
+| Business Logic | `pnpm test` | All tests; embedding tests skip if model unavailable | Every PR, local dev |
+| Full Suite | `pnpm test:all` | Downloads model, runs all tests including embedding | Release gate only |
+
+**Local Development:**
+- Use `pnpm test:fast` for rapid iteration (~6s)
+- Run `pnpm test` before committing
+
+**CI/CD:**
+- PR checks: `pnpm test` (skips gracefully if no model)
+- Release gate: `pnpm test:all` (requires compatible runner with native bindings)
+
+**Release is blocked until both gates pass.** See CONTRIBUTING.md for full pre-release checklist.
 
 ### Test Quality Standards
 

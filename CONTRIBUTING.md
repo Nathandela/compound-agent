@@ -219,21 +219,27 @@ src/
 
 ### Pre-Release Checklist
 
-Before publishing a new version:
+Before publishing a new version, **both test gates must pass**:
 
 ```bash
-# 1. Ensure all tests pass
+# Gate 1: Business logic tests (deterministic, no native deps required)
 pnpm test
 
-# 2. Ensure lint passes
-pnpm lint
+# Gate 2: Full suite with embedding model (requires compatible runner)
+# This ensures native bindings and embedding model work correctly
+pnpm test:all
 
-# 3. Build the package
-pnpm build
-
-# 4. Verify tarball contents
-pnpm pack --dry-run
+# Additional checks
+pnpm lint          # Type checking
+pnpm build         # Build verification
+pnpm pack --dry-run # Tarball contents
 ```
+
+**Test Gates Explained:**
+- `pnpm test`: Runs all tests. Embedding tests skip gracefully if model unavailable.
+- `pnpm test:all`: Downloads model first, then runs all tests. Required for release.
+
+**Release is blocked until both gates are green.**
 
 Expected tarball contents:
 - `dist/` (compiled JavaScript + TypeScript declarations)

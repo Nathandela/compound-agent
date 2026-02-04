@@ -56,8 +56,8 @@ FLOW:
 │ happens │    │ notices │    │ confirm │    │ lesson  │
 └─────────┘    └─────────┘    └─────────┘    └─────────┘
                     │              │
-               (or user          [y/n]
-                corrects)
+               (or user        (MCP or
+                corrects)      --yes)
 
 ┌─────────┐    ┌─────────┐    ┌─────────┐
 │  Next   │<───│ Retrieve│<───│ Session │
@@ -115,12 +115,22 @@ FLOW:
 }
 ```
 
+### Tombstone (deletion marker)
+```json
+{
+  "id": "L001",
+  "deleted": true,
+  "deletedAt": "2025-01-30T14:00:00Z"
+}
+```
+
+Tombstones are minimal records that mark a lesson as deleted. The canonical format contains only `id`, `deleted: true`, and `deletedAt`. Legacy tombstones (full lesson with `deleted: true`) are accepted for backward compatibility but new deletions emit only the minimal format.
+
 ### Metadata & Lifecycle Fields
 - **source**: `user_correction | self_correction | test_failure | manual`
 - **context**: `{ tool: string, intent: string }` (captured at proposal time)
 - **supersedes**: Array of lesson IDs replaced by this one
 - **related**: Array of lesson IDs with adjacent relevance
-- **deleted** (tombstone): Optional boolean; delete/edit appends a record with the same `id` and `deleted: true`
 
 ### Lesson Categories (from user examples)
 - **Preferences**: Use Polars not pandas, uv over pip
@@ -151,8 +161,9 @@ If all YES -> propose with quick confirm
 
 ### Confirmation UX
 ```
-Claude: "Learned: Use Polars for large files. Save? [y/n]"
-User: "y" (or ignores = no)
+Claude: "Learned: Use Polars for large files. Confirm to save."
+User: "yes" (or ignores = no save)
+Claude: [uses lesson_capture MCP tool or capture --yes]
 ```
 
 **Key principle**: Most sessions have NO lessons, and that's fine. Quality over quantity.
