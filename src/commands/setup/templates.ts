@@ -7,11 +7,18 @@
 // ============================================================================
 
 /** Pre-commit hook reminder message */
-export const PRE_COMMIT_MESSAGE = `Before committing, have you captured any valuable lessons from this session?
-Consider: corrections, mistakes, or insights worth remembering.
-
-To capture a lesson:
-  npx lna capture --trigger "what happened" --insight "what to do" --yes`;
+export const PRE_COMMIT_MESSAGE = `
+╔══════════════════════════════════════════════════════════════╗
+║                    LESSON CAPTURE CHECKPOINT                 ║
+╠══════════════════════════════════════════════════════════════╣
+║ STOP. Before this commit, take a moment to reflect:          ║
+║                                                              ║
+║ [ ] Did I learn something relevant during this session?      ║
+║ [ ] Is there anything worth remembering for next time?       ║
+║                                                              ║
+║ If so, consider capturing a lesson:                          ║
+║   npx lna learn "<insight>" --trigger "<what happened>"      ║
+╚══════════════════════════════════════════════════════════════╝`;
 
 /** Pre-commit hook shell script template */
 export const PRE_COMMIT_HOOK_TEMPLATE = `#!/bin/sh
@@ -35,7 +42,14 @@ npx lna hooks run pre-commit
 // ============================================================================
 
 /** Markers to identify our hook in Claude Code settings (current and legacy) */
-export const CLAUDE_HOOK_MARKERS = ['lna prime', 'lna load-session', 'learning-agent load-session'];
+export const CLAUDE_HOOK_MARKERS = [
+  'lna prime',
+  'lna load-session',
+  'learning-agent load-session',
+  'lna hooks run user-prompt',
+  'lna hooks run post-tool-failure',
+  'lna hooks run post-tool-success',
+];
 
 /** Claude Code SessionStart hook configuration (v0.2.4: uses prime for trust language) */
 export const CLAUDE_HOOK_CONFIG = {
@@ -55,6 +69,39 @@ export const CLAUDE_PRECOMPACT_HOOK_CONFIG = {
     {
       type: 'command',
       command: 'npx lna prime 2>/dev/null || true',
+    },
+  ],
+};
+
+/** Claude Code UserPromptSubmit hook configuration */
+export const CLAUDE_USER_PROMPT_HOOK_CONFIG = {
+  matcher: '',
+  hooks: [
+    {
+      type: 'command',
+      command: 'npx lna hooks run user-prompt 2>/dev/null || true',
+    },
+  ],
+};
+
+/** Claude Code PostToolUseFailure hook configuration */
+export const CLAUDE_POST_TOOL_FAILURE_HOOK_CONFIG = {
+  matcher: 'Bash|Edit|Write',
+  hooks: [
+    {
+      type: 'command',
+      command: 'npx lna hooks run post-tool-failure 2>/dev/null || true',
+    },
+  ],
+};
+
+/** Claude Code PostToolUse hook configuration (for success reset) */
+export const CLAUDE_POST_TOOL_SUCCESS_HOOK_CONFIG = {
+  matcher: 'Bash|Edit|Write',
+  hooks: [
+    {
+      type: 'command',
+      command: 'npx lna hooks run post-tool-success 2>/dev/null || true',
     },
   ],
 };
@@ -239,7 +286,7 @@ npx lna stats
 export const PLUGIN_MANIFEST = {
   name: 'learning-agent',
   description: 'Session memory for Claude Code - capture and retrieve lessons',
-  version: '0.2.7',
+  version: '0.2.8',
   author: {
     name: 'Nathan Delacrétaz',
     url: 'https://github.com/Nathandela',
@@ -259,6 +306,24 @@ export const PLUGIN_MANIFEST = {
       {
         matcher: '',
         hooks: [{ type: 'command', command: 'npx lna prime 2>/dev/null || true' }],
+      },
+    ],
+    UserPromptSubmit: [
+      {
+        matcher: '',
+        hooks: [{ type: 'command', command: 'npx lna hooks run user-prompt 2>/dev/null || true' }],
+      },
+    ],
+    PostToolUseFailure: [
+      {
+        matcher: 'Bash|Edit|Write',
+        hooks: [{ type: 'command', command: 'npx lna hooks run post-tool-failure 2>/dev/null || true' }],
+      },
+    ],
+    PostToolUse: [
+      {
+        matcher: 'Bash|Edit|Write',
+        hooks: [{ type: 'command', command: 'npx lna hooks run post-tool-success 2>/dev/null || true' }],
       },
     ],
     // Note: PreCommit is handled by git hooks, not Claude Code hooks

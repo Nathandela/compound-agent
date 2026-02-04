@@ -20,8 +20,9 @@ describe('CLI', { tags: ['integration'] }, () => {
   describe('hooks run command', () => {
     it('outputs lesson reminder prompt for pre-commit hook', () => {
       const { combined } = runCli('hooks run pre-commit', tempDir);
-      expect(combined).toContain('lessons');
-      expect(combined.toLowerCase()).toMatch(/capture|remember|session/i);
+      // Check for key elements of the lesson capture prompt
+      expect(combined).toContain('LESSON CAPTURE CHECKPOINT');
+      expect(combined).toContain('npx lna learn');
     });
 
     it('exits with code 0 (non-blocking)', () => {

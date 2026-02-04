@@ -15,9 +15,12 @@ import {
   AGENTS_SECTION_START_MARKER,
   CLAUDE_HOOK_CONFIG,
   CLAUDE_HOOK_MARKERS,
+  CLAUDE_POST_TOOL_FAILURE_HOOK_CONFIG,
+  CLAUDE_POST_TOOL_SUCCESS_HOOK_CONFIG,
   CLAUDE_PRECOMPACT_HOOK_CONFIG,
   CLAUDE_REF_END_MARKER,
   CLAUDE_REF_START_MARKER,
+  CLAUDE_USER_PROMPT_HOOK_CONFIG,
   MCP_SERVER_CONFIG,
 } from './templates.js';
 import type { ClaudeHooksResult } from './types.js';
@@ -49,17 +52,25 @@ export async function readClaudeSettings(settingsPath: string): Promise<Record<s
 
 /**
  * Check if our hook is already installed.
- * Checks for both current (lna) and legacy (learning-agent) markers.
+ * Checks for both current (lna) and legacy (learning-agent) markers in any hook type.
  */
 export function hasClaudeHook(settings: Record<string, unknown>): boolean {
   const hooks = settings.hooks as Record<string, unknown[]> | undefined;
-  if (!hooks?.SessionStart) return false;
+  if (!hooks) return false;
 
-  return hooks.SessionStart.some((entry) => {
-    const hookEntry = entry as { hooks?: Array<{ command?: string }> };
-    return hookEntry.hooks?.some((h) =>
-      CLAUDE_HOOK_MARKERS.some((marker) => h.command?.includes(marker))
-    );
+  // Check all hook types we manage
+  const hookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse'];
+
+  return hookTypes.some((hookType) => {
+    const hookArray = hooks[hookType];
+    if (!hookArray) return false;
+
+    return hookArray.some((entry) => {
+      const hookEntry = entry as { hooks?: Array<{ command?: string }> };
+      return hookEntry.hooks?.some((h) =>
+        CLAUDE_HOOK_MARKERS.some((marker) => h.command?.includes(marker))
+      );
+    });
   });
 }
 
@@ -78,7 +89,7 @@ export function addLearningAgentHook(settings: Record<string, unknown>): void {
 }
 
 /**
- * Add all v0.2.4 hooks: SessionStart, PreCompact.
+ * Add all v0.2.8 hooks: SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse.
  * Note: PreCommit is handled by git hooks, not Claude Code hooks.
  */
 export function addAllLearningAgentHooks(settings: Record<string, unknown>): void {
@@ -101,6 +112,30 @@ export function addAllLearningAgentHooks(settings: Record<string, unknown>): voi
   }
   if (!hasHookType(hooks.PreCompact, 'lna prime')) {
     hooks.PreCompact.push(CLAUDE_PRECOMPACT_HOOK_CONFIG);
+  }
+
+  // UserPromptSubmit - gentle lesson tool reminders (v0.2.8)
+  if (!hooks.UserPromptSubmit) {
+    hooks.UserPromptSubmit = [];
+  }
+  if (!hasHookType(hooks.UserPromptSubmit, 'lna hooks run user-prompt')) {
+    hooks.UserPromptSubmit.push(CLAUDE_USER_PROMPT_HOOK_CONFIG);
+  }
+
+  // PostToolUseFailure - smart failure detection (v0.2.8)
+  if (!hooks.PostToolUseFailure) {
+    hooks.PostToolUseFailure = [];
+  }
+  if (!hasHookType(hooks.PostToolUseFailure, 'lna hooks run post-tool-failure')) {
+    hooks.PostToolUseFailure.push(CLAUDE_POST_TOOL_FAILURE_HOOK_CONFIG);
+  }
+
+  // PostToolUse - reset failure state on success (v0.2.8)
+  if (!hooks.PostToolUse) {
+    hooks.PostToolUse = [];
+  }
+  if (!hasHookType(hooks.PostToolUse, 'lna hooks run post-tool-success')) {
+    hooks.PostToolUse.push(CLAUDE_POST_TOOL_SUCCESS_HOOK_CONFIG);
   }
 
   // Note: remind-capture functionality is handled by git pre-commit hooks
@@ -240,22 +275,35 @@ export function removeMcpServer(settings: Record<string, unknown>): boolean {
 }
 
 /**
- * Remove our hook from SessionStart array.
- * Removes both current (lna) and legacy (learning-agent) hooks.
+ * Remove our hooks from all hook arrays.
+ * Removes both current (lna) and legacy (learning-agent) hooks from all hook types.
  */
 export function removeLearningAgentHook(settings: Record<string, unknown>): boolean {
   const hooks = settings.hooks as Record<string, unknown[]> | undefined;
-  if (!hooks?.SessionStart) return false;
+  if (!hooks) return false;
 
-  const originalLength = hooks.SessionStart.length;
-  hooks.SessionStart = hooks.SessionStart.filter((entry) => {
-    const hookEntry = entry as { hooks?: Array<{ command?: string }> };
-    return !hookEntry.hooks?.some((h) =>
-      CLAUDE_HOOK_MARKERS.some((marker) => h.command?.includes(marker))
-    );
-  });
+  let anyRemoved = false;
 
-  return hooks.SessionStart.length < originalLength;
+  // Hook types we manage
+  const hookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse'];
+
+  for (const hookType of hookTypes) {
+    if (!hooks[hookType]) continue;
+
+    const originalLength = hooks[hookType].length;
+    hooks[hookType] = hooks[hookType].filter((entry) => {
+      const hookEntry = entry as { hooks?: Array<{ command?: string }> };
+      return !hookEntry.hooks?.some((h) =>
+        CLAUDE_HOOK_MARKERS.some((marker) => h.command?.includes(marker))
+      );
+    });
+
+    if (hooks[hookType].length < originalLength) {
+      anyRemoved = true;
+    }
+  }
+
+  return anyRemoved;
 }
 
 /**

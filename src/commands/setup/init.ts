@@ -11,7 +11,7 @@ import { getRepoRoot } from '../../cli-utils.js';
 import { LESSONS_PATH } from '../../storage/index.js';
 import { getGlobalOpts, out } from '../shared.js';
 import { installClaudeHooksForInit } from './claude-helpers.js';
-import { installPreCommitHook } from './hooks.js';
+import { installPreCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
   createSlashCommands,
@@ -81,9 +81,9 @@ export function registerInitCommand(program: Command): void {
       }
 
       // Install git hooks unless skipped
-      let hooksInstalled = false;
+      let hookResult: HookInstallResult | null = null;
       if (!options.skipHooks) {
-        hooksInstalled = await installPreCommitHook(repoRoot);
+        hookResult = await installPreCommitHook(repoRoot);
       }
 
       // Install Claude hooks unless skipped (f8a)
@@ -96,12 +96,15 @@ export function registerInitCommand(program: Command): void {
       if (options.json) {
         // claudeHooks: true only if we actually installed (not already_installed)
         const claudeHooksInstalled = claudeHooksResult.action === 'installed';
+        // hooks: true if we installed or appended (made changes)
+        const hooksChanged = hookResult?.status === 'installed' || hookResult?.status === 'appended';
         console.log(JSON.stringify({
           initialized: true,
           lessonsDir,
           agentsMd: agentsMdUpdated,
           slashCommands: slashCommandsCreated || !options.skipAgents,
-          hooks: hooksInstalled,
+          hooks: hooksChanged,
+          hookStatus: hookResult?.status ?? 'skipped',
           claudeHooks: claudeHooksInstalled,
         }));
       } else if (!quiet) {
@@ -121,12 +124,16 @@ export function registerInitCommand(program: Command): void {
         } else {
           console.log('  Slash commands: Already exist');
         }
-        if (hooksInstalled) {
-          console.log('  Git hooks: pre-commit hook installed');
-        } else if (options.skipHooks) {
+        if (options.skipHooks) {
           console.log('  Git hooks: Skipped (--skip-hooks)');
-        } else {
-          console.log('  Git hooks: Already installed or not a git repo');
+        } else if (hookResult?.status === 'installed') {
+          console.log('  Git hooks: Installed');
+        } else if (hookResult?.status === 'appended') {
+          console.log('  Git hooks: Appended to existing pre-commit hook');
+        } else if (hookResult?.status === 'already_installed') {
+          console.log('  Git hooks: Already installed');
+        } else if (hookResult?.status === 'not_git_repo') {
+          console.log('  Git hooks: Skipped (not a git repository)');
         }
         // Claude hooks status
         if (options.skipClaude) {

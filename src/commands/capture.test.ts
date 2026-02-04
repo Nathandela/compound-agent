@@ -484,15 +484,16 @@ describe('Capture Commands', () => {
   describe('hooks run command', () => {
     it('outputs lesson reminder prompt for pre-commit hook', () => {
       const { combined } = runCli('hooks run pre-commit');
-      expect(combined).toContain('lessons');
-      expect(combined.toLowerCase()).toMatch(/capture|remember|session/i);
+      expect(combined).toContain('LESSON CAPTURE CHECKPOINT');
+      expect(combined).toContain('npx lna learn');
     });
 
     it('exits with code 0 (non-blocking)', () => {
       // runCli will throw if exit code is non-zero
       const { combined } = runCli('hooks run pre-commit');
-      // Should not contain error indicators
-      expect(combined).not.toMatch(/error|fail/i);
+      // Should contain the checkpoint message, not error output
+      expect(combined).toContain('CHECKPOINT');
+      expect(combined).not.toMatch(/error:/i);
     });
 
     it('outputs JSON with --json flag', () => {

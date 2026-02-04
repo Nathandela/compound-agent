@@ -14,6 +14,7 @@ import { registerSetupAllCommand } from './setup-all.js';
 
 // Re-export types
 export type { ClaudeHooksResult } from './types.js';
+export type { HookInstallResult } from './hooks.js';
 
 // Re-export templates for tests
 export { AGENTS_MD_TEMPLATE } from './templates.js';

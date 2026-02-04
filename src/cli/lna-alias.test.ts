@@ -69,7 +69,7 @@ describe('CLI', { tags: ['integration'] }, () => {
         expect(templateContent).not.toContain('npx learning-agent');
       });
 
-      it('PRE_COMMIT_MESSAGE uses npx lna capture', async () => {
+      it('PRE_COMMIT_MESSAGE uses npx lna learn (preferred alias)', async () => {
         const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
@@ -78,7 +78,8 @@ describe('CLI', { tags: ['integration'] }, () => {
 
         const messageContent = messageMatch![1];
 
-        expect(messageContent).toContain('npx lna capture');
+        // Uses 'learn' alias (preferred) or 'capture' (also valid)
+        expect(messageContent).toMatch(/npx lna (learn|capture)/);
 
         expect(messageContent).not.toContain('npx learning-agent');
       });
