@@ -424,7 +424,7 @@ describe('MCP Server', () => {
   });
 
   describe('error handling', () => {
-    it('propagates errors from searchVector', async () => {
+    it('returns actionable error when searchVector fails', async () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
@@ -438,9 +438,11 @@ describe('MCP Server', () => {
       const { createMcpServer: createMockedServer } = await import('./mcp.js');
       const mockedServer = createMockedServer(tempDir);
 
-      await expect(
-        mockedServer.callTool('lesson_search', { query: 'test' })
-      ).rejects.toThrow();
+      // Now returns error response instead of throwing
+      const result = await mockedServer.callTool('lesson_search', { query: 'test' });
+      expect(result).toHaveProperty('error');
+      expect(result).toHaveProperty('action');
+      expect(result.lessons).toEqual([]);
     });
 
     it('propagates errors from appendLesson', async () => {

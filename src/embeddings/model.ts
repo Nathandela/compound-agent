@@ -8,7 +8,7 @@
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { resolveModelFile } from 'node-llama-cpp';
+import { getLlama, resolveModelFile } from 'node-llama-cpp';
 
 /**
  * HuggingFace URI for EmbeddingGemma-300M (Q4_0 quantization).
@@ -35,6 +35,79 @@ const DEFAULT_MODEL_DIR = join(homedir(), '.node-llama-cpp', 'models');
  */
 export function isModelAvailable(): boolean {
   return existsSync(join(DEFAULT_MODEL_DIR, MODEL_FILENAME));
+}
+
+/**
+ * Result of checking if the model is usable at runtime.
+ *
+ * A discriminated union where `usable` determines which fields are present:
+ * - usable=true: Model can initialize and create embedding context
+ * - usable=false: Model cannot be used, with reason and actionable fix
+ */
+export type UsabilityResult =
+  | { usable: true; reason?: undefined; action?: undefined }
+  | { usable: false; reason: string; action: string };
+
+/**
+ * Check if the embedding model is usable at runtime.
+ *
+ * Goes beyond file existence to verify the model can actually initialize:
+ * 1. Checks if model file exists (fast fail)
+ * 2. Attempts to load llama runtime
+ * 3. Attempts to load model
+ * 4. Attempts to create embedding context
+ * 5. Cleans up all resources after check
+ *
+ * @returns UsabilityResult with usable status and actionable error if failed
+ */
+export async function isModelUsable(): Promise<UsabilityResult> {
+  // Fast fail if model file doesn't exist
+  if (!isModelAvailable()) {
+    return {
+      usable: false,
+      reason: 'Embedding model file not found',
+      action: 'Run: npx lna download-model',
+    };
+  }
+
+  // Attempt runtime initialization
+  let llama = null;
+  let model = null;
+  let context = null;
+
+  try {
+    const modelPath = join(DEFAULT_MODEL_DIR, MODEL_FILENAME);
+
+    // Step 1: Get llama runtime
+    llama = await getLlama();
+
+    // Step 2: Load model
+    model = await llama.loadModel({ modelPath });
+
+    // Step 3: Create embedding context
+    context = await model.createEmbeddingContext();
+
+    // Success - clean up and return
+    return { usable: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return {
+      usable: false,
+      reason: `Embedding model runtime initialization failed: ${message}`,
+      action: 'Check system compatibility or reinstall: npx lna download-model',
+    };
+  } finally {
+    // Clean up resources in reverse order
+    if (context) {
+      try {
+        context.dispose();
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+    // Note: model and llama don't have explicit dispose methods in node-llama-cpp
+    // The GC will handle them when references are released
+  }
 }
 
 /**

@@ -107,31 +107,59 @@ Returns relevant lessons ranked by similarity and severity.`,
       inputSchema: searchInputSchema,
     },
     async ({ query, maxResults }) => {
-      const limit = maxResults ?? DEFAULT_MAX_RESULTS;
-      const results = await searchVector(repoRoot, query, { limit });
+      try {
+        const limit = maxResults ?? DEFAULT_MAX_RESULTS;
+        const results = await searchVector(repoRoot, query, { limit });
 
-      const lessons: SearchResult[] = results.map((r) => ({
-        lesson: r.lesson,
-        score: r.score,
-      }));
+        const lessons: SearchResult[] = results.map((r) => ({
+          lesson: r.lesson,
+          score: r.score,
+        }));
 
-      const output: SearchToolResult = { lessons };
-      return {
-        content: [{ type: 'text' as const, text: JSON.stringify(output) }],
-      };
+        const output: SearchToolResult = { lessons };
+        return {
+          content: [{ type: 'text' as const, text: JSON.stringify(output) }],
+        };
+      } catch (err) {
+        // Convert embedding errors to actionable messages
+        const message = err instanceof Error ? err.message : 'Unknown error';
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: JSON.stringify({
+                error: `Search failed: ${message}`,
+                action: 'Run: npx lna download-model',
+                lessons: [],
+              }),
+            },
+          ],
+        };
+      }
     }
   );
 
   // Store handler for direct invocation
   toolHandlers['lesson_search'] = async (params) => {
     const parsed = z.object(searchInputSchema).parse(params);
-    const limit = parsed.maxResults ?? DEFAULT_MAX_RESULTS;
-    const results = await searchVector(repoRoot, parsed.query, { limit });
-    // Handle case where searchVector returns undefined (shouldn't happen but defensive)
-    const safeResults = results ?? [];
-    return {
-      lessons: safeResults.map((r) => ({ lesson: r.lesson, score: r.score })),
-    } as SearchToolResult;
+
+    try {
+      const limit = parsed.maxResults ?? DEFAULT_MAX_RESULTS;
+      const results = await searchVector(repoRoot, parsed.query, { limit });
+      // Handle case where searchVector returns undefined (shouldn't happen but defensive)
+      const safeResults = results ?? [];
+      return {
+        lessons: safeResults.map((r) => ({ lesson: r.lesson, score: r.score })),
+      } as SearchToolResult;
+    } catch (err) {
+      // Convert embedding errors to actionable messages
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      return {
+        error: `Search failed: ${message}`,
+        action: 'Run: npx lna download-model',
+        lessons: [],
+      } as unknown as SearchToolResult;
+    }
   };
 
   // =========================================================================

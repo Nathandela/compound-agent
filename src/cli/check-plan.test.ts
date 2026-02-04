@@ -108,14 +108,16 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(combined.toLowerCase()).toMatch(/no plan|required|error/i);
     });
 
-    it('includes relevance score in JSON output', () => {
+    it('includes rankScore (final ranking score) in JSON output', () => {
       const { stdout } = runCli('check-plan --json --plan "testing workflow"', tempDir);
       const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
       expect(jsonLine).toBeDefined();
-      const result = JSON.parse(jsonLine!) as { lessons: Array<{ relevance?: number }> };
+      const result = JSON.parse(jsonLine!) as { lessons: Array<{ rankScore?: number }> };
       if (result.lessons.length > 0) {
-        expect(result.lessons[0]).toHaveProperty('relevance');
-        expect(typeof result.lessons[0].relevance).toBe('number');
+        expect(result.lessons[0]).toHaveProperty('rankScore');
+        expect(typeof result.lessons[0].rankScore).toBe('number');
+        // Should NOT have the old 'relevance' field
+        expect(result.lessons[0]).not.toHaveProperty('relevance');
       }
     });
 

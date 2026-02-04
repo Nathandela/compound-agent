@@ -8,7 +8,7 @@ import chalk from 'chalk';
 import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
-import { isModelAvailable, loadSessionLessons, retrieveForPlan } from '../index.js';
+import { isModelUsable, loadSessionLessons, retrieveForPlan } from '../index.js';
 import { readLessons, searchKeyword, syncIfNeeded } from '../storage/index.js';
 import type { Lesson } from '../types.js';
 
@@ -22,8 +22,9 @@ import {
   ISO_DATE_PREFIX_LENGTH,
   LESSON_COUNT_WARNING_THRESHOLD,
   out,
-  RELEVANCE_DECIMAL_PLACES,
 } from './shared.js';
+
+import type { RankedLesson } from '../search/index.js';
 
 // ============================================================================
 // Check-Plan Command Helpers
@@ -46,13 +47,15 @@ async function readPlanFromStdin(): Promise<string | undefined> {
 
 /**
  * Output check-plan results in JSON format.
+ *
+ * Uses rankScore (final boosted score) instead of raw similarity.
  */
-function outputCheckPlanJson(lessons: Array<{ lesson: Lesson; score: number }>): void {
+function outputCheckPlanJson(lessons: RankedLesson[]): void {
   const jsonOutput = {
     lessons: lessons.map((l) => ({
       id: l.lesson.id,
       insight: l.lesson.insight,
-      relevance: l.score,
+      rankScore: l.finalScore ?? l.score, // Use finalScore if available, fallback to raw score
       source: l.lesson.source,
     })),
     count: lessons.length,
@@ -62,15 +65,16 @@ function outputCheckPlanJson(lessons: Array<{ lesson: Lesson; score: number }>):
 
 /**
  * Output check-plan results in human-readable format.
+ *
+ * Omits numeric scores - ordering is sufficient for human consumption.
  */
-function outputCheckPlanHuman(lessons: Array<{ lesson: Lesson; score: number }>, quiet: boolean): void {
+function outputCheckPlanHuman(lessons: RankedLesson[], quiet: boolean): void {
   console.log('## Lessons Check\n');
   console.log('Relevant to your plan:\n');
 
   lessons.forEach((item, i) => {
     const num = i + 1;
     console.log(`${num}. ${chalk.bold(`[${item.lesson.id}]`)} ${item.lesson.insight}`);
-    console.log(`   - Relevance: ${item.score.toFixed(RELEVANCE_DECIMAL_PLACES)}`);
     console.log(`   - Source: ${item.lesson.source}`);
     console.log();
   });
@@ -314,17 +318,18 @@ export function registerRetrievalCommands(program: Command): void {
         process.exit(1);
       }
 
-      // Check model availability - hard fail if not available
-      if (!isModelAvailable()) {
+      // Check model usability - hard fail with actionable error if not usable
+      const usability = await isModelUsable();
+      if (!usability.usable) {
         if (options.json) {
           console.log(JSON.stringify({
-            error: 'Embedding model not available',
-            action: 'Run: npx lna download-model',
+            error: usability.reason,
+            action: usability.action,
           }));
         } else {
-          out.error('Embedding model not available');
+          out.error(usability.reason);
           console.log('');
-          console.log('Run: npx lna download-model');
+          console.log(usability.action);
         }
         process.exit(1);
       }

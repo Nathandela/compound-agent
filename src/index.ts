@@ -108,11 +108,13 @@ export {
   embedTexts,
   getEmbedding,
   isModelAvailable,
+  isModelUsable,
   MODEL_FILENAME,
   MODEL_URI,
   resolveModel,
   unloadEmbedding,
 } from './embeddings/index.js';
+export type { UsabilityResult } from './embeddings/index.js';
 
 // Search API (vector similarity + ranking)
 export {
@@ -161,15 +163,19 @@ export { getPrimeContext } from './commands/index.js';
 // Types and schemas
 export {
   generateId,
+  isLesson,
+  isTombstone,
+  LessonRecordSchema,
   LessonSchema,
   LessonTypeSchema,
   TombstoneSchema,
 } from './types.js';
 export type {
-  Lesson,
-  LessonType,
-  Tombstone,
-  Source,
-  Severity,
   Context,
+  Lesson,
+  LessonRecord,
+  LessonType,
+  Severity,
+  Source,
+  Tombstone,
 } from './types.js';

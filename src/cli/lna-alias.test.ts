@@ -99,16 +99,13 @@ describe('CLI', { tags: ['integration'] }, () => {
       });
 
       it('check-plan error message suggests npx lna download-model', async () => {
-        const retrievalPath = join(process.cwd(), 'src', 'commands', 'retrieval.ts');
-        const retrievalContent = await readFile(retrievalPath, 'utf8');
+        // Error messages now come from model.ts (isModelUsable function)
+        const modelPath = join(process.cwd(), 'src', 'embeddings', 'model.ts');
+        const modelContent = await readFile(modelPath, 'utf8');
 
-        const errorMatches = retrievalContent.match(/Run: npx [\w-]+ download-model/g);
+        const errorMatches = modelContent.match(/npx lna download-model/g);
         expect(errorMatches).toBeTruthy();
         expect(errorMatches!.length).toBeGreaterThan(0);
-
-        errorMatches!.forEach((match) => {
-          expect(match).toBe('Run: npx lna download-model');
-        });
       });
     });
 

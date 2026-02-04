@@ -9,4 +9,5 @@
 export { embedText, embedTexts, getEmbedding, isModelAvailable, unloadEmbedding } from './nomic.js';
 
 // Model resolution
-export { MODEL_FILENAME, MODEL_URI, resolveModel } from './model.js';
+export { isModelUsable, MODEL_FILENAME, MODEL_URI, resolveModel } from './model.js';
+export type { UsabilityResult } from './model.js';

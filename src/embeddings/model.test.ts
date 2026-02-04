@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { isModelAvailable, MODEL_FILENAME, MODEL_URI, resolveModel } from './model.js';
+import { isModelAvailable, isModelUsable, MODEL_FILENAME, MODEL_URI, resolveModel } from './model.js';
 
 describe('embedding model resolution', () => {
   describe('MODEL_URI', () => {
@@ -54,6 +54,49 @@ describe('embedding model resolution', () => {
       // cli: false suppresses download progress (delegates to node-llama-cpp)
       const path = await resolveModel({ cli: false });
       expect(path).toContain(MODEL_FILENAME);
+    });
+  });
+
+  describe('isModelUsable', () => {
+    it('returns a UsabilityResult object', async () => {
+      const result = await isModelUsable();
+      expect(result).toHaveProperty('usable');
+      expect(typeof result.usable).toBe('boolean');
+    });
+
+    it('returns usable=false with reason when model file not present', async () => {
+      // When model is not available, it should fail fast
+      if (!isModelAvailable()) {
+        const result = await isModelUsable();
+        expect(result.usable).toBe(false);
+        expect(result.reason).toContain('not found');
+        expect(result.action).toContain('download-model');
+      }
+    });
+
+    it.skipIf(!isModelAvailable())('returns usable=true when model can initialize', async () => {
+      const result = await isModelUsable();
+      expect(result.usable).toBe(true);
+      expect(result.reason).toBeUndefined();
+    });
+
+    it.skipIf(!isModelAvailable())('cleans up resources after preflight check', async () => {
+      // Should not leave any resources loaded after check
+      const result = await isModelUsable();
+      expect(result.usable).toBe(true);
+      // If cleanup failed, subsequent calls would potentially fail or leak memory
+      const result2 = await isModelUsable();
+      expect(result2.usable).toBe(true);
+    });
+
+    it('provides actionable error message on failure', async () => {
+      if (!isModelAvailable()) {
+        const result = await isModelUsable();
+        expect(result.usable).toBe(false);
+        // Should provide clear action to fix
+        expect(result.action).toBeDefined();
+        expect(result.action).toMatch(/download-model|npx lna/);
+      }
     });
   });
 });
