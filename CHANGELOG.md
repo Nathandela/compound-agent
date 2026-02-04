@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-02-04
+
+### Added
+
+- **UserPromptSubmit Hook**: Detects correction and planning language in user messages
+  - Correction detection: "actually", "wrong", "use X instead", "you forgot", etc.
+  - Planning detection: "implement", "build", "create", "refactor", etc.
+  - Injects gentle reminders to use `lesson_capture` and `lesson_search` MCP tools
+
+- **PostToolUseFailure Hook**: Smart failure detection for Bash/Edit/Write tools
+  - Triggers after 2 failures on same file/command OR 3 total failures
+  - Suggests using `lesson_search` to find relevant lessons
+  - State tracked per session, resets on success
+
+- **PostToolUse Hook**: Resets failure tracking state after successful tool use
+
+### Changed
+
+- **Pre-commit prompt redesigned** with checklist format for better reflection
+  - "LESSON CAPTURE CHECKPOINT" header
+  - Explicit checkboxes for self-reflection
+  - Clearer call-to-action
+
+- **HookInstallResult discriminated union** for clear status messages
+  - `installed`, `already_installed`, `not_git_repo`, `appended` statuses
+  - No more ambiguous "Already installed or not a git repo" messages
+
+### Fixed
+
+- Git hook installation now provides specific status messages
+
 ## [0.2.7] - 2026-02-04
 
 ### Fixed
@@ -312,7 +343,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.8...HEAD
+[0.2.8]: https://github.com/Nathandela/learning_agent/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/Nathandela/learning_agent/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/Nathandela/learning_agent/compare/v0.2.5...v0.2.6
 [0.2.5]: https://github.com/Nathandela/learning_agent/compare/v0.2.4...v0.2.5

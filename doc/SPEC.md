@@ -450,6 +450,18 @@ From neutral reviewer:
 
 This section documents changes since the original spec (v0.1.0).
 
+### v0.2.8 (2026-02-04) - Hook UX Improvements
+
+**New Hooks:**
+- UserPromptSubmit: Detects correction/planning language, injects lesson tool reminders
+- PostToolUseFailure: Smart failure detection (2 same-target OR 3 total failures)
+- PostToolUse: Resets failure state on success
+
+**UX Improvements:**
+- Pre-commit prompt redesigned with checklist format
+- HookInstallResult discriminated union for clear status messages
+- Gentle reminder system encourages natural lesson tool usage
+
 ### v0.2.7 (2026-02-04) - MCP-First Integration
 
 **MCP Priority:**

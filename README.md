@@ -398,11 +398,11 @@ pnpm lint
 
 ## Project Status
 
-Version 0.2.7 - Stable release with MCP-first integration. Key features:
+Version 0.2.8 - Hook UX improvements and smarter failure detection. Key features:
 - **MCP Server**: `lesson_search` and `lesson_capture` as native Claude tools (primary interface)
-- **One-shot setup**: `lna setup` configures hooks, MCP, and downloads model
+- **Smart hooks**: UserPromptSubmit (correction/planning detection), PostToolUseFailure (smart failure tracking)
+- **Pre-commit checkpoint**: Checklist-format reflection prompt before commits
 - **MCP-first workflow**: AGENTS.md and prime output prioritize MCP tools over CLI
-- **Hook system**: SessionStart + PreCompact (Claude Code) + git pre-commit
 
 See [CHANGELOG.md](CHANGELOG.md) for details.
 
