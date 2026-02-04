@@ -73,7 +73,8 @@ Every implementation must pass independent review before being considered comple
 
 ### 1. Tests (MUST ALL PASS)
 - [ ] `pnpm test` shows 100% pass rate
-- [ ] No skipped tests
+- [ ] No unconditional test skips (business logic must always run)
+- [ ] Conditional skips (`skipIf`) allowed only for environment-native/hardware tests
 - [ ] No flaky tests
 
 ### 2. No Regressions

@@ -398,10 +398,10 @@ pnpm lint
 
 ## Project Status
 
-Version 0.2.4 - Hybrid Memory System release. Combines Beads-style trusted hook injection with MCP tools for native Claude integration. Key features:
-- **MCP Server**: `lesson_search` and `lesson_capture` as native Claude tools
+Version 0.2.7 - Stable release with MCP-first integration. Key features:
+- **MCP Server**: `lesson_search` and `lesson_capture` as native Claude tools (primary interface)
 - **One-shot setup**: `lna setup` configures hooks, MCP, and downloads model
-- **Trust language**: Updated AGENTS.md with mandatory recall patterns
+- **MCP-first workflow**: AGENTS.md and prime output prioritize MCP tools over CLI
 - **Hook system**: SessionStart + PreCompact (Claude Code) + git pre-commit
 
 See [CHANGELOG.md](CHANGELOG.md) for details.
