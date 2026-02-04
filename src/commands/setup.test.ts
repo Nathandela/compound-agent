@@ -8,11 +8,17 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { isModelUsable } from '../embeddings/model.js';
 import { isModelAvailable } from '../embeddings/nomic.js';
 import { appendLesson, LESSONS_PATH } from '../storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../storage/sqlite.js';
-import { createQuickLesson } from '../test-utils.js';
+import { createQuickLesson, shouldSkipEmbeddingTests } from '../test-utils.js';
 import { setupCliTestContext } from './test-helpers.js';
+
+// Check if embedding runtime is usable for success-path assertions
+const modelAvailable = isModelAvailable();
+const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
+const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
 
 describe('Setup Commands', () => {
   const { getTempDir, runCli } = setupCliTestContext();
@@ -1322,8 +1328,14 @@ exit 0
       // check-plan should work immediately (no race condition)
       const { combined } = runCli('check-plan --plan "test search"');
 
-      // Should not show "model not available" error
-      expect(combined).not.toMatch(/model not available|download.*model/i);
+      if (skipEmbedding) {
+        expect(combined.toLowerCase()).toMatch(/runtime initialization failed|compatibility|failed to create context/i);
+        // download-model should make file available; error should not be "file not found"
+        expect(combined.toLowerCase()).not.toMatch(/file not found/);
+      } else {
+        // Should not show "model not available" error
+        expect(combined).not.toMatch(/model not available|download.*model/i);
+      }
     });
   });
 });

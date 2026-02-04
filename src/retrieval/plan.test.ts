@@ -3,14 +3,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { isModelUsable } from '../embeddings/model.js';
 import { isModelAvailable } from '../embeddings/nomic.js';
 import { appendLesson } from '../storage/jsonl.js';
 import { createFullLesson, createQuickLesson, shouldSkipEmbeddingTests } from '../test-utils.js';
 
 import { formatLessonsCheck, retrieveForPlan } from './plan.js';
 
-// Check if embedding tests should be skipped (env var or model unavailable)
-const skipEmbedding = shouldSkipEmbeddingTests(isModelAvailable());
+// Check if embedding tests should be skipped (env var, model unavailable, or runtime unusable)
+const modelAvailable = isModelAvailable();
+const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
+const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
 
 describe('plan retrieval', () => {
   let tempDir: string;

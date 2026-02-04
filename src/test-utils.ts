@@ -183,11 +183,13 @@ export function daysAgo(days: number): string {
  * Tests should be skipped if:
  * 1. SKIP_EMBEDDING_TESTS environment variable is set (any truthy value)
  * 2. Model file is not available
+ * 3. Model runtime is not usable on this machine (native backend incompatibility)
  *
  * This provides a way for CI environments without compatible native runners
  * to skip embedding-dependent tests while still running business logic tests.
  *
  * @param modelAvailable - Result of isModelAvailable() check
+ * @param runtimeUsable - Result of isModelUsable().usable check (defaults to modelAvailable)
  * @returns true if embedding tests should be skipped
  *
  * @example
@@ -198,8 +200,11 @@ export function daysAgo(days: number): string {
  * });
  * ```
  */
-export function shouldSkipEmbeddingTests(modelAvailable: boolean): boolean {
+export function shouldSkipEmbeddingTests(
+  modelAvailable: boolean,
+  runtimeUsable: boolean = modelAvailable
+): boolean {
   const envSkip = process.env.SKIP_EMBEDDING_TESTS;
   const skipByEnv = envSkip !== undefined && envSkip !== '' && envSkip !== '0' && envSkip !== 'false';
-  return skipByEnv || !modelAvailable;
+  return skipByEnv || !modelAvailable || !runtimeUsable;
 }

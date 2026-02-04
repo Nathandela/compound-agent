@@ -8,14 +8,17 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { isModelUsable } from '../embeddings/model.js';
 import { isModelAvailable } from '../embeddings/nomic.js';
 import { appendLesson, LESSONS_PATH } from '../storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../storage/sqlite.js';
 import { createFullLesson, createQuickLesson, daysAgo, shouldSkipEmbeddingTests } from '../test-utils.js';
 import { setupCliTestContext } from './test-helpers.js';
 
-// Check if embedding tests should be skipped (env var or model unavailable)
-const skipEmbedding = shouldSkipEmbeddingTests(isModelAvailable());
+// Check if embedding tests should be skipped (env var, model unavailable, or runtime unusable)
+const modelAvailable = isModelAvailable();
+const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
+const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
 
 describe('Retrieval Commands', () => {
   const { getTempDir, runCli } = setupCliTestContext();
@@ -124,7 +127,7 @@ describe('Retrieval Commands', () => {
       closeDb();
     });
 
-    it('retrieves relevant lessons with --plan flag', () => {
+    it.skipIf(skipEmbedding)('retrieves relevant lessons with --plan flag', () => {
       const { combined } = runCli('check-plan --plan "implement testing workflow"');
       // Should find lessons and display them
       expect(combined).toMatch(/lessons|relevant/i);
@@ -141,7 +144,7 @@ describe('Retrieval Commands', () => {
       expect(Array.isArray(result.lessons)).toBe(true);
     });
 
-    it('reads plan from stdin', () => {
+    it.skipIf(skipEmbedding)('reads plan from stdin', () => {
       const cliPath = join(process.cwd(), 'dist', 'cli.js');
       const stdout = execSync(`echo "test workflow" | node ${cliPath} check-plan`, {
         cwd: getTempDir(),
@@ -160,7 +163,7 @@ describe('Retrieval Commands', () => {
       expect(result.lessons.length).toBeLessThanOrEqual(1);
     });
 
-    it('shows user-friendly message when no relevant lessons found', async () => {
+    it.skipIf(skipEmbedding)('shows user-friendly message when no relevant lessons found', async () => {
       // Create a fresh temp dir with no lessons
       const emptyDir = await mkdtemp(join(tmpdir(), 'learning-agent-empty-'));
       try {

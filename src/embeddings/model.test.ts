@@ -20,7 +20,12 @@ import {
 } from './model.js';
 
 // Check if embedding tests should be skipped (env var or model unavailable)
-const skipEmbedding = shouldSkipEmbeddingTests(isModelAvailable());
+const modelAvailable = isModelAvailable();
+const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
+const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
+
+// Keep tests isolated from module-level probe above.
+clearUsabilityCache();
 
 describe('embedding model resolution', () => {
   describe('MODEL_URI', () => {
