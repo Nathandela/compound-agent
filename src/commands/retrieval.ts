@@ -318,11 +318,14 @@ export function registerRetrievalCommands(program: Command): void {
         process.exit(1);
       }
 
-      // Check model usability - hard fail with actionable error if not usable
+      // Check model usability - return stable error response if not usable
       const usability = await isModelUsable();
       if (!usability.usable) {
         if (options.json) {
+          // Stable envelope: always include lessons/count, add error/action
           console.log(JSON.stringify({
+            lessons: [],
+            count: 0,
             error: usability.reason,
             action: usability.action,
           }));
@@ -352,7 +355,12 @@ export function registerRetrievalCommands(program: Command): void {
         // Don't mask errors - surface them clearly
         const message = err instanceof Error ? err.message : 'Unknown error';
         if (options.json) {
-          console.log(JSON.stringify({ error: message }));
+          // Stable envelope: always include lessons/count, add error
+          console.log(JSON.stringify({
+            lessons: [],
+            count: 0,
+            error: message,
+          }));
         } else {
           out.error(`Failed to check plan: ${message}`);
         }

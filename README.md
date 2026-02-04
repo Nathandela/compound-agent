@@ -128,7 +128,7 @@ project_root/
 - **MCP Integration**: Native Claude tools (`lesson_search`, `lesson_capture`) via MCP server
 - **Lesson Capture**: Capture lessons after user corrections, self-corrections, or discoveries
 - **Quality Filter**: Prevents vague or obvious lessons (must be novel, specific, actionable)
-- **Vector Search**: Local semantic search using nomic-embed-text-v1.5 via node-llama-cpp
+- **Vector Search**: Local semantic search using EmbeddingGemma-300M via node-llama-cpp
 - **Hybrid Storage**: JSONL source of truth (git-tracked) with SQLite FTS5 index (rebuildable)
 - **Offline First**: No external API dependencies; works completely offline
 - **Hook System**: SessionStart/PreCompact load context, git pre-commit reminds to capture

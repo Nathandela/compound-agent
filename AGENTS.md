@@ -17,14 +17,14 @@ For detailed project rules and TDD workflow, see `.claude/CLAUDE.md`.
 
 1. Captures lessons from user corrections, self-corrections, and test failures
 2. Stores lessons in JSONL (git-tracked) with SQLite index (cache)
-3. Retrieves relevant lessons via local embeddings (nomic-embed-text)
+3. Retrieves relevant lessons via local embeddings (EmbeddingGemma-300M)
 4. Injects lessons at session-start and plan-time
 
 ### Key Components
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Types/Schemas | `src/types.ts` | Zod schemas for Lesson, QuickLesson, FullLesson |
+| Types/Schemas | `src/types.ts` | Zod schemas for Lesson, Tombstone, LessonRecord |
 | Storage | `src/storage/` | JSONL append-only + SQLite FTS5 index |
 | Embeddings | `src/embeddings/` | node-llama-cpp with nomic model |
 | Search | `src/search/` | Vector similarity + ranking with boosts |
@@ -69,7 +69,7 @@ pnpm test:watch
 # Type checking (lint)
 pnpm lint
 
-# Download embedding model (~500MB)
+# Download embedding model (~278MB)
 pnpm download-model
 
 # Development build with watch
@@ -272,7 +272,9 @@ detectUserCorrection(message: string): DetectedCorrection | null
 - Tests colocated with source files (`*.test.ts`)
 - Use Vitest for all tests
 - Property-based tests with fast-check where appropriate
-- 100% pass rate required, no skipped tests
+- 100% pass rate required
+- Unconditional test skips not allowed for business logic
+- Conditional skips (`skipIf`) allowed for environment-native tests (embeddings)
 
 ### Embedding Tests
 
@@ -343,13 +345,13 @@ npx learning-agent check-plan --plan "Add authentication with JWT tokens" --json
 **What to do with results:**
 - Display as "Lessons Check" after the plan
 - Consider each lesson while implementing
-- Lessons are ranked by relevance score
+- Lessons are ranked by rankScore (combined relevance + boosts)
 
 **Output example:**
 ```json
 {
   "lessons": [
-    {"id": "xyz34", "insight": "JWT tokens need X-Request-ID header", "relevance": 0.87, "source": "test_failure"}
+    {"id": "xyz34", "insight": "JWT tokens need X-Request-ID header", "rankScore": 0.87, "source": "test_failure"}
   ],
   "count": 1
 }
@@ -539,7 +541,7 @@ PLAN CREATED
 │   └─ [1 relevant lesson: "JWT needs X-Request-ID header"]
 │
 ├─ Display: "## Lessons Check
-│            1. JWT needs X-Request-ID header (relevance: 0.87)"
+│            1. JWT needs X-Request-ID header (rankScore: 0.87)"
 │
 IMPLEMENTATION
 ├─ [Claude implements with lesson in mind]

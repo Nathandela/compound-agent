@@ -28,6 +28,9 @@ export const MODEL_FILENAME = 'hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf';
 /** Default model directory used by node-llama-cpp */
 const DEFAULT_MODEL_DIR = join(homedir(), '.node-llama-cpp', 'models');
 
+/** Cached usability result (per-process) */
+let cachedUsability: UsabilityResult | null = null;
+
 /**
  * Check if the embedding model is available locally.
  *
@@ -61,13 +64,19 @@ export type UsabilityResult =
  * @returns UsabilityResult with usable status and actionable error if failed
  */
 export async function isModelUsable(): Promise<UsabilityResult> {
+  // Return cached result if available (avoids double initialization)
+  if (cachedUsability !== null) {
+    return cachedUsability;
+  }
+
   // Fast fail if model file doesn't exist
   if (!isModelAvailable()) {
-    return {
+    cachedUsability = {
       usable: false,
       reason: 'Embedding model file not found',
       action: 'Run: npx lna download-model',
     };
+    return cachedUsability;
   }
 
   // Attempt runtime initialization
@@ -87,15 +96,17 @@ export async function isModelUsable(): Promise<UsabilityResult> {
     // Step 3: Create embedding context
     context = await model.createEmbeddingContext();
 
-    // Success - clean up and return
-    return { usable: true };
+    // Success - cache and return
+    cachedUsability = { usable: true };
+    return cachedUsability;
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
-    return {
+    cachedUsability = {
       usable: false,
       reason: `Embedding model runtime initialization failed: ${message}`,
       action: 'Check system compatibility or reinstall: npx lna download-model',
     };
+    return cachedUsability;
   } finally {
     // Clean up resources in reverse order
     if (context) {
@@ -108,6 +119,16 @@ export async function isModelUsable(): Promise<UsabilityResult> {
     // Note: model and llama don't have explicit dispose methods in node-llama-cpp
     // The GC will handle them when references are released
   }
+}
+
+/**
+ * Clear the cached usability result.
+ *
+ * Primarily for testing purposes. Clears the cached result so the next
+ * call to isModelUsable() will perform a fresh check.
+ */
+export function clearUsabilityCache(): void {
+  cachedUsability = null;
 }
 
 /**

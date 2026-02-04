@@ -5,12 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { isModelAvailable } from '../embeddings/nomic.js';
 import { appendLesson } from '../storage/jsonl.js';
-import { createFullLesson, createQuickLesson } from '../test-utils.js';
+import { createFullLesson, createQuickLesson, shouldSkipEmbeddingTests } from '../test-utils.js';
 
 import { formatLessonsCheck, retrieveForPlan } from './plan.js';
 
-// Check model availability at module load time
-const modelAvailable = isModelAvailable();
+// Check if embedding tests should be skipped (env var or model unavailable)
+const skipEmbedding = shouldSkipEmbeddingTests(isModelAvailable());
 
 describe('plan retrieval', () => {
   let tempDir: string;
@@ -24,12 +24,12 @@ describe('plan retrieval', () => {
   });
 
   describe('retrieveForPlan', () => {
-    it.skipIf(!modelAvailable)('returns empty array for empty database', async () => {
+    it.skipIf(skipEmbedding)('returns empty array for empty database', async () => {
       const result = await retrieveForPlan(tempDir, 'implement user authentication');
       expect(result.lessons).toEqual([]);
     });
 
-    it.skipIf(!modelAvailable)('returns relevant lessons based on plan text', async () => {
+    it.skipIf(skipEmbedding)('returns relevant lessons based on plan text', async () => {
       await appendLesson(
         tempDir,
         createQuickLesson('L001', 'Use JWT tokens for authentication', { trigger: 'login feature' })
@@ -46,7 +46,7 @@ describe('plan retrieval', () => {
       expect(authLesson).toBeDefined();
     });
 
-    it.skipIf(!modelAvailable)('respects limit parameter', async () => {
+    it.skipIf(skipEmbedding)('respects limit parameter', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'Lesson 1', { trigger: 'trigger 1' }));
       await appendLesson(tempDir, createQuickLesson('L002', 'Lesson 2', { trigger: 'trigger 2' }));
       await appendLesson(tempDir, createQuickLesson('L003', 'Lesson 3', { trigger: 'trigger 3' }));
@@ -57,7 +57,7 @@ describe('plan retrieval', () => {
       expect(result.lessons.length).toBeLessThanOrEqual(3);
     });
 
-    it.skipIf(!modelAvailable)('defaults to 5 lessons', async () => {
+    it.skipIf(skipEmbedding)('defaults to 5 lessons', async () => {
       // Create 7 lessons
       for (let i = 1; i <= 7; i++) {
         await appendLesson(tempDir, createQuickLesson(`L00${i}`, `Lesson ${i}`, { trigger: `trigger ${i}` }));
@@ -67,7 +67,7 @@ describe('plan retrieval', () => {
       expect(result.lessons.length).toBeLessThanOrEqual(5);
     });
 
-    it.skipIf(!modelAvailable)('applies ranking boosts (high severity ranked higher)', async () => {
+    it.skipIf(skipEmbedding)('applies ranking boosts (high severity ranked higher)', async () => {
       await appendLesson(tempDir, createFullLesson('L001', 'Important security lesson', 'high'));
       await appendLesson(tempDir, createFullLesson('L002', 'Low priority security lesson', 'low'));
 
@@ -79,7 +79,7 @@ describe('plan retrieval', () => {
       }
     });
 
-    it.skipIf(!modelAvailable)('includes Lessons Check message', async () => {
+    it.skipIf(skipEmbedding)('includes Lessons Check message', async () => {
       await appendLesson(
         tempDir,
         createQuickLesson('L001', 'Use secure headers', { trigger: 'security implementation' })

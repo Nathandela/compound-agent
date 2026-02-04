@@ -33,9 +33,31 @@ interface SearchResult {
   score: number;
 }
 
-/** Result from lesson_search tool */
-interface SearchToolResult {
+/** Success result from lesson_search tool */
+interface SearchToolSuccess {
   lessons: SearchResult[];
+  error?: undefined;
+  action?: undefined;
+}
+
+/** Error result from lesson_search tool */
+interface SearchToolError {
+  lessons: [];
+  error: string;
+  action: string;
+}
+
+/** Result from lesson_search tool - typed union for success/failure */
+export type SearchToolResult = SearchToolSuccess | SearchToolError;
+
+/**
+ * Type guard to check if search result is an error.
+ *
+ * @param result - The search tool result
+ * @returns true if the result is an error response
+ */
+export function isSearchError(result: SearchToolResult): result is SearchToolError {
+  return 'error' in result && result.error !== undefined;
 }
 
 /** Result from lesson_capture tool */
@@ -140,7 +162,7 @@ Returns relevant lessons ranked by similarity and severity.`,
   );
 
   // Store handler for direct invocation
-  toolHandlers['lesson_search'] = async (params) => {
+  toolHandlers['lesson_search'] = async (params): Promise<SearchToolResult> => {
     const parsed = z.object(searchInputSchema).parse(params);
 
     try {
@@ -148,17 +170,19 @@ Returns relevant lessons ranked by similarity and severity.`,
       const results = await searchVector(repoRoot, parsed.query, { limit });
       // Handle case where searchVector returns undefined (shouldn't happen but defensive)
       const safeResults = results ?? [];
-      return {
+      const success: SearchToolSuccess = {
         lessons: safeResults.map((r) => ({ lesson: r.lesson, score: r.score })),
-      } as SearchToolResult;
+      };
+      return success;
     } catch (err) {
       // Convert embedding errors to actionable messages
       const message = err instanceof Error ? err.message : 'Unknown error';
-      return {
+      const error: SearchToolError = {
         error: `Search failed: ${message}`,
         action: 'Run: npx lna download-model',
         lessons: [],
-      } as unknown as SearchToolResult;
+      };
+      return error;
     }
   };
 

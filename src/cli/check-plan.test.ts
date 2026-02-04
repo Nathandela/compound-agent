@@ -11,11 +11,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isModelAvailable } from '../embeddings/nomic.js';
 import { appendLesson } from '../storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../storage/sqlite.js';
-import { createQuickLesson } from '../test-utils.js';
+import { createQuickLesson, shouldSkipEmbeddingTests } from '../test-utils.js';
 import { cleanupCliTestDir, runCli, setupCliTestDir } from './cli-test-utils.js';
 
-// Check model availability at module load time for conditional tests
-const modelAvailable = isModelAvailable();
+// Check if embedding tests should be skipped (env var or model unavailable)
+const skipEmbedding = shouldSkipEmbeddingTests(isModelAvailable());
 
 describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;
@@ -132,7 +132,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       }
     });
 
-    it.skipIf(!modelAvailable)('returns lessons array when model is available', () => {
+    it.skipIf(skipEmbedding)('returns lessons array when model is available', () => {
       const { stdout } = runCli('check-plan --json --plan "testing workflow"', tempDir);
       const jsonLine = stdout.split('\n').find((line) => line.startsWith('{'));
       expect(jsonLine).toBeDefined();

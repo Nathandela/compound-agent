@@ -445,6 +445,29 @@ describe('MCP Server', () => {
       expect(result.lessons).toEqual([]);
     });
 
+    it('search error response has typed structure (not unsafe cast)', async () => {
+      const { createMcpServer, isSearchError } = await import('./mcp.js');
+
+      // Mock searchVector to throw
+      vi.doMock('./search/index.js', () => ({
+        searchVector: vi.fn().mockRejectedValue(new Error('Model not available')),
+      }));
+
+      vi.resetModules();
+      const { createMcpServer: createMockedServer, isSearchError: isError } = await import('./mcp.js');
+      const mockedServer = createMockedServer(tempDir);
+
+      const result = await mockedServer.callTool('lesson_search', { query: 'test' });
+
+      // Type guard should work
+      expect(isError(result)).toBe(true);
+      if (isError(result)) {
+        expect(result.error).toContain('Search failed');
+        expect(result.action).toContain('download-model');
+        expect(result.lessons).toEqual([]);
+      }
+    });
+
     it('propagates errors from appendLesson', async () => {
       const { createMcpServer } = await import('./mcp.js');
 

@@ -176,3 +176,30 @@ export function daysAgo(days: number): string {
   date.setDate(date.getDate() - days);
   return date.toISOString();
 }
+
+/**
+ * Check if embedding tests should be skipped.
+ *
+ * Tests should be skipped if:
+ * 1. SKIP_EMBEDDING_TESTS environment variable is set (any truthy value)
+ * 2. Model file is not available
+ *
+ * This provides a way for CI environments without compatible native runners
+ * to skip embedding-dependent tests while still running business logic tests.
+ *
+ * @param modelAvailable - Result of isModelAvailable() check
+ * @returns true if embedding tests should be skipped
+ *
+ * @example
+ * ```ts
+ * const modelAvailable = isModelAvailable();
+ * it.skipIf(shouldSkipEmbeddingTests(modelAvailable))('test...', async () => {
+ *   // This test requires embedding model
+ * });
+ * ```
+ */
+export function shouldSkipEmbeddingTests(modelAvailable: boolean): boolean {
+  const envSkip = process.env.SKIP_EMBEDDING_TESTS;
+  const skipByEnv = envSkip !== undefined && envSkip !== '' && envSkip !== '0' && envSkip !== 'false';
+  return skipByEnv || !modelAvailable;
+}

@@ -35,7 +35,7 @@ interface SetupResult {
   agentsMd: boolean;
   hooks: boolean;
   mcpServer: boolean;
-  model: boolean | 'skipped';
+  model: 'downloaded' | 'already_exists' | 'failed' | 'skipped';
 }
 
 /**
@@ -106,16 +106,18 @@ export async function runSetup(options: { skipModel?: boolean }): Promise<SetupR
   const { hooks, mcpServer } = await configureClaudeSettings(repoRoot);
 
   // 7. Download model (unless skipped)
-  let modelDownloaded: boolean | 'skipped' = 'skipped';
+  let modelStatus: 'downloaded' | 'already_exists' | 'failed' | 'skipped' = 'skipped';
   if (!options.skipModel) {
     try {
       const alreadyExisted = isModelAvailable();
       if (!alreadyExisted) {
         await resolveModel({ cli: false });
+        modelStatus = 'downloaded';
+      } else {
+        modelStatus = 'already_exists';
       }
-      modelDownloaded = !alreadyExisted;
     } catch {
-      modelDownloaded = false;
+      modelStatus = 'failed';
     }
   }
 
@@ -124,7 +126,7 @@ export async function runSetup(options: { skipModel?: boolean }): Promise<SetupR
     agentsMd: agentsMdUpdated,
     hooks,
     mcpServer,
-    model: modelDownloaded,
+    model: modelStatus,
   };
 }
 
@@ -145,10 +147,19 @@ export function registerSetupAllCommand(setupCommand: Command): void {
       console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
       console.log(`  Claude hooks: ${result.hooks ? 'Installed' : 'Already configured'}`);
       console.log(`  MCP server: ${result.mcpServer ? 'Registered in .mcp.json' : 'Already configured'}`);
-      if (result.model === 'skipped') {
-        console.log('  Model: Skipped (--skip-model)');
-      } else {
-        console.log(`  Model: ${result.model ? 'Downloaded' : 'Already exists'}`);
+      switch (result.model) {
+        case 'skipped':
+          console.log('  Model: Skipped (--skip-model)');
+          break;
+        case 'downloaded':
+          console.log('  Model: Downloaded');
+          break;
+        case 'already_exists':
+          console.log('  Model: Already exists');
+          break;
+        case 'failed':
+          console.log('  Model: Download failed (run `lna download-model` manually)');
+          break;
       }
       console.log('');
       console.log('Next steps:');

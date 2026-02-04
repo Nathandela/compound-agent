@@ -6,9 +6,21 @@
  * npx node-llama-cpp pull hf:ggml-org/embeddinggemma-300M-qat-q4_0-GGUF
  */
 
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
-import { isModelAvailable, isModelUsable, MODEL_FILENAME, MODEL_URI, resolveModel } from './model.js';
+import { shouldSkipEmbeddingTests } from '../test-utils.js';
+
+import {
+  clearUsabilityCache,
+  isModelAvailable,
+  isModelUsable,
+  MODEL_FILENAME,
+  MODEL_URI,
+  resolveModel,
+} from './model.js';
+
+// Check if embedding tests should be skipped (env var or model unavailable)
+const skipEmbedding = shouldSkipEmbeddingTests(isModelAvailable());
 
 describe('embedding model resolution', () => {
   describe('MODEL_URI', () => {
@@ -38,19 +50,19 @@ describe('embedding model resolution', () => {
 
   describe('resolveModel', () => {
     // Skip if model not available (avoid download in CI)
-    it.skipIf(!isModelAvailable())('returns path to model file', async () => {
+    it.skipIf(skipEmbedding)('returns path to model file', async () => {
       const path = await resolveModel({ cli: false });
       expect(path).toContain(MODEL_FILENAME);
       expect(path).toContain('.gguf');
     });
 
-    it.skipIf(!isModelAvailable())('returns consistent path', async () => {
+    it.skipIf(skipEmbedding)('returns consistent path', async () => {
       const path1 = await resolveModel({ cli: false });
       const path2 = await resolveModel({ cli: false });
       expect(path1).toBe(path2);
     });
 
-    it.skipIf(!isModelAvailable())('accepts cli option to suppress progress output', async () => {
+    it.skipIf(skipEmbedding)('accepts cli option to suppress progress output', async () => {
       // cli: false suppresses download progress (delegates to node-llama-cpp)
       const path = await resolveModel({ cli: false });
       expect(path).toContain(MODEL_FILENAME);
@@ -58,6 +70,11 @@ describe('embedding model resolution', () => {
   });
 
   describe('isModelUsable', () => {
+    // Clear cache after each test to ensure isolation
+    afterEach(() => {
+      clearUsabilityCache();
+    });
+
     it('returns a UsabilityResult object', async () => {
       const result = await isModelUsable();
       expect(result).toHaveProperty('usable');
@@ -74,13 +91,13 @@ describe('embedding model resolution', () => {
       }
     });
 
-    it.skipIf(!isModelAvailable())('returns usable=true when model can initialize', async () => {
+    it.skipIf(skipEmbedding)('returns usable=true when model can initialize', async () => {
       const result = await isModelUsable();
       expect(result.usable).toBe(true);
       expect(result.reason).toBeUndefined();
     });
 
-    it.skipIf(!isModelAvailable())('cleans up resources after preflight check', async () => {
+    it.skipIf(skipEmbedding)('cleans up resources after preflight check', async () => {
       // Should not leave any resources loaded after check
       const result = await isModelUsable();
       expect(result.usable).toBe(true);
@@ -97,6 +114,24 @@ describe('embedding model resolution', () => {
         expect(result.action).toBeDefined();
         expect(result.action).toMatch(/download-model|npx lna/);
       }
+    });
+
+    it('caches result to avoid double initialization', async () => {
+      // First call
+      const result1 = await isModelUsable();
+      // Second call should return cached result (no re-initialization)
+      const result2 = await isModelUsable();
+      expect(result1).toBe(result2); // Same object reference (cached)
+    });
+
+    it('clearUsabilityCache resets the cache', async () => {
+      const result1 = await isModelUsable();
+      clearUsabilityCache();
+      const result2 = await isModelUsable();
+      // After clearing, should be a new result (different object reference)
+      expect(result1).not.toBe(result2);
+      // But same usability status
+      expect(result1.usable).toBe(result2.usable);
     });
   });
 });
