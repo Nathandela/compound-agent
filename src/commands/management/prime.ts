@@ -16,50 +16,55 @@ import type { Lesson, Source } from '../../types.js';
  *
  * Uses explicit prohibitions, workflow sequencing, and NEVER/MUST language
  * following Beads conventions for maximum adherence.
+ *
+ * IMPORTANT: Prioritizes MCP tools over CLI commands.
  */
 const TRUST_LANGUAGE_TEMPLATE = `# Learning Agent Active
 
 > **Context Recovery**: Run \`lna prime\` after compaction, clear, or new session
 
+## MCP Tools (ALWAYS USE THESE)
+
+**You MUST use MCP tools, NOT CLI commands:**
+
+| Tool | Purpose |
+|------|---------|
+| \`lesson_search\` | Search lessons - call BEFORE architectural decisions |
+| \`lesson_capture\` | Capture lessons - call AFTER corrections or discoveries |
+
 ## Core Constraints
 
-**Default**: Use CLI commands for lesson management
+**Default**: Use MCP tools for lesson management
 **Prohibited**: NEVER edit .claude/lessons/ files directly
 
 **Default**: Propose lessons freely after corrections
 **Prohibited**: NEVER propose without quality gate (novel + specific + actionable)
 
+## Retrieval Protocol
+
+You MUST call \`lesson_search\` BEFORE:
+- Architectural decisions or complex planning
+- Implementing patterns you've done before in this repo
+
+**NEVER skip lesson_search for complex decisions.** Past mistakes will repeat.
+
 ## Capture Protocol
 
-You MUST use \`lna learn\` AFTER:
+Call \`lesson_capture\` AFTER:
 - User corrects you ("no", "wrong", "actually...")
 - You self-correct after iteration failures
 - Test fails then you fix it
 
-**Workflow**: Capture lessons:
-1. Check quality gate (ALL must pass):
-   - Novel (not already stored)
-   - Specific (clear guidance)
-   - Actionable (obvious what to do)
-2. If pass: \`lna learn "insight"\`
-3. If fail: Skip (most sessions have no lessons)
-
-NEVER skip the quality gate. Quality over quantity.
-
-## Retrieval Protocol
-
-You MUST use \`lna search\` BEFORE:
-- Architectural decisions or complex planning
-- Implementing patterns you've done before in this repo
+**Quality gate** (ALL must pass before capturing):
+- Novel (not already stored)
+- Specific (clear guidance)
+- Actionable (obvious what to do)
 
 **Workflow**: Search BEFORE deciding, capture AFTER learning.
 
-## CLI Commands
-- \`lna learn "insight"\` - Capture a lesson
-- \`lna search "query"\` - Find relevant lessons
-- \`lna list\` - Show all lessons
-- \`lna check-plan --plan "..."\` - Get lessons for plan
-- \`lna stats\` - Database health
+## CLI (fallback only)
+
+When MCP is unavailable: \`lna search "query"\`, \`lna learn "insight"\`, \`lna list\`
 `;
 
 /**

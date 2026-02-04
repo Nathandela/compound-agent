@@ -239,7 +239,7 @@ npx lna stats
 export const PLUGIN_MANIFEST = {
   name: 'learning-agent',
   description: 'Session memory for Claude Code - capture and retrieve lessons',
-  version: '0.2.6',
+  version: '0.2.7',
   author: {
     name: 'Nathan Delacrétaz',
     url: 'https://github.com/Nathandela',

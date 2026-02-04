@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-02-04
+
+### Fixed
+
+- **Prime Context MCP Alignment**: Updated trust language template to prioritize MCP tools
+  - "MCP Tools (ALWAYS USE THESE)" section at top of prime output
+  - `lesson_search` and `lesson_capture` as primary methods
+  - CLI commands moved to "fallback only" section
+  - Now consistent with AGENTS.md MCP-first approach
+
 ## [0.2.6] - 2026-02-04
 
 ### Fixed
