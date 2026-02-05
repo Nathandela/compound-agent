@@ -18,7 +18,7 @@ import {
   searchKeyword,
   setCachedEmbedding,
   syncIfNeeded,
-} from './sqlite.js';
+} from './sqlite/index.js';
 
 /** Helper to open in-memory database for fast tests */
 function openInMemoryDb() {
@@ -577,7 +577,7 @@ describe('SQLite schema', () => {
 
     describe('incrementRetrievalCount', () => {
       it('increments count for single lesson', async () => {
-        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite/index.js');
 
         incrementRetrievalCount(tempDir, ['L001']);
 
@@ -587,7 +587,7 @@ describe('SQLite schema', () => {
       });
 
       it('increments count for multiple lessons', async () => {
-        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite/index.js');
 
         incrementRetrievalCount(tempDir, ['L001', 'L002']);
 
@@ -598,7 +598,7 @@ describe('SQLite schema', () => {
       });
 
       it('accumulates counts across multiple calls', async () => {
-        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite/index.js');
 
         incrementRetrievalCount(tempDir, ['L001']);
         incrementRetrievalCount(tempDir, ['L001']);
@@ -609,7 +609,7 @@ describe('SQLite schema', () => {
       });
 
       it('updates last_retrieved timestamp', async () => {
-        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite/index.js');
 
         const before = new Date();
         incrementRetrievalCount(tempDir, ['L001']);
@@ -624,7 +624,7 @@ describe('SQLite schema', () => {
       });
 
       it('ignores non-existent lesson IDs', async () => {
-        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite/index.js');
 
         // Should not throw
         incrementRetrievalCount(tempDir, ['nonexistent', 'L001']);
@@ -635,7 +635,7 @@ describe('SQLite schema', () => {
       });
 
       it('handles empty array without error', async () => {
-        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite/index.js');
 
         // Should not throw
         incrementRetrievalCount(tempDir, []);
@@ -647,14 +647,14 @@ describe('SQLite schema', () => {
 
     describe('getRetrievalStats', () => {
       it('returns stats for all lessons', async () => {
-        const { getRetrievalStats } = await import('./sqlite.js');
+        const { getRetrievalStats } = await import('./sqlite/index.js');
 
         const stats = getRetrievalStats(tempDir);
         expect(stats).toHaveLength(3);
       });
 
       it('returns zero count and null lastRetrieved for never-retrieved lessons', async () => {
-        const { getRetrievalStats } = await import('./sqlite.js');
+        const { getRetrievalStats } = await import('./sqlite/index.js');
 
         const stats = getRetrievalStats(tempDir);
         for (const stat of stats) {
@@ -664,7 +664,7 @@ describe('SQLite schema', () => {
       });
 
       it('returns correct structure', async () => {
-        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite.js');
+        const { incrementRetrievalCount, getRetrievalStats } = await import('./sqlite/index.js');
 
         incrementRetrievalCount(tempDir, ['L001']);
 
@@ -680,7 +680,7 @@ describe('SQLite schema', () => {
 
     describe('searchKeyword increments retrieval count', () => {
       it('increments count for returned lessons', async () => {
-        const { getRetrievalStats } = await import('./sqlite.js');
+        const { getRetrievalStats } = await import('./sqlite/index.js');
 
         // Search should increment count
         await searchKeyword(tempDir, 'Polars', 10);
@@ -691,7 +691,7 @@ describe('SQLite schema', () => {
       });
 
       it('only increments count for matching lessons', async () => {
-        const { getRetrievalStats } = await import('./sqlite.js');
+        const { getRetrievalStats } = await import('./sqlite/index.js');
 
         await searchKeyword(tempDir, 'Polars', 10);
 
@@ -702,7 +702,7 @@ describe('SQLite schema', () => {
       });
 
       it('accumulates count across multiple searches', async () => {
-        const { getRetrievalStats } = await import('./sqlite.js');
+        const { getRetrievalStats } = await import('./sqlite/index.js');
 
         await searchKeyword(tempDir, 'trigger', 10); // matches all
         await searchKeyword(tempDir, 'Polars', 10); // matches L001 only
@@ -714,7 +714,7 @@ describe('SQLite schema', () => {
       });
 
       it('does not increment count when no matches', async () => {
-        const { getRetrievalStats } = await import('./sqlite.js');
+        const { getRetrievalStats } = await import('./sqlite/index.js');
 
         await searchKeyword(tempDir, 'nonexistent', 10);
 

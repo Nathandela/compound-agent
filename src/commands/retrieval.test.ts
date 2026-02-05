@@ -11,9 +11,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { isModelUsable } from '../embeddings/model.js';
 import { isModelAvailable } from '../embeddings/nomic.js';
 import { appendLesson, LESSONS_PATH } from '../storage/jsonl.js';
-import { closeDb, rebuildIndex } from '../storage/sqlite.js';
-import { createFullLesson, createQuickLesson, daysAgo, shouldSkipEmbeddingTests } from '../test-utils.js';
-import { setupCliTestContext } from './test-helpers.js';
+import { closeDb, rebuildIndex } from '../storage/sqlite/index.js';
+import { createFullLesson, createQuickLesson, daysAgo, setupCliTestContext, shouldSkipEmbeddingTests } from '../test-utils.js';
 
 // Check if embedding tests should be skipped (env var, model unavailable, or runtime unusable)
 const modelAvailable = isModelAvailable();

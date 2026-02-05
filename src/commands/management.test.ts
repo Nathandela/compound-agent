@@ -11,9 +11,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { ARCHIVE_DIR } from '../storage/compact.js';
 import { appendLesson, LESSONS_PATH } from '../storage/jsonl.js';
-import { closeDb, rebuildIndex } from '../storage/sqlite.js';
-import { createFullLesson, createQuickLesson, daysAgo } from '../test-utils.js';
-import { setupCliTestContext } from './test-helpers.js';
+import { closeDb, rebuildIndex } from '../storage/sqlite/index.js';
+import { createFullLesson, createQuickLesson, daysAgo, setupCliTestContext } from '../test-utils.js';
 
 describe('Management Commands', () => {
   const { getTempDir, runCli } = setupCliTestContext();

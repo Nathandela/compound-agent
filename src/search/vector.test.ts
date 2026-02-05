@@ -10,7 +10,7 @@ import {
   openDb,
   rebuildIndex,
   setCachedEmbedding,
-} from '../storage/sqlite.js';
+} from '../storage/sqlite/index.js';
 import { createQuickLesson } from '../test-utils.js';
 
 import { cosineSimilarity, searchVector } from './vector.js';

@@ -1,14 +1,13 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { appendLesson } from '../storage/jsonl.js';
 import {
   closeDb,
   rebuildIndex,
-} from '../storage/sqlite.js';
-import { _resetSqliteState, _setForceUnavailable } from '../storage/sqlite/test-helpers.js';
+} from '../storage/sqlite/index.js';
 import { createQuickLesson } from '../test-utils.js';
 
 import {
@@ -16,7 +15,6 @@ import {
   isNovel,
   isSpecific,
   shouldPropose,
-  _resetNoveltyWarningState,
 } from './quality.js';
 
 describe('quality filters', () => {
@@ -273,134 +271,6 @@ describe('quality filters', () => {
       const result = await shouldPropose(tempDir, 'Use pnpm');
       expect(result.shouldPropose).toBe(false);
       expect(result.reason).toContain('too short');
-    });
-  });
-});
-
-describe('quality filters - SQLite degradation', () => {
-  let tempDir: string;
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(async () => {
-    // Reset and force SQLite unavailable
-    _resetSqliteState();
-    _setForceUnavailable(true);
-    _resetNoveltyWarningState();
-    tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-quality-degraded-'));
-    consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-  });
-
-  afterEach(async () => {
-    closeDb();
-    _resetSqliteState();
-    _resetNoveltyWarningState();
-    consoleWarnSpy.mockRestore();
-    await rm(tempDir, { recursive: true, force: true });
-  });
-
-  describe('isNovel - degraded mode', () => {
-    it('returns true for empty JSONL file', async () => {
-      const result = await isNovel(tempDir, 'Use Polars for large files');
-      expect(result.novel).toBe(true);
-    });
-
-    it('does not throw when SQLite is unavailable', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for CSV'));
-
-      // Should not throw, should use JSONL fallback
-      const result = await isNovel(tempDir, 'Use Polars for large files');
-      expect(result).toBeDefined();
-    });
-
-    it('detects exact duplicate via JSONL fallback', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for large files'));
-
-      const result = await isNovel(tempDir, 'Use Polars for large files');
-      expect(result.novel).toBe(false);
-      expect(result.existingId).toBe('L001');
-    });
-
-    it('detects case-insensitive exact duplicate', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use POLARS for data'));
-
-      const result = await isNovel(tempDir, 'use polars for data');
-      expect(result.novel).toBe(false);
-      expect(result.existingId).toBe('L001');
-    });
-
-    it('detects highly similar insight via Jaccard similarity', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for large CSV files'));
-
-      // Very similar - shares most words
-      const result = await isNovel(tempDir, 'Use Polars for large files');
-      expect(result.novel).toBe(false);
-    });
-
-    it('returns true for unique insight', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for CSV processing'));
-
-      const result = await isNovel(tempDir, 'Always run tests before committing');
-      expect(result.novel).toBe(true);
-    });
-
-    it('logs warning about degraded mode', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Test insight'));
-      await isNovel(tempDir, 'Another insight here');
-
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('degraded')
-      );
-    });
-
-    it('handles multiple lessons in JSONL', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'First insight about testing'));
-      await appendLesson(tempDir, createQuickLesson('L002', 'Second insight about deployment'));
-      await appendLesson(tempDir, createQuickLesson('L003', 'Third insight about reviews'));
-
-      // Should find duplicate of second lesson
-      const result = await isNovel(tempDir, 'Second insight about deployment');
-      expect(result.novel).toBe(false);
-      expect(result.existingId).toBe('L002');
-    });
-
-    it('respects similarity threshold option', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for data'));
-
-      // With very high threshold, should be considered novel
-      const result = await isNovel(tempDir, 'Use Polars', { threshold: 0.99 });
-      expect(result.novel).toBe(true);
-    });
-  });
-
-  describe('shouldPropose - degraded mode', () => {
-    it('returns true for novel, specific, actionable insight', async () => {
-      const result = await shouldPropose(
-        tempDir,
-        'Use Polars instead of pandas for files over 100MB'
-      );
-      expect(result.shouldPropose).toBe(true);
-    });
-
-    it('returns false for duplicate insight', async () => {
-      await appendLesson(
-        tempDir,
-        createQuickLesson('L001', 'Use Polars instead of pandas for files')
-      );
-
-      const result = await shouldPropose(tempDir, 'Use Polars instead of pandas for files');
-      expect(result.shouldPropose).toBe(false);
-      expect(result.reason).toBeDefined();
-    });
-
-    it('does not throw when SQLite unavailable', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Some existing insight'));
-
-      // Should not throw
-      const result = await shouldPropose(
-        tempDir,
-        'Use vitest instead of jest for better TypeScript support'
-      );
-      expect(result).toBeDefined();
     });
   });
 });

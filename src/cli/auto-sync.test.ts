@@ -6,9 +6,8 @@ import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { closeDb } from '../storage/sqlite.js';
-import { createQuickLesson } from '../test-utils.js';
-import { cleanupCliTestDir, runCli, setupCliTestDir } from './cli-test-utils.js';
+import { closeDb } from '../storage/sqlite/index.js';
+import { cleanupCliTestDir, createQuickLesson, runCli, setupCliTestDir } from '../test-utils.js';
 
 describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;
