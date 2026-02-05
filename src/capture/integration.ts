@@ -7,6 +7,9 @@
 
 import * as fs from 'node:fs/promises';
 
+import { z } from 'zod';
+
+import { ContextSchema } from '../types.js';
 import type { Source } from '../types.js';
 import { shouldPropose } from './quality.js';
 import {
@@ -152,23 +155,47 @@ function detectTestFailureFlow(data: TestResult): RawDetection | null {
   };
 }
 
-/** Valid detection types for validation */
-const VALID_TYPES = new Set<string>(['user', 'self', 'test']);
+/** Zod schema for CorrectionSignal */
+const CorrectionSignalSchema = z.object({
+  messages: z.array(z.string()),
+  context: ContextSchema,
+});
+
+/** Zod schema for EditEntry */
+const EditEntrySchema = z.object({
+  file: z.string(),
+  success: z.boolean(),
+  timestamp: z.number(),
+});
+
+/** Zod schema for EditHistory */
+const EditHistorySchema = z.object({
+  edits: z.array(EditEntrySchema),
+});
+
+/** Zod schema for TestResult */
+const TestResultSchema = z.object({
+  passed: z.boolean(),
+  output: z.string(),
+  testFile: z.string(),
+});
+
+/** Zod discriminated union for DetectionInput */
+const DetectionInputSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('user'), data: CorrectionSignalSchema }),
+  z.object({ type: z.literal('self'), data: EditHistorySchema }),
+  z.object({ type: z.literal('test'), data: TestResultSchema }),
+]);
 
 /**
  * Parse detection input from a JSON file.
  *
  * @param filePath - Path to JSON input file
  * @returns Parsed detection input
- * @throws Error if file is invalid or type is unknown
+ * @throws ZodError if file content doesn't match expected schema
  */
 export async function parseInputFile(filePath: string): Promise<DetectionInput> {
   const content = await fs.readFile(filePath, 'utf-8');
-  const data = JSON.parse(content) as { type: string; data: unknown };
-
-  if (!VALID_TYPES.has(data.type)) {
-    throw new Error(`Invalid detection type: ${data.type}. Must be one of: user, self, test`);
-  }
-
-  return data as DetectionInput;
+  const data: unknown = JSON.parse(content);
+  return DetectionInputSchema.parse(data);
 }

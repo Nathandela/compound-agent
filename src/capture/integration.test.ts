@@ -235,7 +235,66 @@ describe('trigger detection integration', () => {
       };
       await fs.writeFile(inputPath, JSON.stringify(inputData));
 
-      await expect(parseInputFile(inputPath)).rejects.toThrow(/Invalid detection type/);
+      await expect(parseInputFile(inputPath)).rejects.toThrow();
+    });
+
+    it('throws for user type with wrong data shape', async () => {
+      const inputPath = path.join(tempDir, 'input.json');
+      const inputData = {
+        type: 'user',
+        data: { wrong: 'fields' },
+      };
+      await fs.writeFile(inputPath, JSON.stringify(inputData));
+
+      await expect(parseInputFile(inputPath)).rejects.toThrow();
+    });
+
+    it('throws for self type with wrong data shape', async () => {
+      const inputPath = path.join(tempDir, 'input.json');
+      const inputData = {
+        type: 'self',
+        data: { messages: ['hello'] },
+      };
+      await fs.writeFile(inputPath, JSON.stringify(inputData));
+
+      await expect(parseInputFile(inputPath)).rejects.toThrow();
+    });
+
+    it('throws for test type with wrong data shape', async () => {
+      const inputPath = path.join(tempDir, 'input.json');
+      const inputData = {
+        type: 'test',
+        data: { edits: [] },
+      };
+      await fs.writeFile(inputPath, JSON.stringify(inputData));
+
+      await expect(parseInputFile(inputPath)).rejects.toThrow();
+    });
+
+    it('throws when data field is missing', async () => {
+      const inputPath = path.join(tempDir, 'input.json');
+      const inputData = { type: 'user' };
+      await fs.writeFile(inputPath, JSON.stringify(inputData));
+
+      await expect(parseInputFile(inputPath)).rejects.toThrow();
+    });
+
+    it('strips extra fields from valid input', async () => {
+      const inputPath = path.join(tempDir, 'input.json');
+      const inputData = {
+        type: 'test',
+        data: {
+          passed: false,
+          output: 'Test failed',
+          testFile: 'test.ts',
+        },
+        extraTopLevel: 'should be stripped',
+      };
+      await fs.writeFile(inputPath, JSON.stringify(inputData));
+
+      const result = await parseInputFile(inputPath);
+      expect(result.type).toBe('test');
+      expect((result as Record<string, unknown>)['extraTopLevel']).toBeUndefined();
     });
   });
 });
