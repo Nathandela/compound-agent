@@ -213,10 +213,11 @@ describe('Failure Tracking Functions', () => {
     });
 
     it('does NOT create temp files', () => {
+      const before = readdirSync(tmpdir()).filter((f) => f.startsWith('lna-failures'));
       processToolFailure('Bash', { command: 'npm test' });
       processToolFailure('Bash', { command: 'npm test' });
-      const tmpFiles = readdirSync(tmpdir()).filter((f) => f.startsWith('lna-failures'));
-      expect(tmpFiles).toHaveLength(0);
+      const after = readdirSync(tmpdir()).filter((f) => f.startsWith('lna-failures'));
+      expect(after.length).toBe(before.length);
     });
   });
 
