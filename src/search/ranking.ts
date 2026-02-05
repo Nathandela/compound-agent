@@ -25,6 +25,16 @@ const RECENCY_BOOST = 1.2;
 const CONFIRMATION_BOOST = 1.3;
 
 /**
+ * Maximum combined boost multiplier.
+ *
+ * Without clamping, the max boost is 1.5 * 1.2 * 1.3 = 2.34x, which lets
+ * a 0.4 similarity lesson outrank a 0.9 similarity lesson. With a 1.8 cap,
+ * a lesson needs at least ~0.53 similarity with all boosts to beat a 0.95
+ * unboosted match, keeping semantic relevance as the primary ranking signal.
+ */
+const MAX_COMBINED_BOOST = 1.8;
+
+/**
  * Calculate severity boost based on lesson severity.
  * Lessons without severity get 1.0 (medium boost).
  */
@@ -60,12 +70,14 @@ export function confirmationBoost(lesson: Lesson): number {
 
 /**
  * Calculate combined score for a lesson.
- * score = vectorSimilarity * severity * recency * confirmation
+ * score = vectorSimilarity * min(severity * recency * confirmation, MAX_COMBINED_BOOST)
  */
 export function calculateScore(lesson: Lesson, vectorSimilarity: number): number {
-  return (
-    vectorSimilarity * severityBoost(lesson) * recencyBoost(lesson) * confirmationBoost(lesson)
+  const boost = Math.min(
+    severityBoost(lesson) * recencyBoost(lesson) * confirmationBoost(lesson),
+    MAX_COMBINED_BOOST,
   );
+  return vectorSimilarity * boost;
 }
 
 /**

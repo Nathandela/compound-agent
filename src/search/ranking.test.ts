@@ -54,13 +54,14 @@ describe('ranking', () => {
   });
 
   describe('calculateScore', () => {
-    it('combines all boosts with vector similarity', () => {
+    it('combines all boosts with vector similarity, clamped', () => {
       const lesson = createFullLesson('L1', 'test insight', 'high', { confirmed: true, created: daysAgo(5) });
       const vectorSimilarity = 0.9;
 
-      // Expected: 0.9 * 1.5 (high) * 1.2 (recent) * 1.3 (confirmed) = 2.106
+      // Raw boost: 1.5 * 1.2 * 1.3 = 2.34, clamped to MAX_COMBINED_BOOST (1.8)
+      // Expected: 0.9 * 1.8 = 1.62
       const score = calculateScore(lesson, vectorSimilarity);
-      expect(score).toBeCloseTo(2.106);
+      expect(score).toBeCloseTo(1.62);
     });
 
     it('works with quick lessons', () => {
@@ -70,6 +71,48 @@ describe('ranking', () => {
       // Expected: 0.8 * 1.0 (no severity) * 1.0 (old) * 1.0 (unconfirmed) = 0.8
       const score = calculateScore(lesson, vectorSimilarity);
       expect(score).toBeCloseTo(0.8);
+    });
+
+    it('does not clamp when combined boost is below threshold', () => {
+      // medium severity (1.0) + recent (1.2) + confirmed (1.3) = 1.56, below 1.8
+      const lesson = createQuickLesson('L1', 'test insight', { confirmed: true, created: daysAgo(5) });
+      const score = calculateScore(lesson, 0.7);
+      expect(score).toBeCloseTo(0.7 * 1.0 * 1.2 * 1.3);
+    });
+
+    it('clamps combined boost at MAX_COMBINED_BOOST for extreme cases', () => {
+      // high severity (1.5) + recent (1.2) + confirmed (1.3) = 2.34 -> clamped to 1.8
+      const maxBoosted = createFullLesson('L1', 'test insight', 'high', { confirmed: true, created: daysAgo(0) });
+      const score = calculateScore(maxBoosted, 0.5);
+      // 0.5 * 1.8 = 0.9, not 0.5 * 2.34 = 1.17
+      expect(score).toBeCloseTo(0.9);
+    });
+
+    it('prevents moderate similarity + all boosts from outranking high similarity + no boosts', () => {
+      // Moderate similarity (0.4) with all boosts maxed
+      const boostedLesson = createFullLesson('L1', 'boosted', 'high', { confirmed: true, created: daysAgo(0) });
+      const boostedScore = calculateScore(boostedLesson, 0.4);
+
+      // Excellent similarity (0.9) with no boosts
+      const unboostedLesson = createFullLesson('L2', 'unboosted', 'medium', { confirmed: false, created: daysAgo(60) });
+      const unboostedScore = calculateScore(unboostedLesson, 0.9);
+
+      // With clamp: 0.4 * 1.8 = 0.72 < 0.9. Unboosted wins.
+      // Without clamp: 0.4 * 2.34 = 0.936 > 0.9. Boosted would win (bad).
+      expect(unboostedScore).toBeGreaterThan(boostedScore);
+    });
+
+    it('allows fully-boosted lesson to outrank unboosted at sufficient similarity', () => {
+      // At 0.6 similarity with full boost: 0.6 * 1.8 = 1.08
+      const boosted = createFullLesson('L1', 'boosted', 'high', { confirmed: true, created: daysAgo(0) });
+      const boostedScore = calculateScore(boosted, 0.6);
+
+      // 0.95 similarity with no boosts: 0.95
+      const unboosted = createFullLesson('L2', 'unboosted', 'medium', { confirmed: false, created: daysAgo(60) });
+      const unboostedScore = calculateScore(unboosted, 0.95);
+
+      // Confirmed + high severity + recent lesson with decent similarity should still win
+      expect(boostedScore).toBeGreaterThan(unboostedScore);
     });
   });
 
