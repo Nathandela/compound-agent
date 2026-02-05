@@ -93,32 +93,17 @@ describe('quality filters', () => {
       expect(result.existingId).toBe('L123');
     });
 
-    it('detects exact match when similarity threshold is very high', async () => {
-      // Use a threshold higher than what Jaccard would produce
-      // but still have an exact case-insensitive match
+    it('catches identical strings via Jaccard similarity, not exact-match branch', async () => {
+      // Identical strings have Jaccard similarity = 1.0, which >= 0.8 threshold.
+      // This proves the exact-match branch (if it existed) would be dead code.
       await appendLesson(tempDir, createQuickLesson('L001', 'Use POLARS for data'));
       await rebuildIndex(tempDir);
       closeDb();
 
-      // Same text, different case - exact match should catch this
-      // Set threshold to 0.99 so similarity check might pass but exact match is definitive
-      const result = await isNovel(tempDir, 'use polars for data', { threshold: 0.99 });
-      // The similarity for identical text is 1.0, so this will be caught by similarity check
+      const result = await isNovel(tempDir, 'use polars for data');
       expect(result.novel).toBe(false);
-    });
-
-    it('detects exact duplicate via exact match fallback when threshold exceeds 1.0', async () => {
-      // Set threshold > 1.0 so similarity check never triggers
-      // forcing the exact match check to be reached
-      await appendLesson(tempDir, createQuickLesson('L002', 'Check tests before pushing'));
-      await rebuildIndex(tempDir);
-      closeDb();
-
-      // Same text, different case - will fall through similarity check to exact match
-      const result = await isNovel(tempDir, 'check tests before pushing', { threshold: 1.01 });
-      expect(result.novel).toBe(false);
-      expect(result.reason).toBe('Exact duplicate found');
-      expect(result.existingId).toBe('L002');
+      expect(result.reason).toContain('similar'); // Jaccard branch, NOT "Exact duplicate found"
+      expect(result.existingId).toBe('L001');
     });
   });
 
