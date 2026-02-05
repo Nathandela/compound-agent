@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { createLesson, createQuickLesson, createFullLesson, daysAgo } from './test-utils.js';
@@ -272,6 +273,19 @@ describe('test-utils', () => {
 
     it('src/cli/cli-test-utils.ts should not exist', () => {
       expect(existsSync(join(srcDir, 'cli', 'cli-test-utils.ts'))).toBe(false);
+    });
+
+    it('src/storage/sqlite/test-helpers.ts should not exist', () => {
+      expect(existsSync(join(srcDir, 'storage', 'sqlite', 'test-helpers.ts'))).toBe(false);
+    });
+  });
+
+  describe('barrel export hygiene', () => {
+    it('AGENTS_MD_TEMPLATE is not exported from commands barrel', async () => {
+      const srcDir = join(new URL('.', import.meta.url).pathname);
+      const barrelPath = join(srcDir, 'commands', 'index.ts');
+      const content = await readFile(barrelPath, 'utf8');
+      expect(content).not.toContain('AGENTS_MD_TEMPLATE');
     });
   });
 
