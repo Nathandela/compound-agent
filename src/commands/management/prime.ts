@@ -122,7 +122,7 @@ export async function getPrimeContext(repoRoot?: string): Promise<string> {
     output += `
 ---
 
-# 🔴 Mandatory Recall
+# [CRITICAL] Mandatory Recall
 
 Critical lessons from past corrections:
 

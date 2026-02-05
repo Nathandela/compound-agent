@@ -103,7 +103,7 @@ describe('Prime Command', () => {
 
       const output = await getPrimeContext(tempDir);
 
-      expect(output).toContain('🔴');
+      expect(output).toContain('[CRITICAL]');
       expect(output).toContain('Mandatory Recall');
     });
 
@@ -114,7 +114,7 @@ describe('Prime Command', () => {
       const output = await getPrimeContext(tempDir);
 
       // Should NOT contain the Emergency Recall section
-      expect(output).not.toContain('🔴 Mandatory Recall');
+      expect(output).not.toContain('[CRITICAL] Mandatory Recall');
       // But should still have trust language
       expect(output).toContain('lna learn');
     });
@@ -455,13 +455,13 @@ describe('Prime Command', () => {
       expect(roundTripped).toBe(output);
     });
 
-    it('handles emoji in output correctly', async () => {
+    it('handles critical marker in output correctly', async () => {
       await appendLesson(tempDir, createFullLesson('L001', 'Test lesson', 'high'));
 
       const output = await getPrimeContext(tempDir);
 
-      // Should contain the red circle emoji from Emergency Recall header
-      expect(output).toContain('🔴');
+      // Should contain the text-based critical marker from Mandatory Recall header
+      expect(output).toContain('[CRITICAL]');
     });
   });
 
@@ -651,14 +651,14 @@ describe('Property-Based Tests: Prime Command Invariants', () => {
         fc.array(
           fc.string({ minLength: 1, maxLength: 200 }).map((s) => {
             // Add special characters that might break encoding
-            const specials = ['🔴', '🟢', '⚠️', '✅', '❌', '💡', '📝'];
+            const specials = ['[!]', '[*]', '[?]', '[+]', '[-]', '[>]', '[#]'];
             return s + specials[Math.floor(Math.random() * specials.length)];
           }),
           { minLength: 0, maxLength: 3 }
         ),
       ],
       { numRuns: FC_RUNS }
-    )('output handles emojis and special chars correctly', async (insights) => {
+    )('output handles special chars correctly', async (insights) => {
       for (let i = 0; i < insights.length; i++) {
         await appendLesson(
           tempDir,
@@ -668,9 +668,9 @@ describe('Property-Based Tests: Prime Command Invariants', () => {
 
       const output = await getPrimeContext(tempDir);
 
-      // Should contain at least the red circle from Emergency Recall (if lessons exist)
+      // Should contain at least the critical marker from Mandatory Recall (if lessons exist)
       if (insights.length > 0) {
-        expect(output).toContain('🔴');
+        expect(output).toContain('[CRITICAL]');
       }
 
       // Roundtrip should preserve all characters
