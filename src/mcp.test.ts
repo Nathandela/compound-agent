@@ -236,6 +236,42 @@ describe('MCP Server', () => {
         expect(item.lesson).toHaveProperty('insight');
       }
     });
+
+    it('applies rankLessons to search results (finalScore present)', async () => {
+      const jsonlPath = join(tempDir, '.claude', 'lessons', 'index.jsonl');
+      await writeFile(jsonlPath, JSON.stringify(HIGH_SEVERITY_LESSON) + '\n');
+
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('lesson_search', {
+        query: 'config validation deploy',
+      });
+
+      // rankLessons adds finalScore to each result
+      expect(result.lessons.length).toBeGreaterThan(0);
+      for (const item of result.lessons) {
+        expect(item).toHaveProperty('finalScore');
+        expect(typeof item.finalScore).toBe('number');
+      }
+    });
+
+    it('rankLessons boosts high-severity lessons above raw score', async () => {
+      const jsonlPath = join(tempDir, '.claude', 'lessons', 'index.jsonl');
+      await writeFile(jsonlPath, JSON.stringify(HIGH_SEVERITY_LESSON) + '\n');
+
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('lesson_search', {
+        query: 'config validation deploy',
+      });
+
+      // HIGH_SEVERITY_LESSON is high severity + confirmed, so finalScore > score
+      expect(result.lessons.length).toBeGreaterThan(0);
+      const first = result.lessons[0];
+      expect(first.finalScore).toBeGreaterThan(first.score);
+    });
   });
 
   describe('lesson_capture tool', () => {
