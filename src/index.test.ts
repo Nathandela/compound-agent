@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 
 import {
@@ -45,6 +48,12 @@ import {
 describe('public API exports', () => {
   it('exports VERSION as semver string', () => {
     expect(VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it('VERSION matches package.json version', () => {
+    const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string };
+    expect(VERSION).toBe(pkg.version);
   });
 
   describe('storage exports', () => {

@@ -84,11 +84,13 @@
  * @module learning-agent
  */
 
-/**
- * Package version - must match package.json.
- * Update this when releasing a new version.
- */
-export const VERSION = '0.2.8';
+import { createRequire } from 'node:module';
+
+const _require = createRequire(import.meta.url);
+const _pkg = _require('../package.json') as { version: string };
+
+/** Package version, read from package.json. */
+export const VERSION: string = _pkg.version;
 
 // Storage API (JSONL source of truth + SQLite index)
 export {
