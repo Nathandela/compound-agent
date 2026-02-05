@@ -920,4 +920,92 @@ describe('MCP Server', () => {
       }
     );
   });
+
+  describe('signal handlers for cleanup', () => {
+    it('registerMcpCleanup registers SIGINT and SIGTERM handlers', async () => {
+      const processOnSpy = vi.spyOn(process, 'on');
+
+      const { registerMcpCleanup } = await import('./mcp.js');
+      registerMcpCleanup();
+
+      const signalCalls = processOnSpy.mock.calls.filter(
+        ([event]) => event === 'SIGINT' || event === 'SIGTERM'
+      );
+      expect(signalCalls.length).toBe(2);
+      expect(signalCalls.some(([event]) => event === 'SIGINT')).toBe(true);
+      expect(signalCalls.some(([event]) => event === 'SIGTERM')).toBe(true);
+
+      processOnSpy.mockRestore();
+    });
+
+    it('SIGINT handler calls closeDb', async () => {
+      const processOnSpy = vi.spyOn(process, 'on');
+      const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+      const { registerMcpCleanup } = await import('./mcp.js');
+      const { closeDb } = await import('./storage/index.js');
+      const closeDbSpy = vi.spyOn(await import('./storage/index.js'), 'closeDb');
+
+      registerMcpCleanup();
+
+      // Find the SIGINT handler and call it
+      const sigintCall = processOnSpy.mock.calls.find(([event]) => event === 'SIGINT');
+      expect(sigintCall).toBeDefined();
+      const handler = sigintCall![1] as () => void;
+      handler();
+
+      expect(closeDbSpy).toHaveBeenCalled();
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+
+      processOnSpy.mockRestore();
+      processExitSpy.mockRestore();
+      closeDbSpy.mockRestore();
+    });
+
+    it('SIGTERM handler calls closeDb', async () => {
+      const processOnSpy = vi.spyOn(process, 'on');
+      const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+      const { registerMcpCleanup } = await import('./mcp.js');
+      const closeDbSpy = vi.spyOn(await import('./storage/index.js'), 'closeDb');
+
+      registerMcpCleanup();
+
+      // Find the SIGTERM handler and call it
+      const sigtermCall = processOnSpy.mock.calls.find(([event]) => event === 'SIGTERM');
+      expect(sigtermCall).toBeDefined();
+      const handler = sigtermCall![1] as () => void;
+      handler();
+
+      expect(closeDbSpy).toHaveBeenCalled();
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+
+      processOnSpy.mockRestore();
+      processExitSpy.mockRestore();
+      closeDbSpy.mockRestore();
+    });
+
+    it('cleanup does not throw even if closeDb fails', async () => {
+      const processOnSpy = vi.spyOn(process, 'on');
+      const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
+
+      const { registerMcpCleanup } = await import('./mcp.js');
+      const closeDbSpy = vi.spyOn(await import('./storage/index.js'), 'closeDb').mockImplementation(() => {
+        throw new Error('DB already closed');
+      });
+
+      registerMcpCleanup();
+
+      const sigintCall = processOnSpy.mock.calls.find(([event]) => event === 'SIGINT');
+      const handler = sigintCall![1] as () => void;
+
+      // Should not throw
+      expect(() => handler()).not.toThrow();
+      expect(processExitSpy).toHaveBeenCalledWith(0);
+
+      processOnSpy.mockRestore();
+      processExitSpy.mockRestore();
+      closeDbSpy.mockRestore();
+    });
+  });
 });

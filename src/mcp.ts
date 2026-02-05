@@ -17,7 +17,7 @@ import { z } from 'zod';
 import { getPrimeContext } from './commands/management/prime.js';
 import { VERSION } from './index.js';
 import { rankLessons, searchVector } from './search/index.js';
-import { appendLesson } from './storage/index.js';
+import { appendLesson, closeDb } from './storage/index.js';
 import { generateId } from './types.js';
 import type { Lesson } from './types.js';
 
@@ -298,10 +298,32 @@ Saves immediately and shows what was captured.`,
 }
 
 /**
+ * Register signal handlers for clean resource cleanup.
+ * Mirrors the CLI pattern in src/cli.ts.
+ *
+ * Note: We only close the SQLite database here. The embedding model
+ * (node-llama-cpp) handles its own cleanup and calling unloadEmbedding()
+ * during signal handlers can cause issues with the native addon.
+ */
+export function registerMcpCleanup(): void {
+  const cleanup = (): void => {
+    try {
+      closeDb();
+    } catch {
+      // Ignore errors - database may never have been opened
+    }
+  };
+  process.on('SIGINT', () => { cleanup(); process.exit(0); });
+  process.on('SIGTERM', () => { cleanup(); process.exit(0); });
+}
+
+/**
  * Start MCP server with stdio transport.
  * Called when this module is run directly.
  */
 async function main(): Promise<void> {
+  registerMcpCleanup();
+
   const repoRoot = process.cwd();
   const { server } = createMcpServer(repoRoot);
 
