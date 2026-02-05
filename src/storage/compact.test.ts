@@ -6,12 +6,13 @@
  * - Active lessons remain in index.jsonl
  * - Tombstones are correctly applied
  * - Archive files use format: YYYY-MM.jsonl
+ * - TOCTOU safety: compact reads file once, produces consistent results
  */
 
 import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { Lesson } from '../types.js';
 
@@ -27,11 +28,32 @@ import {
 } from './compact.js';
 import { appendLesson, LESSONS_PATH, readLessons } from './jsonl.js';
 
+/**
+ * Spy on node:fs/promises readFile to count how many times
+ * the JSONL file is read during compact(). The mock is transparent:
+ * it delegates to the real readFile implementation.
+ */
+const { readFileSpy } = vi.hoisted(() => ({
+  readFileSpy: vi.fn(),
+}));
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('node:fs/promises')>();
+  return {
+    ...mod,
+    readFile: async (...args: unknown[]) => {
+      readFileSpy(args[0]);
+      return (mod.readFile as Function)(...args);
+    },
+  };
+});
+
 describe('Compaction', () => {
   let tempDir: string;
 
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-compact-'));
+    readFileSpy.mockClear();
   });
 
   afterEach(async () => {
@@ -411,6 +433,64 @@ describe('Compaction', () => {
       expect(result.archived).toBe(0);
       expect(result.tombstonesRemoved).toBe(0);
       expect(result.lessonsRemaining).toBe(0);
+    });
+  });
+
+  describe('TOCTOU safety', () => {
+    it('compact reads the JSONL file at most once', async () => {
+      await appendLesson(tempDir, createOldLesson('L001', 'old'));
+      await appendLesson(tempDir, createLesson('L002', 'keep'));
+      await appendLesson(tempDir, createLesson('L003', 'deleted'));
+      await appendLesson(tempDir, { ...createLesson('L003', 'deleted'), deleted: true });
+
+      const jsonlPath = join(tempDir, LESSONS_PATH);
+      readFileSpy.mockClear();
+
+      await compact(tempDir);
+
+      const jsonlReads = readFileSpy.mock.calls.filter(
+        ([path]: [unknown]) => String(path) === jsonlPath
+      );
+
+      expect(jsonlReads).toHaveLength(1);
+    });
+
+    it('returns exact counts for known input', async () => {
+      // 2 archivable (old, 0 retrievals)
+      await appendLesson(tempDir, createOldLesson('L001', 'old1'));
+      await appendLesson(tempDir, createOldLesson('L002', 'old2'));
+      // 2 active
+      await appendLesson(tempDir, createLesson('L003', 'active1'));
+      await appendLesson(tempDir, createLesson('L004', 'active2'));
+      // 1 deleted (creates 1 tombstone)
+      await appendLesson(tempDir, createLesson('L005', 'todelete'));
+      await appendLesson(tempDir, { ...createLesson('L005', 'todelete'), deleted: true });
+
+      const result = await compact(tempDir);
+
+      expect(result.archived).toBe(2);
+      expect(result.tombstonesRemoved).toBe(1);
+      expect(result.lessonsRemaining).toBe(2);
+    });
+
+    it('maintains data invariant: archived + remaining = total non-deleted unique lessons', async () => {
+      await appendLesson(tempDir, createOldLesson('L001', 'archive'));
+      await appendLesson(tempDir, createLesson('L002', 'active'));
+      await appendLesson(tempDir, createLesson('L003', 'willdelete'));
+      await appendLesson(tempDir, { ...createLesson('L003', 'willdelete'), deleted: true });
+
+      const result = await compact(tempDir);
+
+      // L001 (archived) + L002 (remaining) = 2 total non-deleted unique lessons
+      expect(result.archived + result.lessonsRemaining).toBe(2);
+
+      // File contains exactly lessonsRemaining lessons
+      const { lessons } = await readLessons(tempDir);
+      expect(lessons).toHaveLength(result.lessonsRemaining);
+
+      // No tombstones remain after compact
+      const tombstones = await countTombstones(tempDir);
+      expect(tombstones).toBe(0);
     });
   });
 });
