@@ -7,19 +7,8 @@
  * - Actionable (contains action words)
  */
 
-import { readLessons, searchKeyword, syncIfNeeded, isSqliteMode } from '../storage/index.js';
+import { searchKeyword, syncIfNeeded } from '../storage/index.js';
 import type { Lesson } from '../types.js';
-
-/** Track whether degradation warning has been logged */
-let noveltyDegradationWarningLogged = false;
-
-/**
- * Reset novelty degradation warning state. Used in tests.
- * @internal Test-only API
- */
-export function _resetNoveltyWarningState(): void {
-  noveltyDegradationWarningLogged = false;
-}
 
 /** Default similarity threshold for duplicate detection */
 const DEFAULT_SIMILARITY_THRESHOLD = 0.8;
@@ -39,9 +28,6 @@ export interface NoveltyOptions {
 /**
  * Check if an insight is novel (not a duplicate of existing lessons).
  * Uses keyword search to find potentially similar lessons.
- *
- * Graceful degradation: If SQLite is unavailable, falls back to JSONL-based
- * duplicate detection using Jaccard similarity.
  */
 export async function isNovel(
   repoRoot: string,
@@ -50,23 +36,6 @@ export async function isNovel(
 ): Promise<NoveltyResult> {
   const threshold = options.threshold ?? DEFAULT_SIMILARITY_THRESHOLD;
 
-  // Check if SQLite is available
-  if (isSqliteMode()) {
-    return isNovelWithSqlite(repoRoot, insight, threshold);
-  }
-
-  // Fallback to JSONL-based duplicate detection
-  return isNovelWithJsonl(repoRoot, insight, threshold);
-}
-
-/**
- * Check novelty using SQLite FTS5 keyword search (preferred when available).
- */
-async function isNovelWithSqlite(
-  repoRoot: string,
-  insight: string,
-  threshold: number
-): Promise<NoveltyResult> {
   // Sync index if JSONL has changed
   await syncIfNeeded(repoRoot);
 
@@ -91,30 +60,6 @@ async function isNovelWithSqlite(
   }
 
   return checkSimilarity(insight, results, threshold);
-}
-
-/**
- * Check novelty by scanning JSONL file directly (fallback when SQLite unavailable).
- */
-async function isNovelWithJsonl(
-  repoRoot: string,
-  insight: string,
-  threshold: number
-): Promise<NoveltyResult> {
-  // Log degradation warning once
-  if (!noveltyDegradationWarningLogged) {
-    console.warn('Novelty check running in degraded mode (JSONL scan, no FTS5)');
-    noveltyDegradationWarningLogged = true;
-  }
-
-  // Read all lessons from JSONL
-  const { lessons } = await readLessons(repoRoot);
-
-  if (lessons.length === 0) {
-    return { novel: true };
-  }
-
-  return checkSimilarity(insight, lessons, threshold);
 }
 
 /**

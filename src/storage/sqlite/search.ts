@@ -5,7 +5,6 @@
 import type { Lesson } from '../../types.js';
 
 import type { LessonRow, RetrievalStat } from './types.js';
-import { logDegradationWarning } from './availability.js';
 import { openDb } from './connection.js';
 
 /**
@@ -52,7 +51,6 @@ function rowToLesson(row: LessonRow): Lesson {
 
 /**
  * Increment retrieval count for lessons.
- * Gracefully degrades: no-op if SQLite unavailable.
  * @param repoRoot - Absolute path to repository root
  * @param lessonIds - IDs of retrieved lessons
  */
@@ -60,10 +58,6 @@ export function incrementRetrievalCount(repoRoot: string, lessonIds: string[]): 
   if (lessonIds.length === 0) return;
 
   const database = openDb(repoRoot);
-  if (!database) {
-    logDegradationWarning();
-    return;
-  }
 
   const now = new Date().toISOString();
 
@@ -85,12 +79,10 @@ export function incrementRetrievalCount(repoRoot: string, lessonIds: string[]): 
 
 /**
  * Search lessons using FTS5 full-text search.
- * Does NOT degrade gracefully: throws error if SQLite unavailable.
  * @param repoRoot - Absolute path to repository root
  * @param query - FTS5 query string
  * @param limit - Maximum number of results
  * @returns Matching lessons
- * @throws Error if SQLite unavailable (FTS5 required)
  */
 export async function searchKeyword(
   repoRoot: string,
@@ -98,12 +90,6 @@ export async function searchKeyword(
   limit: number
 ): Promise<Lesson[]> {
   const database = openDb(repoRoot);
-  if (!database) {
-    throw new Error(
-      'Keyword search requires SQLite (FTS5 required). ' +
-        'Install native build tools or use vector search instead.'
-    );
-  }
 
   const countResult = database.prepare('SELECT COUNT(*) as cnt FROM lessons').get() as {
     cnt: number;
@@ -132,16 +118,11 @@ export async function searchKeyword(
 
 /**
  * Get retrieval statistics for all lessons.
- * Gracefully degrades: returns empty array if SQLite unavailable.
  * @param repoRoot - Absolute path to repository root
  * @returns Array of retrieval statistics
  */
 export function getRetrievalStats(repoRoot: string): RetrievalStat[] {
   const database = openDb(repoRoot);
-  if (!database) {
-    logDegradationWarning();
-    return [];
-  }
 
   const rows = database
     .prepare('SELECT id, retrieval_count, last_retrieved FROM lessons')

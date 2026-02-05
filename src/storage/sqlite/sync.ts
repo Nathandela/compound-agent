@@ -10,7 +10,6 @@ import type { Lesson } from '../../types.js';
 import { LESSONS_PATH, readLessons } from '../jsonl.js';
 
 import type { SyncOptions } from './types.js';
-import { isSqliteAvailable, logDegradationWarning } from './availability.js';
 import { openDb } from './connection.js';
 import { collectCachedEmbeddings, contentHash } from './cache.js';
 
@@ -60,16 +59,11 @@ function setLastSyncMtime(database: DatabaseType, mtime: number): void {
 
 /**
  * Rebuild the SQLite index from JSONL source of truth.
- * Gracefully degrades: no-op with warning if SQLite unavailable.
  * Preserves cached embeddings when lesson content hasn't changed.
  * @param repoRoot - Absolute path to repository root
  */
 export async function rebuildIndex(repoRoot: string): Promise<void> {
   const database = openDb(repoRoot);
-  if (!database) {
-    logDegradationWarning();
-    return;
-  }
 
   const { lessons } = await readLessons(repoRoot);
   const cachedEmbeddings = collectCachedEmbeddings(database);
@@ -130,7 +124,6 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
 
 /**
  * Sync SQLite index if JSONL has changed.
- * Gracefully degrades: returns false immediately if SQLite unavailable.
  * @param repoRoot - Absolute path to repository root
  * @param options - Sync options
  * @returns true if sync was performed, false otherwise
@@ -139,11 +132,6 @@ export async function syncIfNeeded(
   repoRoot: string,
   options: SyncOptions = {}
 ): Promise<boolean> {
-  if (!isSqliteAvailable()) {
-    logDegradationWarning();
-    return false;
-  }
-
   const { force = false } = options;
   const jsonlMtime = getJsonlMtime(repoRoot);
   if (jsonlMtime === null && !force) {
@@ -151,7 +139,6 @@ export async function syncIfNeeded(
   }
 
   const database = openDb(repoRoot);
-  if (!database) return false;
 
   const lastSyncMtime = getLastSyncMtime(database);
   const needsRebuild = force || lastSyncMtime === null || (jsonlMtime !== null && jsonlMtime > lastSyncMtime);

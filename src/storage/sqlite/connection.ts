@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import type { Database as DatabaseType } from 'better-sqlite3';
 
 import type { DbOptions } from './types.js';
-import { getDatabaseConstructor, isSqliteAvailable } from './availability.js';
+import { getDatabaseConstructor } from './availability.js';
 import { createSchema } from './schema.js';
 
 /** Relative path to database file from repo root */
@@ -19,16 +19,12 @@ let dbIsInMemory = false;
 
 /**
  * Open the SQLite database connection.
- * Gracefully degrades: returns null if SQLite unavailable.
+ * Throws if better-sqlite3 cannot be loaded.
  * @param repoRoot - Absolute path to repository root
  * @param options - Database options (e.g., inMemory for testing)
- * @returns Database instance or null if SQLite unavailable
+ * @returns Database instance
  */
-export function openDb(repoRoot: string, options: DbOptions = {}): DatabaseType | null {
-  if (!isSqliteAvailable()) {
-    return null;
-  }
-
+export function openDb(repoRoot: string, options: DbOptions = {}): DatabaseType {
   const { inMemory = false } = options;
 
   if (db) {
@@ -39,7 +35,7 @@ export function openDb(repoRoot: string, options: DbOptions = {}): DatabaseType 
     }
   }
 
-  const Database = getDatabaseConstructor()!;
+  const Database = getDatabaseConstructor();
 
   if (inMemory) {
     db = new Database(':memory:');

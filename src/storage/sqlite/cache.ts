@@ -6,7 +6,6 @@ import { createHash } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
 
 import type { CachedEmbeddingData } from './types.js';
-import { logDegradationWarning } from './availability.js';
 import { openDb } from './connection.js';
 
 /**
@@ -22,11 +21,10 @@ export function contentHash(trigger: string, insight: string): string {
 
 /**
  * Get cached embedding for a lesson.
- * Gracefully degrades: returns null if SQLite unavailable.
  * @param repoRoot - Absolute path to repository root
  * @param lessonId - ID of the lesson
  * @param expectedHash - Optional content hash to validate cache freshness
- * @returns Embedding array or null if not cached/unavailable
+ * @returns Embedding array or null if not cached
  */
 export function getCachedEmbedding(
   repoRoot: string,
@@ -34,10 +32,6 @@ export function getCachedEmbedding(
   expectedHash?: string
 ): number[] | null {
   const database = openDb(repoRoot);
-  if (!database) {
-    logDegradationWarning();
-    return null;
-  }
 
   const row = database
     .prepare('SELECT embedding, content_hash FROM lessons WHERE id = ?')
@@ -61,7 +55,6 @@ export function getCachedEmbedding(
 
 /**
  * Cache embedding for a lesson in SQLite.
- * Gracefully degrades: no-op if SQLite unavailable.
  * @param repoRoot - Absolute path to repository root
  * @param lessonId - ID of the lesson
  * @param embedding - Embedding vector (Float32Array or number array)
@@ -74,10 +67,6 @@ export function setCachedEmbedding(
   hash: string
 ): void {
   const database = openDb(repoRoot);
-  if (!database) {
-    logDegradationWarning();
-    return;
-  }
 
   const float32 = embedding instanceof Float32Array ? embedding : new Float32Array(embedding);
   const buffer = Buffer.from(float32.buffer, float32.byteOffset, float32.byteLength);
