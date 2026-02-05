@@ -8,8 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { ARCHIVE_DIR } from '../storage/compact.js';
 import { appendLesson, LESSONS_PATH } from '../storage/jsonl.js';
-import { createQuickLesson, daysAgo } from '../test-utils.js';
-import { cleanupCliTestDir, runCli, setupCliTestDir } from './cli-test-utils.js';
+import { cleanupCliTestDir, createQuickLesson, daysAgo, runCli, setupCliTestDir } from '../test-utils.js';
 
 describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;

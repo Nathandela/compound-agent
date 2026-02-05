@@ -7,7 +7,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { LESSONS_PATH } from '../storage/jsonl.js';
-import { setupCliTestContext } from './test-helpers.js';
+import { setupCliTestContext } from '../test-utils.js';
 
 describe('Capture Commands', () => {
   const { getTempDir, runCli } = setupCliTestContext();

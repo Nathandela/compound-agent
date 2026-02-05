@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import { createLesson, createQuickLesson, createFullLesson, daysAgo } from './test-utils.js';
 
@@ -258,6 +260,18 @@ describe('test-utils', () => {
     it('excludes deleted when not provided', () => {
       const lesson = createFullLesson('F007', 'Test', 'low');
       expect('deleted' in lesson).toBe(false);
+    });
+  });
+
+  describe('consolidation: no duplicate test utility files', () => {
+    const srcDir = join(new URL('.', import.meta.url).pathname);
+
+    it('src/commands/test-helpers.ts should not exist', () => {
+      expect(existsSync(join(srcDir, 'commands', 'test-helpers.ts'))).toBe(false);
+    });
+
+    it('src/cli/cli-test-utils.ts should not exist', () => {
+      expect(existsSync(join(srcDir, 'cli', 'cli-test-utils.ts'))).toBe(false);
     });
   });
 

@@ -15,7 +15,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
-import { setupCliTestContext } from './test-helpers.js';
+import { setupCliTestContext } from '../test-utils.js';
 
 describe('Setup Commands - Generated Content', () => {
   const { getTempDir, runCli } = setupCliTestContext();

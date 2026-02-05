@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
-import { cleanupCliTestDir, runCli, setupCliTestDir } from './cli-test-utils.js';
+import { cleanupCliTestDir, runCli, setupCliTestDir } from '../test-utils.js';
 
 describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;
