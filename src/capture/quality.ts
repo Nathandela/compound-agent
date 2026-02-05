@@ -142,15 +142,6 @@ function checkSimilarity(
         existingId: lesson.id,
       };
     }
-
-    // Also check exact match
-    if (lesson.insight.toLowerCase() === insight.toLowerCase()) {
-      return {
-        novel: false,
-        reason: `Exact duplicate found`,
-        existingId: lesson.id,
-      };
-    }
   }
 
   return { novel: true };
