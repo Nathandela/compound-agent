@@ -16,7 +16,7 @@ import { z } from 'zod';
 
 import { getPrimeContext } from './commands/management/prime.js';
 import { VERSION } from './index.js';
-import { searchVector } from './search/index.js';
+import { rankLessons, searchVector } from './search/index.js';
 import { appendLesson } from './storage/index.js';
 import { generateId } from './types.js';
 import type { Lesson } from './types.js';
@@ -31,6 +31,7 @@ const MIN_INSIGHT_LENGTH = 10;
 interface SearchResult {
   lesson: Lesson;
   score: number;
+  finalScore?: number;
 }
 
 /** Success result from lesson_search tool */
@@ -68,6 +69,71 @@ interface CaptureToolResult {
 /** Result from reading a resource */
 interface ResourceResult {
   content: string;
+}
+
+/**
+ * Shared search logic for both MCP protocol and typed API paths.
+ *
+ * @param repoRoot - Repository root directory
+ * @param query - Search query string
+ * @param maxResults - Max results to return (default: DEFAULT_MAX_RESULTS)
+ * @returns Ranked search results or error response
+ */
+async function handleSearch(
+  repoRoot: string,
+  query: string,
+  maxResults?: number
+): Promise<SearchToolResult> {
+  try {
+    const limit = maxResults ?? DEFAULT_MAX_RESULTS;
+    const results = await searchVector(repoRoot, query, { limit });
+    const ranked = rankLessons(results);
+    const lessons: SearchResult[] = ranked.map((r) => ({
+      lesson: r.lesson,
+      score: r.score,
+      finalScore: r.finalScore,
+    }));
+    return { lessons };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    return {
+      error: `Search failed: ${message}`,
+      action: 'Run: npx lna download-model',
+      lessons: [],
+    };
+  }
+}
+
+/**
+ * Shared capture logic for both MCP protocol and typed API paths.
+ *
+ * @param repoRoot - Repository root directory
+ * @param insight - Lesson insight text
+ * @param trigger - Optional trigger description
+ * @param tags - Optional tags array
+ * @returns Captured lesson
+ */
+async function handleCapture(
+  repoRoot: string,
+  insight: string,
+  trigger?: string,
+  tags?: string[]
+): Promise<CaptureToolResult> {
+  const lesson: Lesson = {
+    id: generateId(insight),
+    type: 'quick',
+    trigger: trigger ?? 'Manual capture via MCP',
+    insight,
+    tags: tags ?? [],
+    source: 'manual',
+    context: { tool: 'mcp', intent: 'lesson capture' },
+    created: new Date().toISOString(),
+    confirmed: true,
+    supersedes: [],
+    related: [],
+  };
+  await appendLesson(repoRoot, lesson);
+  return { lesson };
 }
 
 /** MCP Server wrapper with typed tool/resource methods */
@@ -129,61 +195,17 @@ Returns relevant lessons ranked by similarity and severity.`,
       inputSchema: searchInputSchema,
     },
     async ({ query, maxResults }) => {
-      try {
-        const limit = maxResults ?? DEFAULT_MAX_RESULTS;
-        const results = await searchVector(repoRoot, query, { limit });
-
-        const lessons: SearchResult[] = results.map((r) => ({
-          lesson: r.lesson,
-          score: r.score,
-        }));
-
-        const output: SearchToolResult = { lessons };
-        return {
-          content: [{ type: 'text' as const, text: JSON.stringify(output) }],
-        };
-      } catch (err) {
-        // Convert embedding errors to actionable messages
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        return {
-          content: [
-            {
-              type: 'text' as const,
-              text: JSON.stringify({
-                error: `Search failed: ${message}`,
-                action: 'Run: npx lna download-model',
-                lessons: [],
-              }),
-            },
-          ],
-        };
-      }
+      const output = await handleSearch(repoRoot, query, maxResults);
+      return {
+        content: [{ type: 'text' as const, text: JSON.stringify(output) }],
+      };
     }
   );
 
   // Store handler for direct invocation
   toolHandlers['lesson_search'] = async (params): Promise<SearchToolResult> => {
     const parsed = z.object(searchInputSchema).parse(params);
-
-    try {
-      const limit = parsed.maxResults ?? DEFAULT_MAX_RESULTS;
-      const results = await searchVector(repoRoot, parsed.query, { limit });
-      // Handle case where searchVector returns undefined (shouldn't happen but defensive)
-      const safeResults = results ?? [];
-      const success: SearchToolSuccess = {
-        lessons: safeResults.map((r) => ({ lesson: r.lesson, score: r.score })),
-      };
-      return success;
-    } catch (err) {
-      // Convert embedding errors to actionable messages
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      const error: SearchToolError = {
-        error: `Search failed: ${message}`,
-        action: 'Run: npx lna download-model',
-        lessons: [],
-      };
-      return error;
-    }
+    return handleSearch(repoRoot, parsed.query, parsed.maxResults);
   };
 
   // =========================================================================
@@ -208,23 +230,7 @@ Saves immediately and shows what was captured.`,
       inputSchema: captureInputSchema,
     },
     async ({ insight, trigger, tags }) => {
-      const lesson: Lesson = {
-        id: generateId(insight),
-        type: 'quick',
-        trigger: trigger ?? 'Manual capture via MCP',
-        insight,
-        tags: tags ?? [],
-        source: 'manual',
-        context: { tool: 'mcp', intent: 'lesson capture' },
-        created: new Date().toISOString(),
-        confirmed: true,
-        supersedes: [],
-        related: [],
-      };
-
-      await appendLesson(repoRoot, lesson);
-
-      const output: CaptureToolResult = { lesson };
+      const output = await handleCapture(repoRoot, insight, trigger, tags);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(output) }],
       };
@@ -232,25 +238,9 @@ Saves immediately and shows what was captured.`,
   );
 
   // Store handler for direct invocation
-  toolHandlers['lesson_capture'] = async (params) => {
+  toolHandlers['lesson_capture'] = async (params): Promise<CaptureToolResult> => {
     const parsed = z.object(captureInputSchema).parse(params);
-
-    const lesson: Lesson = {
-      id: generateId(parsed.insight),
-      type: 'quick',
-      trigger: parsed.trigger ?? 'Manual capture via MCP',
-      insight: parsed.insight,
-      tags: parsed.tags ?? [],
-      source: 'manual',
-      context: { tool: 'mcp', intent: 'lesson capture' },
-      created: new Date().toISOString(),
-      confirmed: true,
-      supersedes: [],
-      related: [],
-    };
-
-    await appendLesson(repoRoot, lesson);
-    return { lesson } as CaptureToolResult;
+    return handleCapture(repoRoot, parsed.insight, parsed.trigger, parsed.tags);
   };
 
   // =========================================================================
