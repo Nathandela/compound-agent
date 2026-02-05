@@ -14,12 +14,18 @@
  * @see {@link getEmbedding} for the lazy-loading mechanism
  */
 
+import type { Llama, LlamaModel } from 'node-llama-cpp';
 import { getLlama, LlamaEmbeddingContext } from 'node-llama-cpp';
 
 import { isModelAvailable, resolveModel } from './model.js';
 
 /** Singleton embedding context */
 let embeddingContext: LlamaEmbeddingContext | null = null;
+/** Pending initialization promise (prevents concurrent duplicate loads) */
+let pendingInit: Promise<LlamaEmbeddingContext> | null = null;
+/** Native resource refs for proper cleanup */
+let llamaInstance: Llama | null = null;
+let modelInstance: LlamaModel | null = null;
 
 /**
  * Get the LlamaEmbeddingContext instance for generating embeddings.
@@ -53,16 +59,22 @@ let embeddingContext: LlamaEmbeddingContext | null = null;
  */
 export async function getEmbedding(): Promise<LlamaEmbeddingContext> {
   if (embeddingContext) return embeddingContext;
+  if (pendingInit) return pendingInit;
 
-  // Resolve model path (downloads if needed)
-  const modelPath = await resolveModel({ cli: true });
+  pendingInit = (async () => {
+    try {
+      const modelPath = await resolveModel({ cli: true });
+      llamaInstance = await getLlama();
+      modelInstance = await llamaInstance.loadModel({ modelPath });
+      embeddingContext = await modelInstance.createEmbeddingContext();
+      return embeddingContext;
+    } catch (err) {
+      pendingInit = null; // Allow retry on failure
+      throw err;
+    }
+  })();
 
-  // Load llama and model
-  const llama = await getLlama();
-  const model = await llama.loadModel({ modelPath });
-  embeddingContext = await model.createEmbeddingContext();
-
-  return embeddingContext;
+  return pendingInit;
 }
 
 /**
@@ -111,6 +123,15 @@ export function unloadEmbedding(): void {
     embeddingContext.dispose();
     embeddingContext = null;
   }
+  if (modelInstance) {
+    modelInstance.dispose().catch(() => {});
+    modelInstance = null;
+  }
+  if (llamaInstance) {
+    llamaInstance.dispose().catch(() => {});
+    llamaInstance = null;
+  }
+  pendingInit = null;
 }
 
 /**
