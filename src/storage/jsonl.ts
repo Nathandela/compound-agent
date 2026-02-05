@@ -4,13 +4,8 @@
  * Append-only storage with last-write-wins deduplication.
  * Source of truth - git trackable.
  *
- * Record format:
- * - Lessons: Full lesson objects (LessonSchema)
- * - Tombstones: Minimal deletion markers (TombstoneSchema)
- *
- * The read path accepts both:
- * - Legacy format: Full lesson with deleted:true field
- * - Canonical format: Minimal tombstone { id, deleted: true, deletedAt }
+ * Deletion: append the lesson with `deleted: true` and `deletedAt`.
+ * Read path also accepts old minimal tombstone records for backward compat.
  */
 
 import { appendFile, mkdir, readFile } from 'node:fs/promises';
@@ -46,7 +41,6 @@ export interface ReadLessonsResult {
   skippedCount: number;
 }
 
-import type { Tombstone } from '../types.js';
 
 /**
  * Append a lesson to the JSONL file.
@@ -57,20 +51,6 @@ export async function appendLesson(repoRoot: string, lesson: Lesson): Promise<vo
   await mkdir(dirname(filePath), { recursive: true });
 
   const line = JSON.stringify(lesson) + '\n';
-  await appendFile(filePath, line, 'utf-8');
-}
-
-/**
- * Append a canonical tombstone to the JSONL file.
- * Creates directory structure if missing.
- *
- * Use this for deletions instead of appendLesson with deleted:true.
- */
-export async function appendTombstone(repoRoot: string, tombstone: Tombstone): Promise<void> {
-  const filePath = join(repoRoot, LESSONS_PATH);
-  await mkdir(dirname(filePath), { recursive: true });
-
-  const line = JSON.stringify(tombstone) + '\n';
   await appendFile(filePath, line, 'utf-8');
 }
 

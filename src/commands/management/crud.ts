@@ -7,9 +7,9 @@
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../../cli-utils.js';
-import { appendLesson, appendTombstone, readLessons, syncIfNeeded } from '../../storage/index.js';
+import { appendLesson, readLessons, syncIfNeeded } from '../../storage/index.js';
 import { LessonSchema, SeveritySchema } from '../../types.js';
-import type { Lesson, Severity, Tombstone } from '../../types.js';
+import type { Lesson, Severity } from '../../types.js';
 
 import { out } from '../shared.js';
 import { formatLessonHuman, wasLessonDeleted } from './helpers.js';
@@ -170,10 +170,9 @@ export function registerCrudCommands(program: Command): void {
     });
 
   /**
-   * Delete command - Soft delete lessons by creating tombstone records.
+   * Delete command - Soft delete lessons.
    *
-   * Creates a canonical tombstone: { id, deleted: true, deletedAt }
-   * This minimal format replaces the old "full lesson copy with deleted:true".
+   * Appends the full lesson with `deleted: true` and `deletedAt`.
    *
    * @example npx lna delete L12345678
    * @example npx lna delete L001 L002 L003
@@ -201,14 +200,14 @@ export function registerCrudCommands(program: Command): void {
           continue;
         }
 
-        // Create canonical tombstone (minimal format)
-        const tombstone: Tombstone = {
-          id,
+        // Mark lesson as deleted (full record with deleted flag)
+        const deletedLesson: Lesson = {
+          ...lesson,
           deleted: true,
           deletedAt: new Date().toISOString(),
         };
 
-        await appendTombstone(repoRoot, tombstone);
+        await appendLesson(repoRoot, deletedLesson);
 
         deleted.push(id);
       }
