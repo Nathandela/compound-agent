@@ -9,10 +9,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { appendLesson } from '../../storage/jsonl.js';
-import { closeDb } from '../../storage/sqlite/index.js';
-import { createFullLesson, createQuickLesson } from '../../test-utils.js';
-import { getPrimeContext } from './prime.js';
+import { appendLesson } from '../storage/jsonl.js';
+import { closeDb } from '../storage/sqlite/index.js';
+import { createFullLesson, createQuickLesson } from '../test-utils.js';
+import { getPrimeContext } from './management-prime.js';
 
 // Token estimation: ~4 chars per token for English text
 function estimateTokens(text: string): number {

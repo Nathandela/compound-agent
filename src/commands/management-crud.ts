@@ -6,13 +6,13 @@
 
 import type { Command } from 'commander';
 
-import { getRepoRoot } from '../../cli-utils.js';
-import { appendLesson, readLessons, syncIfNeeded } from '../../storage/index.js';
-import { LessonSchema, SeveritySchema } from '../../types.js';
-import type { Lesson, Severity } from '../../types.js';
+import { getRepoRoot } from '../cli-utils.js';
+import { appendLesson, readLessons, syncIfNeeded } from '../storage/index.js';
+import { LessonSchema, SeveritySchema } from '../types.js';
+import type { Lesson, Severity } from '../types.js';
 
-import { out } from '../shared.js';
-import { formatLessonHuman, wasLessonDeleted } from './helpers.js';
+import { out } from './shared.js';
+import { formatLessonHuman, wasLessonDeleted } from './management-helpers.js';
 
 /** JSON indentation for show output */
 const SHOW_JSON_INDENT = 2;

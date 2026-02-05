@@ -8,7 +8,7 @@ import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
-import { formatBytes, getRepoRoot } from '../../cli-utils.js';
+import { formatBytes, getRepoRoot } from '../cli-utils.js';
 import {
   compact,
   countTombstones,
@@ -20,7 +20,7 @@ import {
   rebuildIndex,
   syncIfNeeded,
   TOMBSTONE_THRESHOLD,
-} from '../../storage/index.js';
+} from '../storage/index.js';
 
 import {
   AGE_FLAG_THRESHOLD_DAYS,
@@ -28,7 +28,7 @@ import {
   getLessonAgeDays,
   LESSON_COUNT_WARNING_THRESHOLD,
   out,
-} from '../shared.js';
+} from './shared.js';
 
 /**
  * Register maintenance commands on the program.

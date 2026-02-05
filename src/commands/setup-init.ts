@@ -7,18 +7,18 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { Command } from 'commander';
 
-import { getRepoRoot } from '../../cli-utils.js';
-import { LESSONS_PATH } from '../../storage/index.js';
-import { getGlobalOpts, out } from '../shared.js';
-import { installClaudeHooksForInit } from './claude-helpers.js';
-import { installPreCommitHook, type HookInstallResult } from './hooks.js';
+import { getRepoRoot } from '../cli-utils.js';
+import { LESSONS_PATH } from '../storage/index.js';
+import { getGlobalOpts, out } from './shared.js';
+import { installClaudeHooksForInit } from './setup-claude-helpers.js';
+import { installPreCommitHook, type HookInstallResult } from './setup-hooks.js';
 import {
   createPluginManifest,
   createSlashCommands,
   ensureClaudeMdReference,
   updateAgentsMd,
 } from './setup-primitives.js';
-import type { ClaudeHooksResult } from './types.js';
+import type { ClaudeHooksResult } from './setup-types.js';
 
 /**
  * Create the lessons directory structure.

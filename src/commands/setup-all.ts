@@ -9,10 +9,10 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { Command } from 'commander';
 
-import { getRepoRoot } from '../../cli-utils.js';
-import { isModelAvailable, resolveModel } from '../../embeddings/model.js';
-import { LESSONS_PATH } from '../../storage/index.js';
-import { out } from '../shared.js';
+import { getRepoRoot } from '../cli-utils.js';
+import { isModelAvailable, resolveModel } from '../embeddings/model.js';
+import { LESSONS_PATH } from '../storage/index.js';
+import { out } from './shared.js';
 import {
   addAllLearningAgentHooks,
   addMcpServerToMcpJson,
@@ -21,7 +21,7 @@ import {
   hasMcpServerInMcpJson,
   readClaudeSettings,
   writeClaudeSettings,
-} from './claude-helpers.js';
+} from './setup-claude-helpers.js';
 import {
   createPluginManifest,
   createSlashCommands,

@@ -6,11 +6,11 @@
 
 import type { Command } from 'commander';
 
-import { getRepoRoot } from '../../cli-utils.js';
-import { appendLesson, readLessons } from '../../storage/index.js';
-import type { Lesson } from '../../types.js';
+import { getRepoRoot } from '../cli-utils.js';
+import { appendLesson, readLessons } from '../storage/index.js';
+import type { Lesson } from '../types.js';
 
-import { out } from '../shared.js';
+import { out } from './shared.js';
 
 /**
  * Register invalidation commands on the program.

@@ -6,8 +6,8 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
-import { out } from '../shared.js';
-import { getRepoRoot } from '../../cli-utils.js';
+import { out } from './shared.js';
+import { getRepoRoot } from '../cli-utils.js';
 import {
   addLearningAgentHook,
   getClaudeSettingsPath,
@@ -20,7 +20,7 @@ import {
   removeLearningAgentHook,
   removeMcpServerFromMcpJson,
   writeClaudeSettings,
-} from './claude-helpers.js';
+} from './setup-claude-helpers.js';
 
 /** Status check result */
 interface StatusResult {

@@ -9,7 +9,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 
-import { getRepoRoot } from '../../cli-utils.js';
+import { getRepoRoot } from '../cli-utils.js';
 import {
   AGENTS_SECTION_END_MARKER,
   AGENTS_SECTION_START_MARKER,
@@ -22,8 +22,8 @@ import {
   CLAUDE_REF_START_MARKER,
   CLAUDE_USER_PROMPT_HOOK_CONFIG,
   MCP_SERVER_CONFIG,
-} from './templates.js';
-import type { ClaudeHooksResult } from './types.js';
+} from './setup-templates.js';
+import type { ClaudeHooksResult } from './setup-types.js';
 
 /**
  * Get the path to Claude Code settings file.

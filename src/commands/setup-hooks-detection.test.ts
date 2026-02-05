@@ -15,7 +15,7 @@ import {
   processToolSuccess,
   processUserPrompt,
   resetFailureState,
-} from './hooks.js';
+} from './setup-hooks.js';
 
 describe('Hook Detection Functions', () => {
   describe('detectCorrection', () => {

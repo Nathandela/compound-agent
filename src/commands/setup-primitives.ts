@@ -14,7 +14,7 @@ import {
   LEARNING_AGENT_SECTION_HEADER,
   PLUGIN_MANIFEST,
   SLASH_COMMANDS,
-} from './templates.js';
+} from './setup-templates.js';
 
 /**
  * Check if AGENTS.md already has the Learning Agent section.

@@ -54,7 +54,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
     describe('Claude-facing strings use npx lna', () => {
       it('AGENTS_MD_TEMPLATE uses npx lna (not npx learning-agent)', async () => {
-        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
+        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
         const templateMatch = templatesContent.match(/export const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/);
@@ -70,7 +70,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       });
 
       it('PRE_COMMIT_MESSAGE uses npx lna learn (preferred alias)', async () => {
-        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
+        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
         const messageMatch = templatesContent.match(/export const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/);
@@ -85,7 +85,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       });
 
       it('CLAUDE_HOOK_CONFIG uses npx lna prime (v0.2.4)', async () => {
-        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
+        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
         const hookMatch = templatesContent.match(/export const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/);
@@ -119,7 +119,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
     describe('documentation consistency', () => {
       it('no random mixing of lna and learning-agent in templates', async () => {
-        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
+        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
         const agentsTemplate = templatesContent.match(/export const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
@@ -141,7 +141,7 @@ describe('CLI', { tags: ['integration'] }, () => {
     let agentsTemplate: string;
 
     beforeAll(async () => {
-      const templatesPath = join(process.cwd(), 'src', 'commands', 'setup', 'templates.ts');
+      const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
       const templatesContent = await readFile(templatesPath, 'utf8');
       agentsTemplate = templatesContent.match(/export const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
     });

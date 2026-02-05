@@ -14,7 +14,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 
-import { getPrimeContext } from './commands/management/prime.js';
+import { getPrimeContext } from './commands/management-prime.js';
 import { VERSION } from './index.js';
 import { rankLessons, searchVector } from './search/index.js';
 import { appendLesson, closeDb } from './storage/index.js';
