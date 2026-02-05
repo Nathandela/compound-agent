@@ -10,18 +10,13 @@
 export type { DbOptions, RetrievalStat, SyncOptions } from './types.js';
 
 // Availability
-export {
-  isSqliteMode,
-  _resetSqliteState,
-  _setForceUnavailable,
-} from './availability.js';
+export { isSqliteMode } from './availability.js';
 
 // Connection
 export { closeDb, DB_PATH, openDb } from './connection.js';
 
 // Cache
 export {
-  collectCachedEmbeddings,
   contentHash,
   getCachedEmbedding,
   setCachedEmbedding,

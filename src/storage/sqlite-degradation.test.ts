@@ -32,9 +32,8 @@ import {
   rebuildIndex,
   syncIfNeeded,
   closeDb,
-  _resetSqliteState,
-  _setForceUnavailable,
 } from './sqlite.js';
+import { _resetSqliteState, _setForceUnavailable } from './sqlite/test-helpers.js';
 
 describe('SQLite graceful degradation', () => {
   let tempDir: string;

@@ -7,9 +7,8 @@ import { appendLesson } from '../storage/jsonl.js';
 import {
   closeDb,
   rebuildIndex,
-  _resetSqliteState,
-  _setForceUnavailable,
 } from '../storage/sqlite.js';
+import { _resetSqliteState, _setForceUnavailable } from '../storage/sqlite/test-helpers.js';
 import { createQuickLesson } from '../test-utils.js';
 
 import {

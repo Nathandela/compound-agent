@@ -17,8 +17,6 @@ export {
 
   // Availability
   isSqliteMode,
-  _resetSqliteState,
-  _setForceUnavailable,
 
   // Connection
   closeDb,
@@ -26,7 +24,6 @@ export {
   openDb,
 
   // Cache
-  collectCachedEmbeddings,
   contentHash,
   getCachedEmbedding,
   setCachedEmbedding,

@@ -10,8 +10,8 @@ export { appendLesson, appendTombstone, LESSONS_PATH, readLessons } from './json
 export type { ParseError, ReadLessonsOptions, ReadLessonsResult } from './jsonl.js';
 
 // SQLite storage (rebuildable index)
-// Note: _resetSqliteState and _setForceUnavailable are test-only APIs
-// and should be imported directly from './sqlite/index.js' in tests
+// Note: test-only APIs (_resetSqliteState, _setForceUnavailable) live in
+// './sqlite/test-helpers.js' and are NOT re-exported through this barrel.
 export {
   closeDb,
   contentHash,

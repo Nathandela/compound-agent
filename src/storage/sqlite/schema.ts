@@ -5,7 +5,7 @@
 import type { Database as DatabaseType } from 'better-sqlite3';
 
 /** SQL schema for lessons database with FTS5 full-text search */
-export const SCHEMA_SQL = `
+const SCHEMA_SQL = `
   CREATE TABLE IF NOT EXISTS lessons (
     id TEXT PRIMARY KEY,
     type TEXT NOT NULL,
