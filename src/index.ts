@@ -165,12 +165,9 @@ export { getPrimeContext } from './commands/index.js';
 // Types and schemas
 export {
   generateId,
-  isLesson,
-  isTombstone,
   LessonRecordSchema,
   LessonSchema,
   LessonTypeSchema,
-  TombstoneSchema,
 } from './types.js';
 export type {
   Context,
@@ -179,5 +176,4 @@ export type {
   LessonType,
   Severity,
   Source,
-  Tombstone,
 } from './types.js';

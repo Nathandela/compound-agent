@@ -4,9 +4,8 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { createFullLesson, createQuickLesson } from '../test-utils.js';
-import type { Tombstone } from '../types.js';
 
-import { appendLesson, appendTombstone, LESSONS_PATH, readLessons } from './jsonl.js';
+import { appendLesson, LESSONS_PATH, readLessons } from './jsonl.js';
 import type { ReadLessonsResult } from './jsonl.js';
 
 describe('JSONL storage', () => {
@@ -72,27 +71,10 @@ describe('JSONL storage', () => {
     });
   });
 
-  describe('appendTombstone', () => {
-    it('creates directory structure if missing', async () => {
-      const tombstone: Tombstone = {
-        id: 'L001',
-        deleted: true,
-        deletedAt: new Date().toISOString(),
-      };
-      await appendTombstone(tempDir, tombstone);
-
-      const filePath = join(tempDir, LESSONS_PATH);
-      const content = await readFile(filePath, 'utf-8');
-      expect(content).toContain('L001');
-    });
-
-    it('appends canonical tombstone (minimal format)', async () => {
-      const tombstone: Tombstone = {
-        id: 'L001',
-        deleted: true,
-        deletedAt: '2026-01-30T12:00:00Z',
-      };
-      await appendTombstone(tempDir, tombstone);
+  describe('delete via appendLesson with deleted flag', () => {
+    it('appends lesson with deleted:true and deletedAt', async () => {
+      const lesson = createQuickLesson('L001', 'to delete');
+      await appendLesson(tempDir, { ...lesson, deleted: true, deletedAt: '2026-01-30T12:00:00Z' });
 
       const filePath = join(tempDir, LESSONS_PATH);
       const content = await readFile(filePath, 'utf-8');
@@ -103,22 +85,16 @@ describe('JSONL storage', () => {
       expect(parsed.id).toBe('L001');
       expect(parsed.deleted).toBe(true);
       expect(parsed.deletedAt).toBe('2026-01-30T12:00:00Z');
-      // Canonical format should only have these three fields
-      expect(Object.keys(parsed).sort()).toEqual(['deleted', 'deletedAt', 'id']);
+      // Full record includes all lesson fields
+      expect(parsed.insight).toBe('to delete');
     });
 
-    it('canonical tombstone excludes lesson from readLessons', async () => {
-      // Add a lesson
+    it('deleted lesson is excluded from readLessons', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'keep me'));
       await appendLesson(tempDir, createQuickLesson('L002', 'delete me'));
 
-      // Delete with canonical tombstone
-      const tombstone: Tombstone = {
-        id: 'L002',
-        deleted: true,
-        deletedAt: new Date().toISOString(),
-      };
-      await appendTombstone(tempDir, tombstone);
+      const lessonToDelete = createQuickLesson('L002', 'delete me');
+      await appendLesson(tempDir, { ...lessonToDelete, deleted: true, deletedAt: new Date().toISOString() });
 
       const result = await readLessons(tempDir);
       expect(result.lessons).toHaveLength(1);
@@ -159,34 +135,28 @@ describe('JSONL storage', () => {
       expect(result.lessons[0]!.id).toBe('L001');
     });
 
-    it('filters out deleted lessons (canonical tombstones)', async () => {
+    it('filters out deleted lessons (full record with deleted flag)', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'keep'));
       await appendLesson(tempDir, createQuickLesson('L002', 'delete me'));
-      // Canonical tombstone (minimal format)
-      await appendTombstone(tempDir, {
-        id: 'L002',
-        deleted: true,
-        deletedAt: new Date().toISOString(),
-      });
+      // Full record deletion
+      const toDelete = createQuickLesson('L002', 'delete me');
+      await appendLesson(tempDir, { ...toDelete, deleted: true, deletedAt: new Date().toISOString() });
 
       const result = await readLessons(tempDir);
       expect(result.lessons).toHaveLength(1);
       expect(result.lessons[0]!.id).toBe('L001');
     });
 
-    it('handles mixed legacy and canonical tombstones', async () => {
+    it('handles mixed old and new deletion formats', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'keep'));
-      await appendLesson(tempDir, createQuickLesson('L002', 'legacy delete'));
-      await appendLesson(tempDir, createQuickLesson('L003', 'canonical delete'));
+      await appendLesson(tempDir, createQuickLesson('L002', 'old delete'));
+      await appendLesson(tempDir, createQuickLesson('L003', 'new delete'));
 
-      // Legacy tombstone
-      await appendLesson(tempDir, { ...createQuickLesson('L002', 'legacy delete'), deleted: true });
-      // Canonical tombstone
-      await appendTombstone(tempDir, {
-        id: 'L003',
-        deleted: true,
-        deletedAt: new Date().toISOString(),
-      });
+      // Old format: lesson with deleted:true (no deletedAt)
+      await appendLesson(tempDir, { ...createQuickLesson('L002', 'old delete'), deleted: true });
+      // New format: full record with deleted + deletedAt
+      const toDelete = createQuickLesson('L003', 'new delete');
+      await appendLesson(tempDir, { ...toDelete, deleted: true, deletedAt: new Date().toISOString() });
 
       const result = await readLessons(tempDir);
       expect(result.lessons).toHaveLength(1);
