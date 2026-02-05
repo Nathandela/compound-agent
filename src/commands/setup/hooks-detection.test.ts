@@ -4,10 +4,9 @@
  * Tests the UserPromptSubmit and PostToolUseFailure hook logic.
  */
 
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { readdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 
 import {
   detectCorrection,
@@ -15,6 +14,7 @@ import {
   processToolFailure,
   processToolSuccess,
   processUserPrompt,
+  resetFailureState,
 } from './hooks.js';
 
 describe('Hook Detection Functions', () => {
@@ -52,9 +52,22 @@ describe('Hook Detection Functions', () => {
       expect(detectCorrection('You forgot to add the import')).toBe(true);
     });
 
-    it('detects "stop" and "wait" as corrections', () => {
-      expect(detectCorrection('Stop! That will break things')).toBe(true);
-      expect(detectCorrection('Wait, let me explain')).toBe(true);
+    it('detects targeted "stop" corrections', () => {
+      expect(detectCorrection('Stop doing that')).toBe(true);
+      expect(detectCorrection('stop using that approach')).toBe(true);
+      expect(detectCorrection('Stop, that is wrong')).toBe(true);
+    });
+
+    it('detects targeted "wait" corrections', () => {
+      expect(detectCorrection('Wait, that is wrong')).toBe(true);
+      expect(detectCorrection('wait no, use the other one')).toBe(true);
+    });
+
+    it('does NOT false-positive on casual "stop" and "wait"', () => {
+      expect(detectCorrection('Stop the server')).toBe(false);
+      expect(detectCorrection('Wait for the build to finish')).toBe(false);
+      expect(detectCorrection('Please stop the process')).toBe(false);
+      expect(detectCorrection('Wait until tests pass')).toBe(false);
     });
 
     it('returns false for normal prompts', () => {
@@ -70,33 +83,38 @@ describe('Hook Detection Functions', () => {
   });
 
   describe('detectPlanning', () => {
-    it('detects decision language', () => {
+    it('detects decision language (high confidence)', () => {
       expect(detectPlanning('Please decide which approach to use')).toBe(true);
       expect(detectPlanning('Choose the best database')).toBe(true);
       expect(detectPlanning('Which approach should we pick?')).toBe(true);
       expect(detectPlanning('What do you think about this design?')).toBe(true);
     });
 
-    it('detects question patterns', () => {
+    it('detects question patterns (high confidence)', () => {
       expect(detectPlanning('Should we use React or Vue?')).toBe(true);
       expect(detectPlanning('How should I structure this?')).toBe(true);
       expect(detectPlanning("What's the best way to do this?")).toBe(true);
     });
 
-    it('detects implementation language', () => {
-      expect(detectPlanning('Implement the user authentication')).toBe(true);
-      expect(detectPlanning('Build the API endpoint')).toBe(true);
-      expect(detectPlanning('Create a new component')).toBe(true);
-      expect(detectPlanning('Refactor this function')).toBe(true);
-      expect(detectPlanning('Fix the bug in login')).toBe(true);
-    });
-
-    it('detects "add feature" pattern', () => {
+    it('detects "add feature" pattern (high confidence)', () => {
       expect(detectPlanning('Add feature for dark mode')).toBe(true);
     });
 
-    it('detects "set up" pattern', () => {
+    it('detects "set up" pattern (high confidence)', () => {
       expect(detectPlanning('Set up the testing framework')).toBe(true);
+    });
+
+    it('requires 2+ low-confidence matches for implementation language', () => {
+      // Single low-confidence word alone should NOT match
+      expect(detectPlanning('Fix the typo')).toBe(false);
+      expect(detectPlanning('Build the project')).toBe(false);
+      expect(detectPlanning('Create a file')).toBe(false);
+      expect(detectPlanning('Write a test')).toBe(false);
+
+      // Two low-confidence words together SHOULD match
+      expect(detectPlanning('Implement and build the user authentication')).toBe(true);
+      expect(detectPlanning('Create and refactor this function')).toBe(true);
+      expect(detectPlanning('Fix the bug and write tests')).toBe(true);
     });
 
     it('returns false for non-planning prompts', () => {
@@ -106,8 +124,8 @@ describe('Hook Detection Functions', () => {
     });
 
     it('is case insensitive', () => {
-      expect(detectPlanning('IMPLEMENT the feature')).toBe(true);
-      expect(detectPlanning('Build THE API')).toBe(true);
+      expect(detectPlanning('SHOULD WE use this?')).toBe(true);
+      expect(detectPlanning('IMPLEMENT and BUILD the API')).toBe(true);
     });
   });
 
@@ -121,8 +139,8 @@ describe('Hook Detection Functions', () => {
       expect(result.hookSpecificOutput?.additionalContext).toContain('lesson_search');
     });
 
-    it('returns planning reminder for planning patterns', () => {
-      const result = processUserPrompt('Please implement the login feature');
+    it('returns planning reminder for high-confidence planning patterns', () => {
+      const result = processUserPrompt('Should we use React or Vue?');
 
       expect(result.hookSpecificOutput).toBeDefined();
       expect(result.hookSpecificOutput?.hookEventName).toBe('UserPromptSubmit');
@@ -131,111 +149,90 @@ describe('Hook Detection Functions', () => {
     });
 
     it('prioritizes correction over planning', () => {
-      // This prompt has both correction ("actually") and planning ("implement")
       const result = processUserPrompt('Actually, implement it differently');
-
       expect(result.hookSpecificOutput?.additionalContext).toContain('lesson_capture');
     });
 
     it('returns empty object for normal prompts', () => {
       const result = processUserPrompt('Thank you for the help');
+      expect(result.hookSpecificOutput).toBeUndefined();
+    });
 
+    it('returns empty object for single low-confidence planning words', () => {
+      const result = processUserPrompt('Fix the typo');
       expect(result.hookSpecificOutput).toBeUndefined();
     });
   });
 });
 
 describe('Failure Tracking Functions', () => {
-  let testSessionId: string;
-  let tempDir: string;
-
-  beforeEach(async () => {
-    testSessionId = `test-session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-    tempDir = join(tmpdir(), `lna-test-${testSessionId}`);
-    await mkdir(tempDir, { recursive: true });
-  });
-
-  afterEach(async () => {
-    // Clean up state files
-    await processToolSuccess(testSessionId);
-    try {
-      await rm(tempDir, { recursive: true, force: true });
-    } catch {
-      // Ignore cleanup errors
-    }
+  afterEach(() => {
+    resetFailureState();
   });
 
   describe('processToolFailure', () => {
-    it('returns empty object on first failure', async () => {
-      const result = await processToolFailure('Bash', { command: 'npm test' }, testSessionId);
-
+    it('returns empty object on first failure', () => {
+      const result = processToolFailure('Bash', { command: 'npm test' });
       expect(result.hookSpecificOutput).toBeUndefined();
     });
 
-    it('returns empty object on second different failure', async () => {
-      await processToolFailure('Bash', { command: 'npm test' }, testSessionId);
-      const result = await processToolFailure('Edit', { file_path: '/path/to/file.ts' }, testSessionId);
-
+    it('returns empty object on second different failure', () => {
+      processToolFailure('Bash', { command: 'npm test' });
+      const result = processToolFailure('Edit', { file_path: '/path/to/file.ts' });
       expect(result.hookSpecificOutput).toBeUndefined();
     });
 
-    it('returns tip after 3 total failures', async () => {
-      await processToolFailure('Bash', { command: 'npm test' }, testSessionId);
-      await processToolFailure('Edit', { file_path: '/path/to/file.ts' }, testSessionId);
-      const result = await processToolFailure('Write', { file_path: '/other/file.ts' }, testSessionId);
-
+    it('returns tip after 3 total failures', () => {
+      processToolFailure('Bash', { command: 'npm test' });
+      processToolFailure('Edit', { file_path: '/path/to/file.ts' });
+      const result = processToolFailure('Write', { file_path: '/other/file.ts' });
       expect(result.hookSpecificOutput).toBeDefined();
       expect(result.hookSpecificOutput?.hookEventName).toBe('PostToolUseFailure');
       expect(result.hookSpecificOutput?.additionalContext).toContain('lesson_search');
     });
 
-    it('returns tip after 2 failures on same file', async () => {
-      await processToolFailure('Edit', { file_path: '/path/to/same.ts' }, testSessionId);
-      const result = await processToolFailure('Edit', { file_path: '/path/to/same.ts' }, testSessionId);
-
+    it('returns tip after 2 failures on same file', () => {
+      processToolFailure('Edit', { file_path: '/path/to/same.ts' });
+      const result = processToolFailure('Edit', { file_path: '/path/to/same.ts' });
       expect(result.hookSpecificOutput).toBeDefined();
       expect(result.hookSpecificOutput?.additionalContext).toContain('Multiple failures');
     });
 
-    it('returns tip after 2 failures with same command', async () => {
-      await processToolFailure('Bash', { command: 'npm test' }, testSessionId);
-      const result = await processToolFailure('Bash', { command: 'npm test --coverage' }, testSessionId);
-
+    it('returns tip after 2 failures with same command', () => {
+      processToolFailure('Bash', { command: 'npm test' });
+      const result = processToolFailure('Bash', { command: 'npm test --coverage' });
       expect(result.hookSpecificOutput).toBeDefined();
       expect(result.hookSpecificOutput?.additionalContext).toContain('lesson_search');
     });
 
-    it('clears state after showing tip', async () => {
-      // Trigger tip
-      await processToolFailure('Bash', { command: 'npm test' }, testSessionId);
-      await processToolFailure('Bash', { command: 'npm test' }, testSessionId);
-
-      // Next failures should start fresh
-      const result1 = await processToolFailure('Bash', { command: 'other' }, testSessionId);
+    it('clears state after showing tip', () => {
+      processToolFailure('Bash', { command: 'npm test' });
+      processToolFailure('Bash', { command: 'npm test' });
+      const result1 = processToolFailure('Bash', { command: 'other' });
       expect(result1.hookSpecificOutput).toBeUndefined();
+    });
+
+    it('does NOT create temp files', () => {
+      processToolFailure('Bash', { command: 'npm test' });
+      processToolFailure('Bash', { command: 'npm test' });
+      const tmpFiles = readdirSync(tmpdir()).filter((f) => f.startsWith('lna-failures'));
+      expect(tmpFiles).toHaveLength(0);
     });
   });
 
   describe('processToolSuccess', () => {
-    it('clears failure state on success', async () => {
-      // Add some failures
-      await processToolFailure('Bash', { command: 'npm test' }, testSessionId);
-      await processToolFailure('Bash', { command: 'npm test' }, testSessionId);
-
-      // Process success - should clear state
-      await processToolSuccess(testSessionId);
-
-      // Next failures should start fresh (need 3 again for tip)
-      const result1 = await processToolFailure('Bash', { command: 'npm test' }, testSessionId);
-      const result2 = await processToolFailure('Edit', { file_path: '/file.ts' }, testSessionId);
-
+    it('clears failure state on success', () => {
+      processToolFailure('Bash', { command: 'npm test' });
+      processToolFailure('Bash', { command: 'npm test' });
+      processToolSuccess();
+      const result1 = processToolFailure('Bash', { command: 'npm test' });
+      const result2 = processToolFailure('Edit', { file_path: '/file.ts' });
       expect(result1.hookSpecificOutput).toBeUndefined();
       expect(result2.hookSpecificOutput).toBeUndefined();
     });
 
-    it('handles missing state file gracefully', async () => {
-      // Should not throw even with no state file
-      await expect(processToolSuccess('nonexistent-session')).resolves.not.toThrow();
+    it('handles being called with no prior state', () => {
+      expect(() => processToolSuccess()).not.toThrow();
     });
   });
 });

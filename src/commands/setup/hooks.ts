@@ -3,8 +3,7 @@
  */
 
 import { chmodSync, existsSync } from 'node:fs';
-import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
@@ -46,13 +45,12 @@ const CORRECTION_PATTERNS = [
   /\bnot like that\b/i,
   /\byou forgot\b/i,
   /\byou missed\b/i,
-  /\bstop\b/i,
-  /\bwait\b/i,
+  /\bstop\s*(,\s*)?(doing|using|that)\b/i,
+  /\bwait\s*(,\s*)?(that|no|wrong)\b/i,
 ];
 
-/** Patterns that suggest user wants planning/implementation */
-const PLANNING_PATTERNS = [
-  // Decision language
+/** High-confidence planning patterns (single match sufficient) */
+const HIGH_CONFIDENCE_PLANNING = [
   /\bdecide\b/i,
   /\bchoose\b/i,
   /\bpick\b/i,
@@ -62,16 +60,19 @@ const PLANNING_PATTERNS = [
   /\bwould you\b/i,
   /\bhow should\b/i,
   /\bwhat'?s the best\b/i,
-  // Implementation language
+  /\badd feature\b/i,
+  /\bset up\b/i,
+];
+
+/** Low-confidence planning patterns (need 2+ matches) */
+const LOW_CONFIDENCE_PLANNING = [
   /\bimplement\b/i,
   /\bbuild\b/i,
   /\bcreate\b/i,
   /\brefactor\b/i,
   /\bfix\b/i,
-  /\badd feature\b/i,
   /\bwrite\b/i,
   /\bdevelop\b/i,
-  /\bset up\b/i,
 ];
 
 /** Reminder messages */
@@ -88,7 +89,11 @@ export function detectCorrection(prompt: string): boolean {
 
 /** Check if prompt matches planning patterns */
 export function detectPlanning(prompt: string): boolean {
-  return PLANNING_PATTERNS.some((pattern) => pattern.test(prompt));
+  if (HIGH_CONFIDENCE_PLANNING.some((pattern) => pattern.test(prompt))) {
+    return true;
+  }
+  const lowMatches = LOW_CONFIDENCE_PLANNING.filter((pattern) => pattern.test(prompt));
+  return lowMatches.length >= 2;
 }
 
 /**
@@ -133,98 +138,17 @@ export function processUserPrompt(prompt: string): UserPromptHookOutput {
 }
 
 // ============================================================================
-// PostToolUseFailure Hook: Smart failure detection with lesson tip
+// PostToolUseFailure Hook: In-memory failure tracking with lesson tip
 // ============================================================================
 
-/** Recorded tool failure */
-interface FailureRecord {
-  tool: string;
-  command?: string;
-  file?: string;
-  timestamp: string;
-}
-
-/** Failure tracking state */
-interface FailureState {
-  failures: FailureRecord[];
-  lastTipShown?: string;
-}
-
 /** Threshold constants */
-const SAME_PATTERN_THRESHOLD = 2;
+const SAME_TARGET_THRESHOLD = 2;
 const TOTAL_FAILURE_THRESHOLD = 3;
 
-/** Get the path to the failure state file for a session */
-function getFailureStatePath(sessionId: string): string {
-  return join(tmpdir(), `lna-failures-${sessionId}.json`);
-}
-
-/** Load failure state from temp file */
-async function loadFailureState(sessionId: string): Promise<FailureState> {
-  const statePath = getFailureStatePath(sessionId);
-  try {
-    if (!existsSync(statePath)) {
-      return { failures: [] };
-    }
-    const content = await readFile(statePath, 'utf-8');
-    return JSON.parse(content) as FailureState;
-  } catch {
-    return { failures: [] };
-  }
-}
-
-/** Save failure state to temp file */
-async function saveFailureState(sessionId: string, state: FailureState): Promise<void> {
-  const statePath = getFailureStatePath(sessionId);
-  await writeFile(statePath, JSON.stringify(state, null, 2), 'utf-8');
-}
-
-/** Clear failure state (on success) */
-async function clearFailureState(sessionId: string): Promise<void> {
-  const statePath = getFailureStatePath(sessionId);
-  try {
-    if (existsSync(statePath)) {
-      await unlink(statePath);
-    }
-  } catch {
-    // Ignore errors - file might be already deleted
-  }
-}
-
-/** Extract base command from a full command string (strip arguments) */
-function extractBaseCommand(command: string): string {
-  // Get first word of the command
-  const trimmed = command.trim();
-  const firstSpace = trimmed.indexOf(' ');
-  return firstSpace === -1 ? trimmed : trimmed.slice(0, firstSpace);
-}
-
-/** Check if we have repeated failures on the same file */
-function hasSameFileFailures(failures: FailureRecord[]): boolean {
-  const fileCounts = new Map<string, number>();
-  for (const f of failures) {
-    if (f.file) {
-      const count = (fileCounts.get(f.file) ?? 0) + 1;
-      if (count >= SAME_PATTERN_THRESHOLD) return true;
-      fileCounts.set(f.file, count);
-    }
-  }
-  return false;
-}
-
-/** Check if we have repeated failures with same command */
-function hasSameCommandFailures(failures: FailureRecord[]): boolean {
-  const cmdCounts = new Map<string, number>();
-  for (const f of failures) {
-    if (f.command) {
-      const base = extractBaseCommand(f.command);
-      const count = (cmdCounts.get(base) ?? 0) + 1;
-      if (count >= SAME_PATTERN_THRESHOLD) return true;
-      cmdCounts.set(base, count);
-    }
-  }
-  return false;
-}
+/** In-memory failure counters */
+let failureCount = 0;
+let lastFailedTarget: string | null = null;
+let sameTargetCount = 0;
 
 /** Tip message for failures */
 const FAILURE_TIP = 'Tip: Multiple failures detected. lesson_search may have solutions for similar issues.';
@@ -239,52 +163,46 @@ export interface PostToolFailureHookOutput {
   };
 }
 
+/** Reset failure state (exported for testing) */
+export function resetFailureState(): void {
+  failureCount = 0;
+  lastFailedTarget = null;
+  sameTargetCount = 0;
+}
+
+/** Extract a failure target from tool name and input */
+function getFailureTarget(toolName: string, toolInput: Record<string, unknown>): string | null {
+  if (toolName === 'Bash' && typeof toolInput.command === 'string') {
+    const trimmed = toolInput.command.trim();
+    const firstSpace = trimmed.indexOf(' ');
+    return firstSpace === -1 ? trimmed : trimmed.slice(0, firstSpace);
+  }
+  if ((toolName === 'Edit' || toolName === 'Write') && typeof toolInput.file_path === 'string') {
+    return toolInput.file_path;
+  }
+  return null;
+}
+
 /**
  * Process a tool failure and determine if a tip should be shown.
- *
- * @param toolName - Name of the tool that failed
- * @param toolInput - Input provided to the tool
- * @param sessionId - Current session ID
- * @returns Hook output with optional tip
  */
-export async function processToolFailure(
+export function processToolFailure(
   toolName: string,
-  toolInput: Record<string, unknown>,
-  sessionId: string
-): Promise<PostToolFailureHookOutput> {
-  // Load current state
-  const state = await loadFailureState(sessionId);
-
-  // Extract relevant info from tool input
-  const failure: FailureRecord = {
-    tool: toolName,
-    timestamp: new Date().toISOString(),
-  };
-
-  // Extract command or file based on tool type
-  if (toolName === 'Bash' && typeof toolInput.command === 'string') {
-    failure.command = toolInput.command;
-  } else if ((toolName === 'Edit' || toolName === 'Write') && typeof toolInput.file_path === 'string') {
-    failure.file = toolInput.file_path;
+  toolInput: Record<string, unknown>
+): PostToolFailureHookOutput {
+  failureCount++;
+  const target = getFailureTarget(toolName, toolInput);
+  if (target !== null && target === lastFailedTarget) {
+    sameTargetCount++;
+  } else {
+    sameTargetCount = 1;
+    lastFailedTarget = target;
   }
-
-  // Add to failures list
-  state.failures.push(failure);
-
-  // Check thresholds
   const shouldShowTip =
-    hasSameFileFailures(state.failures) ||
-    hasSameCommandFailures(state.failures) ||
-    state.failures.length >= TOTAL_FAILURE_THRESHOLD;
-
-  // Save state
-  await saveFailureState(sessionId, state);
-
-  // Return tip if threshold reached and not recently shown
+    sameTargetCount >= SAME_TARGET_THRESHOLD ||
+    failureCount >= TOTAL_FAILURE_THRESHOLD;
   if (shouldShowTip) {
-    // Clear state after showing tip to avoid spam
-    await clearFailureState(sessionId);
-
+    resetFailureState();
     return {
       hookSpecificOutput: {
         hookEventName: 'PostToolUseFailure',
@@ -292,15 +210,14 @@ export async function processToolFailure(
       },
     };
   }
-
   return {};
 }
 
 /**
  * Process a tool success - clear failure state.
  */
-export async function processToolSuccess(sessionId: string): Promise<void> {
-  await clearFailureState(sessionId);
+export function processToolSuccess(): void {
+  resetFailureState();
 }
 
 /**
@@ -492,19 +409,14 @@ async function runPostToolFailureHook(): Promise<void> {
     const data = JSON.parse(input) as {
       tool_name?: string;
       tool_input?: Record<string, unknown>;
-      session_id?: string;
     };
 
-    if (!data.tool_name || !data.session_id) {
+    if (!data.tool_name) {
       console.log(JSON.stringify({}));
       return;
     }
 
-    const result = await processToolFailure(
-      data.tool_name,
-      data.tool_input ?? {},
-      data.session_id
-    );
+    const result = processToolFailure(data.tool_name, data.tool_input ?? {});
     console.log(JSON.stringify(result));
   } catch {
     console.log(JSON.stringify({}));
@@ -517,12 +429,8 @@ async function runPostToolFailureHook(): Promise<void> {
  */
 async function runPostToolSuccessHook(): Promise<void> {
   try {
-    const input = await readStdin();
-    const data = JSON.parse(input) as { session_id?: string };
-
-    if (data.session_id) {
-      await processToolSuccess(data.session_id);
-    }
+    await readStdin();
+    processToolSuccess();
     console.log(JSON.stringify({}));
   } catch {
     console.log(JSON.stringify({}));
