@@ -115,16 +115,22 @@ FLOW:
 }
 ```
 
-### Tombstone (deletion marker)
+### Deleted Lesson Record
 ```json
 {
   "id": "L001",
+  "type": "quick",
+  "trigger": "Used pandas for 500MB file",
+  "insight": "Polars 10x faster",
+  "tags": ["performance", "polars"],
+  "source": "user_correction",
   "deleted": true,
   "deletedAt": "2025-01-30T14:00:00Z"
 }
 ```
 
-Tombstones are minimal records that mark a lesson as deleted. The canonical format contains only `id`, `deleted: true`, and `deletedAt`. Legacy tombstones (full lesson with `deleted: true`) are accepted for backward compatibility but new deletions emit only the minimal format.
+Deletions are append-only and represented as full lesson records with `deleted: true` and `deletedAt`.
+Legacy minimal tombstones (`{ id, deleted: true, deletedAt }`) remain readable for backward compatibility.
 
 ### Metadata & Lifecycle Fields
 - **source**: `user_correction | self_correction | test_failure | manual`
@@ -295,7 +301,7 @@ The package installs a CLI (`learning-agent` / `learn`) that:
 ### Week 3: Polish + Iteration
 
 **Day 1-2: Compaction**
-- Tombstones + periodic rewrite compaction
+- Deleted-record compaction + periodic rewrite
 - Archive old lessons (>90 days, never retrieved)
 - Retrieval count tracking
 - Simple truncation (no AI summarization initially)

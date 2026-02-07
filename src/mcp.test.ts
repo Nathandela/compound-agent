@@ -238,8 +238,10 @@ describe('MCP Server', () => {
     });
 
     it('applies rankLessons to search results (finalScore present)', async () => {
-      const jsonlPath = join(tempDir, '.claude', 'lessons', 'index.jsonl');
-      await writeFile(jsonlPath, JSON.stringify(HIGH_SEVERITY_LESSON) + '\n');
+      const searchModule = await import('./search/index.js');
+      vi.spyOn(searchModule, 'searchVector').mockResolvedValue([
+        { lesson: HIGH_SEVERITY_LESSON, score: 0.6 },
+      ]);
 
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
@@ -257,8 +259,10 @@ describe('MCP Server', () => {
     });
 
     it('rankLessons boosts high-severity lessons above raw score', async () => {
-      const jsonlPath = join(tempDir, '.claude', 'lessons', 'index.jsonl');
-      await writeFile(jsonlPath, JSON.stringify(HIGH_SEVERITY_LESSON) + '\n');
+      const searchModule = await import('./search/index.js');
+      vi.spyOn(searchModule, 'searchVector').mockResolvedValue([
+        { lesson: HIGH_SEVERITY_LESSON, score: 0.6 },
+      ]);
 
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);

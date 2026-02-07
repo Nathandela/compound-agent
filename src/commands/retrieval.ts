@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { isModelUsable, loadSessionLessons, retrieveForPlan } from '../index.js';
-import { readLessons, searchKeyword, syncIfNeeded } from '../storage/index.js';
+import { incrementRetrievalCount, readLessons, searchKeyword, syncIfNeeded } from '../storage/index.js';
 import type { Lesson } from '../types.js';
 
 import {
@@ -25,6 +25,19 @@ import {
 } from './shared.js';
 
 import type { RankedLesson } from '../search/index.js';
+
+/**
+ * Parse numeric limit and exit with user-friendly output on invalid input.
+ */
+function parseLimitOrExit(rawLimit: string, optionName: string): number {
+  try {
+    return parseLimit(rawLimit, optionName);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : `Invalid ${optionName}`;
+    out.error(message);
+    process.exit(1);
+  }
+}
 
 // ============================================================================
 // Check-Plan Command Helpers
@@ -140,13 +153,16 @@ export function registerRetrievalCommands(program: Command): void {
     .option('-n, --limit <number>', 'Maximum results', DEFAULT_SEARCH_LIMIT)
     .action(async function (this: Command, query: string, options: { limit: string }) {
       const repoRoot = getRepoRoot();
-      const limit = parseLimit(options.limit, 'limit');
+      const limit = parseLimitOrExit(options.limit, 'limit');
       const { verbose, quiet } = getGlobalOpts(this);
 
       // Sync index if JSONL has changed
       await syncIfNeeded(repoRoot);
 
       const results = await searchKeyword(repoRoot, query, limit);
+      if (results.length > 0) {
+        incrementRetrievalCount(repoRoot, results.map((lesson) => lesson.id));
+      }
 
       if (results.length === 0) {
         console.log('No lessons match your search. Try a different query or use "list" to see all lessons.');
@@ -184,7 +200,7 @@ export function registerRetrievalCommands(program: Command): void {
     .option('--invalidated', 'Show only invalidated lessons')
     .action(async function (this: Command, options: { limit: string; invalidated?: boolean }) {
       const repoRoot = getRepoRoot();
-      const limit = parseLimit(options.limit, 'limit');
+      const limit = parseLimitOrExit(options.limit, 'limit');
       const { verbose, quiet } = getGlobalOpts(this);
 
       const { lessons, skippedCount } = await readLessons(repoRoot);
@@ -307,7 +323,7 @@ export function registerRetrievalCommands(program: Command): void {
     .option('-n, --limit <number>', 'Maximum results', DEFAULT_CHECK_PLAN_LIMIT)
     .action(async function (this: Command, options: { plan?: string; json?: boolean; limit: string }) {
       const repoRoot = getRepoRoot();
-      const limit = parseLimit(options.limit, 'limit');
+      const limit = parseLimitOrExit(options.limit, 'limit');
       const { quiet } = getGlobalOpts(this);
 
       // Get plan text from --plan flag or stdin

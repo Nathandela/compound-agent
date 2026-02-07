@@ -353,22 +353,26 @@ At session start, lessons are loaded based on:
 }
 ```
 
-### Tombstone (deletion marker)
+### Deleted Lesson Record
 ```json
 {
   "id": "L001",
+  "type": "quick",
+  "trigger": "Used pandas for 500MB file",
+  "insight": "Polars 10x faster",
+  "tags": ["performance", "polars"],
+  "source": "user_correction",
   "deleted": true,
   "deletedAt": "2026-01-30T12:00:00Z"
 }
 ```
 
-Tombstones are minimal records that mark a lesson as deleted. The JSONL file uses append-only storage, so deletions are recorded as tombstones rather than modifying existing records.
+Deletion is append-only: a lesson is soft-deleted by appending a full lesson record with `deleted: true` and `deletedAt`.
+For backward compatibility, legacy minimal tombstones (`{ id, deleted: true, deletedAt }`) are still accepted on read.
 
 **Schema types:**
 - `LessonSchema`: Full lesson structure
-- `TombstoneSchema`: Minimal deletion marker (`{ id, deleted: true, deletedAt }`)
-- `LessonRecordSchema`: Union of Lesson | Tombstone (used when reading JSONL)
-- `isLesson()` / `isTombstone()`: Type guards for discriminating records
+- `LessonRecordSchema`: Union of `LessonSchema` and legacy minimal tombstone format (used when reading JSONL)
 
 ## Technology Stack
 

@@ -6,6 +6,7 @@
  */
 
 import { rankLessons, searchVector, type RankedLesson, type ScoredLesson } from '../search/index.js';
+import { incrementRetrievalCount } from '../storage/index.js';
 
 /** Default number of lessons to retrieve */
 const DEFAULT_LIMIT = 5;
@@ -42,6 +43,11 @@ export async function retrieveForPlan(
 
   // Take top N after ranking
   const topLessons = ranked.slice(0, limit);
+
+  // Track actual plan-time retrieval usage only for surfaced lessons.
+  if (topLessons.length > 0) {
+    incrementRetrievalCount(repoRoot, topLessons.map((item) => item.lesson.id));
+  }
 
   // Format the Lessons Check message
   const message = formatLessonsCheck(topLessons);

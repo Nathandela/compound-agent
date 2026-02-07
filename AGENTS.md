@@ -24,7 +24,7 @@ For detailed project rules and TDD workflow, see `.claude/CLAUDE.md`.
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Types/Schemas | `src/types.ts` | Zod schemas for Lesson, Tombstone, LessonRecord |
+| Types/Schemas | `src/types.ts` | Zod schemas for Lesson and LessonRecord (with legacy tombstone compatibility) |
 | Storage | `src/storage/` | JSONL append-only + SQLite FTS5 index |
 | Embeddings | `src/embeddings/` | node-llama-cpp with nomic model |
 | Search | `src/search/` | Vector similarity + ranking with boosts |
@@ -170,12 +170,7 @@ db.prepare(`SELECT * FROM lessons WHERE id = '${id}'`);
 ```typescript
 // Record types for JSONL storage
 LessonSchema        // Unified lesson schema (all fields, optional except core)
-TombstoneSchema     // Minimal deletion marker: { id, deleted: true, deletedAt }
-LessonRecordSchema  // Union: LessonSchema | TombstoneSchema (for reading JSONL)
-
-// Type guards
-isLesson(record)    // Check if record is a lesson (not deleted)
-isTombstone(record) // Check if record is a tombstone (deleted)
+LessonRecordSchema  // Union: LessonSchema | legacy minimal tombstone (for reading JSONL)
 ```
 
 ### Public Exports (src/index.ts)
@@ -202,8 +197,7 @@ detectUserCorrection, detectSelfCorrection, detectTestFailure
 loadSessionLessons, retrieveForPlan, formatLessonsCheck
 
 // Types
-generateId, LessonSchema, TombstoneSchema, LessonRecordSchema
-isLesson, isTombstone  // Type guards
+generateId, LessonSchema, LessonRecordSchema
 ```
 
 ### Function Signatures

@@ -678,39 +678,26 @@ describe('SQLite schema', () => {
       });
     });
 
-    describe('searchKeyword increments retrieval count', () => {
-      it('increments count for returned lessons', async () => {
-        const { getRetrievalStats } = await import('./sqlite/index.js');
-
-        // Search should increment count
-        await searchKeyword(tempDir, 'Polars', 10);
-
-        const stats = getRetrievalStats(tempDir);
-        const l001 = stats.find((s) => s.id === 'L001');
-        expect(l001?.count).toBe(1);
-      });
-
-      it('only increments count for matching lessons', async () => {
+    describe('searchKeyword has no retrieval-count side effects', () => {
+      it('does not increment count for returned lessons', async () => {
         const { getRetrievalStats } = await import('./sqlite/index.js');
 
         await searchKeyword(tempDir, 'Polars', 10);
 
         const stats = getRetrievalStats(tempDir);
-        expect(stats.find((s) => s.id === 'L001')?.count).toBe(1);
+        expect(stats.find((s) => s.id === 'L001')?.count).toBe(0);
         expect(stats.find((s) => s.id === 'L002')?.count).toBe(0);
         expect(stats.find((s) => s.id === 'L003')?.count).toBe(0);
       });
 
-      it('accumulates count across multiple searches', async () => {
+      it('does not increment count across multiple searches', async () => {
         const { getRetrievalStats } = await import('./sqlite/index.js');
 
-        await searchKeyword(tempDir, 'trigger', 10); // matches all
-        await searchKeyword(tempDir, 'Polars', 10); // matches L001 only
+        await searchKeyword(tempDir, 'trigger', 10);
+        await searchKeyword(tempDir, 'Polars', 10);
 
         const stats = getRetrievalStats(tempDir);
-        expect(stats.find((s) => s.id === 'L001')?.count).toBe(2);
-        expect(stats.find((s) => s.id === 'L002')?.count).toBe(1);
-        expect(stats.find((s) => s.id === 'L003')?.count).toBe(1);
+        expect(stats.every((s) => s.count === 0)).toBe(true);
       });
 
       it('does not increment count when no matches', async () => {
@@ -944,7 +931,7 @@ describe('SQLite schema', () => {
       expect(results).toEqual([]);
     });
 
-    it('does not increment retrieval count for excluded invalidated lessons', async () => {
+    it('does not increment retrieval count when filtering invalidated lessons', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'valid lesson'));
       await appendLesson(tempDir, {
         ...createQuickLesson('L002', 'invalid lesson'),
@@ -955,7 +942,7 @@ describe('SQLite schema', () => {
       await searchKeyword(tempDir, 'lesson', 10);
 
       const stats = getRetrievalStats(tempDir);
-      expect(stats.find((s) => s.id === 'L001')?.count).toBe(1);
+      expect(stats.find((s) => s.id === 'L001')?.count).toBe(0);
       expect(stats.find((s) => s.id === 'L002')?.count).toBe(0);
     });
   });

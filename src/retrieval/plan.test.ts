@@ -1,11 +1,12 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { isModelUsable } from '../embeddings/model.js';
 import { isModelAvailable } from '../embeddings/nomic.js';
 import { appendLesson } from '../storage/jsonl.js';
+import { closeDb, getRetrievalStats, rebuildIndex } from '../storage/sqlite/index.js';
 import { createFullLesson, createQuickLesson, shouldSkipEmbeddingTests } from '../test-utils.js';
 
 import { formatLessonsCheck, retrieveForPlan } from './plan.js';
@@ -23,7 +24,9 @@ describe('plan retrieval', () => {
   });
 
   afterEach(async () => {
+    closeDb();
     await rm(tempDir, { recursive: true, force: true });
+    vi.restoreAllMocks();
   });
 
   describe('retrieveForPlan', () => {
@@ -118,6 +121,28 @@ describe('plan retrieval', () => {
       const result = await retrieveForPlan(tempDir, 'some plan');
       expect(result.lessons).toEqual([]);
       expect(result.message).toContain('No relevant lessons');
+    });
+
+    it('increments retrieval counts for surfaced ranked lessons', async () => {
+      const lesson1 = createFullLesson('L001', 'Authentication with JWT', 'high');
+      const lesson2 = createQuickLesson('L002', 'Use Polars for large files');
+      await appendLesson(tempDir, lesson1);
+      await appendLesson(tempDir, lesson2);
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      const searchModule = await import('../search/index.js');
+      vi.spyOn(searchModule, 'searchVector').mockResolvedValue([
+        { lesson: lesson1, score: 0.8 },
+        { lesson: lesson2, score: 0.7 },
+      ]);
+
+      const result = await retrieveForPlan(tempDir, 'implement auth middleware', 1);
+      expect(result.lessons).toHaveLength(1);
+
+      const stats = getRetrievalStats(tempDir);
+      expect(stats.find((s) => s.id === result.lessons[0]!.lesson.id)?.count).toBe(1);
+      expect(stats.find((s) => s.id !== result.lessons[0]!.lesson.id)?.count).toBe(0);
     });
   });
 });

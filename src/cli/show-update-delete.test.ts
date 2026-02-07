@@ -219,25 +219,31 @@ describe('CLI', { tags: ['integration'] }, () => {
       await appendLesson(tempDir, createQuickLesson('DEL003', 'Third lesson to delete'));
     });
 
-    it('delete <id> creates canonical tombstone record', async () => {
+    it('delete <id> appends deleted lesson record with lifecycle fields', async () => {
       runCli('delete DEL001', tempDir);
 
       const filePath = join(tempDir, LESSONS_PATH);
       const content = await readFile(filePath, 'utf-8');
       const lines = content.trim().split('\n');
 
-      const tombstone = JSON.parse(lines[lines.length - 1]) as {
+      const deletedRecord = JSON.parse(lines[lines.length - 1]) as {
         id: string;
+        type: string;
+        trigger: string;
+        insight: string;
+        source: string;
         deleted: boolean;
         deletedAt: string;
       };
 
-      expect(tombstone.id).toBe('DEL001');
-      expect(tombstone.deleted).toBe(true);
-      expect(tombstone.deletedAt).toBeDefined();
-      expect(new Date(tombstone.deletedAt).getTime()).toBeGreaterThan(0);
-      // Canonical tombstone should ONLY have id, deleted, deletedAt
-      expect(Object.keys(tombstone).sort()).toEqual(['deleted', 'deletedAt', 'id']);
+      expect(deletedRecord.id).toBe('DEL001');
+      expect(deletedRecord.type).toBe('quick');
+      expect(deletedRecord.trigger).toBeDefined();
+      expect(deletedRecord.insight).toBe('First lesson to delete');
+      expect(deletedRecord.source).toBe('manual');
+      expect(deletedRecord.deleted).toBe(true);
+      expect(deletedRecord.deletedAt).toBeDefined();
+      expect(new Date(deletedRecord.deletedAt).getTime()).toBeGreaterThan(0);
     });
 
     it('delete <id> --json outputs JSON', () => {

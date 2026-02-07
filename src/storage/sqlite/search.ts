@@ -109,10 +109,6 @@ export async function searchKeyword(
     )
     .all(query, limit) as LessonRow[];
 
-  if (rows.length > 0) {
-    incrementRetrievalCount(repoRoot, rows.map((r) => r.id));
-  }
-
   return rows.map(rowToLesson);
 }
 

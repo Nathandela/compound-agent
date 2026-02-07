@@ -5,7 +5,7 @@
  * No vector search - just filter by severity and recency.
  */
 
-import { readLessons } from '../storage/index.js';
+import { incrementRetrievalCount, readLessons } from '../storage/index.js';
 import type { Lesson, Severity } from '../types.js';
 
 /** Default number of lessons to load at session start */
@@ -54,6 +54,11 @@ export async function loadSessionLessons(
     return dateB - dateA;
   });
 
-  // Return top N
-  return highSeverityLessons.slice(0, limit);
+  // Return top N and track surfaced lessons as retrieved.
+  const topLessons = highSeverityLessons.slice(0, limit);
+  if (topLessons.length > 0) {
+    incrementRetrievalCount(repoRoot, topLessons.map((lesson) => lesson.id));
+  }
+
+  return topLessons;
 }

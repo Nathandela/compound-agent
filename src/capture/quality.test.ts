@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { appendLesson } from '../storage/jsonl.js';
 import {
   closeDb,
+  getRetrievalStats,
   rebuildIndex,
 } from '../storage/sqlite/index.js';
 import { createQuickLesson } from '../test-utils.js';
@@ -101,6 +102,18 @@ describe('quality filters', () => {
       expect(result.novel).toBe(false);
       expect(result.reason).toContain('similar'); // Jaccard branch, NOT "Exact duplicate found"
       expect(result.existingId).toBe('L001');
+    });
+
+    it('does not increment retrieval counts during novelty checks', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for large files'));
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      await isNovel(tempDir, 'Use Polars for large files');
+
+      const stats = getRetrievalStats(tempDir);
+      const l001 = stats.find((s) => s.id === 'L001');
+      expect(l001?.count).toBe(0);
     });
   });
 

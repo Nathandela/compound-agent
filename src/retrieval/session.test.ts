@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { appendLesson } from '../storage/jsonl.js';
+import { closeDb, getRetrievalStats, rebuildIndex } from '../storage/sqlite/index.js';
 import { createFullLesson, createQuickLesson } from '../test-utils.js';
 
 import { loadSessionLessons } from './session.js';
@@ -16,6 +17,7 @@ describe('session retrieval', () => {
   });
 
   afterEach(async () => {
+    closeDb();
     await rm(tempDir, { recursive: true, force: true });
   });
 
@@ -94,6 +96,28 @@ describe('session retrieval', () => {
       const lessons = await loadSessionLessons(tempDir);
       // Should return the lesson - actual token filtering is done by caller
       expect(lessons).toHaveLength(1);
+    });
+
+    it('increments retrieval counts for surfaced lessons', async () => {
+      await appendLesson(tempDir, createFullLesson('L001', 'High one', 'high', { created: 1 }));
+      await appendLesson(tempDir, createFullLesson('L002', 'High two', 'high', { created: 2 }));
+      await appendLesson(tempDir, createFullLesson('L003', 'High three', 'high', { created: 3 }));
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      const lessons = await loadSessionLessons(tempDir, 2);
+      expect(lessons).toHaveLength(2);
+
+      const stats = getRetrievalStats(tempDir);
+      const surfacedIds = new Set(lessons.map((lesson) => lesson.id));
+
+      for (const stat of stats) {
+        if (surfacedIds.has(stat.id)) {
+          expect(stat.count).toBe(1);
+        } else {
+          expect(stat.count).toBe(0);
+        }
+      }
     });
 
     describe('filters invalidated lessons', () => {

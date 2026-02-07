@@ -120,6 +120,15 @@ describe('CLI', { tags: ['integration'] }, () => {
     it('shows friendly message for invalid limit', () => {
       const { combined } = runCli('list -n abc', tempDir);
       expect(combined).toContain('must be a positive integer');
+      expect(combined).not.toMatch(/Error:\s+Invalid limit/i);
+      expect(combined).not.toMatch(/\bat Command\./);
+    });
+
+    it('shows friendly message for non-positive limit', () => {
+      const { combined } = runCli('search "test" -n 0', tempDir);
+      expect(combined).toContain('must be a positive integer');
+      expect(combined).not.toMatch(/Error:\s+Invalid limit/i);
+      expect(combined).not.toMatch(/\bat Command\./);
     });
 
     it('shows friendly message for empty lesson list', () => {
