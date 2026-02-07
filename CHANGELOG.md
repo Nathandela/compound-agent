@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-02-07
+
+### Fixed
+
+- **Race conditions**: Embedding singleton init and TOCTOU in compaction
+- **Score inflation**: Clamp combined boost multiplier in ranking
+- **MCP resource cleanup**: Signal handlers for clean shutdown
+- **Hook patterns**: Tighter matching and simplified failure tracking
+- **Input validation**: Zod discriminated union for parseInputFile data shape
+- **Version source**: Read from package.json instead of hardcoding
+
+### Changed
+
+- **Tombstone simplification**: Replaced tombstone records with `deleted` flag on Lesson
+- **Command structure**: Flattened `setup/` and `management/` into `commands/`
+- **Exports cleanup**: Removed unnecessary barrel re-exports
+- **SQLite**: Removed graceful degradation layer and deprecated shim
+- **MCP**: Deduplicated tool handlers into shared logic
+- **Tests**: Consolidated three test utility files into `test-utils.ts`
+
 ## [0.2.8] - 2026-02-04
 
 ### Added
@@ -343,7 +363,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.8...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.9...HEAD
+[0.2.9]: https://github.com/Nathandela/learning_agent/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/Nathandela/learning_agent/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/Nathandela/learning_agent/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/Nathandela/learning_agent/compare/v0.2.5...v0.2.6
