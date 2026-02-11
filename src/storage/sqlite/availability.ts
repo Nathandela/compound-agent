@@ -32,8 +32,11 @@ export function ensureSqliteAvailable(): void {
     checked = true;
   } catch (cause) {
     throw new Error(
-      'better-sqlite3 failed to load. Install native build tools ' +
-        '(e.g. `npm install better-sqlite3`) or check your platform compatibility.',
+      'better-sqlite3 failed to load.\n' +
+        'If using pnpm, add to your project\'s package.json:\n' +
+        '  "pnpm": { "onlyBuiltDependencies": ["better-sqlite3"] }\n' +
+        'Then run: pnpm install && pnpm rebuild better-sqlite3\n' +
+        'For npm/yarn, run: npm rebuild better-sqlite3',
       { cause }
     );
   }

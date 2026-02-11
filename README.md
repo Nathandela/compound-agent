@@ -53,6 +53,20 @@ npx lna setup --skip-model
 - ~278MB disk space for embedding model
 - ~150MB RAM for embedding operations
 
+### pnpm Users
+
+pnpm v9+ blocks native addon builds by default. Add `better-sqlite3` to your project's `package.json`:
+
+```json
+{
+  "pnpm": {
+    "onlyBuiltDependencies": ["better-sqlite3"]
+  }
+}
+```
+
+Then run `pnpm install`. Without this, the SQLite native addon won't compile and search will fail.
+
 ## Quick Start
 
 ```bash
@@ -402,7 +416,7 @@ pnpm lint
 
 ## Project Status
 
-Version 0.2.8 - Hook UX improvements and smarter failure detection. Key features:
+Version 0.2.9 - Reliability fixes and codebase simplification. Key features:
 - **MCP Server**: `lesson_search` and `lesson_capture` as native Claude tools (primary interface)
 - **Smart hooks**: UserPromptSubmit (correction/planning detection), PostToolUseFailure (smart failure tracking)
 - **Pre-commit checkpoint**: Checklist-format reflection prompt before commits
