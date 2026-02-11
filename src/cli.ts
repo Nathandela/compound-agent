@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * Learning Agent CLI
+ * Compound Agent CLI
  *
- * Repository-scoped learning system for Claude Code.
+ * Semantically-intelligent workflow plugin for Claude Code.
  *
  * Commands:
  *   Capture:    learn, capture, detect
@@ -65,8 +65,8 @@ program
   .option('-q, --quiet', 'Suppress non-essential output');
 
 program
-  .name('learning-agent')
-  .description('Repository-scoped learning system for Claude Code')
+  .name('compound-agent')
+  .description('Semantically-intelligent workflow plugin for Claude Code')
   .version(VERSION);
 
 // ============================================================================

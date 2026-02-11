@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * MCP Server for Learning Agent
+ * MCP Server for Compound Agent
  *
- * Exposes learning-agent functionality as MCP tools and resources:
- * - lesson_search: Search lessons by semantic similarity
- * - lesson_capture: Capture a new lesson
- * - lessons://prime: Get workflow context with high-severity lessons
+ * Exposes compound-agent functionality as MCP tools and resources:
+ * - memory_search: Search memory items by semantic similarity
+ * - memory_capture: Capture a new memory item
+ * - memory://prime: Get workflow context with high-severity memory items
  *
  * This is a thin wrapper - all business logic is delegated to existing modules.
  */
@@ -34,21 +34,21 @@ interface SearchResult {
   finalScore?: number;
 }
 
-/** Success result from lesson_search tool */
+/** Success result from memory_search tool */
 interface SearchToolSuccess {
   lessons: SearchResult[];
   error?: undefined;
   action?: undefined;
 }
 
-/** Error result from lesson_search tool */
+/** Error result from memory_search tool */
 interface SearchToolError {
   lessons: [];
   error: string;
   action: string;
 }
 
-/** Result from lesson_search tool - typed union for success/failure */
+/** Result from memory_search tool - typed union for success/failure */
 export type SearchToolResult = SearchToolSuccess | SearchToolError;
 
 /**
@@ -61,7 +61,7 @@ export function isSearchError(result: SearchToolResult): result is SearchToolErr
   return 'error' in result && result.error !== undefined;
 }
 
-/** Result from lesson_capture tool */
+/** Result from memory_capture tool */
 interface CaptureToolResult {
   lesson: Lesson;
 }
@@ -144,8 +144,8 @@ export interface LearningAgentMcpServer {
   repoRoot: string;
   /**
    * Call a tool by name with parameters.
-   * - lesson_search: { query: string, maxResults?: number } → SearchToolResult
-   * - lesson_capture: { insight: string, trigger?: string, tags?: string[] } → CaptureToolResult
+   * - memory_search: { query: string, maxResults?: number } → SearchToolResult
+   * - memory_capture: { insight: string, trigger?: string, tags?: string[] } → CaptureToolResult
    */
   callTool<T = SearchToolResult | CaptureToolResult>(
     name: string,
@@ -153,7 +153,7 @@ export interface LearningAgentMcpServer {
   ): Promise<T>;
   /**
    * Read a resource by URI.
-   * - lessons://prime → ResourceResult with workflow context
+   * - memory://prime → ResourceResult with workflow context
    */
   readResource(uri: string): Promise<ResourceResult>;
 }
@@ -175,7 +175,7 @@ export function createMcpServer(repoRoot: string): LearningAgentMcpServer {
   const resourceHandlers: Record<string, () => Promise<ResourceResult>> = {};
 
   // =========================================================================
-  // lesson_search tool
+  // memory_search tool
   // =========================================================================
   const searchInputSchema = {
     query: z.string().min(1, 'Query must be non-empty'),
@@ -183,15 +183,15 @@ export function createMcpServer(repoRoot: string): LearningAgentMcpServer {
   };
 
   server.registerTool(
-    'lesson_search',
+    'memory_search',
     {
-      title: 'Search Lessons',
-      description: `Mandatory recall: search lessons BEFORE:
+      title: 'Search Memory',
+      description: `Mandatory recall: search memory BEFORE:
 - Architectural decisions or complex planning
 - Patterns you've implemented before in this repo
 - After corrections ("actually...", "wrong", "use X instead")
 
-Returns relevant lessons ranked by similarity and severity.`,
+Returns relevant memory items ranked by similarity and severity.`,
       inputSchema: searchInputSchema,
     },
     async ({ query, maxResults }) => {
@@ -203,13 +203,13 @@ Returns relevant lessons ranked by similarity and severity.`,
   );
 
   // Store handler for direct invocation
-  toolHandlers['lesson_search'] = async (params): Promise<SearchToolResult> => {
+  toolHandlers['memory_search'] = async (params): Promise<SearchToolResult> => {
     const parsed = z.object(searchInputSchema).parse(params);
     return handleSearch(repoRoot, parsed.query, parsed.maxResults);
   };
 
   // =========================================================================
-  // lesson_capture tool
+  // memory_capture tool
   // =========================================================================
   const captureInputSchema = {
     insight: z.string().min(MIN_INSIGHT_LENGTH, `Insight must be at least ${MIN_INSIGHT_LENGTH} characters`),
@@ -218,10 +218,10 @@ Returns relevant lessons ranked by similarity and severity.`,
   };
 
   server.registerTool(
-    'lesson_capture',
+    'memory_capture',
     {
-      title: 'Capture Lesson',
-      description: `Capture a lesson AFTER:
+      title: 'Capture Memory',
+      description: `Capture a memory item AFTER:
 - User corrects you ("no", "actually...", "use X instead")
 - Test fail → fix → pass cycles
 - Discovering project-specific knowledge
@@ -238,20 +238,20 @@ Saves immediately and shows what was captured.`,
   );
 
   // Store handler for direct invocation
-  toolHandlers['lesson_capture'] = async (params): Promise<CaptureToolResult> => {
+  toolHandlers['memory_capture'] = async (params): Promise<CaptureToolResult> => {
     const parsed = z.object(captureInputSchema).parse(params);
     return handleCapture(repoRoot, parsed.insight, parsed.trigger, parsed.tags);
   };
 
   // =========================================================================
-  // lessons://prime resource
+  // memory://prime resource
   // =========================================================================
   server.registerResource(
     'prime',
-    'lessons://prime',
+    'memory://prime',
     {
       title: 'Prime Context',
-      description: 'Workflow context with high-severity lessons for session start',
+      description: 'Workflow context with high-severity memory items for session start',
       mimeType: 'text/plain',
     },
     async (uri) => {
@@ -264,7 +264,7 @@ Saves immediately and shows what was captured.`,
   );
 
   // Store handler for direct invocation
-  resourceHandlers['lessons://prime'] = async () => {
+  resourceHandlers['memory://prime'] = async () => {
     const content = await getPrimeContext(repoRoot);
     return { content };
   };
