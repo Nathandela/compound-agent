@@ -8,8 +8,8 @@
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
-import { loadSessionLessons } from '../retrieval/index.js';
-import type { Lesson, Source } from '../types.js';
+import { loadSessionLessons } from '../memory/retrieval/index.js';
+import type { Lesson, Source } from '../memory/types.js';
 
 /**
  * Beads-style trust language template.

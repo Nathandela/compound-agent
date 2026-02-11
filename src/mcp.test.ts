@@ -20,7 +20,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fc, test } from '@fast-check/vitest';
 
-import type { Lesson } from './types.js';
+import type { Lesson } from './memory/types.js';
 
 // Test fixtures
 const SAMPLE_LESSON: Lesson = {
@@ -238,7 +238,7 @@ describe('MCP Server', () => {
     });
 
     it('applies rankLessons to search results (finalScore present)', async () => {
-      const searchModule = await import('./search/index.js');
+      const searchModule = await import('./memory/search/index.js');
       vi.spyOn(searchModule, 'searchVector').mockResolvedValue([
         { lesson: HIGH_SEVERITY_LESSON, score: 0.6 },
       ]);
@@ -259,7 +259,7 @@ describe('MCP Server', () => {
     });
 
     it('rankLessons boosts high-severity lessons above raw score', async () => {
-      const searchModule = await import('./search/index.js');
+      const searchModule = await import('./memory/search/index.js');
       vi.spyOn(searchModule, 'searchVector').mockResolvedValue([
         { lesson: HIGH_SEVERITY_LESSON, score: 0.6 },
       ]);
@@ -295,7 +295,7 @@ describe('MCP Server', () => {
 
     it('uses generateId for lesson ID', async () => {
       const { createMcpServer } = await import('./mcp.js');
-      const { generateId } = await import('./types.js');
+      const { generateId } = await import('./memory/types.js');
       const mcpServer = createMcpServer(tempDir);
 
       const insight = 'Always run tests before committing';
@@ -344,7 +344,7 @@ describe('MCP Server', () => {
 
     it('persists lesson to JSONL file', async () => {
       const { createMcpServer } = await import('./mcp.js');
-      const { readLessons } = await import('./storage/index.js');
+      const { readLessons } = await import('./memory/storage/index.js');
       const mcpServer = createMcpServer(tempDir);
 
       await mcpServer.callTool('lesson_capture', {
@@ -469,7 +469,7 @@ describe('MCP Server', () => {
       const mcpServer = createMcpServer(tempDir);
 
       // Mock searchVector to throw
-      vi.doMock('./search/index.js', () => ({
+      vi.doMock('./memory/search/index.js', () => ({
         searchVector: vi.fn().mockRejectedValue(new Error('Embedding model not available')),
       }));
 
@@ -489,7 +489,7 @@ describe('MCP Server', () => {
       const { createMcpServer, isSearchError } = await import('./mcp.js');
 
       // Mock searchVector to throw
-      vi.doMock('./search/index.js', () => ({
+      vi.doMock('./memory/search/index.js', () => ({
         searchVector: vi.fn().mockRejectedValue(new Error('Model not available')),
       }));
 
@@ -565,7 +565,7 @@ describe('MCP Server', () => {
     });
 
     it('delegates capture to appendLesson', async () => {
-      const storageModule = await import('./storage/index.js');
+      const storageModule = await import('./memory/storage/index.js');
       const appendLessonSpy = vi.spyOn(storageModule, 'appendLesson');
 
       const { createMcpServer } = await import('./mcp.js');
@@ -579,7 +579,7 @@ describe('MCP Server', () => {
     });
 
     it('delegates prime to loadSessionLessons', async () => {
-      const retrievalModule = await import('./retrieval/index.js');
+      const retrievalModule = await import('./memory/retrieval/index.js');
       const loadSessionLessonsSpy = vi.spyOn(retrievalModule, 'loadSessionLessons');
 
       const { createMcpServer } = await import('./mcp.js');
@@ -905,7 +905,7 @@ describe('MCP Server', () => {
       'lesson_capture: captured lesson can be retrieved from storage',
       async (insight, trigger, tags) => {
         const { createMcpServer } = await import('./mcp.js');
-        const { readLessons } = await import('./storage/index.js');
+        const { readLessons } = await import('./memory/storage/index.js');
         const mcpServer = createMcpServer(tempDir);
 
         const params: Record<string, unknown> = { insight };
@@ -947,8 +947,8 @@ describe('MCP Server', () => {
       const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
       const { registerMcpCleanup } = await import('./mcp.js');
-      const { closeDb } = await import('./storage/index.js');
-      const closeDbSpy = vi.spyOn(await import('./storage/index.js'), 'closeDb');
+      const { closeDb } = await import('./memory/storage/index.js');
+      const closeDbSpy = vi.spyOn(await import('./memory/storage/index.js'), 'closeDb');
 
       registerMcpCleanup();
 
@@ -971,7 +971,7 @@ describe('MCP Server', () => {
       const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
       const { registerMcpCleanup } = await import('./mcp.js');
-      const closeDbSpy = vi.spyOn(await import('./storage/index.js'), 'closeDb');
+      const closeDbSpy = vi.spyOn(await import('./memory/storage/index.js'), 'closeDb');
 
       registerMcpCleanup();
 
@@ -994,7 +994,7 @@ describe('MCP Server', () => {
       const processExitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as never);
 
       const { registerMcpCleanup } = await import('./mcp.js');
-      const closeDbSpy = vi.spyOn(await import('./storage/index.js'), 'closeDb').mockImplementation(() => {
+      const closeDbSpy = vi.spyOn(await import('./memory/storage/index.js'), 'closeDb').mockImplementation(() => {
         throw new Error('DB already closed');
       });
 

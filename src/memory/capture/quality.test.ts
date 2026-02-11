@@ -9,7 +9,7 @@ import {
   getRetrievalStats,
   rebuildIndex,
 } from '../storage/sqlite/index.js';
-import { createQuickLesson } from '../test-utils.js';
+import { createQuickLesson } from '../../test-utils.js';
 
 import {
   isActionable,

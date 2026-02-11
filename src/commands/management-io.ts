@@ -8,9 +8,9 @@ import { readFile } from 'node:fs/promises';
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
-import { appendLesson, readLessons } from '../storage/index.js';
-import { LessonSchema } from '../types.js';
-import type { Lesson } from '../types.js';
+import { appendLesson, readLessons } from '../memory/storage/index.js';
+import { LessonSchema } from '../memory/types.js';
+import type { Lesson } from '../memory/types.js';
 
 import { JSON_INDENT_SPACES } from './shared.js';
 

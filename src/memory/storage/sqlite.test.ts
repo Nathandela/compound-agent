@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { createFullLesson, createQuickLesson } from '../test-utils.js';
+import { createFullLesson, createQuickLesson } from '../../test-utils.js';
 
 import { appendLesson, LESSONS_PATH } from './jsonl.js';
 import {

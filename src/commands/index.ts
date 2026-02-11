@@ -6,11 +6,11 @@
 
 import type { Command } from 'commander';
 
-import { registerClaudeSubcommand } from './setup-claude.js';
-import { registerDownloadModelCommand } from './setup-download-model.js';
-import { registerHooksCommand } from './setup-hooks.js';
-import { registerInitCommand } from './setup-init.js';
-import { registerSetupAllCommand } from './setup-all.js';
+import { registerClaudeSubcommand } from '../setup/claude.js';
+import { registerDownloadModelCommand } from '../setup/download-model.js';
+import { registerHooksCommand } from '../setup/hooks.js';
+import { registerInitCommand } from '../setup/init.js';
+import { registerSetupAllCommand } from '../setup/all.js';
 
 import { registerCrudCommands } from './management-crud.js';
 import { registerInvalidationCommands } from './management-invalidation.js';
@@ -22,11 +22,11 @@ export { registerCaptureCommands } from './capture.js';
 export { registerRemindCaptureCommand } from './remind-capture.js';
 export { registerRetrievalCommands } from './retrieval.js';
 
-// Re-export types and helpers from flattened modules
-export type { ClaudeHooksResult } from './setup-types.js';
+// Re-export types and helpers from setup and management modules
+export type { ClaudeHooksResult } from '../setup/types.js';
 export { formatLessonHuman, wasLessonDeleted } from './management-helpers.js';
 export { getPrimeContext } from './management-prime.js';
-export type { HookInstallResult } from './setup-hooks.js';
+export type { HookInstallResult } from '../setup/hooks.js';
 
 // Re-export shared utilities for use by cli.ts
 export { getGlobalOpts, out } from './shared.js';

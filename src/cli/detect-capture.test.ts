@@ -6,7 +6,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { LESSONS_PATH } from '../storage/jsonl.js';
+import { LESSONS_PATH } from '../memory/storage/jsonl.js';
 import { cleanupCliTestDir, runCli, setupCliTestDir } from '../test-utils.js';
 
 describe('CLI', { tags: ['integration'] }, () => {

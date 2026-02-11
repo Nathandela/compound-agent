@@ -7,7 +7,7 @@ import { isModelUsable } from '../embeddings/model.js';
 import { isModelAvailable } from '../embeddings/nomic.js';
 import { appendLesson } from '../storage/jsonl.js';
 import { closeDb, getRetrievalStats, rebuildIndex } from '../storage/sqlite/index.js';
-import { createFullLesson, createQuickLesson, shouldSkipEmbeddingTests } from '../test-utils.js';
+import { createFullLesson, createQuickLesson, shouldSkipEmbeddingTests } from '../../test-utils.js';
 
 import { formatLessonsCheck, retrieveForPlan } from './plan.js';
 

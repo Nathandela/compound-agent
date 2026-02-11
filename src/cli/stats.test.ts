@@ -4,8 +4,8 @@
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { appendLesson } from '../storage/jsonl.js';
-import { closeDb, rebuildIndex } from '../storage/sqlite/index.js';
+import { appendLesson } from '../memory/storage/jsonl.js';
+import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
 import { cleanupCliTestDir, createQuickLesson, runCli, setupCliTestDir } from '../test-utils.js';
 
 describe('CLI', { tags: ['integration'] }, () => {

@@ -7,13 +7,13 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
-import { out } from './shared.js';
+import { out } from '../commands/shared.js';
 import {
   HOOK_MARKER,
   COMPOUND_AGENT_HOOK_BLOCK,
   PRE_COMMIT_HOOK_TEMPLATE,
   PRE_COMMIT_MESSAGE,
-} from './setup-templates.js';
+} from './templates.js';
 
 /** Make hook file executable (mode 0o755) */
 const HOOK_FILE_MODE = 0o755;

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 
-import { createFullLesson, createQuickLesson, daysAgo } from '../test-utils.js';
+import { createFullLesson, createQuickLesson, daysAgo } from '../../test-utils.js';
 
 import {
   calculateScore,

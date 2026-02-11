@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 
 import { formatBytes } from '../cli-utils.js';
-import { isModelAvailable, MODEL_FILENAME, resolveModel } from '../index.js';
+import { isModelAvailable, MODEL_FILENAME, resolveModel } from '../memory/embeddings/index.js';
 
 /**
  * Register the download-model command on the program.

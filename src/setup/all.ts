@@ -10,9 +10,9 @@ import { dirname, join } from 'node:path';
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
-import { isModelAvailable, resolveModel } from '../embeddings/model.js';
-import { LESSONS_PATH } from '../storage/index.js';
-import { out } from './shared.js';
+import { isModelAvailable, resolveModel } from '../memory/embeddings/model.js';
+import { LESSONS_PATH } from '../memory/storage/index.js';
+import { out } from '../commands/shared.js';
 import {
   addAllCompoundAgentHooks,
   addMcpServerToMcpJson,
@@ -21,13 +21,13 @@ import {
   hasMcpServerInMcpJson,
   readClaudeSettings,
   writeClaudeSettings,
-} from './setup-claude-helpers.js';
+} from './claude-helpers.js';
 import {
   createPluginManifest,
   createSlashCommands,
   ensureClaudeMdReference,
   updateAgentsMd,
-} from './setup-primitives.js';
+} from './primitives.js';
 
 /** Result of one-shot setup */
 interface SetupResult {

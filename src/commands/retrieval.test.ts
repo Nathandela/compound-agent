@@ -8,10 +8,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { isModelUsable } from '../embeddings/model.js';
-import { isModelAvailable } from '../embeddings/nomic.js';
-import { appendLesson, LESSONS_PATH } from '../storage/jsonl.js';
-import { closeDb, rebuildIndex } from '../storage/sqlite/index.js';
+import { isModelUsable } from '../memory/embeddings/model.js';
+import { isModelAvailable } from '../memory/embeddings/nomic.js';
+import { appendLesson, LESSONS_PATH } from '../memory/storage/jsonl.js';
+import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
 import { createFullLesson, createQuickLesson, daysAgo, setupCliTestContext, shouldSkipEmbeddingTests } from '../test-utils.js';
 
 // Check if embedding tests should be skipped (env var, model unavailable, or runtime unusable)

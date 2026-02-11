@@ -5,10 +5,10 @@
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { isModelUsable } from '../embeddings/model.js';
-import { isModelAvailable } from '../embeddings/nomic.js';
-import { appendLesson } from '../storage/jsonl.js';
-import { closeDb, rebuildIndex } from '../storage/sqlite/index.js';
+import { isModelUsable } from '../memory/embeddings/model.js';
+import { isModelAvailable } from '../memory/embeddings/nomic.js';
+import { appendLesson } from '../memory/storage/jsonl.js';
+import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
 import { cleanupCliTestDir, createQuickLesson, runCli, setupCliTestDir, shouldSkipEmbeddingTests } from '../test-utils.js';
 
 // Check if embedding runtime is usable for success-path assertions

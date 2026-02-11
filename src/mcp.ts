@@ -16,10 +16,10 @@ import { z } from 'zod';
 
 import { getPrimeContext } from './commands/management-prime.js';
 import { VERSION } from './index.js';
-import { rankLessons, searchVector } from './search/index.js';
-import { appendLesson, closeDb } from './storage/index.js';
-import { generateId } from './types.js';
-import type { Lesson } from './types.js';
+import { rankLessons, searchVector } from './memory/search/index.js';
+import { appendLesson, closeDb } from './memory/storage/index.js';
+import { generateId } from './memory/types.js';
+import type { Lesson } from './memory/types.js';
 
 /** Default max results for search */
 const DEFAULT_MAX_RESULTS = 5;

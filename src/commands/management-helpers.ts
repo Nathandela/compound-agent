@@ -5,8 +5,8 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { LESSONS_PATH } from '../storage/index.js';
-import type { Lesson } from '../types.js';
+import { LESSONS_PATH } from '../memory/storage/index.js';
+import type { Lesson } from '../memory/types.js';
 
 /**
  * Format lesson for human-readable display.

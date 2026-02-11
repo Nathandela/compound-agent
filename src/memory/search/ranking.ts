@@ -8,7 +8,7 @@
  */
 
 import type { Lesson } from '../types.js';
-import { getLessonAgeDays } from '../utils.js';
+import { getLessonAgeDays } from '../../utils.js';
 
 import type { ScoredLesson } from './vector.js';
 

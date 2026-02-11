@@ -7,7 +7,7 @@
 
 import { afterAll, describe, expect, it } from 'vitest';
 
-import { shouldSkipEmbeddingTests } from '../test-utils.js';
+import { shouldSkipEmbeddingTests } from '../../test-utils.js';
 import { isModelUsable } from './model.js';
 
 import { embedText, embedTexts, getEmbedding, isModelAvailable, unloadEmbedding } from './nomic.js';

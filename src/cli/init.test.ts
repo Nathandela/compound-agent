@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { appendLesson, LESSONS_PATH } from '../storage/jsonl.js';
+import { appendLesson, LESSONS_PATH } from '../memory/storage/jsonl.js';
 import { cleanupCliTestDir, createQuickLesson, runCli, setupCliTestDir } from '../test-utils.js';
 
 describe('CLI', { tags: ['integration'] }, () => {

@@ -20,7 +20,7 @@ import {
   rebuildIndex,
   syncIfNeeded,
   TOMBSTONE_THRESHOLD,
-} from '../storage/index.js';
+} from '../memory/storage/index.js';
 
 import {
   AGE_FLAG_THRESHOLD_DAYS,

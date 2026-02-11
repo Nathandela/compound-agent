@@ -5,7 +5,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { appendLesson } from '../storage/jsonl.js';
 import { closeDb, getRetrievalStats, rebuildIndex } from '../storage/sqlite/index.js';
-import { createFullLesson, createQuickLesson } from '../test-utils.js';
+import { createFullLesson, createQuickLesson } from '../../test-utils.js';
 
 import { loadSessionLessons } from './session.js';
 

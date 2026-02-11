@@ -14,7 +14,7 @@ import {
   COMPOUND_AGENT_SECTION_HEADER,
   PLUGIN_MANIFEST,
   SLASH_COMMANDS,
-} from './setup-templates.js';
+} from './templates.js';
 
 /**
  * Check if AGENTS.md already has the Compound Agent section.

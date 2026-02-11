@@ -14,8 +14,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach } from 'vitest';
 
-import { closeDb } from './storage/sqlite/index.js';
-import type { Lesson, Severity, Source } from './types.js';
+import { closeDb } from './memory/storage/sqlite/index.js';
+import type { Lesson, Severity, Source } from './memory/types.js';
 
 /**
  * Options for creating lesson fixtures.

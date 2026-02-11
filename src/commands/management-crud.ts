@@ -7,9 +7,9 @@
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
-import { appendLesson, readLessons, syncIfNeeded } from '../storage/index.js';
-import { LessonSchema, SeveritySchema } from '../types.js';
-import type { Lesson, Severity } from '../types.js';
+import { appendLesson, readLessons, syncIfNeeded } from '../memory/storage/index.js';
+import { LessonSchema, SeveritySchema } from '../memory/types.js';
+import type { Lesson, Severity } from '../memory/types.js';
 
 import { out } from './shared.js';
 import { formatLessonHuman, wasLessonDeleted } from './management-helpers.js';

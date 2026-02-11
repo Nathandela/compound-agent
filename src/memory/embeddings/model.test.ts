@@ -8,7 +8,7 @@
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { shouldSkipEmbeddingTests } from '../test-utils.js';
+import { shouldSkipEmbeddingTests } from '../../test-utils.js';
 
 import {
   clearUsabilityCache,

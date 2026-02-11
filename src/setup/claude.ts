@@ -6,7 +6,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
-import { out } from './shared.js';
+import { out } from '../commands/shared.js';
 import { getRepoRoot } from '../cli-utils.js';
 import {
   addCompoundAgentHook,
@@ -20,7 +20,7 @@ import {
   removeCompoundAgentHook,
   removeMcpServerFromMcpJson,
   writeClaudeSettings,
-} from './setup-claude-helpers.js';
+} from './claude-helpers.js';
 
 /** Status check result */
 interface StatusResult {

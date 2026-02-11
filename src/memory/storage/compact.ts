@@ -11,7 +11,7 @@ import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises
 import { dirname, join } from 'node:path';
 
 import type { Lesson } from '../types.js';
-import { getLessonAgeDays } from '../utils.js';
+import { getLessonAgeDays } from '../../utils.js';
 
 import { LESSONS_PATH, readLessons } from './jsonl.js';
 

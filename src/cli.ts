@@ -20,7 +20,7 @@ import {
   registerSetupCommands,
 } from './commands/index.js';
 import { VERSION } from './index.js';
-import { closeDb } from './storage/index.js';
+import { closeDb } from './memory/storage/index.js';
 
 // ============================================================================
 // Resource Cleanup

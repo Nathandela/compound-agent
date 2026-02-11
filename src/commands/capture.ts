@@ -7,11 +7,11 @@
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
-import { detectAndPropose, parseInputFile } from '../capture/index.js';
-import type { DetectionResult } from '../capture/index.js';
-import { appendLesson } from '../storage/index.js';
-import { generateId, SeveritySchema } from '../types.js';
-import type { Lesson, Severity } from '../types.js';
+import { detectAndPropose, parseInputFile } from '../memory/capture/index.js';
+import type { DetectionResult } from '../memory/capture/index.js';
+import { appendLesson } from '../memory/storage/index.js';
+import { generateId, SeveritySchema } from '../memory/types.js';
+import type { Lesson, Severity } from '../memory/types.js';
 
 import { registerRemindCaptureCommand } from './remind-capture.js';
 import { getGlobalOpts, out } from './shared.js';

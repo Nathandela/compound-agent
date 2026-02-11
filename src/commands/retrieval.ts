@@ -9,8 +9,8 @@ import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { isModelUsable, loadSessionLessons, retrieveForPlan } from '../index.js';
-import { incrementRetrievalCount, readLessons, searchKeyword, syncIfNeeded } from '../storage/index.js';
-import type { Lesson } from '../types.js';
+import { incrementRetrievalCount, readLessons, searchKeyword, syncIfNeeded } from '../memory/storage/index.js';
+import type { Lesson } from '../memory/types.js';
 
 import {
   AGE_FLAG_THRESHOLD_DAYS,
@@ -24,7 +24,7 @@ import {
   out,
 } from './shared.js';
 
-import type { RankedLesson } from '../search/index.js';
+import type { RankedLesson } from '../memory/search/index.js';
 
 /**
  * Parse numeric limit and exit with user-friendly output on invalid input.

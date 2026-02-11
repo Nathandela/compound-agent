@@ -22,8 +22,8 @@ import {
   CLAUDE_REF_START_MARKER,
   CLAUDE_USER_PROMPT_HOOK_CONFIG,
   MCP_SERVER_CONFIG,
-} from './setup-templates.js';
-import type { ClaudeHooksResult } from './setup-types.js';
+} from './templates.js';
+import type { ClaudeHooksResult } from './types.js';
 
 /**
  * Get the path to Claude Code settings file.

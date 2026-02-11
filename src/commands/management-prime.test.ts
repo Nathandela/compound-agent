@@ -9,8 +9,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { appendLesson } from '../storage/jsonl.js';
-import { closeDb } from '../storage/sqlite/index.js';
+import { appendLesson } from '../memory/storage/jsonl.js';
+import { closeDb } from '../memory/storage/sqlite/index.js';
 import { createFullLesson, createQuickLesson } from '../test-utils.js';
 import { getPrimeContext } from './management-prime.js';
 

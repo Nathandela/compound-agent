@@ -5,7 +5,7 @@
 import chalk from 'chalk';
 import type { Command } from 'commander';
 
-// Re-export centralized utilities
+// Re-export centralized utilities (utils.ts remains in src/ root)
 export { getLessonAgeDays, MS_PER_DAY } from '../utils.js';
 
 // ============================================================================

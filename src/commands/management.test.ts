@@ -9,9 +9,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { ARCHIVE_DIR } from '../storage/compact.js';
-import { appendLesson, LESSONS_PATH } from '../storage/jsonl.js';
-import { closeDb, rebuildIndex } from '../storage/sqlite/index.js';
+import { ARCHIVE_DIR } from '../memory/storage/compact.js';
+import { appendLesson, LESSONS_PATH } from '../memory/storage/jsonl.js';
+import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
 import { createFullLesson, createQuickLesson, daysAgo, setupCliTestContext } from '../test-utils.js';
 
 describe('Management Commands', () => {

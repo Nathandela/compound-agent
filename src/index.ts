@@ -101,8 +101,8 @@ export {
   readLessons,
   rebuildIndex,
   searchKeyword,
-} from './storage/index.js';
-export type { ParseError, ReadLessonsOptions, ReadLessonsResult } from './storage/index.js';
+} from './memory/storage/index.js';
+export type { ParseError, ReadLessonsOptions, ReadLessonsResult } from './memory/storage/index.js';
 
 // Embeddings API
 export {
@@ -115,8 +115,8 @@ export {
   MODEL_URI,
   resolveModel,
   unloadEmbedding,
-} from './embeddings/index.js';
-export type { UsabilityResult } from './embeddings/index.js';
+} from './memory/embeddings/index.js';
+export type { UsabilityResult } from './memory/embeddings/index.js';
 
 // Search API (vector similarity + ranking)
 export {
@@ -127,8 +127,8 @@ export {
   recencyBoost,
   searchVector,
   severityBoost,
-} from './search/index.js';
-export type { RankedLesson, ScoredLesson, SearchVectorOptions } from './search/index.js';
+} from './memory/search/index.js';
+export type { RankedLesson, ScoredLesson, SearchVectorOptions } from './memory/search/index.js';
 
 // Capture API (quality filters + trigger detection)
 export {
@@ -139,7 +139,7 @@ export {
   isNovel,
   isSpecific,
   shouldPropose,
-} from './capture/index.js';
+} from './memory/capture/index.js';
 export type {
   ActionabilityResult,
   CorrectionSignal,
@@ -153,11 +153,11 @@ export type {
   ProposeResult,
   SpecificityResult,
   TestResult,
-} from './capture/index.js';
+} from './memory/capture/index.js';
 
 // Retrieval API (session + plan time)
-export { formatLessonsCheck, loadSessionLessons, retrieveForPlan } from './retrieval/index.js';
-export type { PlanRetrievalResult } from './retrieval/index.js';
+export { formatLessonsCheck, loadSessionLessons, retrieveForPlan } from './memory/retrieval/index.js';
+export type { PlanRetrievalResult } from './memory/retrieval/index.js';
 
 // Context recovery API (for MCP server integration)
 export { getPrimeContext } from './commands/index.js';
@@ -168,7 +168,7 @@ export {
   LessonRecordSchema,
   LessonSchema,
   LessonTypeSchema,
-} from './types.js';
+} from './memory/types.js';
 export type {
   Context,
   Lesson,
@@ -176,4 +176,4 @@ export type {
   LessonType,
   Severity,
   Source,
-} from './types.js';
+} from './memory/types.js';
