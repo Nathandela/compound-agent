@@ -148,7 +148,7 @@ describe('Retrieval Commands', () => {
       const stdout = execSync(`echo "test workflow" | node ${cliPath} check-plan`, {
         cwd: getTempDir(),
         encoding: 'utf-8',
-        env: { ...process.env, LEARNING_AGENT_ROOT: getTempDir() },
+        env: { ...process.env, COMPOUND_AGENT_ROOT: getTempDir() },
       });
       expect(stdout).toMatch(/lessons|relevant|no.*found/i);
     });
@@ -164,13 +164,13 @@ describe('Retrieval Commands', () => {
 
     it.skipIf(skipEmbedding)('shows user-friendly message when no relevant lessons found', async () => {
       // Create a fresh temp dir with no lessons
-      const emptyDir = await mkdtemp(join(tmpdir(), 'learning-agent-empty-'));
+      const emptyDir = await mkdtemp(join(tmpdir(), 'compound-agent-empty-'));
       try {
         const cliPath = join(process.cwd(), 'dist', 'cli.js');
         const stdout = execSync(`node ${cliPath} check-plan --plan "something completely unrelated xyz123"`, {
           cwd: emptyDir,
           encoding: 'utf-8',
-          env: { ...process.env, LEARNING_AGENT_ROOT: emptyDir },
+          env: { ...process.env, COMPOUND_AGENT_ROOT: emptyDir },
         });
         expect(stdout).toMatch(/no.*lessons|no.*relevant|no.*found/i);
       } finally {
@@ -374,7 +374,7 @@ describe('Retrieval Commands', () => {
 
 
     // ========================================================================
-    // NEW TESTS FOR ENHANCED OUTPUT FORMAT (learning_agent-793)
+    // NEW TESTS FOR ENHANCED OUTPUT FORMAT (compound_agent-793)
     // ========================================================================
 
     describe('enhanced output format (S1, S2, S3)', () => {

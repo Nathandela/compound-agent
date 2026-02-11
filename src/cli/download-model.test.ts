@@ -158,7 +158,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       const { combined } = runCli('check-plan --plan "test plan"', tempDir);
 
       if (combined.includes('download-model')) {
-        expect(combined).toContain('npx lna download-model');
+        expect(combined).toContain('npx ca download-model');
       }
     });
 

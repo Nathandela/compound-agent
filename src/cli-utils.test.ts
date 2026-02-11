@@ -66,24 +66,24 @@ describe('CLI utilities', () => {
   });
 
   describe('getRepoRoot', () => {
-    const originalEnv = process.env['LEARNING_AGENT_ROOT'];
+    const originalEnv = process.env['COMPOUND_AGENT_ROOT'];
 
     beforeEach(() => {
       // Clear the env var before each test
-      delete process.env['LEARNING_AGENT_ROOT'];
+      delete process.env['COMPOUND_AGENT_ROOT'];
     });
 
     afterEach(() => {
       // Restore original value
       if (originalEnv !== undefined) {
-        process.env['LEARNING_AGENT_ROOT'] = originalEnv;
+        process.env['COMPOUND_AGENT_ROOT'] = originalEnv;
       } else {
-        delete process.env['LEARNING_AGENT_ROOT'];
+        delete process.env['COMPOUND_AGENT_ROOT'];
       }
     });
 
-    it('returns LEARNING_AGENT_ROOT if set', () => {
-      process.env['LEARNING_AGENT_ROOT'] = '/custom/path';
+    it('returns COMPOUND_AGENT_ROOT if set', () => {
+      process.env['COMPOUND_AGENT_ROOT'] = '/custom/path';
       expect(getRepoRoot()).toBe('/custom/path');
     });
 

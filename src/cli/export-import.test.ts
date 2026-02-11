@@ -105,12 +105,12 @@ describe('CLI', { tags: ['integration'] }, () => {
     });
 
     it('outputs empty array when no lessons exist', async () => {
-      const emptyDir = await mkdtemp(join(tmpdir(), 'learning-agent-empty-'));
+      const emptyDir = await mkdtemp(join(tmpdir(), 'compound-agent-empty-'));
       try {
         const exportResult = execSync(`node ${join(process.cwd(), 'dist', 'cli.js')} export`, {
           cwd: emptyDir,
           encoding: 'utf-8',
-          env: { ...process.env, LEARNING_AGENT_ROOT: emptyDir },
+          env: { ...process.env, COMPOUND_AGENT_ROOT: emptyDir },
         });
         const exported = JSON.parse(exportResult);
         expect(exported).toEqual([]);

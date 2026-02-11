@@ -13,7 +13,7 @@ describe('session retrieval', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-session-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-session-'));
   });
 
   afterEach(async () => {

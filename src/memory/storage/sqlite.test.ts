@@ -53,7 +53,7 @@ describe('SQLite in-memory mode', () => {
   });
 
   it('switches between in-memory and file-based modes', async () => {
-    const tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-mode-switch-'));
+    const tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-mode-switch-'));
     try {
       // Start with in-memory
       const memDb = openInMemoryDb();
@@ -93,7 +93,7 @@ describe('SQLite schema', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-sqlite-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-sqlite-'));
   });
 
   afterEach(async () => {
@@ -428,7 +428,7 @@ describe('SQLite schema', () => {
 
     it('handles empty index', async () => {
       closeDb();
-      const emptyDir = await mkdtemp(join(tmpdir(), 'learning-agent-empty-'));
+      const emptyDir = await mkdtemp(join(tmpdir(), 'compound-agent-empty-'));
       try {
         const results = await searchKeyword(emptyDir, 'test', 10);
         expect(results).toEqual([]);

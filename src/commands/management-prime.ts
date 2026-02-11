@@ -29,8 +29,8 @@ const TRUST_LANGUAGE_TEMPLATE = `# Compound Agent Active
 
 | Tool | Purpose |
 |------|---------|
-| \`lesson_search\` | Search lessons - call BEFORE architectural decisions |
-| \`lesson_capture\` | Capture lessons - call AFTER corrections or discoveries |
+| \`memory_search\` | Search lessons - call BEFORE architectural decisions |
+| \`memory_capture\` | Capture lessons - call AFTER corrections or discoveries |
 
 ## Core Constraints
 
@@ -42,15 +42,15 @@ const TRUST_LANGUAGE_TEMPLATE = `# Compound Agent Active
 
 ## Retrieval Protocol
 
-You MUST call \`lesson_search\` BEFORE:
+You MUST call \`memory_search\` BEFORE:
 - Architectural decisions or complex planning
 - Implementing patterns you've done before in this repo
 
-**NEVER skip lesson_search for complex decisions.** Past mistakes will repeat.
+**NEVER skip memory_search for complex decisions.** Past mistakes will repeat.
 
 ## Capture Protocol
 
-Call \`lesson_capture\` AFTER:
+Call \`memory_capture\` AFTER:
 - User corrects you ("no", "wrong", "actually...")
 - You self-correct after iteration failures
 - Test fails then you fix it

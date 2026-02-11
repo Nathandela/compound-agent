@@ -166,21 +166,21 @@ This project uses compound-agent for session memory via **MCP tools** (preferred
 
 | Tool | Purpose |
 |------|---------|
-| \`lesson_search\` | Search lessons - use BEFORE architectural decisions |
-| \`lesson_capture\` | Capture lessons - use AFTER corrections or discoveries |
+| \`memory_search\` | Search lessons - use BEFORE architectural decisions |
+| \`memory_capture\` | Capture lessons - use AFTER corrections or discoveries |
 
 ### Mandatory Recall
 
-You MUST call \`lesson_search\` BEFORE:
+You MUST call \`memory_search\` BEFORE:
 - Architectural decisions or complex planning
 - Patterns you've implemented before in this repo
 - After user corrections ("actually...", "wrong", "use X instead")
 
-**NEVER skip lesson_search for complex decisions.** Past mistakes will repeat.
+**NEVER skip memory_search for complex decisions.** Past mistakes will repeat.
 
 ### Capture Protocol
 
-Call \`lesson_capture\` AFTER:
+Call \`memory_capture\` AFTER:
 - User corrects you
 - Test fail → fix → pass cycles
 - You discover project-specific knowledge
@@ -199,7 +199,7 @@ Before capturing, verify the lesson is:
 **WARNING: NEVER edit .claude/lessons/index.jsonl directly.**
 
 The JSONL file requires proper ID generation, schema validation, and SQLite sync.
-Use \`lesson_capture\` MCP tool or CLI (\`npx ca learn\`) - never manual edits.
+Use \`memory_capture\` MCP tool or CLI (\`npx ca learn\`) - never manual edits.
 
 ### CLI (fallback only)
 
@@ -240,7 +240,7 @@ Examples:
 npx ca search "$ARGUMENTS"
 \`\`\`
 
-Note: You can also use the \`lesson_search\` MCP tool directly.
+Note: You can also use the \`memory_search\` MCP tool directly.
 `,
   'list.md': `Show all stored lessons.
 

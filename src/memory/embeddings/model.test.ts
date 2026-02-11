@@ -117,7 +117,7 @@ describe('embedding model resolution', () => {
         expect(result.usable).toBe(false);
         // Should provide clear action to fix
         expect(result.action).toBeDefined();
-        expect(result.action).toMatch(/download-model|npx lna/);
+        expect(result.action).toMatch(/download-model|npx ca/);
       }
     });
 

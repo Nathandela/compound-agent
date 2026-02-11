@@ -485,7 +485,7 @@ describe('Capture Commands', () => {
     it('outputs lesson reminder prompt for pre-commit hook', () => {
       const { combined } = runCli('hooks run pre-commit');
       expect(combined).toContain('LESSON CAPTURE CHECKPOINT');
-      expect(combined).toContain('npx lna learn');
+      expect(combined).toContain('npx ca learn');
     });
 
     it('exits with code 0 (non-blocking)', () => {

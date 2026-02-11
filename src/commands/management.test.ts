@@ -102,13 +102,13 @@ describe('Management Commands', () => {
 
     it('outputs empty array when no lessons exist', async () => {
       // Create new temp dir with no lessons
-      const emptyDir = await mkdtemp(join(tmpdir(), 'learning-agent-empty-'));
+      const emptyDir = await mkdtemp(join(tmpdir(), 'compound-agent-empty-'));
       try {
         const cliPath = join(process.cwd(), 'dist', 'cli.js');
         const result = execSync(`node ${cliPath} export`, {
           cwd: emptyDir,
           encoding: 'utf-8',
-          env: { ...process.env, LEARNING_AGENT_ROOT: emptyDir },
+          env: { ...process.env, COMPOUND_AGENT_ROOT: emptyDir },
         });
         const exported = JSON.parse(result);
         expect(exported).toEqual([]);
@@ -817,7 +817,7 @@ describe('Management Commands', () => {
     it('outputs workflow context for Claude Code', () => {
       const { stdout } = runCli('prime');
       // Should contain the header (now Beads-style)
-      expect(stdout).toContain('Learning Agent Active');
+      expect(stdout).toContain('Compound Agent Active');
     });
 
     it('includes core rules (NEVER edit files directly)', () => {
@@ -825,7 +825,7 @@ describe('Management Commands', () => {
       // Updated to match new Beads-style language
       expect(stdout).toMatch(/NEVER.*edit/i);
       expect(stdout).toMatch(/\.claude\/lessons/i);
-      expect(stdout).toMatch(/lna learn|lna list|lna show|lna search/i);
+      expect(stdout).toMatch(/ca learn|ca list|ca show|ca search/i);
     });
 
     it('includes when to capture lessons', () => {
@@ -838,8 +838,8 @@ describe('Management Commands', () => {
     it('includes MCP tools prominently', () => {
       const { stdout } = runCli('prime');
       // MCP tools should be mentioned prominently at top
-      expect(stdout).toContain('lesson_search');
-      expect(stdout).toContain('lesson_capture');
+      expect(stdout).toContain('memory_search');
+      expect(stdout).toContain('memory_capture');
       // Should emphasize MCP over CLI
       expect(stdout).toMatch(/MUST use MCP/i);
     });
@@ -847,12 +847,12 @@ describe('Management Commands', () => {
     it('includes CLI fallback reference (search, learn, list only)', () => {
       const { stdout } = runCli('prime');
       // CLI fallback should mention only these three commands
-      expect(stdout).toContain('lna search');
-      expect(stdout).toContain('lna learn');
-      expect(stdout).toContain('lna list');
+      expect(stdout).toContain('ca search');
+      expect(stdout).toContain('ca learn');
+      expect(stdout).toContain('ca list');
       // Should NOT mention check-plan or stats in CLI fallback
       expect(stdout).not.toContain('check-plan');
-      expect(stdout).not.toContain('lna stats');
+      expect(stdout).not.toContain('ca stats');
     });
 
     it('includes quality gate (novel, specific, actionable)', () => {

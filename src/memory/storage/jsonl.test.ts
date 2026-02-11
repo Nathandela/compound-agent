@@ -12,7 +12,7 @@ describe('JSONL storage', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-test-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-test-'));
   });
 
   afterEach(async () => {

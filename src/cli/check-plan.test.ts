@@ -79,7 +79,7 @@ describe('CLI', { tags: ['integration'] }, () => {
         const stdout = execSync(`echo "test workflow" | node ${cliPath} check-plan`, {
           cwd: tempDir,
           encoding: 'utf-8',
-          env: { ...process.env, LEARNING_AGENT_ROOT: tempDir },
+          env: { ...process.env, COMPOUND_AGENT_ROOT: tempDir },
         });
         expect(stdout).toMatch(/lessons|relevant|no.*found/i);
       } catch (error) {
@@ -98,14 +98,14 @@ describe('CLI', { tags: ['integration'] }, () => {
     });
 
     it('shows user-friendly message when no relevant lessons found', async () => {
-      const emptyDir = await mkdtemp(join(tmpdir(), 'learning-agent-empty-'));
+      const emptyDir = await mkdtemp(join(tmpdir(), 'compound-agent-empty-'));
       try {
         const cliPath = join(process.cwd(), 'dist', 'cli.js');
         try {
           const stdout = execSync(`node ${cliPath} check-plan --plan "something completely unrelated xyz123"`, {
             cwd: emptyDir,
             encoding: 'utf-8',
-            env: { ...process.env, LEARNING_AGENT_ROOT: emptyDir },
+            env: { ...process.env, COMPOUND_AGENT_ROOT: emptyDir },
           });
           expect(stdout).toMatch(/no.*lessons|no.*relevant|no.*found/i);
         } catch (error) {

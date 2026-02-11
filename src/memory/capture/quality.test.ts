@@ -22,7 +22,7 @@ describe('quality filters', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-quality-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-quality-'));
   });
 
   afterEach(async () => {

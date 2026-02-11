@@ -52,7 +52,7 @@ describe('Compaction', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-compact-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-compact-'));
     readFileSpy.mockClear();
   });
 

@@ -40,15 +40,15 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(content.trim()).toBe('');
     });
 
-    it('creates AGENTS.md with Learning Agent section', async () => {
+    it('creates AGENTS.md with Compound Agent section', async () => {
       runCli('init', tempDir);
 
       const agentsPath = join(tempDir, 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
-      expect(content).toContain('Learning Agent Integration');
+      expect(content).toContain('Compound Agent Integration');
       // v0.2.4: uses MCP tools instead of CLI commands
-      expect(content).toContain('lesson_search');
-      expect(content).toContain('lesson_capture');
+      expect(content).toContain('memory_search');
+      expect(content).toContain('memory_capture');
     });
 
     it('AGENTS.md template includes explicit plan-time instructions', async () => {
@@ -59,7 +59,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
       // v0.2.4: uses Mandatory Recall section and MCP tools
       expect(content).toContain('Mandatory Recall');
-      expect(content).toContain('lesson_search');
+      expect(content).toContain('memory_search');
       expect(content).toMatch(/MUST\s+use/i);
     });
 
@@ -71,7 +71,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
       const content = await readFile(agentsPath, 'utf-8');
       expect(content).toContain('Existing Content');
-      expect(content).toContain('Learning Agent Integration');
+      expect(content).toContain('Compound Agent Integration');
     });
 
     it('is idempotent - does not duplicate section on re-run', async () => {
@@ -81,7 +81,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       const agentsPath = join(tempDir, 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      const matches = content.match(/## Learning Agent Integration/g);
+      const matches = content.match(/## Compound Agent Integration/g);
       expect(matches?.length).toBe(1);
     });
 
@@ -152,7 +152,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(stats.mode & 0o111).toBeGreaterThan(0);
     });
 
-    it('pre-commit hook calls lna hooks run', async () => {
+    it('pre-commit hook calls ca hooks run', async () => {
       const gitHooksDir = join(tempDir, '.git', 'hooks');
       await mkdir(gitHooksDir, { recursive: true });
 
@@ -160,7 +160,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
       const hookPath = join(gitHooksDir, 'pre-commit');
       const content = await readFile(hookPath, 'utf-8');
-      expect(content).toContain('lna');
+      expect(content).toContain('ca');
       expect(content).toContain('hooks run pre-commit');
     });
 
@@ -218,16 +218,16 @@ describe('CLI', { tags: ['integration'] }, () => {
       const newContent = await readFile(hookPath, 'utf-8');
       expect(newContent).toContain('existing hook');
       expect(newContent).toContain('pnpm test');
-      expect(newContent).toContain('Learning Agent');
-      expect(newContent).toContain('lna hooks run');
+      expect(newContent).toContain('Compound Agent');
+      expect(newContent).toContain('ca hooks run');
     });
 
-    it('does not modify hook that already has Learning Agent marker', async () => {
+    it('does not modify hook that already has Compound Agent marker', async () => {
       const gitHooksDir = join(tempDir, '.git', 'hooks');
       await mkdir(gitHooksDir, { recursive: true });
 
       const hookPath = join(gitHooksDir, 'pre-commit');
-      const contentWithMarker = '#!/bin/sh\n# Learning Agent pre-commit hook\nnpx lna hooks run pre-commit\n';
+      const contentWithMarker = '#!/bin/sh\n# Compound Agent pre-commit hook\nnpx ca hooks run pre-commit\n';
       await writeFile(hookPath, contentWithMarker);
 
       runCli('init', tempDir);
@@ -279,12 +279,12 @@ describe('CLI', { tags: ['integration'] }, () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
+        const compoundAgentLine = lines.findIndex((line) => line.includes('ca hooks run'));
         const exitLine = lines.findIndex((line) => line.trim() === 'exit 0');
 
-        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(compoundAgentLine).toBeGreaterThan(-1);
         expect(exitLine).toBeGreaterThan(-1);
-        expect(learningAgentLine).toBeLessThan(exitLine);
+        expect(compoundAgentLine).toBeLessThan(exitLine);
       });
 
       it('inserts hook BEFORE exit 1 statement', async () => {
@@ -300,12 +300,12 @@ describe('CLI', { tags: ['integration'] }, () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
+        const compoundAgentLine = lines.findIndex((line) => line.includes('ca hooks run'));
         const exitLine = lines.findIndex((line) => line.trim() === 'exit 1');
 
-        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(compoundAgentLine).toBeGreaterThan(-1);
         expect(exitLine).toBeGreaterThan(-1);
-        expect(learningAgentLine).toBeLessThan(exitLine);
+        expect(compoundAgentLine).toBeLessThan(exitLine);
       });
 
       it('inserts hook BEFORE exit with variable (exit $STATUS)', async () => {
@@ -321,12 +321,12 @@ describe('CLI', { tags: ['integration'] }, () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
+        const compoundAgentLine = lines.findIndex((line) => line.includes('ca hooks run'));
         const exitLine = lines.findIndex((line) => line.trim().startsWith('exit $'));
 
-        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(compoundAgentLine).toBeGreaterThan(-1);
         expect(exitLine).toBeGreaterThan(-1);
-        expect(learningAgentLine).toBeLessThan(exitLine);
+        expect(compoundAgentLine).toBeLessThan(exitLine);
       });
 
       it('inserts hook BEFORE first top-level exit when multiple exist', async () => {
@@ -342,12 +342,12 @@ describe('CLI', { tags: ['integration'] }, () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
+        const compoundAgentLine = lines.findIndex((line) => line.includes('ca hooks run'));
         const firstExitLine = lines.findIndex((line) => line.trim() === 'exit 0');
 
-        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(compoundAgentLine).toBeGreaterThan(-1);
         expect(firstExitLine).toBeGreaterThan(-1);
-        expect(learningAgentLine).toBeLessThan(firstExitLine);
+        expect(compoundAgentLine).toBeLessThan(firstExitLine);
       });
 
       it('appends hook at end when no exit statement exists', async () => {
@@ -363,11 +363,11 @@ describe('CLI', { tags: ['integration'] }, () => {
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
+        const compoundAgentLine = lines.findIndex((line) => line.includes('ca hooks run'));
         const lastContentLine = lines.findIndex((line) => line.includes('pnpm test'));
 
-        expect(learningAgentLine).toBeGreaterThan(-1);
-        expect(learningAgentLine).toBeGreaterThan(lastContentLine);
+        expect(compoundAgentLine).toBeGreaterThan(-1);
+        expect(compoundAgentLine).toBeGreaterThan(lastContentLine);
       });
 
       it('ignores exit inside function definition', async () => {
@@ -391,14 +391,14 @@ exit 0
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
+        const compoundAgentLine = lines.findIndex((line) => line.includes('ca hooks run'));
         const functionExitLine = lines.findIndex((line) => line.trim() === 'exit 1');
         const topLevelExitLine = lines.findIndex((line) => line.trim() === 'exit 0');
 
-        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(compoundAgentLine).toBeGreaterThan(-1);
         expect(topLevelExitLine).toBeGreaterThan(-1);
-        expect(learningAgentLine).toBeLessThan(topLevelExitLine);
-        expect(learningAgentLine).toBeGreaterThan(functionExitLine);
+        expect(compoundAgentLine).toBeLessThan(topLevelExitLine);
+        expect(compoundAgentLine).toBeGreaterThan(functionExitLine);
       });
 
       it('ignores exit in heredoc', async () => {
@@ -420,7 +420,7 @@ exit 0
         const newContent = await readFile(hookPath, 'utf-8');
         const lines = newContent.split('\n');
 
-        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
+        const compoundAgentLine = lines.findIndex((line) => line.includes('ca hooks run'));
         let topLevelExitLine = -1;
         for (let i = lines.length - 1; i >= 0; i--) {
           if (lines[i].trim() === 'exit 0') {
@@ -429,9 +429,9 @@ exit 0
           }
         }
 
-        expect(learningAgentLine).toBeGreaterThan(-1);
+        expect(compoundAgentLine).toBeGreaterThan(-1);
         expect(topLevelExitLine).toBeGreaterThan(-1);
-        expect(learningAgentLine).toBeLessThan(topLevelExitLine);
+        expect(compoundAgentLine).toBeLessThan(topLevelExitLine);
       });
 
       it('remains idempotent when run twice with exit statements', async () => {
@@ -447,13 +447,13 @@ exit 0
 
         const newContent = await readFile(hookPath, 'utf-8');
 
-        const matches = newContent.match(/lna hooks run pre-commit/g);
+        const matches = newContent.match(/ca hooks run pre-commit/g);
         expect(matches?.length).toBe(1);
 
         const lines = newContent.split('\n');
-        const learningAgentLine = lines.findIndex((line) => line.includes('lna hooks run'));
+        const compoundAgentLine = lines.findIndex((line) => line.includes('ca hooks run'));
         const exitLine = lines.findIndex((line) => line.trim() === 'exit 0');
-        expect(learningAgentLine).toBeLessThan(exitLine);
+        expect(compoundAgentLine).toBeLessThan(exitLine);
       });
     });
   });
@@ -474,7 +474,7 @@ exit 0
         expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
 
         const hookEntry = settings.hooks.SessionStart[0];
-        expect(hookEntry.hooks[0].command).toContain('lna');
+        expect(hookEntry.hooks[0].command).toContain('ca');
         // v0.2.4: uses prime instead of load-session
         expect(hookEntry.hooks[0].command).toContain('prime');
       });
@@ -502,7 +502,7 @@ exit 0
         execSync(`node ${cliPath} init 2>&1`, {
           cwd: tempDir,
           encoding: 'utf-8',
-          env: { ...process.env, HOME: mockHome, LEARNING_AGENT_ROOT: tempDir },
+          env: { ...process.env, HOME: mockHome, COMPOUND_AGENT_ROOT: tempDir },
         });
 
         const projectSettings = join(tempDir, '.claude', 'settings.json');
@@ -685,11 +685,11 @@ exit 0
         const settingsPath = join(tempDir, '.claude', 'settings.json');
         const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
-        const learningAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
-          entry.hooks.some((hook: { command: string }) => hook.command.includes('lna'))
+        const compoundAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('ca'))
         );
 
-        expect(learningAgentHooks).toHaveLength(1);
+        expect(compoundAgentHooks).toHaveLength(1);
       });
 
       it('init after setup claude does NOT duplicate hooks', async () => {
@@ -699,7 +699,7 @@ exit 0
         execSync(`node ${cliPath} setup claude 2>&1`, {
           cwd: tempDir,
           encoding: 'utf-8',
-          env: { ...process.env, LEARNING_AGENT_ROOT: tempDir },
+          env: { ...process.env, COMPOUND_AGENT_ROOT: tempDir },
         });
 
         runCli('init', tempDir);
@@ -707,11 +707,11 @@ exit 0
         const settingsPath = join(tempDir, '.claude', 'settings.json');
         const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
-        const learningAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
-          entry.hooks.some((hook: { command: string }) => hook.command.includes('lna'))
+        const compoundAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('ca'))
         );
 
-        expect(learningAgentHooks).toHaveLength(1);
+        expect(compoundAgentHooks).toHaveLength(1);
       });
 
       it('setup claude after init does NOT duplicate hooks', async () => {
@@ -723,17 +723,17 @@ exit 0
         execSync(`node ${cliPath} setup claude 2>&1`, {
           cwd: tempDir,
           encoding: 'utf-8',
-          env: { ...process.env, LEARNING_AGENT_ROOT: tempDir },
+          env: { ...process.env, COMPOUND_AGENT_ROOT: tempDir },
         });
 
         const settingsPath = join(tempDir, '.claude', 'settings.json');
         const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
-        const learningAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
-          entry.hooks.some((hook: { command: string }) => hook.command.includes('lna'))
+        const compoundAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('ca'))
         );
 
-        expect(learningAgentHooks).toHaveLength(1);
+        expect(compoundAgentHooks).toHaveLength(1);
       });
 
       it('second init reports claudeHooks: false when already installed', async () => {
@@ -783,10 +783,10 @@ exit 0
         expect(existingHook).toBeDefined();
         expect(existingHook.hooks[0].command).toBe('echo "existing hook"');
 
-        const learningAgentHook = settings.hooks.SessionStart.find((entry: { hooks: Array<{ command: string }> }) =>
-          entry.hooks.some((hook: { command: string }) => hook.command.includes('lna'))
+        const compoundAgentHook = settings.hooks.SessionStart.find((entry: { hooks: Array<{ command: string }> }) =>
+          entry.hooks.some((hook: { command: string }) => hook.command.includes('ca'))
         );
-        expect(learningAgentHook).toBeDefined();
+        expect(compoundAgentHook).toBeDefined();
       });
     });
 
@@ -875,7 +875,7 @@ exit 0
         execSync(`node ${cliPath} init 2>&1`, {
           cwd: tempDir,
           encoding: 'utf-8',
-          env: { ...process.env, HOME: mockHome, LEARNING_AGENT_ROOT: tempDir },
+          env: { ...process.env, HOME: mockHome, COMPOUND_AGENT_ROOT: tempDir },
         });
 
         const newGlobalContent = await readFile(globalSettings, 'utf-8');
@@ -939,8 +939,8 @@ exit 0
 
     describe('integration: equivalent to setup claude', () => {
       it('init produces same Claude settings as setup claude', async () => {
-        const dir1 = await mkdtemp(join(tmpdir(), 'learning-agent-test1-'));
-        const dir2 = await mkdtemp(join(tmpdir(), 'learning-agent-test2-'));
+        const dir1 = await mkdtemp(join(tmpdir(), 'compound-agent-test1-'));
+        const dir2 = await mkdtemp(join(tmpdir(), 'compound-agent-test2-'));
 
         try {
           await mkdir(join(dir1, '.claude'), { recursive: true });
@@ -951,13 +951,13 @@ exit 0
           execSync(`node ${cliPath} init 2>&1`, {
             cwd: dir1,
             encoding: 'utf-8',
-            env: { ...process.env, LEARNING_AGENT_ROOT: dir1 },
+            env: { ...process.env, COMPOUND_AGENT_ROOT: dir1 },
           });
 
           execSync(`node ${cliPath} setup claude 2>&1`, {
             cwd: dir2,
             encoding: 'utf-8',
-            env: { ...process.env, LEARNING_AGENT_ROOT: dir2 },
+            env: { ...process.env, COMPOUND_AGENT_ROOT: dir2 },
           });
 
           const settings1 = JSON.parse(await readFile(join(dir1, '.claude', 'settings.json'), 'utf-8'));

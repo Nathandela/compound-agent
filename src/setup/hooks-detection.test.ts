@@ -135,8 +135,8 @@ describe('Hook Detection Functions', () => {
 
       expect(result.hookSpecificOutput).toBeDefined();
       expect(result.hookSpecificOutput?.hookEventName).toBe('UserPromptSubmit');
-      expect(result.hookSpecificOutput?.additionalContext).toContain('lesson_capture');
-      expect(result.hookSpecificOutput?.additionalContext).toContain('lesson_search');
+      expect(result.hookSpecificOutput?.additionalContext).toContain('memory_capture');
+      expect(result.hookSpecificOutput?.additionalContext).toContain('memory_search');
     });
 
     it('returns planning reminder for high-confidence planning patterns', () => {
@@ -144,13 +144,13 @@ describe('Hook Detection Functions', () => {
 
       expect(result.hookSpecificOutput).toBeDefined();
       expect(result.hookSpecificOutput?.hookEventName).toBe('UserPromptSubmit');
-      expect(result.hookSpecificOutput?.additionalContext).toContain('lesson_search');
+      expect(result.hookSpecificOutput?.additionalContext).toContain('memory_search');
       expect(result.hookSpecificOutput?.additionalContext).toContain('uncertain');
     });
 
     it('prioritizes correction over planning', () => {
       const result = processUserPrompt('Actually, implement it differently');
-      expect(result.hookSpecificOutput?.additionalContext).toContain('lesson_capture');
+      expect(result.hookSpecificOutput?.additionalContext).toContain('memory_capture');
     });
 
     it('returns empty object for normal prompts', () => {
@@ -188,7 +188,7 @@ describe('Failure Tracking Functions', () => {
       const result = processToolFailure('Write', { file_path: '/other/file.ts' });
       expect(result.hookSpecificOutput).toBeDefined();
       expect(result.hookSpecificOutput?.hookEventName).toBe('PostToolUseFailure');
-      expect(result.hookSpecificOutput?.additionalContext).toContain('lesson_search');
+      expect(result.hookSpecificOutput?.additionalContext).toContain('memory_search');
     });
 
     it('returns tip after 2 failures on same file', () => {
@@ -202,7 +202,7 @@ describe('Failure Tracking Functions', () => {
       processToolFailure('Bash', { command: 'npm test' });
       const result = processToolFailure('Bash', { command: 'npm test --coverage' });
       expect(result.hookSpecificOutput).toBeDefined();
-      expect(result.hookSpecificOutput?.additionalContext).toContain('lesson_search');
+      expect(result.hookSpecificOutput?.additionalContext).toContain('memory_search');
     });
 
     it('clears state after showing tip', () => {
@@ -213,10 +213,10 @@ describe('Failure Tracking Functions', () => {
     });
 
     it('does NOT create temp files', () => {
-      const before = readdirSync(tmpdir()).filter((f) => f.startsWith('lna-failures'));
+      const before = readdirSync(tmpdir()).filter((f) => f.startsWith('ca-failures'));
       processToolFailure('Bash', { command: 'npm test' });
       processToolFailure('Bash', { command: 'npm test' });
-      const after = readdirSync(tmpdir()).filter((f) => f.startsWith('lna-failures'));
+      const after = readdirSync(tmpdir()).filter((f) => f.startsWith('ca-failures'));
       expect(after.length).toBe(before.length);
     });
   });

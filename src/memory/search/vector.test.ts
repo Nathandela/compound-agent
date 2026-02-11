@@ -65,7 +65,7 @@ describe('vector search', () => {
     let tempDir: string;
 
     beforeEach(async () => {
-      tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-vector-'));
+      tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-vector-'));
     });
 
     afterEach(async () => {

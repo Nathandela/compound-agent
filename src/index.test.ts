@@ -47,7 +47,7 @@ import {
 
 describe('public API exports', () => {
   it('exports VERSION as semver string', () => {
-    expect(VERSION).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(VERSION).toMatch(/^\d+\.\d+\.\d+(-[\w.]+)?$/);
   });
 
   it('VERSION matches package.json version', () => {

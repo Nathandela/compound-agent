@@ -16,7 +16,7 @@ describe('trigger detection integration', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'learning-agent-test-'));
+    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'compound-agent-test-'));
     // Create .claude/lessons directory
     await fs.mkdir(path.join(tempDir, '.claude', 'lessons'), { recursive: true });
   });

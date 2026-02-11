@@ -1,5 +1,5 @@
 /**
- * CLI tests for lna CLI alias (v0.2.1) and documentation requirements.
+ * CLI tests for ca CLI alias (v0.2.1) and documentation requirements.
  */
 
 import { readFile } from 'node:fs/promises';
@@ -19,16 +19,16 @@ describe('CLI', { tags: ['integration'] }, () => {
     await cleanupCliTestDir(tempDir);
   });
 
-  describe('lna CLI alias (v0.2.1)', () => {
+  describe('ca CLI alias (v0.2.1)', () => {
     describe('package.json bin configuration', () => {
-      it('has both learning-agent and lna bin entries', async () => {
+      it('has both compound-agent and ca bin entries', async () => {
         const pkgPath = join(process.cwd(), 'package.json');
         const pkgContent = await readFile(pkgPath, 'utf8');
         const pkg = JSON.parse(pkgContent) as { bin?: Record<string, string> };
 
         expect(pkg.bin).toBeDefined();
-        expect(pkg.bin!['learning-agent']).toBe('./dist/cli.js');
-        expect(pkg.bin!['lna']).toBe('./dist/cli.js');
+        expect(pkg.bin!['compound-agent']).toBe('./dist/cli.js');
+        expect(pkg.bin!['ca']).toBe('./dist/cli.js');
       });
 
       it('both bin entries point to identical path', async () => {
@@ -36,24 +36,24 @@ describe('CLI', { tags: ['integration'] }, () => {
         const pkgContent = await readFile(pkgPath, 'utf8');
         const pkg = JSON.parse(pkgContent) as { bin?: Record<string, string> };
 
-        expect(pkg.bin!['lna']).toBe(pkg.bin!['learning-agent']);
+        expect(pkg.bin!['ca']).toBe(pkg.bin!['compound-agent']);
       });
 
-      it('has required bin entries (lna, learning-agent, learning-agent-mcp)', async () => {
+      it('has required bin entries (ca, compound-agent, compound-agent-mcp)', async () => {
         const pkgPath = join(process.cwd(), 'package.json');
         const pkgContent = await readFile(pkgPath, 'utf8');
         const pkg = JSON.parse(pkgContent) as { bin?: Record<string, string> };
 
         const binKeys = Object.keys(pkg.bin ?? {});
         expect(binKeys).toHaveLength(3);
-        expect(binKeys).toContain('lna');
-        expect(binKeys).toContain('learning-agent');
-        expect(binKeys).toContain('learning-agent-mcp');
+        expect(binKeys).toContain('ca');
+        expect(binKeys).toContain('compound-agent');
+        expect(binKeys).toContain('compound-agent-mcp');
       });
     });
 
-    describe('Claude-facing strings use npx lna', () => {
-      it('AGENTS_MD_TEMPLATE uses npx lna (not npx learning-agent)', async () => {
+    describe('Claude-facing strings use npx ca', () => {
+      it('AGENTS_MD_TEMPLATE uses npx ca (not npx compound-agent)', async () => {
         const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
@@ -62,14 +62,14 @@ describe('CLI', { tags: ['integration'] }, () => {
 
         const templateContent = templateMatch![1];
 
-        // v0.2.4: uses lesson_search MCP tool, CLI commands still use lna prefix
-        expect(templateContent).toContain('npx lna search');
-        expect(templateContent).toContain('npx lna learn');
+        // v0.2.4: uses memory_search MCP tool, CLI commands still use ca prefix
+        expect(templateContent).toContain('npx ca search');
+        expect(templateContent).toContain('npx ca learn');
 
-        expect(templateContent).not.toContain('npx learning-agent');
+        expect(templateContent).not.toContain('npx compound-agent');
       });
 
-      it('PRE_COMMIT_MESSAGE uses npx lna learn (preferred alias)', async () => {
+      it('PRE_COMMIT_MESSAGE uses npx ca learn (preferred alias)', async () => {
         const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
@@ -79,12 +79,12 @@ describe('CLI', { tags: ['integration'] }, () => {
         const messageContent = messageMatch![1];
 
         // Uses 'learn' alias (preferred) or 'capture' (also valid)
-        expect(messageContent).toMatch(/npx lna (learn|capture)/);
+        expect(messageContent).toMatch(/npx ca (learn|capture)/);
 
-        expect(messageContent).not.toContain('npx learning-agent');
+        expect(messageContent).not.toContain('npx compound-agent');
       });
 
-      it('CLAUDE_HOOK_CONFIG uses npx lna prime (v0.2.4)', async () => {
+      it('CLAUDE_HOOK_CONFIG uses npx ca prime (v0.2.4)', async () => {
         const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
@@ -94,31 +94,31 @@ describe('CLI', { tags: ['integration'] }, () => {
         const hookContent = hookMatch![1];
 
         // v0.2.4: uses prime instead of load-session for trust language
-        expect(hookContent).toContain('npx lna prime');
+        expect(hookContent).toContain('npx ca prime');
 
-        expect(hookContent).not.toContain('npx learning-agent');
+        expect(hookContent).not.toContain('npx compound-agent');
       });
 
-      it('check-plan error message suggests npx lna download-model', async () => {
+      it('check-plan error message suggests npx ca download-model', async () => {
         // Error messages now come from model.ts (isModelUsable function)
         const modelPath = join(process.cwd(), 'src', 'embeddings', 'model.ts');
         const modelContent = await readFile(modelPath, 'utf8');
 
-        const errorMatches = modelContent.match(/npx lna download-model/g);
+        const errorMatches = modelContent.match(/npx ca download-model/g);
         expect(errorMatches).toBeTruthy();
         expect(errorMatches!.length).toBeGreaterThan(0);
       });
     });
 
     describe('backwards compatibility', () => {
-      it('learning-agent command still works for basic commands', () => {
+      it('compound-agent command still works for basic commands', () => {
         const { combined } = runCli('--version', tempDir);
         expect(combined).toMatch(/\d+\.\d+\.\d+/);
       });
     });
 
     describe('documentation consistency', () => {
-      it('no random mixing of lna and learning-agent in templates', async () => {
+      it('no random mixing of ca and compound-agent in templates', async () => {
         const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
@@ -128,11 +128,11 @@ describe('CLI', { tags: ['integration'] }, () => {
 
         const combinedTemplates = agentsTemplate + preCommitMsg + claudeHook;
 
-        const lnaCount = (combinedTemplates.match(/npx lna/g) || []).length;
-        const learningAgentCount = (combinedTemplates.match(/npx learning-agent/g) || []).length;
+        const caCount = (combinedTemplates.match(/npx ca/g) || []).length;
+        const compoundAgentCount = (combinedTemplates.match(/npx compound-agent/g) || []).length;
 
-        expect(lnaCount).toBeGreaterThan(0);
-        expect(learningAgentCount).toBe(0);
+        expect(caCount).toBeGreaterThan(0);
+        expect(compoundAgentCount).toBe(0);
       });
     });
   });
@@ -156,11 +156,11 @@ describe('CLI', { tags: ['integration'] }, () => {
 
     it('lists MCP tools as primary and CLI as fallback', () => {
       // MCP tools are primary
-      expect(agentsTemplate).toContain('lesson_capture');
-      expect(agentsTemplate).toContain('lesson_search');
+      expect(agentsTemplate).toContain('memory_capture');
+      expect(agentsTemplate).toContain('memory_search');
       // CLI is fallback
       expect(agentsTemplate).toContain('CLI (fallback only)');
-      expect(agentsTemplate).toContain('npx lna learn');
+      expect(agentsTemplate).toContain('npx ca learn');
     });
 
     it('mentions schema/validation/sync issues from manual edits', () => {

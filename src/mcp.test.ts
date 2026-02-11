@@ -1,14 +1,14 @@
 /**
  * MCP Server Tests
  *
- * Tests for the MCP server that exposes learning-agent functionality.
+ * Tests for the MCP server that exposes compound-agent functionality.
  * Following TDD: these tests are written BEFORE implementation.
  *
  * Test categories:
  * 1. Server initialization
- * 2. lesson_search tool
- * 3. lesson_capture tool
- * 4. lessons://prime resource
+ * 2. memory_search tool
+ * 3. memory_capture tool
+ * 4. memory://prime resource
  * 5. Error handling
  * 6. Parameter validation
  * 7. Property-based tests (fast-check)
@@ -107,7 +107,7 @@ describe('MCP Server', () => {
     });
   });
 
-  describe('lesson_search tool', () => {
+  describe('memory_search tool', () => {
     beforeEach(async () => {
       // Write sample lessons to JSONL
       const jsonlPath = join(tempDir, '.claude', 'lessons', 'index.jsonl');
@@ -123,7 +123,7 @@ describe('MCP Server', () => {
         const { createMcpServer } = await import('./mcp.js');
         const mcpServer = createMcpServer(emptyDir);
 
-        const result = await mcpServer.callTool('lesson_search', {
+        const result = await mcpServer.callTool('memory_search', {
           query: 'any query',
         });
 
@@ -145,7 +145,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_search', {
+      const result = await mcpServer.callTool('memory_search', {
         query: 'API documentation',
       });
 
@@ -172,7 +172,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_search', {
+      const result = await mcpServer.callTool('memory_search', {
         query: 'testing',
         maxResults: 3,
       });
@@ -193,7 +193,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_search', {
+      const result = await mcpServer.callTool('memory_search', {
         query: 'testing',
       });
 
@@ -204,7 +204,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      await expect(mcpServer.callTool('lesson_search', { query: '' })).rejects.toThrow();
+      await expect(mcpServer.callTool('memory_search', { query: '' })).rejects.toThrow();
     });
 
     it('validates maxResults is positive integer', async () => {
@@ -212,11 +212,11 @@ describe('MCP Server', () => {
       const mcpServer = createMcpServer(tempDir);
 
       await expect(
-        mcpServer.callTool('lesson_search', { query: 'test', maxResults: -1 })
+        mcpServer.callTool('memory_search', { query: 'test', maxResults: -1 })
       ).rejects.toThrow();
 
       await expect(
-        mcpServer.callTool('lesson_search', { query: 'test', maxResults: 0 })
+        mcpServer.callTool('memory_search', { query: 'test', maxResults: 0 })
       ).rejects.toThrow();
     });
 
@@ -224,7 +224,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_search', {
+      const result = await mcpServer.callTool('memory_search', {
         query: 'API version',
       });
 
@@ -246,7 +246,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_search', {
+      const result = await mcpServer.callTool('memory_search', {
         query: 'config validation deploy',
       });
 
@@ -267,7 +267,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_search', {
+      const result = await mcpServer.callTool('memory_search', {
         query: 'config validation deploy',
       });
 
@@ -278,12 +278,12 @@ describe('MCP Server', () => {
     });
   });
 
-  describe('lesson_capture tool', () => {
+  describe('memory_capture tool', () => {
     it('captures lesson with required insight parameter', async () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_capture', {
+      const result = await mcpServer.callTool('memory_capture', {
         insight: 'Always run tests before committing',
       });
 
@@ -301,7 +301,7 @@ describe('MCP Server', () => {
       const insight = 'Always run tests before committing';
       const expectedId = generateId(insight);
 
-      const result = await mcpServer.callTool('lesson_capture', { insight });
+      const result = await mcpServer.callTool('memory_capture', { insight });
 
       expect(result.lesson.id).toBe(expectedId);
     });
@@ -312,8 +312,8 @@ describe('MCP Server', () => {
 
       const insight = 'Consistent insight for ID test';
 
-      const result1 = await mcpServer.callTool('lesson_capture', { insight });
-      const result2 = await mcpServer.callTool('lesson_capture', { insight });
+      const result1 = await mcpServer.callTool('memory_capture', { insight });
+      const result2 = await mcpServer.callTool('memory_capture', { insight });
 
       expect(result1.lesson.id).toBe(result2.lesson.id);
     });
@@ -322,7 +322,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_capture', {
+      const result = await mcpServer.callTool('memory_capture', {
         insight: 'Check API version first',
         trigger: 'Used deprecated API endpoint',
       });
@@ -334,7 +334,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_capture', {
+      const result = await mcpServer.callTool('memory_capture', {
         insight: 'Use Polars for large datasets',
         tags: ['performance', 'polars', 'data'],
       });
@@ -347,7 +347,7 @@ describe('MCP Server', () => {
       const { readLessons } = await import('./memory/storage/index.js');
       const mcpServer = createMcpServer(tempDir);
 
-      await mcpServer.callTool('lesson_capture', {
+      await mcpServer.callTool('memory_capture', {
         insight: 'Persisted lesson test',
       });
 
@@ -359,7 +359,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      await expect(mcpServer.callTool('lesson_capture', { insight: '' })).rejects.toThrow();
+      await expect(mcpServer.callTool('memory_capture', { insight: '' })).rejects.toThrow();
     });
 
     it('validates insight minimum length', async () => {
@@ -367,7 +367,7 @@ describe('MCP Server', () => {
       const mcpServer = createMcpServer(tempDir);
 
       // Insight should be at least 10 chars for minimal quality
-      await expect(mcpServer.callTool('lesson_capture', { insight: 'short' })).rejects.toThrow();
+      await expect(mcpServer.callTool('memory_capture', { insight: 'short' })).rejects.toThrow();
     });
 
     it('validates tags are array of strings', async () => {
@@ -375,7 +375,7 @@ describe('MCP Server', () => {
       const mcpServer = createMcpServer(tempDir);
 
       await expect(
-        mcpServer.callTool('lesson_capture', {
+        mcpServer.callTool('memory_capture', {
           insight: 'Valid insight for tags test',
           tags: [123 as unknown as string], // Invalid tag type
         })
@@ -386,7 +386,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_capture', {
+      const result = await mcpServer.callTool('memory_capture', {
         insight: 'Lesson captured via MCP',
       });
 
@@ -397,7 +397,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_capture', {
+      const result = await mcpServer.callTool('memory_capture', {
         insight: 'Confirmed lesson test',
       });
 
@@ -405,16 +405,16 @@ describe('MCP Server', () => {
     });
   });
 
-  describe('lessons://prime resource', () => {
+  describe('memory://prime resource', () => {
     it('returns workflow context string', async () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.readResource('lessons://prime');
+      const result = await mcpServer.readResource('memory://prime');
 
       expect(result).toBeDefined();
       expect(typeof result.content).toBe('string');
-      expect(result.content).toContain('Learning Agent');
+      expect(result.content).toContain('Compound Agent');
     });
 
     it('includes high-severity lessons when available', async () => {
@@ -425,7 +425,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.readResource('lessons://prime');
+      const result = await mcpServer.readResource('memory://prime');
 
       expect(result.content).toContain('validate config');
     });
@@ -438,9 +438,9 @@ describe('MCP Server', () => {
         const { createMcpServer } = await import('./mcp.js');
         const mcpServer = createMcpServer(emptyDir);
 
-        const result = await mcpServer.readResource('lessons://prime');
+        const result = await mcpServer.readResource('memory://prime');
 
-        expect(result.content).toContain('Learning Agent');
+        expect(result.content).toContain('Compound Agent');
       } finally {
         await rm(emptyDir, { recursive: true, force: true });
       }
@@ -454,9 +454,9 @@ describe('MCP Server', () => {
         const mcpServer = createMcpServer(emptyDir);
 
         // Should not throw, just return workflow context
-        const result = await mcpServer.readResource('lessons://prime');
+        const result = await mcpServer.readResource('memory://prime');
 
-        expect(result.content).toContain('Learning Agent');
+        expect(result.content).toContain('Compound Agent');
       } finally {
         await rm(emptyDir, { recursive: true, force: true });
       }
@@ -479,7 +479,7 @@ describe('MCP Server', () => {
       const mockedServer = createMockedServer(tempDir);
 
       // Now returns error response instead of throwing
-      const result = await mockedServer.callTool('lesson_search', { query: 'test' });
+      const result = await mockedServer.callTool('memory_search', { query: 'test' });
       expect(result).toHaveProperty('error');
       expect(result).toHaveProperty('action');
       expect(result.lessons).toEqual([]);
@@ -497,7 +497,7 @@ describe('MCP Server', () => {
       const { createMcpServer: createMockedServer, isSearchError: isError } = await import('./mcp.js');
       const mockedServer = createMockedServer(tempDir);
 
-      const result = await mockedServer.callTool('lesson_search', { query: 'test' });
+      const result = await mockedServer.callTool('memory_search', { query: 'test' });
 
       // Type guard should work
       expect(isError(result)).toBe(true);
@@ -523,7 +523,7 @@ describe('MCP Server', () => {
         await fs.chmod(join(readOnlyDir, '.claude', 'lessons'), 0o444);
 
         await expect(
-          mcpServer.callTool('lesson_capture', {
+          mcpServer.callTool('memory_capture', {
             insight: 'This should fail to save',
           })
         ).rejects.toThrow();
@@ -551,7 +551,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_search', { query: 'test query' });
+      const result = await mcpServer.callTool('memory_search', { query: 'test query' });
 
       // Verify the search returned results (which requires searchVector to have been called)
       expect(result).toBeDefined();
@@ -571,7 +571,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      await mcpServer.callTool('lesson_capture', {
+      await mcpServer.callTool('memory_capture', {
         insight: 'Test insight for spy',
       });
 
@@ -585,7 +585,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      await mcpServer.readResource('lessons://prime');
+      await mcpServer.readResource('memory://prime');
 
       expect(loadSessionLessonsSpy).toHaveBeenCalledWith(tempDir, expect.any(Number));
     });
@@ -622,38 +622,38 @@ describe('MCP Server', () => {
     // Property: ID Generation Determinism (Idempotence)
     // =========================================================================
 
-    test.prop([insightArb])('lesson_capture: same insight always produces same ID', async (insight) => {
+    test.prop([insightArb])('memory_capture: same insight always produces same ID', async (insight) => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result1 = await mcpServer.callTool('lesson_capture', { insight });
-      const result2 = await mcpServer.callTool('lesson_capture', { insight });
+      const result1 = await mcpServer.callTool('memory_capture', { insight });
+      const result2 = await mcpServer.callTool('memory_capture', { insight });
 
       // Property: generateId is deterministic - same input produces same output
       expect(result1.lesson.id).toBe(result2.lesson.id);
     });
 
     test.prop([insightArb, insightArb])(
-      'lesson_capture: different insights produce different IDs',
+      'memory_capture: different insights produce different IDs',
       async (insight1, insight2) => {
         fc.pre(insight1 !== insight2); // Skip if insights happen to be equal
 
         const { createMcpServer } = await import('./mcp.js');
         const mcpServer = createMcpServer(tempDir);
 
-        const result1 = await mcpServer.callTool('lesson_capture', { insight: insight1 });
-        const result2 = await mcpServer.callTool('lesson_capture', { insight: insight2 });
+        const result1 = await mcpServer.callTool('memory_capture', { insight: insight1 });
+        const result2 = await mcpServer.callTool('memory_capture', { insight: insight2 });
 
         // Property: Different insights produce different IDs (no collisions)
         expect(result1.lesson.id).not.toBe(result2.lesson.id);
       }
     );
 
-    test.prop([insightArb])('lesson_capture: ID format is always L followed by 8 hex chars', async (insight) => {
+    test.prop([insightArb])('memory_capture: ID format is always L followed by 8 hex chars', async (insight) => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_capture', { insight });
+      const result = await mcpServer.callTool('memory_capture', { insight });
 
       // Property: ID format is consistent (L + 8 hex chars)
       expect(result.lesson.id).toMatch(/^L[a-f0-9]{8}$/);
@@ -664,7 +664,7 @@ describe('MCP Server', () => {
     // =========================================================================
 
     test.prop([insightArb, triggerArb, tagsArb])(
-      'lesson_capture: captured lesson always has source=manual and confirmed=true',
+      'memory_capture: captured lesson always has source=manual and confirmed=true',
       async (insight, trigger, tags) => {
         const { createMcpServer } = await import('./mcp.js');
         const mcpServer = createMcpServer(tempDir);
@@ -673,7 +673,7 @@ describe('MCP Server', () => {
         if (trigger !== undefined) params.trigger = trigger;
         if (tags !== undefined) params.tags = tags;
 
-        const result = await mcpServer.callTool('lesson_capture', params);
+        const result = await mcpServer.callTool('memory_capture', params);
 
         // Property: All MCP-captured lessons have source='manual' and confirmed=true
         expect(result.lesson.source).toBe('manual');
@@ -682,7 +682,7 @@ describe('MCP Server', () => {
     );
 
     test.prop([insightArb, tagsArb])(
-      'lesson_capture: tags are preserved exactly as provided',
+      'memory_capture: tags are preserved exactly as provided',
       async (insight, tags) => {
         const { createMcpServer } = await import('./mcp.js');
         const mcpServer = createMcpServer(tempDir);
@@ -690,7 +690,7 @@ describe('MCP Server', () => {
         const params: Record<string, unknown> = { insight };
         if (tags !== undefined) params.tags = tags;
 
-        const result = await mcpServer.callTool('lesson_capture', params);
+        const result = await mcpServer.callTool('memory_capture', params);
 
         // Property: Tags array is preserved exactly (no mutation)
         const expectedTags = tags ?? [];
@@ -698,11 +698,11 @@ describe('MCP Server', () => {
       }
     );
 
-    test.prop([insightArb])('lesson_capture: created timestamp is valid ISO8601', async (insight) => {
+    test.prop([insightArb])('memory_capture: created timestamp is valid ISO8601', async (insight) => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_capture', { insight });
+      const result = await mcpServer.callTool('memory_capture', { insight });
 
       // Property: created timestamp is valid ISO8601 format
       const date = new Date(result.lesson.created);
@@ -711,7 +711,7 @@ describe('MCP Server', () => {
     });
 
     test.prop([insightArb, triggerArb])(
-      'lesson_capture: trigger defaults to "Manual capture via MCP" when not provided',
+      'memory_capture: trigger defaults to "Manual capture via MCP" when not provided',
       async (insight, trigger) => {
         const { createMcpServer } = await import('./mcp.js');
         const mcpServer = createMcpServer(tempDir);
@@ -719,7 +719,7 @@ describe('MCP Server', () => {
         const params: Record<string, unknown> = { insight };
         if (trigger !== undefined) params.trigger = trigger;
 
-        const result = await mcpServer.callTool('lesson_capture', params);
+        const result = await mcpServer.callTool('memory_capture', params);
 
         // Property: trigger is either provided value or default
         if (trigger !== undefined) {
@@ -734,11 +734,11 @@ describe('MCP Server', () => {
     // Property: Search Result Structure Invariants
     // =========================================================================
 
-    test.prop([queryArb])('lesson_search: result is always an array', async (query) => {
+    test.prop([queryArb])('memory_search: result is always an array', async (query) => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_search', { query });
+      const result = await mcpServer.callTool('memory_search', { query });
 
       // Property: Result structure is always { lessons: Array }
       expect(result).toHaveProperty('lessons');
@@ -746,19 +746,19 @@ describe('MCP Server', () => {
     });
 
     test.prop([queryArb, maxResultsArb])(
-      'lesson_search: number of results never exceeds maxResults',
+      'memory_search: number of results never exceeds maxResults',
       async (query, maxResults) => {
         const { createMcpServer } = await import('./mcp.js');
         const mcpServer = createMcpServer(tempDir);
 
-        const result = await mcpServer.callTool('lesson_search', { query, maxResults });
+        const result = await mcpServer.callTool('memory_search', { query, maxResults });
 
         // Property: Result count is bounded by maxResults parameter
         expect(result.lessons.length).toBeLessThanOrEqual(maxResults);
       }
     );
 
-    test.prop([queryArb])('lesson_search: results are sorted by score descending', async (query) => {
+    test.prop([queryArb])('memory_search: results are sorted by score descending', async (query) => {
       // Add multiple lessons to ensure we have results to sort
       const lessons = Array.from({ length: 5 }, (_, i) => ({
         ...SAMPLE_LESSON,
@@ -771,7 +771,7 @@ describe('MCP Server', () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_search', { query });
+      const result = await mcpServer.callTool('memory_search', { query });
 
       // Property: Results are always sorted by score in descending order
       for (let i = 1; i < result.lessons.length; i++) {
@@ -780,12 +780,12 @@ describe('MCP Server', () => {
     });
 
     test.prop([queryArb])(
-      'lesson_search: each result has both lesson and score properties',
+      'memory_search: each result has both lesson and score properties',
       async (query) => {
         const { createMcpServer } = await import('./mcp.js');
         const mcpServer = createMcpServer(tempDir);
 
-        const result = await mcpServer.callTool('lesson_search', { query });
+        const result = await mcpServer.callTool('memory_search', { query });
 
         // Property: Every result has required structure { lesson, score }
         for (const item of result.lessons) {
@@ -798,11 +798,11 @@ describe('MCP Server', () => {
       }
     );
 
-    test.prop([queryArb])('lesson_search: all scores are numbers', async (query) => {
+    test.prop([queryArb])('memory_search: all scores are numbers', async (query) => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.callTool('lesson_search', { query });
+      const result = await mcpServer.callTool('memory_search', { query });
 
       // Property: Scores are always numeric and not NaN
       for (const item of result.lessons) {
@@ -816,30 +816,30 @@ describe('MCP Server', () => {
     // Property: Resource Invariants
     // =========================================================================
 
-    test.prop([fc.constant(null)])('lessons://prime: always returns a string', async () => {
+    test.prop([fc.constant(null)])('memory://prime: always returns a string', async () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.readResource('lessons://prime');
+      const result = await mcpServer.readResource('memory://prime');
 
       // Property: Resource always returns { content: string }
       expect(result).toHaveProperty('content');
       expect(typeof result.content).toBe('string');
     });
 
-    test.prop([fc.constant(null)])('lessons://prime: content always contains workflow header', async () => {
+    test.prop([fc.constant(null)])('memory://prime: content always contains workflow header', async () => {
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const result = await mcpServer.readResource('lessons://prime');
+      const result = await mcpServer.readResource('memory://prime');
 
-      // Property: Content always includes the Learning Agent workflow context
-      expect(result.content).toContain('Learning Agent');
+      // Property: Content always includes the Compound Agent workflow context
+      expect(result.content).toContain('Compound Agent');
       // v0.2.4: prime.ts uses "Core Constraints" (Beads-style trust language)
       expect(result.content).toContain('Core Constraints');
     });
 
-    test.prop([fc.constant(null)])('lessons://prime: never throws even if .claude missing', async () => {
+    test.prop([fc.constant(null)])('memory://prime: never throws even if .claude missing', async () => {
       // Create a directory without .claude folder
       const emptyDir = await mkdtemp(join(tmpdir(), 'mcp-prop-prime-'));
 
@@ -848,7 +848,7 @@ describe('MCP Server', () => {
         const mcpServer = createMcpServer(emptyDir);
 
         // Property: Resource is fault-tolerant - always succeeds
-        const result = await mcpServer.readResource('lessons://prime');
+        const result = await mcpServer.readResource('memory://prime');
         expect(result.content).toBeDefined();
         expect(typeof result.content).toBe('string');
       } finally {
@@ -861,7 +861,7 @@ describe('MCP Server', () => {
     // =========================================================================
 
     test.prop([fc.string({ maxLength: 9 })])(
-      'lesson_capture: rejects insight shorter than 10 chars',
+      'memory_capture: rejects insight shorter than 10 chars',
       async (shortInsight) => {
         fc.pre(shortInsight.length < 10); // Ensure it's actually short
 
@@ -869,30 +869,30 @@ describe('MCP Server', () => {
         const mcpServer = createMcpServer(tempDir);
 
         // Property: Validation enforces minimum insight length
-        await expect(mcpServer.callTool('lesson_capture', { insight: shortInsight })).rejects.toThrow();
+        await expect(mcpServer.callTool('memory_capture', { insight: shortInsight })).rejects.toThrow();
       }
     );
 
     test.prop([fc.oneof(fc.constant(''), fc.constant(null), fc.constant(undefined))])(
-      'lesson_search: rejects empty or null query',
+      'memory_search: rejects empty or null query',
       async (invalidQuery) => {
         const { createMcpServer } = await import('./mcp.js');
         const mcpServer = createMcpServer(tempDir);
 
         // Property: Query parameter is required and non-empty
-        await expect(mcpServer.callTool('lesson_search', { query: invalidQuery })).rejects.toThrow();
+        await expect(mcpServer.callTool('memory_search', { query: invalidQuery })).rejects.toThrow();
       }
     );
 
     test.prop([queryArb, fc.oneof(fc.integer({ max: 0 }), fc.constant(-1), fc.constant(101))])(
-      'lesson_search: rejects invalid maxResults',
+      'memory_search: rejects invalid maxResults',
       async (query, invalidMaxResults) => {
         const { createMcpServer } = await import('./mcp.js');
         const mcpServer = createMcpServer(tempDir);
 
         // Property: maxResults must be positive integer between 1-100
         await expect(
-          mcpServer.callTool('lesson_search', { query, maxResults: invalidMaxResults })
+          mcpServer.callTool('memory_search', { query, maxResults: invalidMaxResults })
         ).rejects.toThrow();
       }
     );
@@ -902,7 +902,7 @@ describe('MCP Server', () => {
     // =========================================================================
 
     test.prop([insightArb, triggerArb, tagsArb])(
-      'lesson_capture: captured lesson can be retrieved from storage',
+      'memory_capture: captured lesson can be retrieved from storage',
       async (insight, trigger, tags) => {
         const { createMcpServer } = await import('./mcp.js');
         const { readLessons } = await import('./memory/storage/index.js');
@@ -912,7 +912,7 @@ describe('MCP Server', () => {
         if (trigger !== undefined) params.trigger = trigger;
         if (tags !== undefined) params.tags = tags;
 
-        const result = await mcpServer.callTool('lesson_capture', params);
+        const result = await mcpServer.callTool('memory_capture', params);
         const capturedId = result.lesson.id;
 
         // Property: Captured lesson exists in storage (round-trip)

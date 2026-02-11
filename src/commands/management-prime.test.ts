@@ -23,7 +23,7 @@ describe('Prime Command', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-prime-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-prime-'));
   });
 
   afterEach(async () => {
@@ -88,9 +88,9 @@ describe('Prime Command', () => {
       const output = await getPrimeContext(tempDir);
 
       // Trust language markers
-      expect(output).toContain('Learning Agent');
-      expect(output).toContain('lna learn');
-      expect(output).toContain('lna search');
+      expect(output).toContain('Compound Agent');
+      expect(output).toContain('ca learn');
+      expect(output).toContain('ca search');
     });
 
     it('includes Emergency Recall section when high-severity lessons exist', async () => {
@@ -116,7 +116,7 @@ describe('Prime Command', () => {
       // Should NOT contain the Emergency Recall section
       expect(output).not.toContain('[CRITICAL] Mandatory Recall');
       // But should still have trust language
-      expect(output).toContain('lna learn');
+      expect(output).toContain('ca learn');
     });
   });
 
@@ -340,8 +340,8 @@ describe('Prime Command', () => {
 
       // Should still return useful trust language
       expect(output.length).toBeGreaterThan(100);
-      expect(output).toContain('Learning Agent');
-      expect(output).toContain('lna');
+      expect(output).toContain('Compound Agent');
+      expect(output).toContain('ca');
     });
 
     it('does not throw error with empty repo', async () => {
@@ -510,7 +510,7 @@ describe('Property-Based Tests: Prime Command Invariants', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-prime-prop-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-prime-prop-'));
   });
 
   afterEach(async () => {
@@ -708,7 +708,7 @@ describe('Property-Based Tests: Prime Command Invariants', () => {
       const output = await getPrimeContext(tempDir);
 
       // Trust language markers (Beads-style patterns)
-      expect(output).toContain('Learning Agent');
+      expect(output).toContain('Compound Agent');
       expect(output).toMatch(/\*\*Default\*\*/);
       expect(output).toMatch(/\*\*Prohibited\*\*/);
       expect(output).toContain('NEVER');
@@ -716,8 +716,8 @@ describe('Property-Based Tests: Prime Command Invariants', () => {
       expect(output).toMatch(/\*\*Workflow\*\*/);
 
       // CLI commands
-      expect(output).toContain('lna learn');
-      expect(output).toContain('lna search');
+      expect(output).toContain('ca learn');
+      expect(output).toContain('ca search');
     });
 
   });

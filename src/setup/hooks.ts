@@ -29,7 +29,7 @@ export type HookInstallResult =
   | { status: 'appended' };
 
 // ============================================================================
-// UserPromptSubmit Hook: Gentle lesson tool reminders
+// UserPromptSubmit Hook: Gentle memory tool reminders
 // ============================================================================
 
 /** Patterns that suggest user is correcting Claude */
@@ -77,10 +77,10 @@ const LOW_CONFIDENCE_PLANNING = [
 
 /** Reminder messages */
 const CORRECTION_REMINDER =
-  'Remember: You have lesson tools available - lesson_capture to save insights, lesson_search to find past solutions.';
+  'Remember: You have memory tools available - memory_capture to save insights, memory_search to find past solutions.';
 
 const PLANNING_REMINDER =
-  'If you\'re uncertain or hesitant, remember your lesson tools: lesson_search may have relevant context from past sessions.';
+  'If you\'re uncertain or hesitant, remember your memory tools: memory_search may have relevant context from past sessions.';
 
 /** Check if prompt matches correction patterns */
 export function detectCorrection(prompt: string): boolean {
@@ -138,7 +138,7 @@ export function processUserPrompt(prompt: string): UserPromptHookOutput {
 }
 
 // ============================================================================
-// PostToolUseFailure Hook: In-memory failure tracking with lesson tip
+// PostToolUseFailure Hook: In-memory failure tracking with memory tip
 // ============================================================================
 
 /** Threshold constants */
@@ -151,7 +151,7 @@ let lastFailedTarget: string | null = null;
 let sameTargetCount = 0;
 
 /** Tip message for failures */
-const FAILURE_TIP = 'Tip: Multiple failures detected. lesson_search may have solutions for similar issues.';
+const FAILURE_TIP = 'Tip: Multiple failures detected. memory_search may have solutions for similar issues.';
 
 /**
  * PostToolUseFailure hook output format.

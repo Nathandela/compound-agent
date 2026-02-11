@@ -22,7 +22,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       const { combined } = runCli('hooks run pre-commit', tempDir);
       // Check for key elements of the lesson capture prompt
       expect(combined).toContain('LESSON CAPTURE CHECKPOINT');
-      expect(combined).toContain('npx lna learn');
+      expect(combined).toContain('npx ca learn');
     });
 
     it('exits with code 0 (non-blocking)', () => {

@@ -20,7 +20,7 @@ describe('plan retrieval', () => {
   let tempDir: string;
 
   beforeEach(async () => {
-    tempDir = await mkdtemp(join(tmpdir(), 'learning-agent-plan-'));
+    tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-plan-'));
   });
 
   afterEach(async () => {

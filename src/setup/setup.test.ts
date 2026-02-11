@@ -41,7 +41,7 @@ describe('Setup Commands - Generated Content', () => {
         version: string;
       };
 
-      expect(content.name).toBe('learning-agent');
+      expect(content.name).toBe('compound-agent');
       expect(content.description).toContain('lesson');
       expect(content.version).toMatch(/^\d+\.\d+\.\d+$/);
     });
@@ -93,13 +93,13 @@ describe('Setup Commands - Generated Content', () => {
       const commandsDir = join(getTempDir(), '.claude', 'commands');
 
       const showContent = await readFile(join(commandsDir, 'show.md'), 'utf-8');
-      expect(showContent).toContain('lna show');
+      expect(showContent).toContain('ca show');
 
       const wrongContent = await readFile(join(commandsDir, 'wrong.md'), 'utf-8');
-      expect(wrongContent).toContain('lna wrong');
+      expect(wrongContent).toContain('ca wrong');
 
       const statsContent = await readFile(join(commandsDir, 'stats.md'), 'utf-8');
-      expect(statsContent).toContain('lna stats');
+      expect(statsContent).toContain('ca stats');
     });
 
     it('plugin.json is idempotent - not duplicated on re-run', async () => {
@@ -109,7 +109,7 @@ describe('Setup Commands - Generated Content', () => {
       const pluginPath = join(getTempDir(), '.claude', 'plugin.json');
       // Should still be valid JSON (not corrupted by double write)
       const content = JSON.parse(await readFile(pluginPath, 'utf-8'));
-      expect(content.name).toBe('learning-agent');
+      expect(content.name).toBe('compound-agent');
     });
 
     it('--skip-agents also skips plugin.json', async () => {
@@ -143,18 +143,18 @@ describe('Setup Commands - Generated Content', () => {
       const content = await readFile(agentsPath, 'utf-8');
 
       // Must mention MCP tool and CLI as alternatives
-      expect(content).toContain('lesson_capture');
-      expect(content).toContain('lna learn');
+      expect(content).toContain('memory_capture');
+      expect(content).toContain('ca learn');
     });
 
-    it('MCP Tools section appears near top of Learning Agent section', async () => {
+    it('MCP Tools section appears near top of Compound Agent section', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
       // Find positions
-      const sectionStart = content.indexOf('## Learning Agent Integration');
+      const sectionStart = content.indexOf('## Compound Agent Integration');
       const mcpTools = content.indexOf('### MCP Tools');
       const mandatoryRecall = content.indexOf('### Mandatory Recall');
 
@@ -185,7 +185,7 @@ describe('Setup Commands - Generated Content', () => {
       const claudeMdPath = join(getTempDir(), '.claude', 'CLAUDE.md');
       const content = await readFile(claudeMdPath, 'utf-8');
 
-      expect(content).toContain('Learning Agent');
+      expect(content).toContain('Compound Agent');
       expect(content).toMatch(/AGENTS\.md|agents\.md/i);
     });
 
@@ -210,14 +210,14 @@ describe('Setup Commands - Generated Content', () => {
       const claudeDir = join(getTempDir(), '.claude');
       await mkdir(claudeDir, { recursive: true });
       const claudeMdPath = join(claudeDir, 'CLAUDE.md');
-      await writeFile(claudeMdPath, '# Project\n\n## Learning Agent\nSee AGENTS.md for workflow.\n');
+      await writeFile(claudeMdPath, '# Project\n\n## Compound Agent\nSee AGENTS.md for workflow.\n');
 
       runCli('init');
       runCli('init'); // Run twice
 
       const content = await readFile(claudeMdPath, 'utf-8');
-      // Should have only one Learning Agent section
-      const matches = content.match(/Learning Agent/g);
+      // Should have only one Compound Agent section
+      const matches = content.match(/Compound Agent/g);
       expect(matches?.length).toBe(1);
     });
 
@@ -228,9 +228,9 @@ describe('Setup Commands - Generated Content', () => {
       const content = await readFile(claudeMdPath, 'utf-8');
 
       // Should have start and end markers
-      expect(content).toContain('<!-- learning-agent:');
-      expect(content).toMatch(/learning-agent:[^>]*start/);
-      expect(content).toMatch(/learning-agent:[^>]*end/);
+      expect(content).toContain('<!-- compound-agent:');
+      expect(content).toMatch(/compound-agent:[^>]*start/);
+      expect(content).toMatch(/compound-agent:[^>]*end/);
     });
   });
 
@@ -266,7 +266,7 @@ describe('Setup Commands - Generated Content', () => {
       const content = await readFile(agentsPath, 'utf-8');
 
       // Should tell Claude what to do when pattern detected (v0.2.4: uses MCP tools)
-      expect(content).toMatch(/lesson_capture|lna learn/i);
+      expect(content).toMatch(/memory_capture|ca learn/i);
     });
   });
 
@@ -274,25 +274,25 @@ describe('Setup Commands - Generated Content', () => {
    * Tests for v0.2.4: MCP-based capture and retrieval
    */
   describe('MCP tools documentation in AGENTS.md (v0.2.4)', () => {
-    it('documents lesson_search tool', async () => {
+    it('documents memory_search tool', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Should document lesson_search MCP tool
-      expect(content).toContain('lesson_search');
+      // Should document memory_search MCP tool
+      expect(content).toContain('memory_search');
       expect(content).toMatch(/before.*architectural|architectural.*decisions/i);
     });
 
-    it('documents lesson_capture tool', async () => {
+    it('documents memory_capture tool', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Should document lesson_capture MCP tool
-      expect(content).toContain('lesson_capture');
+      // Should document memory_capture MCP tool
+      expect(content).toContain('memory_capture');
       expect(content).toMatch(/user corrects|mistakes|corrections/i);
     });
 

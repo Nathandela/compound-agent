@@ -30,7 +30,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       const stdout = execSync(`node ${cliPath} setup claude ${args} 2>&1`, {
         cwd: tempDir,
         encoding: 'utf-8',
-        env: { ...process.env, HOME: mockHome, LEARNING_AGENT_ROOT: tempDir },
+        env: { ...process.env, HOME: mockHome, COMPOUND_AGENT_ROOT: tempDir },
       });
       return { stdout, stderr: '', combined: stdout };
     } catch (error) {
@@ -58,7 +58,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(settings.hooks.SessionStart.length).toBeGreaterThan(0);
 
       const hookEntry = settings.hooks.SessionStart[0];
-      expect(hookEntry.hooks[0].command).toContain('lna');
+      expect(hookEntry.hooks[0].command).toContain('ca');
       // v0.2.4: uses prime instead of load-session
       expect(hookEntry.hooks[0].command).toContain('prime');
     });
@@ -112,7 +112,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
       expect(settings.hooks.SessionStart.length).toBe(2);
       expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('echo "existing hook"');
-      expect(settings.hooks.SessionStart[1].hooks[0].command).toContain('lna');
+      expect(settings.hooks.SessionStart[1].hooks[0].command).toContain('ca');
     });
 
     it('is idempotent - does not duplicate hook on re-run', async () => {
@@ -162,7 +162,7 @@ describe('CLI', { tags: ['integration'] }, () => {
                 { matcher: 'startup', hooks: [{ type: 'command', command: 'echo "keep me"' }] },
                 {
                   matcher: 'startup|resume|compact',
-                  hooks: [{ type: 'command', command: 'npx learning-agent load-session 2>/dev/null || true' }],
+                  hooks: [{ type: 'command', command: 'npx compound-agent load-session 2>/dev/null || true' }],
                 },
               ],
             },
@@ -376,7 +376,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
         const { combined } = runSetupClaude('--uninstall');
 
-        expect(combined.toLowerCase()).toMatch(/no.*hook|not found|no.*learning/i);
+        expect(combined.toLowerCase()).toMatch(/no.*hook|not found|no.*compound/i);
 
         const globalAfter = await readFile(globalSettings, 'utf-8');
         expect(globalAfter).toBe(globalBefore);
@@ -393,7 +393,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
         const { combined } = runSetupClaude('--global --uninstall');
 
-        expect(combined.toLowerCase()).toMatch(/no.*hook|not found|no.*learning/i);
+        expect(combined.toLowerCase()).toMatch(/no.*hook|not found|no.*compound/i);
 
         const projectAfter = await readFile(projectSettings, 'utf-8');
         expect(projectAfter).toBe(projectBefore);
