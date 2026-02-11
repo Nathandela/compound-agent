@@ -1,10 +1,10 @@
 # Resource Lifecycle Management
 
-This document describes the heavyweight resources managed by learning-agent and best practices for cleanup.
+This document describes the heavyweight resources managed by compound-agent and best practices for cleanup.
 
 ## Overview
 
-Learning-agent manages two resources that persist in memory:
+Compound-agent manages two resources that persist in memory:
 
 | Resource | When Loaded | Memory Usage | Cleanup Function |
 |----------|-------------|--------------|------------------|
@@ -45,7 +45,7 @@ Next DB operation      --> Reopens connection (if needed)
 **Always call before process exit** to ensure clean shutdown:
 
 ```typescript
-import { searchKeyword, closeDb } from 'learning-agent';
+import { searchKeyword, closeDb } from 'compound-agent';
 
 async function main() {
   try {
@@ -97,7 +97,7 @@ The nomic-embed-text model requires approximately **500MB of RAM** when loaded. 
 **Always call before process exit** to free memory:
 
 ```typescript
-import { embedText, unloadEmbedding } from 'learning-agent';
+import { embedText, unloadEmbedding } from 'compound-agent';
 
 async function main() {
   try {
@@ -127,11 +127,11 @@ import {
   searchKeyword,
   closeDb,
   unloadEmbedding
-} from 'learning-agent';
+} from 'compound-agent';
 
 async function main() {
   try {
-    // Your code that uses learning-agent
+    // Your code that uses compound-agent
     const results = await searchKeyword(repoRoot, query, 10);
     // ...
   } finally {
@@ -147,7 +147,7 @@ main().catch(console.error);
 ### Long-Running Processes
 
 ```typescript
-import { closeDb, unloadEmbedding } from 'learning-agent';
+import { closeDb, unloadEmbedding } from 'compound-agent';
 
 // Register shutdown handlers
 function cleanup() {
@@ -176,9 +176,9 @@ process.on('uncaughtException', (err) => {
 ### Server/Daemon Pattern
 
 ```typescript
-import { closeDb, unloadEmbedding } from 'learning-agent';
+import { closeDb, unloadEmbedding } from 'compound-agent';
 
-class LearningAgentService {
+class CompoundAgentService {
   async start() {
     // Resources loaded lazily as needed
   }
@@ -190,7 +190,7 @@ class LearningAgentService {
 }
 
 // In your server shutdown logic
-const service = new LearningAgentService();
+const service = new CompoundAgentService();
 
 process.on('SIGTERM', async () => {
   await service.stop();
@@ -216,10 +216,10 @@ Before first embedding call, the model must be downloaded:
 
 ```bash
 # Via CLI
-npx learning-agent download-model
+npx compound-agent download-model
 
 # Or programmatically
-import { ensureModel } from 'learning-agent';
+import { ensureModel } from 'compound-agent';
 await ensureModel();
 ```
 

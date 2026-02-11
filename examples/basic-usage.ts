@@ -1,5 +1,5 @@
 /**
- * Basic usage example for learning-agent
+ * Basic usage example for compound-agent
  *
  * Demonstrates:
  * - Importing from the library
@@ -8,7 +8,7 @@
  * - Searching lessons (keyword and vector)
  *
  * When installed as dependency, use:
- *   import { ... } from 'learning-agent';
+ *   import { ... } from 'compound-agent';
  */
 
 import {

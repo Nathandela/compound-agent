@@ -91,7 +91,7 @@ Property tests revealed that filesystem timing is inherently variable:
 
 **Properties Verified:**
 - Invalid installs always have non-empty reason
-- Reasons contain actionable fix command (`pnpm add -D learning-agent`)
+- Reasons contain actionable fix command (`pnpm add -D compound-agent`)
 - Missing dist/ reasons mention GitHub installation
 - Missing cli.js reasons mention the specific file
 - Error messages have no leading/trailing whitespace
@@ -208,14 +208,14 @@ fc.integer({ min: 1, max: 5 })  // Symlink test repetitions
 
 ## Files Modified
 
-- `/Users/Nathan/Documents/Code/learning_agent/src/install-check.test.ts`
+- `/Users/Nathan/Documents/Code/compound_agent/src/install-check.test.ts`
   - Added 20 property-based tests
   - Adjusted performance threshold from 50ms → 100ms
   - Organized into property test suites
 
 ## References
 
-- Implementation: `/Users/Nathan/Documents/Code/learning_agent/src/install-check.ts`
-- Invariants: `/Users/Nathan/Documents/Code/learning_agent/doc/invariants/install-check.md`
+- Implementation: `/Users/Nathan/Documents/Code/compound_agent/src/install-check.ts`
+- Invariants: `/Users/Nathan/Documents/Code/compound_agent/doc/invariants/install-check.md`
 - fast-check: https://fast-check.dev/
 - Property-based testing guide: https://fast-check.dev/docs/introduction/getting-started/

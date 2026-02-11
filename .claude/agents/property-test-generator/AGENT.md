@@ -59,7 +59,7 @@ test.prop([fc.array(fc.string())])('lessons always sorted by date', (insights) =
 });
 ```
 
-## fast-check Strategies for Learning Agent
+## fast-check Strategies for Compound Agent
 
 ### Lesson Data
 ```typescript

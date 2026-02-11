@@ -20,18 +20,9 @@
  * await appendLesson(repoRoot, lesson);
  * ```
  *
- * ## Hook Integration
+ * ## Setup
  *
- * Add to your `.claude/settings.json`:
- *
- * ```json
- * {
- *   "hooks": {
- *     "session_start": "npx compound-agent load-session",
- *     "pre_tool": "npx compound-agent check-plan"
- *   }
- * }
- * ```
+ * Run `npx ca init` in your project root to configure hooks and AGENTS.md.
  *
  * ## Resource Management
  *

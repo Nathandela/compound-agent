@@ -218,7 +218,7 @@ Configure Claude Code to automatically load high-severity lessons at session sta
 
 ### E8: Uninstall from Wrong Scope
 **Scenario**: Hook installed globally, user runs `setup claude --uninstall` (project scope)
-**Expected**: Helpful message: "No learning-agent hook found in project settings. Did you mean --global?"
+**Expected**: Helpful message: "No compound-agent hook found in project settings. Did you mean --global?"
 
 ### E9: Concurrent Modifications
 **Scenario**: Two processes modify settings.json simultaneously
@@ -250,19 +250,19 @@ Configure Claude Code to automatically load high-severity lessons at session sta
 Users upgrading from v0.2.0 who installed globally:
 ```bash
 # v0.2.0 behavior (installed globally)
-npx learning-agent@0.2.0 setup claude
+npx ca@0.2.0 setup claude
 
 # v0.2.1 equivalent (now needs explicit --global)
-npx learning-agent@0.2.1 setup claude --global
+npx ca@0.2.1 setup claude --global
 ```
 
 Users who want project-local (new default):
 ```bash
 # v0.2.0 required --project flag
-npx learning-agent@0.2.0 setup claude --project
+npx ca@0.2.0 setup claude --project
 
 # v0.2.1 is now the default
-npx learning-agent@0.2.1 setup claude
+npx ca@0.2.1 setup claude
 ```
 
 ### Deprecation Strategy
@@ -316,7 +316,7 @@ ALL of the following must be true for this feature to be complete:
 
 ## References
 
-- Original issue: `learning_agent-9bw`
+- Original issue: `compound_agent-9bw`
 - Related spec: `doc/SPEC.md` (CLI commands section)
 - Current implementation: `src/cli.ts` lines 614-805
 - Current tests: `src/cli.test.ts` lines 1453-1672

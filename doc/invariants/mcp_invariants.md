@@ -2,7 +2,7 @@
 
 ## Module Overview
 
-**Purpose**: Expose learning-agent functionality as MCP (Model Context Protocol) tools and resources.
+**Purpose**: Expose compound-agent functionality as MCP (Model Context Protocol) tools and resources.
 
 **Scope**: `src/mcp.ts` - A thin wrapper that delegates all business logic to existing modules.
 

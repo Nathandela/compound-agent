@@ -1,10 +1,10 @@
-# Learning Loop for Claude Code Agent
+# Compound Agent for Claude Code
 
 ## Project Overview
 
 A learning system that helps Claude Code avoid repeating mistakes across sessions. Captures lessons from corrections and retrieves them when relevant.
 
-**Location**: `/Users/Nathan/Documents/Code/learning_agent/`
+**Location**: `/Users/Nathan/Documents/Code/compound_agent/`
 **Timeline**: 2.5-3 weeks
 **Status**: Spec finalized, ready to implement
 **Stack**: TypeScript + pnpm (deployable as dev dependency to any repo)
@@ -237,20 +237,20 @@ Runs at the end of a task to propose new lessons while context is fresh.
 
 ```
 # Install as dev dependency in any repo
-pnpm add -D @scope/learning-agent
+pnpm add -D @scope/compound-agent
 
 # Or link locally during development
-pnpm add -D ../learning_agent
+pnpm add -D ../compound_agent
 
 # Usage via package.json scripts or npx
 pnpm learn "Use Polars not pandas"
-npx learning-agent search "data processing"
+npx ca search "data processing"
 ```
 
-The package installs a CLI (`learning-agent` / `learn`) that:
+The package installs a CLI (`ca` / `learn`) that:
 - Stores lessons in `.claude/lessons/index.jsonl` (per-repo, git-tracked)
 - Caches SQLite index in `.claude/.cache/lessons.sqlite` (gitignored)
-- Downloads embedding model to `~/.cache/learning-agent/models/` (global, first-use)
+- Downloads embedding model to `~/.cache/compound-agent/models/` (global, first-use)
 
 ---
 
@@ -321,7 +321,7 @@ The package installs a CLI (`learning-agent` / `learn`) that:
 ## File Structure
 
 ```
-learning_agent/
+compound_agent/
 ├── doc/
 │   ├── SPEC.md                 <- This file
 │   ├── CONTEXT.md              <- Research & decisions
@@ -361,14 +361,14 @@ learning_agent/
 
 ```json
 {
-  "name": "@scope/learning-agent",
+  "name": "@scope/compound-agent",
   "version": "0.1.0",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "learning-agent": "./dist/cli.js",
-    "learn": "./dist/cli.js"
+    "compound-agent": "./dist/cli.js",
+    "ca": "./dist/cli.js"
   },
   "exports": {
     ".": {
@@ -487,7 +487,7 @@ This section documents changes since the original spec (v0.1.0).
 
 **Key Changes:**
 - MCP server integration with `lesson_search` and `lesson_capture` tools
-- One-shot `lna setup` command for init + hooks + MCP + model
+- One-shot `ca setup` command for init + hooks + MCP + model
 - Removed invalid `PreCommit` Claude Code hook
 - Git pre-commit hook for remind-capture
 

@@ -1,5 +1,7 @@
 # Changelog
 
+> **Note**: This project was renamed from **learning-agent** (CLI: `lna`) to **compound-agent** (CLI: `ca`) in v1.0.0. Historical entries below use the original name.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),

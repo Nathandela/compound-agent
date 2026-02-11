@@ -2,9 +2,9 @@
 
 ## Vision
 
-A semantically-intelligent workflow plugin for Claude Code that replaces the current disconnected toolchain (learning-agent + compound-engineering + manual coordination) with a unified system where **every unit of work makes subsequent work easier**.
+A semantically-intelligent workflow plugin for Claude Code that replaces the current disconnected toolchain (compound-agent + compound-engineering + manual coordination) with a unified system where **every unit of work makes subsequent work easier**.
 
-The core insight: compound-engineering's workflow is powerful but its knowledge storage (grep on markdown files) doesn't scale. Our learning-agent's semantic retrieval is powerful but its scope (just lessons) is too narrow. Compound-agent combines the best of both: **compound-engineering's workflow cycle** powered by **semantic memory with vector search**.
+The core insight: compound-engineering's workflow is powerful but its knowledge storage (grep on markdown files) doesn't scale. Our compound-agent's semantic retrieval is powerful but its scope (just lessons) is too narrow. Compound-agent combines the best of both: **compound-engineering's workflow cycle** powered by **semantic memory with vector search**.
 
 ---
 
@@ -64,7 +64,7 @@ Beads is the storage and orchestration backbone. We don't replace it; we build o
 
 ### Layer 2: Semantic Memory (The Intelligence Layer)
 
-The evolution of learning-agent's lesson store into a unified knowledge base.
+The evolution of compound-agent's lesson store into a unified knowledge base.
 
 **What gets stored:**
 
@@ -90,7 +90,7 @@ All types share one store, one schema, one search mechanism. A query returns the
 
 This is the same proven three-layer model from beads (fast local DB + portable JSONL + git distribution) applied to knowledge.
 
-**Schema (extended from learning-agent):**
+**Schema (extended from compound-agent):**
 
 ```typescript
 interface MemoryItem {
@@ -403,7 +403,7 @@ Implemented as Claude Code agent files (markdown with YAML frontmatter):
 
 ---
 
-## Migration from Learning-Agent
+## Migration from Compound-Agent V1
 
 The transition preserves all existing investment:
 
@@ -503,7 +503,7 @@ User: /compound:compound
 
 | Component | Technology | Notes |
 |-----------|------------|-------|
-| Language | TypeScript (ESM) | Same as current learning-agent |
+| Language | TypeScript (ESM) | Same as current compound-agent |
 | Package Manager | pnpm | Same |
 | Build | tsup | Same |
 | Testing | Vitest + fast-check | Same |
@@ -569,7 +569,7 @@ pnpm remove compound-agent
 
 | Before | After | Why |
 |--------|-------|-----|
-| learning-agent standalone | compound-agent memory module | Same functionality, broader scope |
+| compound-agent standalone | compound-agent memory module | Same functionality, broader scope |
 | compound-engineering-plugin | compound-agent workflow | Semantic retrieval > grep on markdown |
 | Manual agent coordination | Agent teams with beads integration | Structured, trackable, reproducible |
 | docs/solutions/ markdown dumps | Structured JSONL with embeddings | Searchable, ranked, scalable |
@@ -592,9 +592,9 @@ pnpm remove compound-agent
 1. **Knowledge compounds**: Each completed workflow cycle measurably improves future cycles
 2. **Context efficiency**: Memory items add <3K tokens per agent (semantic retrieval, not bulk loading)
 3. **Workflow adoption**: User naturally uses `/compound:plan` instead of ad-hoc planning
-4. **Capture rate**: More knowledge items captured per session than current learning-agent
+4. **Capture rate**: More knowledge items captured per session than current compound-agent
 5. **Retrieval precision**: Retrieved items are relevant >80% of the time
-6. **Zero friction migration**: All existing learning-agent functionality preserved
+6. **Zero friction migration**: All existing compound-agent functionality preserved
 
 ---
 
@@ -606,4 +606,4 @@ pnpm remove compound-agent
 | [gastown](https://github.com/steveyegge/gastown) | Propulsion principle, formula/molecule system, agent CVs concept, plugin model |
 | [openclaw](https://github.com/openclaw/openclaw) | SKILL.md pattern, three-tier extensibility, memory architecture with multiple backends |
 | [beads](https://github.com/steveyegge/beads) | Three-layer data model, dependency-aware readiness, compaction, git-backed sync |
-| [learning-agent](.) (current) | Semantic retrieval, vector search, ranking boosts, quality filters, TDD enforcement |
+| [compound-agent](.) (current) | Semantic retrieval, vector search, ranking boosts, quality filters, TDD enforcement |

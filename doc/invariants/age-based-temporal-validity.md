@@ -1,6 +1,6 @@
 # Age-based Temporal Validity Invariants
 
-## Feature: learning_agent-eik
+## Feature: compound_agent-eik
 
 This document defines the invariants for the age-based temporal validity feature.
 

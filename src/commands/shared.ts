@@ -47,7 +47,7 @@ export const DEFAULT_SEARCH_LIMIT = '10';
 /** Default limit for list results */
 export const DEFAULT_LIST_LIMIT = '20';
 
-/** Default limit for check-plan results */
+/** Default limit for search results */
 export const DEFAULT_CHECK_PLAN_LIMIT = '5';
 
 /** Threshold for lesson count warning (context pollution prevention) */

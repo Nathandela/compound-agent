@@ -65,7 +65,7 @@ program
   .option('-q, --quiet', 'Suppress non-essential output');
 
 program
-  .name('compound-agent')
+  .name('ca')
   .description('Semantically-intelligent workflow plugin for Claude Code')
   .version(VERSION);
 

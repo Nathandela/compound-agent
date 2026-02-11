@@ -12,7 +12,7 @@ Semantic search requires vector embeddings. The system should work offline witho
 
 Use node-llama-cpp with nomic-embed-text-v1.5 for local embedding generation.
 
-- Model downloaded to `~/.cache/learning-agent/models/` on first use
+- Model downloaded to `~/.cache/compound-agent/models/` on first use
 - No online fallback; embedding failures cause hard errors
 - Embeddings cached in SQLite by content hash
 

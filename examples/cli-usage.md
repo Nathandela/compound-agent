@@ -1,12 +1,12 @@
 # CLI Usage Examples
 
-The learning-agent CLI provides commands for managing lessons from the terminal.
+The compound-agent CLI provides commands for managing lessons from the terminal.
 
 ## Installation
 
 ```bash
 # Install as dev dependency
-pnpm add -D learning-agent
+pnpm add -D compound-agent
 
 # Or link locally during development
 pnpm add -D ../learning_agent
@@ -20,19 +20,19 @@ Capture a lesson with the `learn` command:
 
 ```bash
 # Basic usage
-npx learning-agent learn "Use Polars instead of pandas for large datasets"
+npx ca learn "Use Polars instead of pandas for large datasets"
 
 # With a trigger (what caused you to learn this)
-npx learning-agent learn "Use Polars instead of pandas" --trigger "pandas was slow on 500MB file"
+npx ca learn "Use Polars instead of pandas" --trigger "pandas was slow on 500MB file"
 
 # With tags
-npx learning-agent learn "Use Polars instead of pandas" --tags "performance,python,data"
+npx ca learn "Use Polars instead of pandas" --tags "performance,python,data"
 
 # Skip confirmation prompt
-npx learning-agent learn "Use Polars instead of pandas" --yes
+npx ca learn "Use Polars instead of pandas" --yes
 
 # Combine all options
-npx learning-agent learn "Use Polars instead of pandas for large datasets" \
+npx ca learn "Use Polars instead of pandas for large datasets" \
   --trigger "pandas was slow on 500MB file" \
   --tags "performance,python" \
   --yes
@@ -50,13 +50,13 @@ Search lessons using SQLite FTS5 full-text search:
 
 ```bash
 # Basic search
-npx learning-agent search "pandas"
+npx ca search "pandas"
 
 # Limit results
-npx learning-agent search "pandas" --limit 5
+npx ca search "pandas" --limit 5
 
 # Search with multiple terms (OR)
-npx learning-agent search "pandas OR polars"
+npx ca search "pandas OR polars"
 ```
 
 Output:
@@ -78,10 +78,10 @@ View all stored lessons:
 
 ```bash
 # List lessons (default: 20)
-npx learning-agent list
+npx ca list
 
 # Limit results
-npx learning-agent list --limit 10
+npx ca list --limit 10
 ```
 
 Output:
@@ -107,10 +107,10 @@ Rebuild the search index from the JSONL source file:
 
 ```bash
 # Rebuild only if JSONL has changed
-npx learning-agent rebuild
+npx ca rebuild
 
 # Force rebuild
-npx learning-agent rebuild --force
+npx ca rebuild --force
 ```
 
 Output:
@@ -123,12 +123,12 @@ Index rebuilt.
 Download the nomic-embed-text model for vector search (~500MB):
 
 ```bash
-npx learning-agent download-model
+npx ca download-model
 ```
 
 Output:
 ```
-Model path: /Users/you/.cache/learning-agent/models/nomic-embed-text-v1.5.Q4_K_M.gguf
+Model path: /Users/you/.cache/compound-agent/models/nomic-embed-text-v1.5.Q4_K_M.gguf
 Downloading nomic-embed-text-v1.5...
 Model ready.
 ```
@@ -137,11 +137,11 @@ Model ready.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `LEARNING_AGENT_ROOT` | Repository root path | `process.cwd()` |
+| `COMPOUND_AGENT_ROOT` | Repository root path | `process.cwd()` |
 
 Example:
 ```bash
-LEARNING_AGENT_ROOT=/path/to/repo npx learning-agent list
+COMPOUND_AGENT_ROOT=/path/to/repo npx ca list
 ```
 
 ## File Locations
@@ -150,7 +150,7 @@ LEARNING_AGENT_ROOT=/path/to/repo npx learning-agent list
 |------|---------|-------------|
 | `.claude/lessons/index.jsonl` | Lesson storage (source of truth) | Yes |
 | `.claude/.cache/lessons.sqlite` | Search index (rebuildable) | No |
-| `~/.cache/learning-agent/models/` | Embedding model | No |
+| `~/.cache/compound-agent/models/` | Embedding model | No |
 
 ## Integration with Claude Code
 
@@ -159,8 +159,8 @@ Add to your `.claude/settings.json`:
 ```json
 {
   "hooks": {
-    "session_start": "npx learning-agent load-session",
-    "pre_tool": "npx learning-agent check-plan"
+    "session_start": "npx ca load-session",
+    "pre_tool": "npx ca check-plan"
   }
 }
 ```

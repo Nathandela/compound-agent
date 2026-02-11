@@ -8,8 +8,8 @@ For detailed project rules and TDD workflow, see `.claude/CLAUDE.md`.
 
 ## Project Overview
 
-**Name**: Learning Agent
-**Purpose**: Repository-scoped learning system that helps Claude Code avoid repeating mistakes across sessions
+**Name**: Compound Agent
+**Purpose**: Semantically-intelligent workflow plugin that helps Claude Code avoid repeating mistakes across sessions
 **Type**: TypeScript library, deployable as dev dependency
 **Package Manager**: pnpm
 
@@ -24,13 +24,15 @@ For detailed project rules and TDD workflow, see `.claude/CLAUDE.md`.
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Types/Schemas | `src/types.ts` | Zod schemas for Lesson and LessonRecord (with legacy tombstone compatibility) |
-| Storage | `src/storage/` | JSONL append-only + SQLite FTS5 index |
-| Embeddings | `src/embeddings/` | node-llama-cpp with nomic model |
-| Search | `src/search/` | Vector similarity + ranking with boosts |
-| Capture | `src/capture/` | Trigger detection + quality filters |
-| Retrieval | `src/retrieval/` | Session-start and plan-time retrieval |
-| CLI | `src/cli.ts` | Commander.js commands |
+| Types/Schemas | `src/memory/types.ts` | Zod schemas for Lesson and LessonRecord |
+| Storage | `src/memory/storage/` | JSONL append-only + SQLite FTS5 index |
+| Embeddings | `src/memory/embeddings/` | node-llama-cpp with nomic model |
+| Search | `src/memory/search/` | Vector similarity + ranking with boosts |
+| Capture | `src/memory/capture/` | Trigger detection + quality filters |
+| Retrieval | `src/memory/retrieval/` | Session-start and plan-time retrieval |
+| Setup | `src/setup/` | Init, hooks, templates, Claude integration |
+| Commands | `src/commands/` | CLI command registrations |
+| CLI | `src/cli.ts` | Commander.js entry point |
 | Public API | `src/index.ts` | All exports for library consumers |
 
 ### Architecture
@@ -43,7 +45,7 @@ For detailed project rules and TDD workflow, see `.claude/CLAUDE.md`.
   .cache/
     lessons.sqlite              <- Rebuildable index (.gitignore)
 
-~/.cache/learning-agent/models/ <- Global embedding model cache
+~/.cache/compound-agent/models/ <- Global embedding model cache
 ```
 
 ---
@@ -121,11 +123,12 @@ node ./dist/cli.js download-model   # Download nomic-embed-text model
 ### Module Boundaries
 
 Each module exports through its `index.ts`:
-- `src/storage/index.ts` - Storage operations
-- `src/embeddings/index.ts` - Embedding operations
-- `src/search/index.ts` - Search operations
-- `src/capture/index.ts` - Capture operations
-- `src/retrieval/index.ts` - Retrieval operations
+- `src/memory/storage/index.ts` - Storage operations
+- `src/memory/embeddings/index.ts` - Embedding operations
+- `src/memory/search/index.ts` - Search operations
+- `src/memory/capture/index.ts` - Capture operations
+- `src/memory/retrieval/index.ts` - Retrieval operations
+- `src/setup/index.ts` - Setup command registrations
 
 ---
 
@@ -288,9 +291,28 @@ Tests check `SKIP_EMBEDDING_TESTS` environment variable:
 
 ---
 
-## Using Learning Agent (Claude Integration)
+## Compound Agent Integration
 
-This section explains HOW and WHEN Claude should interact with the learning-agent system.
+This section explains HOW and WHEN Claude should interact with the compound-agent memory system.
+
+### MCP Tools (Primary)
+
+| Tool | Purpose |
+|------|---------|
+| `memory_search` | Search lessons by query (semantic + keyword) |
+| `memory_capture` | Capture a new lesson after user confirmation |
+
+MCP tools are the preferred interface. Use CLI only as fallback.
+
+### CLI (fallback only)
+
+| Command | Purpose |
+|---------|---------|
+| `npx ca prime` | Load session context (high-severity lessons) |
+| `npx ca search <query>` | Search lessons |
+| `npx ca learn --trigger "..." --insight "..."` | Capture a lesson |
+| `npx ca list` | List all lessons |
+| `npx ca stats` | Database health |
 
 ### Core Principle
 
@@ -301,61 +323,19 @@ This section explains HOW and WHEN Claude should interact with the learning-agen
 
 ---
 
-### 1. Lesson Retrieval Flow
+### Mandatory Recall
 
-#### Session Start (Automatic)
+#### Session Start (Automatic via hooks)
 
-When a new session begins, load high-severity lessons:
+`npx ca prime` runs automatically via `.claude/plugin.json` hooks at SessionStart and PreCompact.
 
-```bash
-npx learning-agent load-session --json
-```
+#### Before Architectural Decisions
 
-**What to do with results:**
-- Inject high-severity lessons into context
-- These are critical lessons that should always be visible
-- Format: Short summary in session preamble
-
-**Output example:**
-```json
-{
-  "lessons": [
-    {"id": "abc12", "insight": "Use Polars not pandas for files >100MB", "source": "user_correction"}
-  ],
-  "count": 1
-}
-```
-
-#### Plan-Time Retrieval (On Plan Creation)
-
-When creating or reviewing a plan, retrieve semantically relevant lessons:
-
-```bash
-echo "Add authentication with JWT tokens" | npx learning-agent check-plan --json
-# OR
-npx learning-agent check-plan --plan "Add authentication with JWT tokens" --json
-```
-
-**What to do with results:**
-- Display as "Lessons Check" after the plan
-- Consider each lesson while implementing
-- Lessons are ranked by rankScore (combined relevance + boosts)
-
-**Output example:**
-```json
-{
-  "lessons": [
-    {"id": "xyz34", "insight": "JWT tokens need X-Request-ID header", "rankScore": 0.87, "source": "test_failure"}
-  ],
-  "count": 1
-}
-```
-
-**Important:** No per-tool retrieval. All context injection happens at plan time only.
+Before making architectural decisions or choosing between approaches, use `memory_search` to check for relevant past lessons.
 
 ---
 
-### 2. Lesson Capture Flow
+### Lesson Capture Flow
 
 #### Trigger Detection
 
@@ -378,182 +358,52 @@ Before proposing ANY lesson, verify ALL THREE criteria:
 [ ] Is this ACTIONABLE? - Obvious what to do differently
 ```
 
-**If ANY check fails → DO NOT propose the lesson.**
+**If ANY check fails -> DO NOT propose the lesson.**
 
 #### Confirmation UX
 
-When proposing a lesson, describe what you learned and ask for confirmation:
-
 ```
 Learned: [insight]. Confirm to save?
-```
-
-**Examples:**
-```
-Learned: Use Polars for files >100MB instead of pandas. Confirm to save?
-```
-
-```
-Learned: API v2 requires X-Request-ID header. Confirm to save?
 ```
 
 **Rules:**
 - Keep insight concise (one sentence)
 - User must explicitly confirm with "yes" or similar
 - Silence or other response = do not save
-- After confirmation, use `lesson_capture` MCP tool (preferred) or CLI with `--yes`
-
-#### Capture Command
-
-After user confirms, save the lesson:
-
-```bash
-npx learning-agent capture \
-  --trigger "Used pandas for 500MB file, was too slow" \
-  --insight "Use Polars for files >100MB" \
-  --yes --json
-```
-
-**From input file (auto-detect trigger):**
-```bash
-npx learning-agent capture --input conversation.json --yes --json
-```
+- After confirmation, use `memory_capture` MCP tool (preferred) or `npx ca learn --yes`
 
 ---
 
-### 3. Session-End Protocol (Compound Check)
+### Never Edit JSONL Directly
 
-At the end of a task, run a parallel reflection to propose lessons while context is fresh.
+**WARNING: NEVER directly edit `.claude/lessons/index.jsonl`.**
 
-#### When to Run
-
-**Preconditions (ALL must be true):**
-- Problem was solved
-- Solution verified (user confirmed OR tests pass)
-- Non-trivial work was done
-
-#### Reflection Process
-
-Run these checks in parallel:
-
-1. **Context Analysis**: Summarize plan + tool calls + git diff + test output
-2. **Mistake/Lesson Extraction**: Identify missteps, corrections, and fixes
-3. **Related/Contradiction Check**: Link related lessons, mark supersedes
-4. **Prevention Strategy**: Turn lessons into actionable guidance
-5. **Classification**: Quick vs Full lesson, severity level
-6. **Proposal**: Propose lessons that pass quality gate
-
-#### Output
-
-Only propose lessons that pass the quality filter. Use the standard confirmation UX:
-
-```
-Session complete. Reflecting on lessons learned...
-
-Learned: Always verify API version before integration. Confirm to save?
-```
+Direct edits bypass schema validation, embedding sync, and SQLite index updates. Always use:
+1. `memory_capture` MCP tool (preferred)
+2. `npx ca learn` CLI (fallback)
 
 ---
 
-### 4. CLI Quick Reference
-
-| Command | Purpose | When to Use |
-|---------|---------|-------------|
-| `load-session` | Load high-severity lessons | Session start |
-| `check-plan --plan "..."` | Retrieve lessons for plan | Plan creation |
-| `capture --trigger "..." --insight "..."` | Save confirmed lesson | After user confirms |
-| `search <query>` | Search lessons by keyword | Manual lookup |
-| `list` | List all lessons | Debug/review |
-| `stats` | Show database health | Diagnostics |
-
-**Common flags:**
-- `--json` - Machine-readable output (use in hooks)
-- `--quiet` - Suppress non-essential output
-- `-n, --limit <N>` - Limit results
-
----
-
-### 5. Integration Points
-
-#### Claude Code Hooks
-
-Learning-agent integrates via Claude Code hooks:
-
-```yaml
-# .claude/hooks.yml (example)
-hooks:
-  session_start:
-    - command: "npx learning-agent load-session --json"
-      inject: context
-
-  plan_created:
-    - command: "npx learning-agent check-plan --json"
-      inject: after_plan
-```
-
-#### CLAUDE.md Integration
-
-Reference learning-agent in project CLAUDE.md:
-
-```markdown
-## Learning Agent
-
-This project uses learning-agent for session memory.
-- Lessons loaded at session start (high-severity)
-- Lessons checked at plan time (semantic search)
-- Compound check at task end
-
-See `.claude/lessons/` for lesson history.
-```
-
----
-
-### 6. Anti-Patterns (DO NOT)
+### Anti-Patterns (DO NOT)
 
 | Pattern | Why It's Wrong |
 |---------|----------------|
 | Propose vague lessons | "Write better code" is not actionable |
 | Auto-save without confirmation | User must explicitly confirm |
-| Retrieve per-tool | Too noisy, plan-time only |
 | Ignore quality gate | Leads to lesson database bloat |
 | Propose every correction | Most corrections don't need lessons |
-| Skip compound check | Misses valuable end-of-task insights |
+| Edit index.jsonl directly | Breaks schema/validation/sync |
 
 ---
 
-### 7. Example Session Flow
+### Setup
 
-```
-SESSION START
-├─ load-session --json
-│   └─ [2 high-severity lessons injected]
-│
-├─ User: "Add JWT authentication"
-│
-PLAN CREATED
-├─ check-plan --plan "Add JWT authentication" --json
-│   └─ [1 relevant lesson: "JWT needs X-Request-ID header"]
-│
-├─ Display: "## Lessons Check
-│            1. JWT needs X-Request-ID header (rankScore: 0.87)"
-│
-IMPLEMENTATION
-├─ [Claude implements with lesson in mind]
-├─ User: "Actually, use RS256 not HS256"
-│
-TRIGGER DETECTED (user correction)
-├─ Quality check: Novel? Yes. Specific? Yes. Actionable? Yes.
-├─ Display: "Learned: Use RS256 algorithm for JWT signing. Confirm to save?"
-├─ User: "yes"
-├─ [Claude calls lesson_capture MCP tool or capture --yes]
-│
-TASK COMPLETE
-├─ Compound check (parallel reflection)
-├─ No additional lessons pass quality gate
-│
-SESSION END
-└─ [No pending lessons]
-```
+Run `npx ca init` in a project root to configure:
+- `.claude/plugin.json` - Hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUse)
+- `AGENTS.md` - Agent instructions
+- `.claude/CLAUDE.md` - Project reference
+- `.claude/commands/` - Slash commands (/learn, /show, /wrong, /stats)
+- Pre-commit hook - Capture reminder
 
 ---
 

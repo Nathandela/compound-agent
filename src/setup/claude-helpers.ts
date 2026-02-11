@@ -89,7 +89,7 @@ export function addCompoundAgentHook(settings: Record<string, unknown>): void {
 }
 
 /**
- * Add all v0.2.8 hooks: SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse.
+ * Add all hooks: SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse.
  * Note: PreCommit is handled by git hooks, not Claude Code hooks.
  */
 export function addAllCompoundAgentHooks(settings: Record<string, unknown>): void {
@@ -114,7 +114,7 @@ export function addAllCompoundAgentHooks(settings: Record<string, unknown>): voi
     hooks.PreCompact.push(CLAUDE_PRECOMPACT_HOOK_CONFIG);
   }
 
-  // UserPromptSubmit - gentle lesson tool reminders (v0.2.8)
+  // UserPromptSubmit - gentle lesson tool reminders
   if (!hooks.UserPromptSubmit) {
     hooks.UserPromptSubmit = [];
   }
@@ -122,7 +122,7 @@ export function addAllCompoundAgentHooks(settings: Record<string, unknown>): voi
     hooks.UserPromptSubmit.push(CLAUDE_USER_PROMPT_HOOK_CONFIG);
   }
 
-  // PostToolUseFailure - smart failure detection (v0.2.8)
+  // PostToolUseFailure - smart failure detection
   if (!hooks.PostToolUseFailure) {
     hooks.PostToolUseFailure = [];
   }
@@ -130,7 +130,7 @@ export function addAllCompoundAgentHooks(settings: Record<string, unknown>): voi
     hooks.PostToolUseFailure.push(CLAUDE_POST_TOOL_FAILURE_HOOK_CONFIG);
   }
 
-  // PostToolUse - reset failure state on success (v0.2.8)
+  // PostToolUse - reset failure state on success
   if (!hooks.PostToolUse) {
     hooks.PostToolUse = [];
   }

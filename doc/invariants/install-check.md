@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Detect and report invalid installations of learning-agent when installed from GitHub URL instead of npm registry.
+Detect and report invalid installations of compound-agent when installed from GitHub URL instead of npm registry.
 
-**Problem**: When users install via `pnpm add -D github:user/learning-agent`, they get source code WITHOUT the compiled `dist/` directory, causing all CLI commands (hooks, load-session, etc.) to fail with "Cannot find module './dist/cli.js'".
+**Problem**: When users install via `pnpm add -D github:user/compound-agent`, they get source code WITHOUT the compiled `dist/` directory, causing all CLI commands (hooks, load-session, etc.) to fail with "Cannot find module './dist/cli.js'".
 
 **Solution**: Provide utilities to detect invalid installations and guide users toward correct installation method.
 
@@ -61,12 +61,12 @@ D6: All paths use path.join() for cross-platform compatibility (never string con
 **Test Strategy**:
 - Missing dist/: reason mentions GitHub URL installation
 - Missing cli.js: reason mentions missing build output
-- Verify reason includes correct command: `pnpm add -D learning-agent`
+- Verify reason includes correct command: `pnpm add -D compound-agent`
 - Check reason does NOT blame user's project setup
 
 **Expected reason format**:
 ```
-"Invalid installation: learning-agent was installed from GitHub URL without compiled output. Install from npm registry instead: pnpm add -D learning-agent"
+"Invalid installation: compound-agent was installed from GitHub URL without compiled output. Install from npm registry instead: pnpm add -D compound-agent"
 ```
 
 ---
@@ -176,7 +176,7 @@ D6: All paths use path.join() for cross-platform compatibility (never string con
 **Expected**: checkInstallation().valid = false, reason mentions missing cli.js
 
 ### Case 2: Package installed as dependency of dependency
-**Scenario**: learning-agent installed transitively (not direct devDependency)
+**Scenario**: compound-agent installed transitively (not direct devDependency)
 **Expected**: Detection still works (uses relative paths from package root)
 
 ### Case 3: Symlinked installation (pnpm)
@@ -188,7 +188,7 @@ D6: All paths use path.join() for cross-platform compatibility (never string con
 **Expected**: Detection resolves package root correctly via package.json
 
 ### Case 5: Global installation
-**Scenario**: npx learning-agent (global cache install)
+**Scenario**: npx compound-agent (global cache install)
 **Expected**: Detection works; global installs use npm registry (include dist/)
 
 ### Case 6: Corrupted dist/ (partial build)
@@ -211,8 +211,8 @@ D6: All paths use path.join() for cross-platform compatibility (never string con
 ```typescript
 {
   valid: true,
-  distPath: "/path/to/node_modules/learning-agent/dist",
-  cliPath: "/path/to/node_modules/learning-agent/dist/cli.js"
+  distPath: "/path/to/node_modules/compound-agent/dist",
+  cliPath: "/path/to/node_modules/compound-agent/dist/cli.js"
 }
 ```
 
@@ -221,9 +221,9 @@ OR
 ```typescript
 {
   valid: false,
-  reason: "Invalid installation: learning-agent was installed from GitHub URL without compiled output. Install from npm registry instead: pnpm add -D learning-agent",
-  distPath: "/path/to/node_modules/learning-agent/dist",
-  cliPath: "/path/to/node_modules/learning-agent/dist/cli.js"
+  reason: "Invalid installation: compound-agent was installed from GitHub URL without compiled output. Install from npm registry instead: pnpm add -D compound-agent",
+  distPath: "/path/to/node_modules/compound-agent/dist",
+  cliPath: "/path/to/node_modules/compound-agent/dist/cli.js"
 }
 ```
 
@@ -264,11 +264,11 @@ assertValidInstall(); // Dies here if invalid
 **Rationale**: Catch invalid installs before any commands run
 
 ### src/commands/setup/hooks.ts (Git hook installation)
-**Invariant**: Hook scripts call CLI via `npx lna`, which triggers assertValidInstall()
+**Invariant**: Hook scripts call CLI via `npx ca`, which triggers assertValidInstall()
 **Rationale**: Hooks fail early with clear error if invalid install
 
-### src/commands/setup/templates.ts (LEARNING_AGENT_HOOK_BLOCK)
-**Invariant**: Hook template uses `npx lna hooks run pre-commit`
+### src/commands/setup/templates.ts (COMPOUND_AGENT_HOOK_BLOCK)
+**Invariant**: Hook template uses `npx ca hooks run pre-commit`
 **Rationale**: npx resolves to installed package, which includes install check
 
 ### package.json bin field
@@ -276,8 +276,8 @@ assertValidInstall(); // Dies here if invalid
 ```json
 {
   "bin": {
-    "learning-agent": "./dist/cli.js",
-    "lna": "./dist/cli.js"
+    "compound-agent": "./dist/cli.js",
+    "ca": "./dist/cli.js"
   }
 }
 ```
@@ -314,7 +314,7 @@ const cliExists = existsSync(cliPath);
 if (!distExists || !cliExists) {
   return {
     valid: false,
-    reason: "Invalid installation: learning-agent was installed from GitHub URL...",
+    reason: "Invalid installation: compound-agent was installed from GitHub URL...",
     distPath,
     cliPath
   };

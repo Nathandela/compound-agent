@@ -105,7 +105,7 @@ See `doc/invariants/sqlite_graceful_degradation_invariants.md` for complete spec
 
 ## References
 
-- **Issue**: learning_agent-2f0 - Fix better-sqlite3 native bindings error
+- **Issue**: compound_agent-2f0 - Fix better-sqlite3 native bindings error
 - **Invariants**: `doc/invariants/sqlite_graceful_degradation_invariants.md`
 - **Pattern reference**: `src/types.test.ts` (existing property-based tests)
 - **Fast-check docs**: https://fast-check.dev/

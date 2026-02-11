@@ -2,6 +2,8 @@
  * Templates and constants for setup commands.
  */
 
+import { VERSION } from '../index.js';
+
 // ============================================================================
 // Hooks Constants
 // ============================================================================
@@ -286,7 +288,7 @@ npx ca stats
 export const PLUGIN_MANIFEST = {
   name: 'compound-agent',
   description: 'Session memory for Claude Code - capture and retrieve lessons',
-  version: '0.2.8',
+  version: VERSION,
   author: {
     name: 'Nathan Delacrétaz',
     url: 'https://github.com/Nathandela',

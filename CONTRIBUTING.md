@@ -1,6 +1,6 @@
-# Contributing to Learning Agent
+# Contributing to Compound Agent
 
-Thank you for your interest in contributing to Learning Agent! This document outlines the development workflow and standards for the project.
+Thank you for your interest in contributing to Compound Agent! This document outlines the development workflow and standards for the project.
 
 ## Development Setup
 

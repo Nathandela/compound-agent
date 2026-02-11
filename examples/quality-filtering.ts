@@ -1,12 +1,12 @@
 /**
- * Quality filtering example for learning-agent
+ * Quality filtering example for compound-agent
  *
  * Demonstrates:
  * - Using shouldPropose() to check if a lesson is worth capturing
  * - Using isNovel(), isSpecific(), isActionable() individually
  *
  * When installed as dependency, use:
- *   import { ... } from 'learning-agent';
+ *   import { ... } from 'compound-agent';
  */
 
 import { shouldPropose, isNovel, isSpecific, isActionable } from '../dist/index.js';

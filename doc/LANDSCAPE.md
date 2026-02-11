@@ -381,13 +381,13 @@ DISASTER ←──────────────────────�
 
 1. **Add citation tracking**: Store which file/line triggered each lesson. Validate on retrieval.
 
-2. **Add feedback mechanism**: CLI command `lna wrong <lesson-id>` to mark lessons that caused problems.
+2. **Add feedback mechanism**: CLI command `ca wrong <lesson-id>` to mark lessons that caused problems.
 
 3. **Implement temporal validity**: Lessons should have optional expiry or "verify after" dates.
 
 4. **Reduce injection volume**: Research suggests 3-5 lessons total, not 6-10.
 
-5. **Rename it**: "Learning Agent" implies something it can't deliver. Consider "Lesson Injection System" or "Context Enhancement Tool."
+5. **Rename it**: "Compound Agent" implies something it can't deliver. Consider "Lesson Injection System" or "Context Enhancement Tool."
 
 ### If We Pivot (Simpler Path)
 
@@ -542,7 +542,7 @@ _Add comments here..._
 
 ## Foundational References
 
-These three projects directly inspired the Learning Agent design:
+These three projects directly inspired the Compound Agent design:
 
 | Project | Influence |
 |---------|-----------|

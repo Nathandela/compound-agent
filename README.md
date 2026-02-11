@@ -1,4 +1,4 @@
-# Learning Agent
+# Compound Agent
 
 A repository-scoped learning system that helps Claude Code avoid repeating mistakes across sessions. Captures lessons from corrections and retrieves them when relevant.
 
@@ -9,19 +9,19 @@ Claude Code forgets lessons between sessions. This leads to:
 - Users re-explaining preferences
 - No memory of what worked or failed
 
-Learning Agent solves this by capturing lessons when corrections happen and retrieving relevant ones at session start and plan time.
+Compound Agent solves this by capturing lessons when corrections happen and retrieving relevant ones at session start and plan time.
 
 ## Installation
 
 ```bash
 # Using pnpm (recommended)
-pnpm add -D learning-agent
+pnpm add -D compound-agent
 
 # Using npm
-npm install --save-dev learning-agent
+npm install --save-dev compound-agent
 ```
 
-> **Warning**: Do NOT install from GitHub URL (e.g., `pnpm add github:user/learning-agent`).
+> **Warning**: Do NOT install from GitHub URL (e.g., `pnpm add github:user/compound-agent`).
 > GitHub installs don't include the compiled `dist/` folder, which will cause all CLI
 > commands and hooks to fail. Always install from npm registry as shown above.
 
@@ -30,7 +30,7 @@ npm install --save-dev learning-agent
 After installation, run the setup command to configure everything:
 
 ```bash
-npx lna setup
+npx ca setup
 ```
 
 This single command:
@@ -44,7 +44,7 @@ This single command:
 To skip the model download (if you'll do it later):
 
 ```bash
-npx lna setup --skip-model
+npx ca setup --skip-model
 ```
 
 ### Requirements
@@ -154,41 +154,41 @@ project_root/
 pnpm learn "Use Polars for large files, not pandas"
 
 # Capture with citation (file:line provenance)
-learning-agent learn "API requires auth header" --citation src/api.ts:42
+ca learn "API requires auth header" --citation src/api.ts:42
 
 # Search lessons
-learning-agent search "data processing"
+ca search "data processing"
 
 # List all lessons
-learning-agent list
+ca list
 
 # List only invalidated lessons
-learning-agent list --invalidated
+ca list --invalidated
 
 # Mark a lesson as wrong/invalid
-learning-agent wrong L12345678 --reason "This advice was incorrect"
+ca wrong L12345678 --reason "This advice was incorrect"
 
 # Re-enable an invalidated lesson
-learning-agent validate L12345678
+ca validate L12345678
 
 # Show database stats (includes age distribution)
-learning-agent stats
+ca stats
 
 # Rebuild index from JSONL
-learning-agent rebuild
+ca rebuild
 
 # Compact and archive old lessons
-learning-agent compact
+ca compact
 ```
 
 ## Claude Code Integration
 
 ### Automatic Setup (Recommended)
 
-The `lna setup` command configures everything automatically:
+The `ca setup` command configures everything automatically:
 
 ```bash
-npx lna setup
+npx ca setup
 ```
 
 This installs:
@@ -208,7 +208,7 @@ If you prefer to configure hooks manually, add to `.claude/settings.json`:
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "npx lna prime 2>/dev/null || true" }
+          { "type": "command", "command": "npx ca prime 2>/dev/null || true" }
         ]
       }
     ],
@@ -216,21 +216,21 @@ If you prefer to configure hooks manually, add to `.claude/settings.json`:
       {
         "matcher": "",
         "hooks": [
-          { "type": "command", "command": "npx lna prime 2>/dev/null || true" }
+          { "type": "command", "command": "npx ca prime 2>/dev/null || true" }
         ]
       }
     ]
   },
   "mcpServers": {
-    "learning-agent": {
+    "compound-agent": {
       "command": "npx",
-      "args": ["learning-agent-mcp"]
+      "args": ["compound-agent-mcp"]
     }
   }
 }
 ```
 
-The git pre-commit hook is installed separately via `npx lna init` and runs `lna remind-capture` before commits.
+The git pre-commit hook is installed separately via `npx ca init` and runs `ca remind-capture` before commits.
 ```
 
 ### MCP Tools
@@ -251,13 +251,13 @@ The git pre-commit hook is installed separately via `npx lna init` and runs `lna
 
 ```bash
 # Check integration status
-npx lna setup claude --status
+npx ca setup claude --status
 
 # Remove hooks
-npx lna setup claude --uninstall
+npx ca setup claude --uninstall
 
 # Preview changes
-npx lna setup claude --dry-run
+npx ca setup claude --dry-run
 ```
 
 ## API Reference
@@ -279,7 +279,7 @@ import {
 
   // Types
   type Lesson, LessonSchema, generateId,
-} from 'learning-agent';
+} from 'compound-agent';
 ```
 
 See [examples/](examples/) for usage examples.

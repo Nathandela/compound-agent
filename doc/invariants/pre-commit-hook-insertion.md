@@ -4,9 +4,9 @@
 
 ### Problem Statement
 
-When appending the Learning Agent hook to an existing git pre-commit hook, the code must be inserted BEFORE any exit statements that would terminate execution. Currently, the code blindly appends to the end of the file, causing the Learning Agent hook to be unreachable if the existing hook contains exit statements.
+When appending the Compound Agent hook to an existing git pre-commit hook, the code must be inserted BEFORE any exit statements that would terminate execution. Currently, the code blindly appends to the end of the file, causing the Compound Agent hook to be unreachable if the existing hook contains exit statements.
 
-### Edge Cases Identified (from issue learning_agent-cfe)
+### Edge Cases Identified (from issue compound_agent-cfe)
 
 1. Exit inside function definition (don't insert there)
 2. Exit in heredoc/string (don't insert there)
@@ -28,11 +28,11 @@ When appending the Learning Agent hook to an existing git pre-commit hook, the c
   - Must be valid UTF-8 text
 - **Rationale**: Git requires hooks to be executable shell scripts
 
-### DI-2: Learning Agent Hook Block
-- **Field**: `LEARNING_AGENT_HOOK_BLOCK` constant
+### DI-2: Compound Agent Hook Block
+- **Field**: `COMPOUND_AGENT_HOOK_BLOCK` constant
 - **Type**: String containing shell script fragment
 - **Constraints**:
-  - Must include unique marker comment: `# Learning Agent pre-commit hook`
+  - Must include unique marker comment: `# Compound Agent pre-commit hook`
   - Must be valid shell syntax when appended to any valid shell script
   - Must not introduce syntax errors (balanced quotes, proper line endings)
 - **Rationale**: Used for idempotency check and safe insertion
@@ -51,7 +51,7 @@ When appending the Learning Agent hook to an existing git pre-commit hook, the c
 - **Type**: String
 - **Constraints**:
   - Original content must remain byte-for-byte identical
-  - Only addition is Learning Agent block + preceding newline
+  - Only addition is Compound Agent block + preceding newline
   - Line order preserved (insertion, not replacement)
 - **Rationale**: Non-destructive modification ensures existing hooks continue to work
 
@@ -68,7 +68,7 @@ When appending the Learning Agent hook to an existing git pre-commit hook, the c
 ## Safety Properties (Must NEVER Happen)
 
 ### S1: Unreachable Hook Code
-**Property**: The Learning Agent hook code must NEVER be inserted after a top-level exit statement that would prevent it from executing.
+**Property**: The Compound Agent hook code must NEVER be inserted after a top-level exit statement that would prevent it from executing.
 
 **Why this matters**: If the hook is unreachable, users won't see lesson capture reminders, defeating the entire purpose of the hook.
 
@@ -127,14 +127,14 @@ When appending the Learning Agent hook to an existing git pre-commit hook, the c
   - Empty hooks
 
 ### S4: Duplicate Insertion
-**Property**: Running the installation twice must NEVER result in duplicate Learning Agent blocks.
+**Property**: Running the installation twice must NEVER result in duplicate Compound Agent blocks.
 
 **Why this matters**: Duplicate blocks would cause redundant prompts and slower hook execution.
 
 **Test strategy**:
 - Run installation twice on same hook
 - Verify marker appears exactly once
-- Count occurrences of `npx learning-agent hooks run pre-commit`
+- Count occurrences of `npx ca hooks run pre-commit`
 
 ### S5: Permission Loss
 **Property**: The hook file must NEVER lose executable permissions after modification.
@@ -326,7 +326,7 @@ Given the complexity of parsing shell scripts correctly (requires full shell par
 
 Every test must verify:
 1. **Syntax validity**: `sh -n <file>` passes
-2. **Reachability**: Learning Agent line appears before first `exit` (line number check)
+2. **Reachability**: Compound Agent line appears before first `exit` (line number check)
 3. **Idempotency**: Second run doesn't modify file
 4. **Preservation**: Original lines unchanged (diff check)
 5. **Executability**: File has 0o755 permissions
@@ -363,9 +363,9 @@ One test per edge case (EC1-EC10) listed above.
 ### Integration Tests
 
 1. Create real git repo with various hook configurations
-2. Run `npx learning-agent init`
+2. Run `npx ca init`
 3. Manually trigger pre-commit hook
-4. Verify Learning Agent prompt appears
+4. Verify Compound Agent prompt appears
 
 ---
 
@@ -384,6 +384,6 @@ Implementation is COMPLETE when:
 
 ## References
 
-- **Issue**: learning_agent-cfe
+- **Issue**: compound_agent-cfe
 - **Current Implementation**: `src/cli.ts:470-502` (installPreCommitHook)
 - **Test File**: `src/cli.test.ts:1674-1944` (init command tests)

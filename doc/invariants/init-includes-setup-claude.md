@@ -3,7 +3,7 @@
 ## Module: CLI Command `init`
 
 ### Purpose
-Initialize learning-agent in a repository with a single command that sets up:
+Initialize compound-agent in a repository with a single command that sets up:
 - Lessons directory structure (.claude/lessons/)
 - AGENTS.md integration documentation
 - Git pre-commit hooks
@@ -89,7 +89,7 @@ Initialize learning-agent in a repository with a single command that sets up:
 - Uses `getClaudeSettingsPath(false)` for project-local path
 - Uses `readClaudeSettings()` to load existing settings
 - Uses `hasClaudeHook()` to detect existing hooks
-- Uses `addLearningAgentHook()` to insert hook
+- Uses `addCompoundAgentHook()` to insert hook
 - Uses `writeClaudeSettings()` for atomic write
 - NO code duplication from `setup claude` command
 
@@ -233,7 +233,7 @@ Initialize learning-agent in a repository with a single command that sets up:
 ```
 [ok] Learning agent initialized
   Lessons directory: .claude/lessons
-  AGENTS.md: Updated with Learning Agent section
+  AGENTS.md: Updated with Compound Agent section
   Git hooks: pre-commit hook installed
   Claude Code hooks: Installed to .claude/settings.json
 ```
@@ -300,11 +300,11 @@ Initialize learning-agent in a repository with a single command that sets up:
 **Invariant**: `init` is equivalent to running these commands:
 ```bash
 # These three commands:
-npx learning-agent init --skip-claude
-npx learning-agent setup claude
+npx ca init --skip-claude
+npx ca setup claude
 
 # Are equivalent to:
-npx learning-agent init
+npx ca init
 ```
 
 **Verification**: Integration test comparing state after both sequences
@@ -337,14 +337,14 @@ This feature is additive and backward-compatible:
 Users upgrading from previous versions:
 ```bash
 # Old workflow (two commands)
-npx learning-agent@0.2.0 init
-npx learning-agent@0.2.0 setup claude
+npx ca@0.2.0 init
+npx ca@0.2.0 setup claude
 
 # New workflow (single command)
-npx learning-agent@0.2.1 init
+npx ca@0.2.1 init
 
 # Opt-out if desired
-npx learning-agent@0.2.1 init --skip-claude
+npx ca@0.2.1 init --skip-claude
 ```
 
 ### Documentation Updates Required
@@ -410,8 +410,8 @@ ALL of the following must be true for this feature to be complete:
 
 ## References
 
-- Feature issue: `learning_agent-gql`
-- Related epic: `learning_agent-egt` (Release v0.2.1)
+- Feature issue: `compound_agent-gql`
+- Related epic: `compound_agent-egt` (Release v0.2.1)
 - Related invariants: `doc/invariants/setup-claude-defaults.md`
 - Current init implementation: `src/cli.ts` lines 598-651
 - Setup claude implementation: `src/cli.ts` lines 687-887
@@ -428,7 +428,7 @@ To maintain DRY principle and ensure consistency:
    - `getClaudeSettingsPath(global: boolean)`
    - `readClaudeSettings(settingsPath: string)`
    - `hasClaudeHook(settings: Record<string, unknown>)`
-   - `addLearningAgentHook(settings: Record<string, unknown>)`
+   - `addCompoundAgentHook(settings: Record<string, unknown>)`
    - `writeClaudeSettings(settingsPath: string, settings: Record<string, unknown>)`
 
 2. `init` command calls these functions with `global: false` (project-local)
@@ -462,7 +462,7 @@ Match existing output format:
 ```
 [ok] Learning agent initialized
   Lessons directory: .claude/lessons
-  AGENTS.md: Updated with Learning Agent section
+  AGENTS.md: Updated with Compound Agent section
   Git hooks: pre-commit hook installed
   Claude Code hooks: Installed to .claude/settings.json
 ```

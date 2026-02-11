@@ -71,7 +71,7 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
       if (options.status) {
         const repoRoot = getRepoRoot();
         const learnMdPath = join(repoRoot, '.claude', 'commands', 'learn.md');
-        // v0.2.4: check-plan replaced by search
+        // search replaces deprecated check-plan
         const searchMdPath = join(repoRoot, '.claude', 'commands', 'search.md');
         const mcpPath = getMcpJsonPath(repoRoot);
 

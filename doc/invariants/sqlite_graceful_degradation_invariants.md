@@ -2,7 +2,7 @@
 
 ## Problem Statement
 
-When learning-agent is installed as a dependency in another project, better-sqlite3 may fail to load due to native binding compilation issues. This failure currently crashes the application.
+When compound-agent is installed as a dependency in another project, better-sqlite3 may fail to load due to native binding compilation issues. This failure currently crashes the application.
 
 **Proposed Solution**: Graceful degradation to JSONL-only mode when SQLite is unavailable.
 

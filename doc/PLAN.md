@@ -4,7 +4,7 @@
 
 Build a learning loop for Claude Code as a TypeScript pnpm package, deployable as a dev dependency to any repo.
 
-**Project**: `/Users/Nathan/Documents/Code/learning_agent/`
+**Project**: `/Users/Nathan/Documents/Code/compound_agent/`
 **Timeline**: 2.5-3 weeks
 **Stack**: TypeScript, pnpm, better-sqlite3, node-llama-cpp
 
@@ -23,7 +23,7 @@ Build a learning loop for Claude Code as a TypeScript pnpm package, deployable a
 
 **Commands**:
 ```bash
-cd /Users/Nathan/Documents/Code/learning_agent
+cd /Users/Nathan/Documents/Code/compound_agent
 pnpm init
 pnpm add -D typescript tsup vitest @types/node
 pnpm add zod commander
@@ -31,7 +31,7 @@ pnpm add zod commander
 
 **Files to create**:
 ```
-learning_agent/
+compound_agent/
 ├── package.json
 ├── tsconfig.json
 ├── tsup.config.ts
@@ -391,7 +391,7 @@ const MODEL_URL = 'https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF/re
 const MODEL_NAME = 'nomic-embed-text-v1.5.Q4_K_M.gguf';
 
 export function getModelPath(): string {
-  return path.join(os.homedir(), '.cache', 'learning-agent', 'models', MODEL_NAME);
+  return path.join(os.homedir(), '.cache', 'compound-agent', 'models', MODEL_NAME);
 }
 
 export async function ensureModel(): Promise<string> {
@@ -520,7 +520,7 @@ import { generateId } from './utils.js';
 const program = new Command();
 
 program
-  .name('learning-agent')
+  .name('compound-agent')
   .description('Learning loop for Claude Code')
   .version('0.1.0');
 
@@ -802,7 +802,7 @@ pnpm test
 ## Next Action
 
 ```bash
-cd /Users/Nathan/Documents/Code/learning_agent
+cd /Users/Nathan/Documents/Code/compound_agent
 pnpm init
 pnpm add -D typescript tsup vitest @types/node
 pnpm add zod commander better-sqlite3 node-llama-cpp

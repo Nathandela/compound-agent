@@ -43,7 +43,7 @@ describe('Setup Commands - Generated Content', () => {
 
       expect(content.name).toBe('compound-agent');
       expect(content.description).toContain('lesson');
-      expect(content.version).toMatch(/^\d+\.\d+\.\d+$/);
+      expect(content.version).toMatch(/^\d+\.\d+\.\d+(-[\w.]+)?$/);
     });
 
     it('plugin.json includes SessionStart hook', async () => {

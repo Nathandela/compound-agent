@@ -1,6 +1,6 @@
 # Architectural Decision Records
 
-This directory contains Architectural Decision Records (ADRs) for the Learning Agent project.
+This directory contains Architectural Decision Records (ADRs) for the Compound Agent project.
 
 ## What is an ADR?
 

@@ -118,7 +118,7 @@ export function registerInitCommand(program: Command): void {
           console.log('  AGENTS.md: Already has Compound Agent section');
         }
         if (slashCommandsCreated) {
-          console.log('  Slash commands: Created (/learn, /check-plan, /list, /prime)');
+          console.log('  Slash commands: Created (/learn, /show, /wrong, /stats)');
         } else if (options.skipAgents) {
           console.log('  Slash commands: Skipped (--skip-agents)');
         } else {

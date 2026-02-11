@@ -6,7 +6,7 @@
 
 ## Context
 
-The Learning Agent needs persistent storage for lessons. Storage must support:
+The Compound Agent needs persistent storage for lessons. Storage must support:
 
 - Git-friendly version control (human-readable diffs)
 - Fast full-text and vector search

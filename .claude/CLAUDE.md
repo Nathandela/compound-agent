@@ -1,9 +1,9 @@
 
-# Learning Agent - Claude Code Instructions
+# Compound Agent - Claude Code Instructions
 
 ## Project Overview
 
-**Name**: Learning Agent
+**Name**: Compound Agent
 **Goal**: Learning system that helps Claude Code avoid repeating mistakes across sessions
 **Stack**: TypeScript + pnpm (deployable as dev dependency)
 **Status**: Spec finalized, ready to implement

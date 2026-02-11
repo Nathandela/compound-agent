@@ -1,4 +1,4 @@
-# Pnpm Packaging for Learning Agent
+# Pnpm Packaging for Compound Agent
 
 > Spec ID: 0006
 > Status: Approved
@@ -7,7 +7,7 @@
 
 ## Goal
 
-Ship Learning Agent as a pnpm package (library + CLI) that developers can add to their repo with minimal friction, without Docker.
+Ship Compound Agent as a pnpm package (library + CLI) that developers can add to their repo with minimal friction, without Docker.
 
 ## Context
 
@@ -15,19 +15,19 @@ The target users are developers installing this tool on their own machines to ex
 
 ## Requirements
 
-- [x] Package can be installed with `pnpm add -D learning-agent` and used as a library via ESM imports.
-- [x] CLI is available after install as `learning-agent` (and `learn` alias) and works via `pnpm dlx learning-agent <cmd>`.
+- [x] Package can be installed with `pnpm add -D compound-agent` and used as a library via ESM imports.
+- [x] CLI is available after install as `compound-agent` (and `learn` alias) and works via `pnpm dlx compound-agent <cmd>`.
 - [x] `dist/` artifacts are the only required runtime output and are included in the published tarball.
-- [x] No postinstall scripts download the embedding model; model download is explicit (`learning-agent download-model`).
+- [x] No postinstall scripts download the embedding model; model download is explicit (`compound-agent download-model`).
 - [x] Documentation clearly describes install, build, and usage flows.
 - [x] Publish checklist is defined and verifiable with `pnpm pack` and `pnpm publish --dry-run`.
 
 ## Acceptance Criteria
 
-- [x] Given a fresh repo, when running `pnpm add -D learning-agent`, then `import { LessonSchema } from 'learning-agent'` works in ESM and resolves to `dist/index.js` and `dist/index.d.ts`.
-- [x] Given a fresh repo, when running `pnpm dlx learning-agent --help`, then CLI help prints and exits with code 0.
+- [x] Given a fresh repo, when running `pnpm add -D compound-agent`, then `import { LessonSchema } from 'compound-agent'` works in ESM and resolves to `dist/index.js` and `dist/index.d.ts`.
+- [x] Given a fresh repo, when running `pnpm dlx compound-agent --help`, then CLI help prints and exits with code 0.
 - [x] Given `pnpm pack`, when inspecting the tarball, then it includes `dist/` and excludes source, tests, and local caches.
-- [x] Given a machine without a downloaded model, when running `learning-agent search`, then a clear error instructs to run `learning-agent download-model`.
+- [x] Given a machine without a downloaded model, when running `compound-agent search`, then a clear error instructs to run `compound-agent download-model`.
 - [x] Given `pnpm publish --dry-run`, then the output matches the intended file list and no large binary model file is included.
 
 ## Edge Cases
@@ -82,4 +82,4 @@ The target users are developers installing this tool on their own machines to ex
 - [x] Code reviewed
 - [x] Documentation updated (README and CONTRIBUTING references)
 - [x] No regressions in existing tests
-- [x] Spec approved (implementation in learning_agent-3uc)
+- [x] Spec approved (implementation in compound_agent-3uc)

@@ -1,6 +1,6 @@
 # Invariants for CLI Severity Flag Feature
 
-**Issue**: learning_agent-s92 - CRITICAL: No way to create high-severity lessons via CLI
+**Issue**: compound_agent-s92 - CRITICAL: No way to create high-severity lessons via CLI
 
 ## Module Overview
 

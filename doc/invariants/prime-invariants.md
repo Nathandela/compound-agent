@@ -2,11 +2,11 @@
 
 ## Purpose
 
-The `prime` command generates trust language guidelines for Claude Code that include high-severity lessons from the learning agent. This document defines the invariants that the output MUST maintain using Lamport's safety/liveness framework.
+The `prime` command generates trust language guidelines for Claude Code that include high-severity lessons from the compound agent. This document defines the invariants that the output MUST maintain using Lamport's safety/liveness framework.
 
 ## Module Overview
 
-**Command**: `npx lna prime`
+**Command**: `npx ca prime`
 
 **Inputs**:
 - Repository root directory (implicit)
@@ -60,7 +60,7 @@ Trust language section MUST include:
 
 **Workflow**:
 1. User corrects you
-2. Capture lesson: `lna learn "insight"`
+2. Capture lesson: `ca learn "insight"`
 3. Lesson loads automatically next session
 
 NEVER skip the quality gate (novel + specific + actionable).
@@ -135,7 +135,7 @@ When no high-severity lessons exist:
 - **Property**: MUST include enough context for Claude to understand when/how to use commands
 - **Required elements**:
   - When to capture lessons (correction triggers)
-  - How to capture (`lna learn` command)
+  - How to capture (`ca learn` command)
   - Quality gate criteria (novel, specific, actionable)
   - Session-start auto-loading behavior
 - **Test**: Verify all required elements present
@@ -158,7 +158,7 @@ When no high-severity lessons exist:
 ### S8: Never Duplicate Information
 - **Property**: Each piece of information MUST appear exactly once
 - **Why**: Token budget is tight; duplication wastes tokens
-- **Example violation**: Repeating "Use lna learn" in both workflow and commands sections
+- **Example violation**: Repeating "Use ca learn" in both workflow and commands sections
 - **Test**: Text similarity analysis for duplicate content blocks
 
 ## Liveness Properties (Must EVENTUALLY Happen)
@@ -250,7 +250,7 @@ When no high-severity lessons exist:
 ### Trust Language Section (Target: ~1200 tokens)
 
 ```markdown
-# Learning Agent Workflow
+# Compound Agent Workflow
 
 ## 🔴 Core Constraints
 
@@ -267,7 +267,7 @@ When no high-severity lessons exist:
    - Novel (not already stored)
    - Specific (clear guidance)
    - Actionable (obvious what to do)
-2. If pass: Capture with `lna learn "insight"`
+2. If pass: Capture with `ca learn "insight"`
 3. If fail: Skip (most sessions have no lessons)
 
 **Workflow**: When starting a session:
@@ -275,7 +275,7 @@ When no high-severity lessons exist:
 2. No action needed
 
 **Workflow**: When creating a plan:
-1. Check relevant lessons: `lna check-plan --plan "..."`
+1. Check relevant lessons: `ca check-plan --plan "..."`
 2. Consider lessons in implementation
 
 NEVER skip the quality gate.

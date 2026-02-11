@@ -5,7 +5,7 @@
 
 ## Context
 
-The learning agent stores lessons in two places:
+The compound agent stores lessons in two places:
 - **JSONL file** (`.claude/lessons/index.jsonl`) - **source of truth**, git-tracked
 - **SQLite database** (`.claude/.cache/lessons.sqlite`) - **rebuildable index**, gitignored
 
@@ -320,9 +320,9 @@ test('syncIfNeeded rebuilds when JSONL modified', async () => {
 **Implementation needed:**
 ```bash
 # .git/hooks/pre-commit (addition)
-if ! npx learning-agent validate --quiet; then
+if ! npx ca validate --quiet; then
   echo "Error: .claude/lessons/index.jsonl contains invalid lessons"
-  echo "Run: npx learning-agent validate --fix"
+  echo "Run: npx ca validate --fix"
   exit 1
 fi
 ```
@@ -369,7 +369,7 @@ fi
 
 1. **Add `validate` CLI command**
    ```bash
-   npx learning-agent validate
+   npx ca validate
    # Output: "✅ All lessons valid" or "❌ 3 lessons failed validation (lines 10, 15, 22)"
    ```
 
@@ -406,7 +406,7 @@ fi
    // When no high-severity lessons found, hint at common issues:
    if (lessons.length === 0) {
      console.log('No high-severity lessons found.');
-     console.log('Tip: Run `npx learning-agent validate` to check for parse errors.');
+     console.log('Tip: Run `npx ca validate` to check for parse errors.');
    }
    ```
 

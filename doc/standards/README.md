@@ -1,6 +1,6 @@
 # Coding Standards
 
-This directory contains coding standards and best practices for the Learning Agent project.
+This directory contains coding standards and best practices for the Compound Agent project.
 
 ## Documents
 

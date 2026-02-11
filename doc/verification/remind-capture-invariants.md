@@ -231,7 +231,7 @@ test('output reminder when staged changes present', () => {
   // Mock: git diff --cached returns "src/foo.ts\n"
   const output = captureStdout(() => remindCapture(repoRoot));
   expect(output).toContain('Lesson Capture Reminder');
-  expect(output).toContain('lna learn');
+  expect(output).toContain('ca learn');
   expect(output.length).toBeLessThan(800);
   expect(process.exitCode).toBe(0);
 });

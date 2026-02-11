@@ -5,9 +5,9 @@
 **Purpose**: Provide complete CRUD operations for lesson management via CLI commands: show, update, delete.
 
 **Commands**:
-- `learning-agent show <id> [--json]` - Display lesson by ID
-- `learning-agent update <id> [--field value] [--json]` - Modify existing lesson
-- `learning-agent delete <id>... [--json]` - Soft delete lessons (tombstone)
+- `compound-agent show <id> [--json]` - Display lesson by ID
+- `compound-agent update <id> [--field value] [--json]` - Modify existing lesson
+- `compound-agent delete <id>... [--json]` - Soft delete lessons (tombstone)
 
 **Integration Points**:
 - JSONL storage (append-only, source of truth)
@@ -315,7 +315,7 @@
 
 **Signature**:
 ```bash
-learning-agent show <id> [--json]
+compound-agent show <id> [--json]
 ```
 
 **Flags**:
@@ -370,7 +370,7 @@ Pattern:
 
 **Signature**:
 ```bash
-learning-agent update <id> [OPTIONS] [--json]
+compound-agent update <id> [OPTIONS] [--json]
 ```
 
 **Flags**:
@@ -417,7 +417,7 @@ Updated lesson L001:
 
 **Signature**:
 ```bash
-learning-agent delete <id>... [--json]
+compound-agent delete <id>... [--json]
 ```
 
 **Arguments**:

@@ -69,7 +69,7 @@ Create structured documentation:
 - Scenario: expected behavior
 ```
 
-## Example for Learning Agent
+## Example for Compound Agent
 
 ```markdown
 ## Invariants for Lesson Storage

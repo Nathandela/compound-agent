@@ -435,7 +435,7 @@ function getLabel(type: 'quick' | 'full'): string {
 
 ---
 
-## Learning Agent Specifics
+## Compound Agent Specifics
 
 This project uses these patterns:
 

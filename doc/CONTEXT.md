@@ -1,4 +1,4 @@
-# Learning Agent - Full Context & Research
+# Compound Agent - Full Context & Research
 
 This document captures all research, sources, and decisions made during the design phase.
 
@@ -349,11 +349,11 @@ A neutral Plan agent reviewed the proposed design. Key feedback:
 **Usage**:
 ```bash
 # Add to any repo
-pnpm add -D @scope/learning-agent
+pnpm add -D @scope/compound-agent
 
 # Use via scripts or npx
 pnpm learn "Use Polars not pandas"
-npx learning-agent search "data"
+npx ca search "data"
 ```
 
 ### 9. Embedding Model Download on First Use

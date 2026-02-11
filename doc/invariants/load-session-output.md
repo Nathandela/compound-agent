@@ -6,7 +6,7 @@ The `load-session` command loads high-severity lessons at session startup and ou
 
 ## Module Overview
 
-**Command**: `npx learning-agent load-session [--json]`
+**Command**: `npx ca load-session [--json]`
 
 **Inputs**:
 - Repository root directory (implicit)
