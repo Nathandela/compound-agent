@@ -19,7 +19,6 @@ import { registerMaintenanceCommands } from './management-maintenance.js';
 import { registerPrimeCommand } from './management-prime.js';
 
 export { registerCaptureCommands } from './capture.js';
-export { registerRemindCaptureCommand } from './remind-capture.js';
 export { registerRetrievalCommands } from './retrieval.js';
 
 // Re-export types and helpers from setup and management modules

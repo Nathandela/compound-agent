@@ -13,7 +13,6 @@ import { appendLesson } from '../memory/storage/index.js';
 import { generateId, SeveritySchema } from '../memory/types.js';
 import type { Lesson, Severity } from '../memory/types.js';
 
-import { registerRemindCaptureCommand } from './remind-capture.js';
 import { getGlobalOpts, out } from './shared.js';
 
 // ============================================================================
@@ -319,6 +318,4 @@ export function registerCaptureCommands(program: Command): void {
       }
     });
 
-  // Register remind-capture (PreCommit hook)
-  registerRemindCaptureCommand(program);
 }
