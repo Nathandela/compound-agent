@@ -1,14 +1,14 @@
 {
-  "name": "learning-agent",
-  "version": "0.2.9",
-  "description": "Repository-scoped learning system for Claude Code",
+  "name": "compound-agent",
+  "version": "1.0.0-alpha.0",
+  "description": "Semantically-intelligent workflow plugin for Claude Code",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
-    "learning-agent": "./dist/cli.js",
-    "lna": "./dist/cli.js",
-    "learning-agent-mcp": "./dist/mcp.js"
+    "compound-agent": "./dist/cli.js",
+    "ca": "./dist/cli.js",
+    "compound-agent-mcp": "./dist/mcp.js"
   },
   "exports": {
     ".": {
@@ -42,9 +42,11 @@
   },
   "keywords": [
     "claude",
-    "learning",
+    "compound",
+    "workflow",
     "memory",
-    "ai"
+    "ai",
+    "agent"
   ],
   "author": "Nathan Delacrétaz",
   "license": "MIT",
