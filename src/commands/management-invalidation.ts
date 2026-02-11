@@ -22,8 +22,8 @@ export function registerInvalidationCommands(program: Command): void {
    * Appends an invalidatedAt timestamp and optional reason to the lesson.
    * Invalidated lessons are excluded from retrieval but remain in storage.
    *
-   * @example npx lna wrong L12345678
-   * @example npx lna wrong L12345678 --reason "This advice was incorrect"
+   * @example npx ca wrong L12345678
+   * @example npx ca wrong L12345678 --reason "This advice was incorrect"
    */
   program
     .command('wrong <id>')
@@ -68,7 +68,7 @@ export function registerInvalidationCommands(program: Command): void {
    *
    * Re-enables a previously invalidated lesson for retrieval.
    *
-   * @example npx lna validate L12345678
+   * @example npx ca validate L12345678
    */
   program
     .command('validate <id>')

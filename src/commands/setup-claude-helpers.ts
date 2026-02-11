@@ -52,7 +52,7 @@ export async function readClaudeSettings(settingsPath: string): Promise<Record<s
 
 /**
  * Check if our hook is already installed.
- * Checks for both current (lna) and legacy (learning-agent) markers in any hook type.
+ * Checks for both current (ca) and legacy (compound-agent) markers in any hook type.
  */
 export function hasClaudeHook(settings: Record<string, unknown>): boolean {
   const hooks = settings.hooks as Record<string, unknown[]> | undefined;
@@ -77,7 +77,7 @@ export function hasClaudeHook(settings: Record<string, unknown>): boolean {
 /**
  * Add our hook to SessionStart array.
  */
-export function addLearningAgentHook(settings: Record<string, unknown>): void {
+export function addCompoundAgentHook(settings: Record<string, unknown>): void {
   if (!settings.hooks) {
     settings.hooks = {};
   }
@@ -92,7 +92,7 @@ export function addLearningAgentHook(settings: Record<string, unknown>): void {
  * Add all v0.2.8 hooks: SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse.
  * Note: PreCommit is handled by git hooks, not Claude Code hooks.
  */
-export function addAllLearningAgentHooks(settings: Record<string, unknown>): void {
+export function addAllCompoundAgentHooks(settings: Record<string, unknown>): void {
   if (!settings.hooks) {
     settings.hooks = {};
   }
@@ -102,7 +102,7 @@ export function addAllLearningAgentHooks(settings: Record<string, unknown>): voi
   if (!hooks.SessionStart) {
     hooks.SessionStart = [];
   }
-  if (!hasHookType(hooks.SessionStart, 'lna prime')) {
+  if (!hasHookType(hooks.SessionStart, 'ca prime')) {
     hooks.SessionStart.push(CLAUDE_HOOK_CONFIG);
   }
 
@@ -110,7 +110,7 @@ export function addAllLearningAgentHooks(settings: Record<string, unknown>): voi
   if (!hooks.PreCompact) {
     hooks.PreCompact = [];
   }
-  if (!hasHookType(hooks.PreCompact, 'lna prime')) {
+  if (!hasHookType(hooks.PreCompact, 'ca prime')) {
     hooks.PreCompact.push(CLAUDE_PRECOMPACT_HOOK_CONFIG);
   }
 
@@ -118,7 +118,7 @@ export function addAllLearningAgentHooks(settings: Record<string, unknown>): voi
   if (!hooks.UserPromptSubmit) {
     hooks.UserPromptSubmit = [];
   }
-  if (!hasHookType(hooks.UserPromptSubmit, 'lna hooks run user-prompt')) {
+  if (!hasHookType(hooks.UserPromptSubmit, 'ca hooks run user-prompt')) {
     hooks.UserPromptSubmit.push(CLAUDE_USER_PROMPT_HOOK_CONFIG);
   }
 
@@ -126,7 +126,7 @@ export function addAllLearningAgentHooks(settings: Record<string, unknown>): voi
   if (!hooks.PostToolUseFailure) {
     hooks.PostToolUseFailure = [];
   }
-  if (!hasHookType(hooks.PostToolUseFailure, 'lna hooks run post-tool-failure')) {
+  if (!hasHookType(hooks.PostToolUseFailure, 'ca hooks run post-tool-failure')) {
     hooks.PostToolUseFailure.push(CLAUDE_POST_TOOL_FAILURE_HOOK_CONFIG);
   }
 
@@ -134,7 +134,7 @@ export function addAllLearningAgentHooks(settings: Record<string, unknown>): voi
   if (!hooks.PostToolUse) {
     hooks.PostToolUse = [];
   }
-  if (!hasHookType(hooks.PostToolUse, 'lna hooks run post-tool-success')) {
+  if (!hasHookType(hooks.PostToolUse, 'ca hooks run post-tool-success')) {
     hooks.PostToolUse.push(CLAUDE_POST_TOOL_SUCCESS_HOOK_CONFIG);
   }
 
@@ -198,7 +198,7 @@ export async function addMcpServerToMcpJson(repoRoot?: string): Promise<boolean>
   }
   const mcpServers = config.mcpServers as Record<string, unknown>;
 
-  if (mcpServers['learning-agent']) {
+  if (mcpServers['compound-agent']) {
     return false; // Already configured
   }
 
@@ -214,7 +214,7 @@ export async function hasMcpServerInMcpJson(repoRoot?: string): Promise<boolean>
   const mcpPath = getMcpJsonPath(repoRoot);
   const config = await readMcpJson(mcpPath);
   const mcpServers = config.mcpServers as Record<string, unknown> | undefined;
-  return !!mcpServers?.['learning-agent'];
+  return !!mcpServers?.['compound-agent'];
 }
 
 /**
@@ -225,11 +225,11 @@ export async function removeMcpServerFromMcpJson(repoRoot?: string): Promise<boo
   const config = await readMcpJson(mcpPath);
   const mcpServers = config.mcpServers as Record<string, unknown> | undefined;
 
-  if (!mcpServers?.['learning-agent']) {
+  if (!mcpServers?.['compound-agent']) {
     return false;
   }
 
-  delete mcpServers['learning-agent'];
+  delete mcpServers['compound-agent'];
   await writeMcpJson(mcpPath, config);
   return true;
 }
@@ -246,7 +246,7 @@ export function addMcpServer(settings: Record<string, unknown>): boolean {
   }
   const mcpServers = settings.mcpServers as Record<string, unknown>;
 
-  if (mcpServers['learning-agent']) {
+  if (mcpServers['compound-agent']) {
     return false; // Already configured
   }
 
@@ -259,7 +259,7 @@ export function addMcpServer(settings: Record<string, unknown>): boolean {
  */
 export function hasMcpServer(settings: Record<string, unknown>): boolean {
   const mcpServers = settings.mcpServers as Record<string, unknown> | undefined;
-  return !!mcpServers?.['learning-agent'];
+  return !!mcpServers?.['compound-agent'];
 }
 
 /**
@@ -267,18 +267,18 @@ export function hasMcpServer(settings: Record<string, unknown>): boolean {
  */
 export function removeMcpServer(settings: Record<string, unknown>): boolean {
   const mcpServers = settings.mcpServers as Record<string, unknown> | undefined;
-  if (!mcpServers?.['learning-agent']) {
+  if (!mcpServers?.['compound-agent']) {
     return false;
   }
-  delete mcpServers['learning-agent'];
+  delete mcpServers['compound-agent'];
   return true;
 }
 
 /**
  * Remove our hooks from all hook arrays.
- * Removes both current (lna) and legacy (learning-agent) hooks from all hook types.
+ * Removes both current (ca) and legacy (compound-agent) hooks from all hook types.
  */
-export function removeLearningAgentHook(settings: Record<string, unknown>): boolean {
+export function removeCompoundAgentHook(settings: Record<string, unknown>): boolean {
   const hooks = settings.hooks as Record<string, unknown[]> | undefined;
   if (!hooks) return false;
 
@@ -340,7 +340,7 @@ export async function installClaudeHooksForInit(repoRoot: string): Promise<Claud
   }
 
   try {
-    addLearningAgentHook(settings);
+    addCompoundAgentHook(settings);
     await writeClaudeSettings(settingsPath, settings);
     return { installed: true, action: 'installed' };
   } catch (err) {

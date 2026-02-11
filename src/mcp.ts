@@ -98,7 +98,7 @@ async function handleSearch(
     const message = err instanceof Error ? err.message : 'Unknown error';
     return {
       error: `Search failed: ${message}`,
-      action: 'Run: npx lna download-model',
+      action: 'Run: npx ca download-model',
       lessons: [],
     };
   }
@@ -137,7 +137,7 @@ async function handleCapture(
 }
 
 /** MCP Server wrapper with typed tool/resource methods */
-export interface LearningAgentMcpServer {
+export interface CompoundAgentMcpServer {
   /** The underlying MCP server instance */
   server: McpServer;
   /** Repository root path (immutable after creation) */
@@ -159,14 +159,14 @@ export interface LearningAgentMcpServer {
 }
 
 /**
- * Create an MCP server for learning-agent.
+ * Create an MCP server for compound-agent.
  *
  * @param repoRoot - Repository root directory (immutable after creation)
  * @returns MCP server wrapper with typed tool/resource methods
  */
-export function createMcpServer(repoRoot: string): LearningAgentMcpServer {
+export function createMcpServer(repoRoot: string): CompoundAgentMcpServer {
   const server = new McpServer({
-    name: 'learning-agent',
+    name: 'compound-agent',
     version: VERSION,
   });
 

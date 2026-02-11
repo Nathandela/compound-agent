@@ -19,9 +19,9 @@ import type { Lesson, Source } from '../types.js';
  *
  * IMPORTANT: Prioritizes MCP tools over CLI commands.
  */
-const TRUST_LANGUAGE_TEMPLATE = `# Learning Agent Active
+const TRUST_LANGUAGE_TEMPLATE = `# Compound Agent Active
 
-> **Context Recovery**: Run \`lna prime\` after compaction, clear, or new session
+> **Context Recovery**: Run \`ca prime\` after compaction, clear, or new session
 
 ## MCP Tools (ALWAYS USE THESE)
 
@@ -64,7 +64,7 @@ Call \`lesson_capture\` AFTER:
 
 ## CLI (fallback only)
 
-When MCP is unavailable: \`lna search "query"\`, \`lna learn "insight"\`, \`lna list\`
+When MCP is unavailable: \`ca search "query"\`, \`ca learn "insight"\`, \`ca list\`
 `;
 
 /**
@@ -142,9 +142,9 @@ export function registerPrimeCommand(program: Command): void {
    *
    * Combines Beads-style trust language guidelines with high-severity lessons.
    * Used after compaction or context loss to remind Claude of the
-   * learning-agent workflow, rules, and commands.
+   * compound-agent workflow, rules, and commands.
    *
-   * @example npx lna prime
+   * @example npx ca prime
    */
   program
     .command('prime')

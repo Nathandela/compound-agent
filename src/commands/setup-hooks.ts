@@ -10,7 +10,7 @@ import type { Command } from 'commander';
 import { out } from './shared.js';
 import {
   HOOK_MARKER,
-  LEARNING_AGENT_HOOK_BLOCK,
+  COMPOUND_AGENT_HOOK_BLOCK,
   PRE_COMMIT_HOOK_TEMPLATE,
   PRE_COMMIT_MESSAGE,
 } from './setup-templates.js';
@@ -223,7 +223,7 @@ export function processToolSuccess(): void {
 /**
  * Check if a pre-commit hook already exists with our marker.
  */
-function hasLearningAgentHook(content: string): boolean {
+function hasCompoundAgentHook(content: string): boolean {
   return content.includes(HOOK_MARKER);
 }
 
@@ -334,7 +334,7 @@ export async function installPreCommitHook(repoRoot: string): Promise<HookInstal
   // Check if hook already exists
   if (existsSync(hookPath)) {
     const content = await readFile(hookPath, 'utf-8');
-    if (hasLearningAgentHook(content)) {
+    if (hasCompoundAgentHook(content)) {
       return { status: 'already_installed' };
     }
 
@@ -345,12 +345,12 @@ export async function installPreCommitHook(repoRoot: string): Promise<HookInstal
     let newContent: string;
     if (exitLineIndex === -1) {
       // No top-level exit found - append to end
-      newContent = content.trimEnd() + '\n' + LEARNING_AGENT_HOOK_BLOCK;
+      newContent = content.trimEnd() + '\n' + COMPOUND_AGENT_HOOK_BLOCK;
     } else {
       // Insert before the exit line
       const before = lines.slice(0, exitLineIndex);
       const after = lines.slice(exitLineIndex);
-      newContent = before.join('\n') + LEARNING_AGENT_HOOK_BLOCK + after.join('\n');
+      newContent = before.join('\n') + COMPOUND_AGENT_HOOK_BLOCK + after.join('\n');
     }
 
     await writeFile(hookPath, newContent, 'utf-8');

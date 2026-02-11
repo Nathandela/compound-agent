@@ -27,7 +27,7 @@ Before committing, consider:
 
 If yes, capture it now:
 \`\`\`
-lna learn "<what you learned>"
+ca learn "<what you learned>"
 \`\`\`
 
 Or use the \`lesson_capture\` tool directly.

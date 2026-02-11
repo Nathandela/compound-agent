@@ -1,5 +1,5 @@
 /**
- * Learning Agent - Repository-scoped learning system for Claude Code
+ * Compound Agent - Repository-scoped learning system for Claude Code
  *
  * This package helps Claude Code learn from mistakes and avoid repeating them.
  * It captures lessons during coding sessions and retrieves relevant lessons
@@ -8,7 +8,7 @@
  * ## Quick Start
  *
  * ```typescript
- * import { appendLesson, retrieveForPlan, loadSessionLessons } from 'learning-agent';
+ * import { appendLesson, retrieveForPlan, loadSessionLessons } from 'compound-agent';
  *
  * // At session start, load high-severity lessons
  * const criticalLessons = await loadSessionLessons(repoRoot);
@@ -27,8 +27,8 @@
  * ```json
  * {
  *   "hooks": {
- *     "session_start": "npx learning-agent load-session",
- *     "pre_tool": "npx learning-agent check-plan"
+ *     "session_start": "npx compound-agent load-session",
+ *     "pre_tool": "npx compound-agent check-plan"
  *   }
  * }
  * ```
@@ -50,12 +50,12 @@
  * ### Recommended Cleanup Pattern
  *
  * ```typescript
- * import { closeDb, unloadEmbedding } from 'learning-agent';
+ * import { closeDb, unloadEmbedding } from 'compound-agent';
  *
  * // For CLI commands - use try/finally
  * async function main() {
  *   try {
- *     // ... your code that uses learning-agent
+ *     // ... your code that uses compound-agent
  *   } finally {
  *     unloadEmbedding();
  *     closeDb();
@@ -81,7 +81,7 @@
  *
  * @see {@link closeDb} for database cleanup
  * @see {@link unloadEmbedding} for embedding model cleanup
- * @module learning-agent
+ * @module compound-agent
  */
 
 import { createRequire } from 'node:module';

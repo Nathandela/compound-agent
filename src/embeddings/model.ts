@@ -74,7 +74,7 @@ export async function isModelUsable(): Promise<UsabilityResult> {
     cachedUsability = {
       usable: false,
       reason: 'Embedding model file not found',
-      action: 'Run: npx lna download-model',
+      action: 'Run: npx ca download-model',
     };
     return cachedUsability;
   }
@@ -104,7 +104,7 @@ export async function isModelUsable(): Promise<UsabilityResult> {
     cachedUsability = {
       usable: false,
       reason: `Embedding model runtime initialization failed: ${message}`,
-      action: 'Check system compatibility or reinstall: npx lna download-model',
+      action: 'Check system compatibility or reinstall: npx ca download-model',
     };
     return cachedUsability;
   } finally {

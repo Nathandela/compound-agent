@@ -1,5 +1,5 @@
 /**
- * One-shot setup command - Configure everything for learning-agent.
+ * One-shot setup command - Configure everything for compound-agent.
  *
  * Combines: init + Claude hooks + MCP server + optionally model download.
  */
@@ -14,7 +14,7 @@ import { isModelAvailable, resolveModel } from '../embeddings/model.js';
 import { LESSONS_PATH } from '../storage/index.js';
 import { out } from './shared.js';
 import {
-  addAllLearningAgentHooks,
+  addAllCompoundAgentHooks,
   addMcpServerToMcpJson,
   getClaudeSettingsPath,
   hasClaudeHook,
@@ -68,7 +68,7 @@ async function configureClaudeSettings(repoRoot: string): Promise<{ hooks: boole
   }
 
   const hadHooks = hasClaudeHook(settings);
-  addAllLearningAgentHooks(settings);
+  addAllCompoundAgentHooks(settings);
   await writeClaudeSettings(settingsPath, settings);
 
   // 2. Configure MCP in .mcp.json (project scope, shareable)
@@ -142,7 +142,7 @@ export function registerSetupAllCommand(setupCommand: Command): void {
       const result = await runSetup({ skipModel: options.skipModel });
 
       // Always human-readable output for one-shot setup
-      out.success('Learning agent setup complete');
+      out.success('Compound agent setup complete');
       console.log(`  Lessons directory: ${result.lessonsDir}`);
       console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
       console.log(`  Claude hooks: ${result.hooks ? 'Installed' : 'Already configured'}`);
@@ -158,7 +158,7 @@ export function registerSetupAllCommand(setupCommand: Command): void {
           console.log('  Model: Already exists');
           break;
         case 'failed':
-          console.log('  Model: Download failed (run `lna download-model` manually)');
+          console.log('  Model: Download failed (run `ca download-model` manually)');
           break;
       }
       console.log('');

@@ -144,8 +144,8 @@ export function registerRetrievalCommands(program: Command): void {
   /**
    * Search command - Search lessons by keyword.
    *
-   * @example npx lna search "Polars"
-   * @example npx lna search "authentication" --limit 5
+   * @example npx ca search "Polars"
+   * @example npx ca search "authentication" --limit 5
    */
   program
     .command('search <query>')
@@ -189,9 +189,9 @@ export function registerRetrievalCommands(program: Command): void {
   /**
    * List command - List all lessons.
    *
-   * @example npx lna list
-   * @example npx lna list --limit 10
-   * @example npx lna list --invalidated
+   * @example npx ca list
+   * @example npx ca list --limit 10
+   * @example npx ca list --invalidated
    */
   program
     .command('list')
@@ -265,7 +265,7 @@ export function registerRetrievalCommands(program: Command): void {
    * Used by Claude Code hooks to inject critical lessons at session start.
    * Returns lessons sorted by severity/recency for immediate context.
    *
-   * @example npx lna load-session --json
+   * @example npx ca load-session --json
    */
   program
     .command('load-session')
@@ -295,7 +295,7 @@ export function registerRetrievalCommands(program: Command): void {
       // Show count note if total lessons exceed threshold
       if (totalCount > LESSON_COUNT_WARNING_THRESHOLD) {
         console.log('');
-        out.info(`${totalCount} lessons in index. Consider \`lna compact\` to reduce context pollution.`);
+        out.info(`${totalCount} lessons in index. Consider \`ca compact\` to reduce context pollution.`);
       }
 
       // Show age warnings for old lessons
@@ -312,8 +312,8 @@ export function registerRetrievalCommands(program: Command): void {
    * Used by Claude Code hooks during plan mode to retrieve lessons
    * that are semantically relevant to the proposed implementation.
    *
-   * @example echo "Add authentication" | npx lna check-plan --json
-   * @example npx lna check-plan --plan "Refactor the API"
+   * @example echo "Add authentication" | npx ca check-plan --json
+   * @example npx ca check-plan --plan "Refactor the API"
    */
   program
     .command('check-plan')

@@ -21,9 +21,9 @@ export function registerIOCommands(program: Command): void {
   /**
    * Export command - Export lessons as JSON to stdout.
    *
-   * @example npx lna export
-   * @example npx lna export --since 2024-01-15
-   * @example npx lna export --tags typescript,testing
+   * @example npx ca export
+   * @example npx ca export --since 2024-01-15
+   * @example npx ca export --tags typescript,testing
    */
   program
     .command('export')
@@ -60,7 +60,7 @@ export function registerIOCommands(program: Command): void {
   /**
    * Import command - Import lessons from a JSONL file.
    *
-   * @example npx lna import lessons.jsonl
+   * @example npx ca import lessons.jsonl
    */
   program
     .command('import <file>')

@@ -1,5 +1,5 @@
 /**
- * Install-check utility for learning-agent.
+ * Install-check utility for compound-agent.
  *
  * Detects invalid installations when package is installed from GitHub URL
  * instead of npm registry. GitHub installs don't include dist/ folder since
@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
  * const result = checkInstallation();
  * if (!result.valid) {
  *   console.error(result.reason);
- *   // "Invalid installation: learning-agent was installed from GitHub..."
+ *   // "Invalid installation: compound-agent was installed from GitHub..."
  * }
  * ```
  */
@@ -70,7 +70,7 @@ function getPackageRoot(packageRoot?: string): string {
 }
 
 /**
- * Check if learning-agent was installed correctly (from npm, not GitHub).
+ * Check if compound-agent was installed correctly (from npm, not GitHub).
  *
  * GitHub installs don't include dist/ folder since it's gitignored.
  * Only npm registry installs include the built output.
@@ -89,9 +89,9 @@ export function checkInstallation(packageRoot?: string): InstallCheckResult {
     return {
       valid: false,
       reason:
-        'Invalid installation: learning-agent was installed from GitHub URL ' +
+        'Invalid installation: compound-agent was installed from GitHub URL ' +
         'without compiled output. Install from npm registry instead: ' +
-        'pnpm add -D learning-agent',
+        'pnpm add -D compound-agent',
       distPath,
       cliPath,
     };
@@ -104,7 +104,7 @@ export function checkInstallation(packageRoot?: string): InstallCheckResult {
       reason:
         'Invalid installation: dist/cli.js is missing. The package may be ' +
         'corrupted or was installed from GitHub URL. Reinstall from npm: ' +
-        'pnpm add -D learning-agent',
+        'pnpm add -D compound-agent',
       distPath,
       cliPath,
     };
@@ -118,7 +118,7 @@ export function checkInstallation(packageRoot?: string): InstallCheckResult {
 }
 
 /**
- * Assert that learning-agent was installed correctly.
+ * Assert that compound-agent was installed correctly.
  *
  * Exits with code 1 if installation is invalid. Use at the start of CLI
  * commands to fail fast with a clear error message.

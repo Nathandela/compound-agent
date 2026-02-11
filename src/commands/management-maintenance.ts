@@ -37,9 +37,9 @@ export function registerMaintenanceCommands(program: Command): void {
   /**
    * Compact command - Archive old lessons and remove tombstones.
    *
-   * @example npx lna compact
-   * @example npx lna compact --force
-   * @example npx lna compact --dry-run
+   * @example npx ca compact
+   * @example npx ca compact --force
+   * @example npx ca compact --dry-run
    */
   program
     .command('compact')
@@ -81,8 +81,8 @@ export function registerMaintenanceCommands(program: Command): void {
   /**
    * Rebuild command - Rebuild SQLite index from JSONL.
    *
-   * @example npx lna rebuild
-   * @example npx lna rebuild --force
+   * @example npx ca rebuild
+   * @example npx ca rebuild --force
    */
   program
     .command('rebuild')
@@ -107,7 +107,7 @@ export function registerMaintenanceCommands(program: Command): void {
   /**
    * Stats command - Show database health and statistics.
    *
-   * @example npx lna stats
+   * @example npx ca stats
    */
   program
     .command('stats')
@@ -170,7 +170,7 @@ export function registerMaintenanceCommands(program: Command): void {
 
       // Show warning if lesson count exceeds threshold (context pollution prevention)
       if (totalLessons > LESSON_COUNT_WARNING_THRESHOLD) {
-        out.warn(`High lesson count may degrade retrieval quality. Consider running \`lna compact\`.`);
+        out.warn(`High lesson count may degrade retrieval quality. Consider running \`ca compact\`.`);
       }
 
       // Show age distribution if lessons exist

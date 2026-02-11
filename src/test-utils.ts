@@ -1,5 +1,5 @@
 /**
- * Shared test utilities for the learning-agent test suite.
+ * Shared test utilities for the compound-agent test suite.
  *
  * Sections:
  *   1. Lesson fixtures  - createLesson, createQuickLesson, createFullLesson, daysAgo
@@ -242,7 +242,7 @@ export interface CliResult {
  * Each test should call this in beforeEach.
  */
 export async function setupCliTestDir(): Promise<string> {
-  return mkdtemp(join(tmpdir(), 'learning-agent-cli-'));
+  return mkdtemp(join(tmpdir(), 'compound-agent-cli-'));
 }
 
 /**
@@ -258,7 +258,7 @@ export async function cleanupCliTestDir(tempDir: string): Promise<void> {
  * Run the CLI with given arguments.
  *
  * @param args - Command line arguments
- * @param tempDir - Working directory (used as LEARNING_AGENT_ROOT)
+ * @param tempDir - Working directory (used as COMPOUND_AGENT_ROOT)
  * @returns Object with stdout, stderr, and combined output
  */
 export function runCli(args: string, tempDir: string): CliResult {
@@ -267,7 +267,7 @@ export function runCli(args: string, tempDir: string): CliResult {
     const stdout = execSync(`node ${cliPath} ${args} 2>&1`, {
       cwd: tempDir,
       encoding: 'utf-8',
-      env: { ...process.env, LEARNING_AGENT_ROOT: tempDir },
+      env: { ...process.env, COMPOUND_AGENT_ROOT: tempDir },
     });
     return { stdout, stderr: '', combined: stdout };
   } catch (error) {
@@ -297,7 +297,7 @@ export function runCliWithEnv(
     const stdout = execSync(`node ${cliPath} ${args} 2>&1`, {
       cwd: tempDir,
       encoding: 'utf-8',
-      env: { ...process.env, LEARNING_AGENT_ROOT: tempDir, ...env },
+      env: { ...process.env, COMPOUND_AGENT_ROOT: tempDir, ...env },
     });
     return { stdout, stderr: '', combined: stdout };
   } catch (error) {

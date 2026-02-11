@@ -11,27 +11,27 @@ import {
   AGENTS_MD_TEMPLATE,
   CLAUDE_MD_REFERENCE,
   CLAUDE_REF_START_MARKER,
-  LEARNING_AGENT_SECTION_HEADER,
+  COMPOUND_AGENT_SECTION_HEADER,
   PLUGIN_MANIFEST,
   SLASH_COMMANDS,
 } from './setup-templates.js';
 
 /**
- * Check if AGENTS.md already has the Learning Agent section.
+ * Check if AGENTS.md already has the Compound Agent section.
  */
-export function hasLearningAgentSection(content: string): boolean {
-  return content.includes(LEARNING_AGENT_SECTION_HEADER);
+export function hasCompoundAgentSection(content: string): boolean {
+  return content.includes(COMPOUND_AGENT_SECTION_HEADER);
 }
 
 /**
- * Check if CLAUDE.md already has the Learning Agent reference.
+ * Check if CLAUDE.md already has the Compound Agent reference.
  */
 export function hasClaudeMdReference(content: string): boolean {
-  return content.includes('Learning Agent') || content.includes(CLAUDE_REF_START_MARKER);
+  return content.includes('Compound Agent') || content.includes(CLAUDE_REF_START_MARKER);
 }
 
 /**
- * Create or update AGENTS.md with Learning Agent section.
+ * Create or update AGENTS.md with Compound Agent section.
  */
 export async function updateAgentsMd(repoRoot: string): Promise<boolean> {
   const agentsPath = join(repoRoot, 'AGENTS.md');
@@ -41,7 +41,7 @@ export async function updateAgentsMd(repoRoot: string): Promise<boolean> {
   if (existsSync(agentsPath)) {
     content = await readFile(agentsPath, 'utf-8');
     existed = true;
-    if (hasLearningAgentSection(content)) {
+    if (hasCompoundAgentSection(content)) {
       return false; // Already has section, no update needed
     }
   }
@@ -53,7 +53,7 @@ export async function updateAgentsMd(repoRoot: string): Promise<boolean> {
 }
 
 /**
- * Ensure CLAUDE.md has a reference to AGENTS.md for Learning Agent workflow.
+ * Ensure CLAUDE.md has a reference to AGENTS.md for Compound Agent workflow.
  * Creates CLAUDE.md if it doesn't exist, appends reference if not present.
  * Uses markers for clean uninstall support.
  */

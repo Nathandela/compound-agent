@@ -1,5 +1,5 @@
 /**
- * Init command - Initialize learning-agent in a repository.
+ * Init command - Initialize compound-agent in a repository.
  */
 
 import { existsSync } from 'node:fs';
@@ -44,7 +44,7 @@ async function createIndexFile(repoRoot: string): Promise<void> {
 export function registerInitCommand(program: Command): void {
   program
     .command('init')
-    .description('Initialize learning-agent in this repository')
+    .description('Initialize compound-agent in this repository')
     .option('--skip-agents', 'Skip AGENTS.md modification')
     .option('--skip-hooks', 'Skip git hooks installation')
     .option('--skip-claude', 'Skip Claude Code hooks installation')
@@ -108,14 +108,14 @@ export function registerInitCommand(program: Command): void {
           claudeHooks: claudeHooksInstalled,
         }));
       } else if (!quiet) {
-        out.success('Learning agent initialized');
+        out.success('Compound agent initialized');
         console.log(`  Lessons directory: ${lessonsDir}`);
         if (agentsMdUpdated) {
-          console.log('  AGENTS.md: Updated with Learning Agent section');
+          console.log('  AGENTS.md: Updated with Compound Agent section');
         } else if (options.skipAgents) {
           console.log('  AGENTS.md: Skipped (--skip-agents)');
         } else {
-          console.log('  AGENTS.md: Already has Learning Agent section');
+          console.log('  AGENTS.md: Already has Compound Agent section');
         }
         if (slashCommandsCreated) {
           console.log('  Slash commands: Created (/learn, /check-plan, /list, /prime)');

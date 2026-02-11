@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 import { out } from './shared.js';
 import { getRepoRoot } from '../cli-utils.js';
 import {
-  addLearningAgentHook,
+  addCompoundAgentHook,
   getClaudeSettingsPath,
   getMcpJsonPath,
   hasClaudeHook,
@@ -17,7 +17,7 @@ import {
   readClaudeSettings,
   removeAgentsSection,
   removeClaudeMdReference,
-  removeLearningAgentHook,
+  removeCompoundAgentHook,
   removeMcpServerFromMcpJson,
   writeClaudeSettings,
 } from './setup-claude-helpers.js';
@@ -45,7 +45,7 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
     .command('claude')
     .description('Install Claude Code SessionStart hooks')
     .option('--global', 'Install to global ~/.claude/ instead of project')
-    .option('--uninstall', 'Remove learning-agent hooks')
+    .option('--uninstall', 'Remove compound-agent hooks')
     .option('--status', 'Check status of Claude Code integration')
     .option('--dry-run', 'Show what would change without writing')
     .option('--json', 'Output as JSON')
@@ -117,7 +117,7 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
           console.log('');
           console.log('MCP config: .mcp.json');
           console.log(`  ${mcpExists ? '[ok]' : '[missing]'} File exists`);
-          console.log(`  ${mcpInstalled ? '[ok]' : '[warn]'} learning-agent MCP server`);
+          console.log(`  ${mcpInstalled ? '[ok]' : '[warn]'} compound-agent MCP server`);
           console.log('');
           console.log('Slash commands:');
           console.log(`  ${learnExists ? '[ok]' : '[warn]'} /learn command`);
@@ -129,11 +129,11 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
           } else if (status === 'partial') {
             out.warn('Partial setup detected.');
             console.log('');
-            console.log("Run 'npx lna setup' to complete setup.");
+            console.log("Run 'npx ca setup' to complete setup.");
           } else {
             out.error('Not connected.');
             console.log('');
-            console.log("Run 'npx lna setup' to set up Learning Agent.");
+            console.log("Run 'npx ca setup' to set up Compound Agent.");
           }
         }
         return;
@@ -148,15 +148,15 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
             console.log(JSON.stringify({ dryRun: true, wouldRemove: alreadyInstalled, location: displayPath }));
           } else {
             if (alreadyInstalled) {
-              console.log(`Would remove learning-agent hooks from ${displayPath}`);
+              console.log(`Would remove compound-agent hooks from ${displayPath}`);
             } else {
-              console.log('No learning-agent hooks to remove');
+              console.log('No compound-agent hooks to remove');
             }
           }
           return;
         }
 
-        const removedHook = removeLearningAgentHook(settings);
+        const removedHook = removeCompoundAgentHook(settings);
         if (removedHook) {
           await writeClaudeSettings(settingsPath, settings);
         }
@@ -181,7 +181,7 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
               claudeMdRemoved: removedClaudeMd,
             }));
           } else {
-            out.success('Learning agent removed');
+            out.success('Compound agent removed');
             if (removedHook) {
               console.log(`  Hooks: ${displayPath}`);
             }
@@ -189,17 +189,17 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
               console.log('  MCP: .mcp.json');
             }
             if (removedAgents) {
-              console.log('  AGENTS.md: Learning Agent section removed');
+              console.log('  AGENTS.md: Compound Agent section removed');
             }
             if (removedClaudeMd) {
-              console.log('  CLAUDE.md: Learning Agent reference removed');
+              console.log('  CLAUDE.md: Compound Agent reference removed');
             }
           }
         } else {
           if (options.json) {
             console.log(JSON.stringify({ installed: false, location: displayPath, action: 'unchanged' }));
           } else {
-            out.info('No learning agent hooks to remove');
+            out.info('No compound agent hooks to remove');
             // Suggest the other scope if no hooks found
             if (options.global) {
               console.log('  Hint: Try without --global to check project settings.');
@@ -217,9 +217,9 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
           console.log(JSON.stringify({ dryRun: true, wouldInstall: !alreadyInstalled, location: displayPath }));
         } else {
           if (alreadyInstalled) {
-            console.log('Learning agent hooks already installed');
+            console.log('Compound agent hooks already installed');
           } else {
-            console.log(`Would install learning-agent hooks to ${displayPath}`);
+            console.log(`Would install compound-agent hooks to ${displayPath}`);
           }
         }
         return;
@@ -234,7 +234,7 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
             action: 'unchanged',
           }));
         } else {
-          out.info('Learning agent hooks already installed');
+          out.info('Compound agent hooks already installed');
           console.log(`  Location: ${displayPath}`);
         }
         return;
@@ -242,7 +242,7 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
 
       // Add hook
       const fileExists = existsSync(settingsPath);
-      addLearningAgentHook(settings);
+      addCompoundAgentHook(settings);
       await writeClaudeSettings(settingsPath, settings);
 
       if (options.json) {

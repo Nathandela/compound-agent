@@ -24,8 +24,8 @@ export function registerCrudCommands(program: Command): void {
   /**
    * Show command - Display details of a specific lesson.
    *
-   * @example npx lna show L12345678
-   * @example npx lna show L12345678 --json
+   * @example npx ca show L12345678
+   * @example npx ca show L12345678 --json
    */
   program
     .command('show <id>')
@@ -59,8 +59,8 @@ export function registerCrudCommands(program: Command): void {
   /**
    * Update command - Update a lesson's mutable fields.
    *
-   * @example npx lna update L12345678 --insight "New insight"
-   * @example npx lna update L12345678 --severity high --tags "api,auth"
+   * @example npx ca update L12345678 --insight "New insight"
+   * @example npx ca update L12345678 --severity high --tags "api,auth"
    */
   program
     .command('update <id>')
@@ -174,8 +174,8 @@ export function registerCrudCommands(program: Command): void {
    *
    * Appends the full lesson with `deleted: true` and `deletedAt`.
    *
-   * @example npx lna delete L12345678
-   * @example npx lna delete L001 L002 L003
+   * @example npx ca delete L12345678
+   * @example npx ca delete L001 L002 L003
    */
   program
     .command('delete <ids...>')
