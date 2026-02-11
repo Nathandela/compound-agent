@@ -54,7 +54,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
     describe('Claude-facing strings use npx ca', () => {
       it('AGENTS_MD_TEMPLATE uses npx ca (not npx compound-agent)', async () => {
-        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
+        const templatesPath = join(process.cwd(), 'src', 'setup', 'templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
         const templateMatch = templatesContent.match(/export const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/);
@@ -70,7 +70,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       });
 
       it('PRE_COMMIT_MESSAGE uses npx ca learn (preferred alias)', async () => {
-        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
+        const templatesPath = join(process.cwd(), 'src', 'setup', 'templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
         const messageMatch = templatesContent.match(/export const PRE_COMMIT_MESSAGE = `([\s\S]*?)`;/);
@@ -85,7 +85,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       });
 
       it('CLAUDE_HOOK_CONFIG uses npx ca prime (v0.2.4)', async () => {
-        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
+        const templatesPath = join(process.cwd(), 'src', 'setup', 'templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
         const hookMatch = templatesContent.match(/export const CLAUDE_HOOK_CONFIG = \{([\s\S]*?)\};/);
@@ -101,7 +101,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
       it('check-plan error message suggests npx ca download-model', async () => {
         // Error messages now come from model.ts (isModelUsable function)
-        const modelPath = join(process.cwd(), 'src', 'embeddings', 'model.ts');
+        const modelPath = join(process.cwd(), 'src', 'memory', 'embeddings', 'model.ts');
         const modelContent = await readFile(modelPath, 'utf8');
 
         const errorMatches = modelContent.match(/npx ca download-model/g);
@@ -119,7 +119,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
     describe('documentation consistency', () => {
       it('no random mixing of ca and compound-agent in templates', async () => {
-        const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
+        const templatesPath = join(process.cwd(), 'src', 'setup', 'templates.ts');
         const templatesContent = await readFile(templatesPath, 'utf8');
 
         const agentsTemplate = templatesContent.match(/export const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
@@ -141,7 +141,7 @@ describe('CLI', { tags: ['integration'] }, () => {
     let agentsTemplate: string;
 
     beforeAll(async () => {
-      const templatesPath = join(process.cwd(), 'src', 'commands', 'setup-templates.ts');
+      const templatesPath = join(process.cwd(), 'src', 'setup', 'templates.ts');
       const templatesContent = await readFile(templatesPath, 'utf8');
       agentsTemplate = templatesContent.match(/export const AGENTS_MD_TEMPLATE = `([\s\S]*?)`;\n\n/)?.[1] ?? '';
     });
