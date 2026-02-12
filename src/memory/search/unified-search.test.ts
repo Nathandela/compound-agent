@@ -113,18 +113,18 @@ describe('unified search across all memory types', () => {
   describe('ranking works with all memory types', () => {
     it('severityBoost works on solution type', () => {
       const solution = createMemoryItem('S001', 'solution', 'fix timeout', { severity: 'high' });
-      expect(severityBoost(solution as any)).toBe(1.5);
+      expect(severityBoost(solution)).toBe(1.5);
     });
 
     it('recencyBoost works on pattern type', () => {
       const pattern = createMemoryItem('P001', 'pattern', 'use map');
       // Created just now, so should get recency boost
-      expect(recencyBoost(pattern as any)).toBe(1.2);
+      expect(recencyBoost(pattern)).toBe(1.2);
     });
 
     it('confirmationBoost works on preference type', () => {
       const preference = createMemoryItem('R001', 'preference', 'prefer pnpm', { confirmed: true });
-      expect(confirmationBoost(preference as any)).toBe(1.3);
+      expect(confirmationBoost(preference)).toBe(1.3);
     });
 
     it('calculateScore works on all types', () => {
@@ -132,22 +132,22 @@ describe('unified search across all memory types', () => {
         severity: 'high',
         confirmed: true,
       });
-      const score = calculateScore(solution as any, 0.8);
+      const score = calculateScore(solution, 0.8);
       expect(score).toBeGreaterThan(0.8); // Should get some boost
     });
 
     it('rankLessons handles mixed-type scored items', () => {
       const items: ScoredLesson[] = [
         {
-          lesson: createMemoryItem('L001', 'lesson', 'test lesson', { severity: 'low' }) as any,
+          lesson: createMemoryItem('L001', 'lesson', 'test lesson', { severity: 'low' }),
           score: 0.9,
         },
         {
-          lesson: createMemoryItem('S001', 'solution', 'fix timeout', { severity: 'high' }) as any,
+          lesson: createMemoryItem('S001', 'solution', 'fix timeout', { severity: 'high' }),
           score: 0.7,
         },
         {
-          lesson: createMemoryItem('P001', 'pattern', 'use map', { severity: 'medium' }) as any,
+          lesson: createMemoryItem('P001', 'pattern', 'use map', { severity: 'medium' }),
           score: 0.8,
         },
       ];
@@ -166,15 +166,14 @@ describe('unified search across all memory types', () => {
   describe('backward compatibility', () => {
     it('ScoredLesson type accepts MemoryItem in lesson field', () => {
       const item = createMemoryItem('S001', 'solution', 'fix timeout');
-      // This should compile and work - ScoredLesson.lesson is typed as Lesson
-      // but MemoryItem shares the same base structure
-      const scored: ScoredLesson = { lesson: item as any, score: 0.8 };
+      // ScoredLesson.lesson is typed as MemoryItem - no cast needed
+      const scored: ScoredLesson = { lesson: item, score: 0.8 };
       expect(scored.lesson.type).toBe('solution');
     });
 
     it('RankedLesson type works with mixed types', () => {
       const ranked: RankedLesson = {
-        lesson: createMemoryItem('P001', 'pattern', 'use map') as any,
+        lesson: createMemoryItem('P001', 'pattern', 'use map'),
         score: 0.8,
         finalScore: 1.0,
       };

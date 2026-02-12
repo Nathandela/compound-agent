@@ -229,9 +229,9 @@ describe('ranking', () => {
 
       it('ranks mixed memory item types by combined score', () => {
         const items: ScoredLesson[] = [
-          { lesson: createSolution('S1', 'solution', { confirmed: false, created: daysAgo(50) }) as any, score: 0.9 },
-          { lesson: { ...createPattern('P1', 'pattern', 'bad', 'good', { confirmed: true, created: daysAgo(5) }), severity: 'high' as const } as any, score: 0.7 },
-          { lesson: createPreference('R1', 'preference', { confirmed: true, created: daysAgo(5) }) as any, score: 0.8 },
+          { lesson: createSolution('S1', 'solution', { confirmed: false, created: daysAgo(50) }), score: 0.9 },
+          { lesson: { ...createPattern('P1', 'pattern', 'bad', 'good', { confirmed: true, created: daysAgo(5) }), severity: 'high' as const }, score: 0.7 },
+          { lesson: createPreference('R1', 'preference', { confirmed: true, created: daysAgo(5) }), score: 0.8 },
         ];
 
         const ranked = rankMemoryItems(items);
@@ -243,7 +243,7 @@ describe('ranking', () => {
 
       it('returns ranked items with finalScore', () => {
         const items: ScoredLesson[] = [
-          { lesson: createSolution('S1', 'test') as any, score: 0.5 },
+          { lesson: createSolution('S1', 'test'), score: 0.5 },
         ];
 
         const ranked = rankMemoryItems(items);

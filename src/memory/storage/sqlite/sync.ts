@@ -15,8 +15,8 @@ import { collectCachedEmbeddings, contentHash } from './cache.js';
 
 /** SQL for inserting a lesson record */
 const INSERT_LESSON_SQL = `
-  INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, last_retrieved, embedding, content_hash, invalidated_at, invalidation_reason, citation_file, citation_line, citation_commit, compaction_level, compacted_at)
-  VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count, @last_retrieved, @embedding, @content_hash, @invalidated_at, @invalidation_reason, @citation_file, @citation_line, @citation_commit, @compaction_level, @compacted_at)
+  INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, last_retrieved, embedding, content_hash, invalidated_at, invalidation_reason, citation_file, citation_line, citation_commit, compaction_level, compacted_at, pattern_bad, pattern_good)
+  VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count, @last_retrieved, @embedding, @content_hash, @invalidated_at, @invalidation_reason, @citation_file, @citation_line, @citation_commit, @compaction_level, @compacted_at, @pattern_bad, @pattern_good)
 `;
 
 /**
@@ -110,6 +110,8 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
         citation_commit: item.citation?.commit ?? null,
         compaction_level: item.compactionLevel ?? 0,
         compacted_at: item.compactedAt ?? null,
+        pattern_bad: item.pattern?.bad ?? null,
+        pattern_good: item.pattern?.good ?? null,
       });
     }
   });

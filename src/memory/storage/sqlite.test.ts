@@ -59,7 +59,7 @@ describe('SQLite in-memory mode', () => {
       const memDb = openInMemoryDb();
       memDb.prepare(`
         INSERT INTO lessons (id, type, trigger, insight, tags, source, context, created, confirmed)
-        VALUES ('MEM001', 'quick', 'memory test', 'memory insight', '', 'manual', '{}', '2026-01-30', 1)
+        VALUES ('MEM001', 'lesson', 'memory test', 'memory insight', '', 'manual', '{}', '2026-01-30', 1)
       `).run();
 
       // Switch to file-based (should close in-memory and open file)
@@ -78,7 +78,7 @@ describe('SQLite in-memory mode', () => {
 
     db.prepare(`
       INSERT INTO lessons (id, type, trigger, insight, tags, source, context, created, confirmed)
-      VALUES ('L001', 'quick', 'test trigger', 'test insight', 'tag1', 'manual', '{}', '2026-01-30', 1)
+      VALUES ('L001', 'lesson', 'test trigger', 'test insight', 'tag1', 'manual', '{}', '2026-01-30', 1)
     `).run();
 
     const results = db
@@ -151,7 +151,7 @@ describe('SQLite schema', () => {
       // Insert a test row
       db.prepare(`
         INSERT INTO lessons (id, type, trigger, insight, tags, source, context, created, confirmed)
-        VALUES ('L001', 'quick', 'test trigger', 'test insight', 'tag1,tag2', 'manual', '{}', '2026-01-30', 1)
+        VALUES ('L001', 'lesson', 'test trigger', 'test insight', 'tag1,tag2', 'manual', '{}', '2026-01-30', 1)
       `).run();
 
       // Search FTS should find it
@@ -168,7 +168,7 @@ describe('SQLite schema', () => {
       // Insert via lessons table
       db.prepare(`
         INSERT INTO lessons (id, type, trigger, insight, tags, source, context, created, confirmed)
-        VALUES ('L002', 'quick', 'auto trigger', 'auto insight', 'auto,test', 'manual', '{}', '2026-01-30', 1)
+        VALUES ('L002', 'lesson', 'auto trigger', 'auto insight', 'auto,test', 'manual', '{}', '2026-01-30', 1)
       `).run();
 
       // FTS should have the row
@@ -191,7 +191,7 @@ describe('SQLite schema', () => {
       const db1 = openDb(tempDir);
       db1.prepare(`
         INSERT INTO lessons (id, type, trigger, insight, tags, source, context, created, confirmed)
-        VALUES ('L003', 'quick', 'test', 'test', '', 'manual', '{}', '2026-01-30', 1)
+        VALUES ('L003', 'lesson', 'test', 'test', '', 'manual', '{}', '2026-01-30', 1)
       `).run();
       closeDb();
 
@@ -437,7 +437,7 @@ describe('SQLite schema', () => {
   });
 
   describe('lossless roundtrip for optional fields', () => {
-    it('preserves evidence/severity on quick lesson', async () => {
+    it('preserves evidence/severity when optional fields are set', async () => {
       // Quick lesson with optional fields set
       const lesson = {
         ...createQuickLesson('L001', 'quick with evidence'),
@@ -453,8 +453,8 @@ describe('SQLite schema', () => {
       expect(results[0]!.severity).toBe('high');
     });
 
-    it('returns undefined for missing evidence/severity on full lesson', async () => {
-      // Full lesson WITHOUT evidence/severity
+    it('returns undefined when evidence/severity not provided', async () => {
+      // Lesson WITHOUT evidence/severity
       const lesson = createFullLesson('L001', 'full without extras', 'medium');
       // Remove evidence and severity to test undefined handling
       delete (lesson as Record<string, unknown>).evidence;
@@ -469,7 +469,7 @@ describe('SQLite schema', () => {
       expect(results[0]!.severity).toBeUndefined();
     });
 
-    it('preserves evidence/severity exactly on full lesson', async () => {
+    it('preserves evidence/severity values exactly', async () => {
       const lesson = createFullLesson('L001', 'full with high severity', 'high');
       (lesson as Record<string, unknown>).evidence = 'Critical bug';
       await appendLesson(tempDir, lesson);
@@ -496,7 +496,7 @@ describe('SQLite schema', () => {
       const db = openDb(tempDir);
       db.prepare(`
         INSERT INTO lessons (id, type, trigger, insight, tags, source, context, supersedes, related, created, confirmed, deleted)
-        VALUES ('L001', 'quick', 'test trigger', 'test insight', 'tag1', 'manual', '{}', '[]', '[]', '2026-01-30', 1, 1)
+        VALUES ('L001', 'lesson', 'test trigger', 'test insight', 'tag1', 'manual', '{}', '[]', '[]', '2026-01-30', 1, 1)
       `).run();
 
       // Query directly to get the deleted lesson through rowToLesson

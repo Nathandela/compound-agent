@@ -230,4 +230,93 @@ describe('unified memory types in SQLite', () => {
       expect(typeMap['S00000001']).toBe('solution');
     });
   });
+
+  // -- Pattern field round-trip -----------------------------------------------
+
+  describe('pattern field storage and retrieval', () => {
+    it('stores pattern_bad and pattern_good columns for pattern items', async () => {
+      await appendMemoryItem(tempDir, PATTERN_ITEM);
+      await rebuildIndex(tempDir);
+
+      const db = openDb(tempDir);
+      const row = db
+        .prepare('SELECT pattern_bad, pattern_good FROM lessons WHERE id = ?')
+        .get('P00000001') as { pattern_bad: string | null; pattern_good: string | null };
+
+      expect(row.pattern_bad).toBe('bad code');
+      expect(row.pattern_good).toBe('good code');
+    });
+
+    it('stores null pattern columns for items without pattern', async () => {
+      await appendMemoryItem(tempDir, LESSON_ITEM);
+      await rebuildIndex(tempDir);
+
+      const db = openDb(tempDir);
+      const row = db
+        .prepare('SELECT pattern_bad, pattern_good FROM lessons WHERE id = ?')
+        .get('L00000001') as { pattern_bad: string | null; pattern_good: string | null };
+
+      expect(row.pattern_bad).toBeNull();
+      expect(row.pattern_good).toBeNull();
+    });
+
+    it('reconstructs pattern object when searching pattern items', async () => {
+      await appendMemoryItem(tempDir, PATTERN_ITEM);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'forEach', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.pattern).toEqual({ bad: 'bad code', good: 'good code' });
+    });
+
+    it('does not add pattern to items without pattern data', async () => {
+      await appendMemoryItem(tempDir, LESSON_ITEM);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'tests first', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.pattern).toBeUndefined();
+    });
+
+    it('stores pattern for lesson items with optional pattern', async () => {
+      const lessonWithPattern = createMemoryItem('L00000002', 'lesson', 'use const over let', {
+        pattern: { bad: 'let x = 1', good: 'const x = 1' },
+      } as Partial<MemoryItem>);
+      await appendMemoryItem(tempDir, lessonWithPattern);
+      await rebuildIndex(tempDir);
+
+      const results = await searchKeyword(tempDir, 'const', 10);
+      expect(results).toHaveLength(1);
+      expect(results[0]!.pattern).toEqual({ bad: 'let x = 1', good: 'const x = 1' });
+    });
+
+    it('includes pattern_bad and pattern_good in FTS5 index', async () => {
+      const patternItem = createMemoryItem('P00000002', 'pattern', 'avoid any type', {
+        pattern: { bad: 'function foo(x: any)', good: 'function foo(x: string)' },
+      } as Partial<MemoryItem>);
+      await appendMemoryItem(tempDir, patternItem);
+      await rebuildIndex(tempDir);
+
+      // Search for text that only appears in pattern_bad
+      const results = await searchKeyword(tempDir, 'any', 10);
+      expect(results.length).toBeGreaterThanOrEqual(1);
+      expect(results.some((r) => r.id === 'P00000002')).toBe(true);
+    });
+  });
+
+  // -- Schema v3 pattern columns exist ----------------------------------------
+
+  describe('schema v3 pattern columns', () => {
+    it('SCHEMA_VERSION is at least 3', () => {
+      expect(SCHEMA_VERSION).toBeGreaterThanOrEqual(3);
+    });
+
+    it('lessons table has pattern_bad and pattern_good columns', () => {
+      const db = openDb(tempDir);
+      const columns = db.prepare("PRAGMA table_info('lessons')").all() as Array<{ name: string }>;
+      const columnNames = columns.map((c) => c.name);
+      expect(columnNames).toContain('pattern_bad');
+      expect(columnNames).toContain('pattern_good');
+    });
+  });
 });

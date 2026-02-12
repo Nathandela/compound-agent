@@ -9,8 +9,8 @@ import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { isModelUsable, loadSessionLessons, retrieveForPlan } from '../index.js';
-import { incrementRetrievalCount, readLessons, searchKeyword, syncIfNeeded } from '../memory/storage/index.js';
-import type { Lesson } from '../memory/types.js';
+import { incrementRetrievalCount, readLessons, readMemoryItems, searchKeyword, syncIfNeeded } from '../memory/storage/index.js';
+import type { MemoryItem } from '../memory/types.js';
 
 import {
   AGE_FLAG_THRESHOLD_DAYS,
@@ -114,7 +114,7 @@ function formatSource(source: string): string {
  * Output load-session results in human-readable format.
  * Optimized for Claude's context window - no IDs, clear structure.
  */
-function outputSessionLessonsHuman(lessons: Lesson[], quiet: boolean): void {
+function outputSessionLessonsHuman(lessons: MemoryItem[], quiet: boolean): void {
   console.log('## Lessons from Past Sessions\n');
   console.log('These lessons were captured from previous corrections and should inform your work:\n');
 
@@ -203,14 +203,14 @@ export function registerRetrievalCommands(program: Command): void {
       const limit = parseLimitOrExit(options.limit, 'limit');
       const { verbose, quiet } = getGlobalOpts(this);
 
-      const { lessons, skippedCount } = await readLessons(repoRoot);
+      const { items, skippedCount } = await readMemoryItems(repoRoot);
 
-      // Filter for invalidated lessons if flag is set
-      const filteredLessons = options.invalidated
-        ? lessons.filter((l) => l.invalidatedAt)
-        : lessons;
+      // Filter for invalidated items if flag is set
+      const filteredItems = options.invalidated
+        ? items.filter((i) => i.invalidatedAt)
+        : items;
 
-      if (filteredLessons.length === 0) {
+      if (filteredItems.length === 0) {
         if (options.invalidated) {
           console.log('No invalidated lessons found.');
         } else {
@@ -222,34 +222,34 @@ export function registerRetrievalCommands(program: Command): void {
         return;
       }
 
-      const toShow = filteredLessons.slice(0, limit);
+      const toShow = filteredItems.slice(0, limit);
 
       // Show summary unless quiet mode
       if (!quiet) {
-        const label = options.invalidated ? 'invalidated lesson(s)' : 'lesson(s)';
-        out.info(`Showing ${toShow.length} of ${filteredLessons.length} ${label}:\n`);
+        const label = options.invalidated ? 'invalidated lesson(s)' : 'item(s)';
+        out.info(`Showing ${toShow.length} of ${filteredItems.length} ${label}:\n`);
       }
 
-      for (const lesson of toShow) {
-        const invalidMarker = lesson.invalidatedAt ? chalk.red('[INVALID] ') : '';
-        console.log(`[${chalk.cyan(lesson.id)}] ${invalidMarker}${lesson.insight}`);
+      for (const item of toShow) {
+        const invalidMarker = item.invalidatedAt ? chalk.red('[INVALID] ') : '';
+        console.log(`[${chalk.cyan(item.id)}] ${invalidMarker}${item.insight}`);
         if (verbose) {
-          console.log(`  Type: ${lesson.type} | Source: ${lesson.source}`);
-          console.log(`  Created: ${lesson.created}`);
-          if (lesson.context) {
-            console.log(`  Context: ${lesson.context.tool} - ${lesson.context.intent}`);
+          console.log(`  Type: ${item.type} | Source: ${item.source}`);
+          console.log(`  Created: ${item.created}`);
+          if (item.context) {
+            console.log(`  Context: ${item.context.tool} - ${item.context.intent}`);
           }
-          if (lesson.invalidatedAt) {
-            console.log(`  Invalidated: ${lesson.invalidatedAt}`);
-            if (lesson.invalidationReason) {
-              console.log(`  Reason: ${lesson.invalidationReason}`);
+          if (item.invalidatedAt) {
+            console.log(`  Invalidated: ${item.invalidatedAt}`);
+            if (item.invalidationReason) {
+              console.log(`  Reason: ${item.invalidationReason}`);
             }
           }
         } else {
-          console.log(`  Type: ${lesson.type} | Source: ${lesson.source}`);
+          console.log(`  Type: ${item.type} | Source: ${item.source}`);
         }
-        if (lesson.tags.length > 0) {
-          console.log(`  Tags: ${lesson.tags.join(', ')}`);
+        if (item.tags.length > 0) {
+          console.log(`  Tags: ${item.tags.join(', ')}`);
         }
         console.log();
       }

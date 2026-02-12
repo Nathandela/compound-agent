@@ -6,13 +6,13 @@
  */
 
 import { incrementRetrievalCount, readMemoryItems } from '../storage/index.js';
-import type { Lesson, MemoryItem, Severity } from '../types.js';
+import type { MemoryItem, Severity } from '../types.js';
 
 /** Default number of lessons to load at session start */
 const DEFAULT_LIMIT = 5;
 
 /** A memory item with severity field present */
-type LessonWithSeverity = Lesson & { severity: Severity };
+type LessonWithSeverity = MemoryItem & { severity: Severity };
 
 /**
  * Type guard to check if a memory item has severity set
@@ -45,7 +45,7 @@ export async function loadSessionLessons(
       item.severity === 'high' &&
       item.confirmed &&
       !item.invalidatedAt
-  ) as LessonWithSeverity[];
+  );
 
   // Sort by recency (most recent first)
   highSeverityLessons.sort((a, b) => {

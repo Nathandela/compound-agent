@@ -2,52 +2,56 @@
  * SQLite search operations using FTS5 full-text search.
  */
 
-import type { Lesson, MemoryItemType } from '../../types.js';
+import type { Lesson, MemoryItem, MemoryItemType } from '../../types.js';
 
-import type { LessonRow, RetrievalStat } from './types.js';
+import type { MemoryItemRow, RetrievalStat } from './types.js';
 import { openDb } from './connection.js';
 
 /**
- * Convert a database row to a Lesson object.
+ * Convert a database row to a MemoryItem object.
  * @param row - Database row
- * @returns Lesson object
+ * @returns MemoryItem object
  */
-function rowToLesson(row: LessonRow): Lesson {
-  const lesson: Lesson = {
+function rowToMemoryItem(row: MemoryItemRow): MemoryItem {
+  const item: MemoryItem = {
     id: row.id,
-    type: row.type as Lesson['type'],
+    type: row.type as MemoryItem['type'],
     trigger: row.trigger,
     insight: row.insight,
     tags: row.tags ? row.tags.split(',').filter(Boolean) : [],
-    source: row.source as Lesson['source'],
-    context: JSON.parse(row.context) as Lesson['context'],
+    source: row.source as MemoryItem['source'],
+    context: JSON.parse(row.context) as MemoryItem['context'],
     supersedes: JSON.parse(row.supersedes) as string[],
     related: JSON.parse(row.related) as string[],
     created: row.created,
     confirmed: row.confirmed === 1,
-  };
+  } as MemoryItem;
 
-  if (row.evidence !== null) lesson.evidence = row.evidence;
-  if (row.severity !== null) lesson.severity = row.severity as 'high' | 'medium' | 'low';
-  if (row.deleted === 1) lesson.deleted = true;
-  if (row.retrieval_count > 0) lesson.retrievalCount = row.retrieval_count;
-  if (row.invalidated_at !== null) lesson.invalidatedAt = row.invalidated_at;
-  if (row.invalidation_reason !== null) lesson.invalidationReason = row.invalidation_reason;
+  if (row.evidence !== null) item.evidence = row.evidence;
+  if (row.severity !== null) item.severity = row.severity as 'high' | 'medium' | 'low';
+  if (row.deleted === 1) item.deleted = true;
+  if (row.retrieval_count > 0) item.retrievalCount = row.retrieval_count;
+  if (row.invalidated_at !== null) item.invalidatedAt = row.invalidated_at;
+  if (row.invalidation_reason !== null) item.invalidationReason = row.invalidation_reason;
   if (row.citation_file !== null) {
-    lesson.citation = {
+    item.citation = {
       file: row.citation_file,
       ...(row.citation_line !== null && { line: row.citation_line }),
       ...(row.citation_commit !== null && { commit: row.citation_commit }),
     };
   }
   if (row.compaction_level !== null && row.compaction_level !== 0) {
-    lesson.compactionLevel = row.compaction_level as 0 | 1 | 2;
+    item.compactionLevel = row.compaction_level as 0 | 1 | 2;
   }
-  if (row.compacted_at !== null) lesson.compactedAt = row.compacted_at;
-  if (row.last_retrieved !== null) lesson.lastRetrieved = row.last_retrieved;
+  if (row.compacted_at !== null) item.compactedAt = row.compacted_at;
+  if (row.last_retrieved !== null) item.lastRetrieved = row.last_retrieved;
+  if (row.pattern_bad !== null && row.pattern_good !== null) {
+    item.pattern = { bad: row.pattern_bad, good: row.pattern_good };
+  }
 
-  return lesson;
+  return item;
 }
+
 
 /**
  * Increment retrieval count for lessons.
@@ -111,8 +115,8 @@ export async function searchKeyword(
         LIMIT ?
       `
       )
-      .all(query, typeFilter, limit) as LessonRow[];
-    return rows.map(rowToLesson);
+      .all(query, typeFilter, limit) as MemoryItemRow[];
+    return rows.map(rowToMemoryItem) as Lesson[];
   }
 
   const rows = database
@@ -126,9 +130,9 @@ export async function searchKeyword(
       LIMIT ?
     `
     )
-    .all(query, limit) as LessonRow[];
+    .all(query, limit) as MemoryItemRow[];
 
-  return rows.map(rowToLesson);
+  return rows.map(rowToMemoryItem) as Lesson[];
 }
 
 /**

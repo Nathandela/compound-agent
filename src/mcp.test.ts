@@ -614,9 +614,9 @@ describe('MCP Server', () => {
     it('filters results by type when type parameter provided', async () => {
       const searchModule = await import('./memory/search/index.js');
       vi.spyOn(searchModule, 'searchVector').mockResolvedValue([
-        { lesson: SAMPLE_LESSON as Lesson, score: 0.9 },
-        { lesson: SAMPLE_SOLUTION as unknown as Lesson, score: 0.8 },
-        { lesson: SAMPLE_PATTERN as unknown as Lesson, score: 0.7 },
+        { lesson: SAMPLE_LESSON, score: 0.9 },
+        { lesson: SAMPLE_SOLUTION, score: 0.8 },
+        { lesson: SAMPLE_PATTERN, score: 0.7 },
       ]);
 
       const { createMcpServer } = await import('./mcp.js');
@@ -1288,8 +1288,8 @@ describe('MCP Server', () => {
           ...actual as Record<string, unknown>,
           searchVector: vi.fn().mockResolvedValue([
             { lesson: SAMPLE_LESSON, score: 0.9 },
-            { lesson: solutionItem as Lesson, score: 0.8 },
-            { lesson: preferenceItem as Lesson, score: 0.7 },
+            { lesson: solutionItem, score: 0.8 },
+            { lesson: preferenceItem, score: 0.7 },
           ]),
         };
       });

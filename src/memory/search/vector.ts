@@ -7,7 +7,7 @@
 
 import { embedText } from '../embeddings/index.js';
 import { contentHash, getCachedEmbedding, readMemoryItems, setCachedEmbedding } from '../storage/index.js';
-import type { Lesson } from '../types.js';
+import type { MemoryItem } from '../types.js';
 
 /**
  * Calculate cosine similarity between two vectors.
@@ -40,7 +40,7 @@ export function cosineSimilarity(a: number[], b: number[]): number {
  * Field name kept for backward compatibility.
  */
 export interface ScoredLesson {
-  lesson: Lesson;
+  lesson: MemoryItem;
   score: number;
 }
 
@@ -93,7 +93,7 @@ export async function searchVector(
     }
 
     const score = cosineSimilarity(queryVector, itemVector);
-    scored.push({ lesson: item as Lesson, score });
+    scored.push({ lesson: item, score });
   }
 
   // Sort by score descending and take top N

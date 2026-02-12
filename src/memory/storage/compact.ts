@@ -10,7 +10,8 @@
 import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import type { Lesson } from '../types.js';
+import { MemoryItemSchema } from '../types.js';
+import type { MemoryItem } from '../types.js';
 import { getLessonAgeDays } from '../../utils.js';
 
 import { LESSONS_PATH, readLessons } from './jsonl.js';
@@ -138,7 +139,7 @@ export async function rewriteWithoutTombstones(repoRoot: string): Promise<number
  * @param lesson - The lesson to evaluate
  * @returns true if lesson should be archived
  */
-function shouldArchive(lesson: Lesson): boolean {
+function shouldArchive(lesson: MemoryItem): boolean {
   const ageDays = getLessonAgeDays(lesson);
 
   // Archive if: older than threshold AND never retrieved
@@ -153,8 +154,8 @@ function shouldArchive(lesson: Lesson): boolean {
 export async function archiveOldLessons(repoRoot: string): Promise<number> {
   const { lessons } = await readLessons(repoRoot);
 
-  const toArchive: Lesson[] = [];
-  const toKeep: Lesson[] = [];
+  const toArchive: MemoryItem[] = [];
+  const toKeep: MemoryItem[] = [];
 
   for (const lesson of lessons) {
     if (shouldArchive(lesson)) {
@@ -169,7 +170,7 @@ export async function archiveOldLessons(repoRoot: string): Promise<number> {
   }
 
   // Group lessons by archive file (YYYY-MM)
-  const archiveGroups = new Map<string, Lesson[]>();
+  const archiveGroups = new Map<string, MemoryItem[]>();
   for (const lesson of toArchive) {
     const created = new Date(lesson.created);
     const archivePath = getArchivePath(repoRoot, created);
@@ -218,7 +219,7 @@ export async function compact(repoRoot: string): Promise<CompactResult> {
   }
 
   // 2. Parse all records in-memory with last-write-wins dedup
-  const lessonMap = new Map<string, Lesson>();
+  const lessonMap = new Map<string, MemoryItem>();
   let tombstoneCount = 0;
 
   for (const rawLine of content.split('\n')) {
@@ -235,14 +236,17 @@ export async function compact(repoRoot: string): Promise<CompactResult> {
     if (parsed['deleted'] === true) {
       lessonMap.delete(parsed['id'] as string);
       tombstoneCount++;
-    } else if (parsed['id']) {
-      lessonMap.set(parsed['id'] as string, parsed as unknown as Lesson);
+    } else {
+      const result = MemoryItemSchema.safeParse(parsed);
+      if (result.success) {
+        lessonMap.set(result.data.id, result.data);
+      }
     }
   }
 
   // 3. Split into archivable and kept
-  const toArchive: Lesson[] = [];
-  const toKeep: Lesson[] = [];
+  const toArchive: MemoryItem[] = [];
+  const toKeep: MemoryItem[] = [];
 
   for (const lesson of lessonMap.values()) {
     if (shouldArchive(lesson)) {
@@ -254,7 +258,7 @@ export async function compact(repoRoot: string): Promise<CompactResult> {
 
   // 4. Write archive files
   if (toArchive.length > 0) {
-    const archiveGroups = new Map<string, Lesson[]>();
+    const archiveGroups = new Map<string, MemoryItem[]>();
     for (const lesson of toArchive) {
       const created = new Date(lesson.created);
       const archivePath = getArchivePath(repoRoot, created);

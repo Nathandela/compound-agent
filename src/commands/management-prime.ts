@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { loadSessionLessons } from '../memory/retrieval/index.js';
-import type { Lesson, Source } from '../memory/types.js';
+import type { MemoryItem, Source } from '../memory/types.js';
 
 /**
  * Beads-style trust language template.
@@ -91,7 +91,7 @@ function formatSource(source: Source): string {
  * Format: - **{insight}** ({tags})
  *           Learned: {date} via {source}
  */
-function formatLessonForPrime(lesson: Lesson): string {
+function formatLessonForPrime(lesson: MemoryItem): string {
   const date = lesson.created.slice(0, 10); // YYYY-MM-DD
   const tags = lesson.tags.length > 0 ? ` (${lesson.tags.join(', ')})` : '';
   const source = formatSource(lesson.source);

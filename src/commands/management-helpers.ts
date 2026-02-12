@@ -6,12 +6,12 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { LESSONS_PATH } from '../memory/storage/index.js';
-import type { Lesson } from '../memory/types.js';
+import type { MemoryItem } from '../memory/types.js';
 
 /**
- * Format lesson for human-readable display.
+ * Format a memory item for human-readable display.
  */
-export function formatLessonHuman(lesson: Lesson): string {
+export function formatLessonHuman(lesson: MemoryItem): string {
   const lines: string[] = [];
 
   lines.push(`ID: ${lesson.id}`);

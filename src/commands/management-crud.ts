@@ -7,9 +7,9 @@
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
-import { appendLesson, readLessons, syncIfNeeded } from '../memory/storage/index.js';
-import { LessonSchema, SeveritySchema } from '../memory/types.js';
-import type { Lesson, Severity } from '../memory/types.js';
+import { appendMemoryItem, readMemoryItems, syncIfNeeded } from '../memory/storage/index.js';
+import { MemoryItemSchema, SeveritySchema } from '../memory/types.js';
+import type { MemoryItem, Severity } from '../memory/types.js';
 
 import { out } from './shared.js';
 import { formatLessonHuman, wasLessonDeleted } from './management-helpers.js';
@@ -34,11 +34,11 @@ export function registerCrudCommands(program: Command): void {
     .action(async (id: string, options: { json?: boolean }) => {
       const repoRoot = getRepoRoot();
 
-      const { lessons } = await readLessons(repoRoot);
-      const lesson = lessons.find((l) => l.id === id);
+      const { items } = await readMemoryItems(repoRoot);
+      const item = items.find((i) => i.id === id);
 
-      if (!lesson) {
-        // Check if lesson was deleted (tombstone)
+      if (!item) {
+        // Check if item was deleted (tombstone)
         const wasDeleted = await wasLessonDeleted(repoRoot, id);
 
         if (options.json) {
@@ -50,9 +50,9 @@ export function registerCrudCommands(program: Command): void {
       }
 
       if (options.json) {
-        console.log(JSON.stringify(lesson, null, SHOW_JSON_INDENT));
+        console.log(JSON.stringify(item, null, SHOW_JSON_INDENT));
       } else {
-        console.log(formatLessonHuman(lesson));
+        console.log(formatLessonHuman(item));
       }
     });
 
@@ -100,11 +100,11 @@ export function registerCrudCommands(program: Command): void {
         process.exit(1);
       }
 
-      // Read current lessons
-      const { lessons } = await readLessons(repoRoot);
-      const lesson = lessons.find((l) => l.id === id);
+      // Read current items
+      const { items } = await readMemoryItems(repoRoot);
+      const item = items.find((i) => i.id === id);
 
-      if (!lesson) {
+      if (!item) {
         // Check if deleted
         const wasDeleted = await wasLessonDeleted(repoRoot, id);
 
@@ -129,9 +129,9 @@ export function registerCrudCommands(program: Command): void {
         }
       }
 
-      // Build updated lesson
-      const updatedLesson: Lesson = {
-        ...lesson,
+      // Build updated item
+      const updatedItem: MemoryItem = {
+        ...item,
         ...(options.insight !== undefined && { insight: options.insight }),
         ...(options.trigger !== undefined && { trigger: options.trigger }),
         ...(options.evidence !== undefined && { evidence: options.evidence }),
@@ -147,8 +147,8 @@ export function registerCrudCommands(program: Command): void {
         ...(options.confirmed !== undefined && { confirmed: options.confirmed === 'true' }),
       };
 
-      // Validate updated lesson against schema
-      const validationResult = LessonSchema.safeParse(updatedLesson);
+      // Validate updated item against schema
+      const validationResult = MemoryItemSchema.safeParse(updatedItem);
       if (!validationResult.success) {
         if (options.json) {
           console.log(JSON.stringify({ error: `Schema validation failed: ${validationResult.error.message}` }));
@@ -158,12 +158,12 @@ export function registerCrudCommands(program: Command): void {
         process.exit(1);
       }
 
-      // Append updated lesson (last-write-wins)
-      await appendLesson(repoRoot, updatedLesson);
+      // Append updated item (last-write-wins)
+      await appendMemoryItem(repoRoot, updatedItem);
       await syncIfNeeded(repoRoot);
 
       if (options.json) {
-        console.log(JSON.stringify(updatedLesson, null, SHOW_JSON_INDENT));
+        console.log(JSON.stringify(updatedItem, null, SHOW_JSON_INDENT));
       } else {
         out.success(`Updated lesson ${id}`);
       }
@@ -184,30 +184,30 @@ export function registerCrudCommands(program: Command): void {
     .action(async (ids: string[], options: { json?: boolean }) => {
       const repoRoot = getRepoRoot();
 
-      const { lessons } = await readLessons(repoRoot);
-      const lessonMap = new Map(lessons.map((l) => [l.id, l]));
+      const { items } = await readMemoryItems(repoRoot);
+      const itemMap = new Map(items.map((i) => [i.id, i]));
 
       const deleted: string[] = [];
       const warnings: Array<{ id: string; message: string }> = [];
 
       for (const id of ids) {
-        const lesson = lessonMap.get(id);
+        const item = itemMap.get(id);
 
-        if (!lesson) {
+        if (!item) {
           // Check if already deleted or never existed
           const wasDeleted = await wasLessonDeleted(repoRoot, id);
           warnings.push({ id, message: wasDeleted ? 'already deleted' : 'not found' });
           continue;
         }
 
-        // Mark lesson as deleted (full record with deleted flag)
-        const deletedLesson: Lesson = {
-          ...lesson,
+        // Mark item as deleted (full record with deleted flag)
+        const deletedItem: MemoryItem = {
+          ...item,
           deleted: true,
           deletedAt: new Date().toISOString(),
         };
 
-        await appendLesson(repoRoot, deletedLesson);
+        await appendMemoryItem(repoRoot, deletedItem);
 
         deleted.push(id);
       }

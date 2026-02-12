@@ -873,6 +873,142 @@ describe('Management Commands', () => {
     });
   });
 
+  // ==========================================================================
+  // CRUD with unified memory item types (show, update, delete, list)
+  // ==========================================================================
+
+  describe('show command with non-lesson types', () => {
+    beforeEach(async () => {
+      await appendMemoryItem(getTempDir(), createSolution('S001', 'Use connection pooling for DB'));
+      await appendMemoryItem(getTempDir(), createPattern('P001', 'Replace var with const', 'var x = 1', 'const x = 1'));
+      await appendMemoryItem(getTempDir(), createPreference('R001', 'Always use pnpm over npm'));
+    });
+
+    it('show displays a solution item', () => {
+      const { combined } = runCli('show S001');
+      expect(combined).toContain('S001');
+      expect(combined).toContain('Use connection pooling for DB');
+      expect(combined).toContain('solution');
+    });
+
+    it('show displays a pattern item with bad/good fields', () => {
+      const { combined } = runCli('show P001');
+      expect(combined).toContain('P001');
+      expect(combined).toContain('Replace var with const');
+      expect(combined).toContain('var x = 1');
+      expect(combined).toContain('const x = 1');
+    });
+
+    it('show displays a preference item', () => {
+      const { combined } = runCli('show R001');
+      expect(combined).toContain('R001');
+      expect(combined).toContain('Always use pnpm over npm');
+      expect(combined).toContain('preference');
+    });
+
+    it('show --json outputs non-lesson type correctly', () => {
+      const { stdout } = runCli('show P001 --json');
+      const item = JSON.parse(stdout) as { id: string; type: string; pattern: { bad: string; good: string } };
+      expect(item.id).toBe('P001');
+      expect(item.type).toBe('pattern');
+      expect(item.pattern.bad).toBe('var x = 1');
+      expect(item.pattern.good).toBe('const x = 1');
+    });
+  });
+
+  describe('update command with non-lesson types', () => {
+    beforeEach(async () => {
+      await appendMemoryItem(getTempDir(), createSolution('S001', 'Original solution insight'));
+      await appendMemoryItem(getTempDir(), createPattern('P001', 'Original pattern insight', 'bad code', 'good code'));
+    });
+
+    it('update changes insight on a solution item', async () => {
+      runCli('update S001 --insight "Updated solution insight"');
+
+      const filePath = join(getTempDir(), LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+      const updated = JSON.parse(lines[lines.length - 1]) as { id: string; type: string; insight: string };
+      expect(updated.id).toBe('S001');
+      expect(updated.type).toBe('solution');
+      expect(updated.insight).toBe('Updated solution insight');
+    });
+
+    it('update changes tags on a pattern item', async () => {
+      runCli('update P001 --tags "es6,best-practice"');
+
+      const filePath = join(getTempDir(), LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+      const updated = JSON.parse(lines[lines.length - 1]) as { id: string; type: string; tags: string[] };
+      expect(updated.id).toBe('P001');
+      expect(updated.type).toBe('pattern');
+      expect(updated.tags).toEqual(['es6', 'best-practice']);
+    });
+  });
+
+  describe('delete command with non-lesson types', () => {
+    beforeEach(async () => {
+      await appendMemoryItem(getTempDir(), createSolution('S001', 'Solution to delete'));
+      await appendMemoryItem(getTempDir(), createPattern('P001', 'Pattern to delete', 'old', 'new'));
+      await appendMemoryItem(getTempDir(), createPreference('R001', 'Preference to delete'));
+    });
+
+    it('delete removes a solution item', async () => {
+      runCli('delete S001');
+
+      const filePath = join(getTempDir(), LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      const lines = content.trim().split('\n');
+      const tombstone = JSON.parse(lines[lines.length - 1]) as { id: string; deleted: boolean };
+      expect(tombstone.id).toBe('S001');
+      expect(tombstone.deleted).toBe(true);
+    });
+
+    it('delete removes a pattern item', () => {
+      const { combined } = runCli('delete P001');
+      expect(combined).toMatch(/deleted/i);
+    });
+
+    it('delete removes a preference item', () => {
+      const { combined } = runCli('delete R001');
+      expect(combined).toMatch(/deleted/i);
+    });
+
+    it('deleted non-lesson item excluded from list output', () => {
+      runCli('delete S001');
+
+      const { combined } = runCli('list');
+      expect(combined).not.toContain('Solution to delete');
+      expect(combined).toContain('Pattern to delete');
+    });
+  });
+
+  describe('list command with non-lesson types', () => {
+    beforeEach(async () => {
+      await appendMemoryItem(getTempDir(), createQuickLesson('L001', 'lesson insight'));
+      await appendMemoryItem(getTempDir(), createSolution('S001', 'solution insight'));
+      await appendMemoryItem(getTempDir(), createPattern('P001', 'pattern insight', 'bad', 'good'));
+      await appendMemoryItem(getTempDir(), createPreference('R001', 'preference insight'));
+    });
+
+    it('list shows all memory item types', () => {
+      const { combined } = runCli('list');
+      expect(combined).toContain('lesson insight');
+      expect(combined).toContain('solution insight');
+      expect(combined).toContain('pattern insight');
+      expect(combined).toContain('preference insight');
+    });
+
+    it('list output includes item type', () => {
+      const { combined } = runCli('list');
+      expect(combined).toContain('lesson');
+      expect(combined).toContain('solution');
+      expect(combined).toContain('pattern');
+      expect(combined).toContain('preference');
+    });
+  });
+
   describe('rebuild command', () => {
     it('shows rebuild progress', () => {
       const { combined } = runCli('rebuild --force');

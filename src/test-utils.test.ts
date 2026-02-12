@@ -108,8 +108,8 @@ describe('test-utils', () => {
     });
 
     it('includes pattern when provided', () => {
-      const lesson = createLesson({ pattern: 'anti-pattern' });
-      expect(lesson.pattern).toBe('anti-pattern');
+      const lesson = createLesson({ pattern: { bad: 'old way', good: 'new way' } });
+      expect(lesson.pattern).toEqual({ bad: 'old way', good: 'new way' });
       expect('pattern' in lesson).toBe(true);
     });
 
@@ -143,15 +143,15 @@ describe('test-utils', () => {
     it('includes multiple optional fields when provided', () => {
       const lesson = createLesson({
         evidence: 'evidence text',
-        severity: 'critical',
-        pattern: 'best-practice',
+        severity: 'high',
+        pattern: { bad: 'old way', good: 'new way' },
         deleted: false,
         retrievalCount: 10,
       });
 
       expect(lesson.evidence).toBe('evidence text');
-      expect(lesson.severity).toBe('critical');
-      expect(lesson.pattern).toBe('best-practice');
+      expect(lesson.severity).toBe('high');
+      expect(lesson.pattern).toEqual({ bad: 'old way', good: 'new way' });
       expect(lesson.deleted).toBe(false);
       expect(lesson.retrievalCount).toBe(10);
     });

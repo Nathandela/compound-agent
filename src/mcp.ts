@@ -20,7 +20,7 @@ import { inferMemoryItemType } from './memory/capture/triggers.js';
 import { rankLessons, searchVector } from './memory/search/index.js';
 import { appendMemoryItem, closeDb } from './memory/storage/index.js';
 import { generateId, MemoryItemTypeSchema, PatternSchema } from './memory/types.js';
-import type { Lesson, MemoryItem, MemoryItemType } from './memory/types.js';
+import type { MemoryItem, MemoryItemType } from './memory/types.js';
 
 /** Default max results for search */
 const DEFAULT_MAX_RESULTS = 5;
@@ -30,7 +30,7 @@ const MIN_INSIGHT_LENGTH = 10;
 
 /** Search result with lesson and score */
 interface SearchResult {
-  lesson: Lesson;
+  lesson: MemoryItem;
   score: number;
   finalScore?: number;
 }
@@ -67,7 +67,7 @@ interface CaptureToolResult {
   /** Unified memory item (all types) */
   item: MemoryItem;
   /** Backward-compatible alias (same object as item) */
-  lesson: Lesson;
+  lesson: MemoryItem;
 }
 
 /** Result from reading a resource */
@@ -158,7 +158,7 @@ async function handleCapture(
     ...(pattern ? { pattern } : {}),
   } as MemoryItem;
   await appendMemoryItem(repoRoot, item);
-  return { item, lesson: item as Lesson };
+  return { item, lesson: item };
 }
 
 /** MCP Server wrapper with typed tool/resource methods */

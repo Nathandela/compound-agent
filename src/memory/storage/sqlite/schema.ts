@@ -12,7 +12,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
  * Bump this when making incompatible schema changes.
  * The connection module auto-rebuilds when the DB version is older.
  */
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 /** SQL schema for lessons database with FTS5 full-text search */
 const SCHEMA_SQL = `
@@ -41,29 +41,31 @@ const SCHEMA_SQL = `
     citation_line INTEGER,
     citation_commit TEXT,
     compaction_level INTEGER DEFAULT 0,
-    compacted_at TEXT
+    compacted_at TEXT,
+    pattern_bad TEXT,
+    pattern_good TEXT
   );
 
   CREATE VIRTUAL TABLE IF NOT EXISTS lessons_fts USING fts5(
-    id, trigger, insight, tags,
+    id, trigger, insight, tags, pattern_bad, pattern_good,
     content='lessons', content_rowid='rowid'
   );
 
   CREATE TRIGGER IF NOT EXISTS lessons_ai AFTER INSERT ON lessons BEGIN
-    INSERT INTO lessons_fts(rowid, id, trigger, insight, tags)
-    VALUES (new.rowid, new.id, new.trigger, new.insight, new.tags);
+    INSERT INTO lessons_fts(rowid, id, trigger, insight, tags, pattern_bad, pattern_good)
+    VALUES (new.rowid, new.id, new.trigger, new.insight, new.tags, new.pattern_bad, new.pattern_good);
   END;
 
   CREATE TRIGGER IF NOT EXISTS lessons_ad AFTER DELETE ON lessons BEGIN
-    INSERT INTO lessons_fts(lessons_fts, rowid, id, trigger, insight, tags)
-    VALUES ('delete', old.rowid, old.id, old.trigger, old.insight, old.tags);
+    INSERT INTO lessons_fts(lessons_fts, rowid, id, trigger, insight, tags, pattern_bad, pattern_good)
+    VALUES ('delete', old.rowid, old.id, old.trigger, old.insight, old.tags, old.pattern_bad, old.pattern_good);
   END;
 
   CREATE TRIGGER IF NOT EXISTS lessons_au AFTER UPDATE ON lessons BEGIN
-    INSERT INTO lessons_fts(lessons_fts, rowid, id, trigger, insight, tags)
-    VALUES ('delete', old.rowid, old.id, old.trigger, old.insight, old.tags);
-    INSERT INTO lessons_fts(rowid, id, trigger, insight, tags)
-    VALUES (new.rowid, new.id, new.trigger, new.insight, new.tags);
+    INSERT INTO lessons_fts(lessons_fts, rowid, id, trigger, insight, tags, pattern_bad, pattern_good)
+    VALUES ('delete', old.rowid, old.id, old.trigger, old.insight, old.tags, old.pattern_bad, old.pattern_good);
+    INSERT INTO lessons_fts(rowid, id, trigger, insight, tags, pattern_bad, pattern_good)
+    VALUES (new.rowid, new.id, new.trigger, new.insight, new.tags, new.pattern_bad, new.pattern_good);
   END;
 
   CREATE INDEX IF NOT EXISTS idx_lessons_created ON lessons(created);
