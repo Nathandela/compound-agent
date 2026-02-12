@@ -14,7 +14,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Lesson } from '../types.js';
+import type { MemoryItem } from '../types.js';
 
 import {
   archiveOldLessons,
@@ -67,7 +67,7 @@ describe('Compaction', () => {
     id: string,
     insight: string,
     options: { created?: string; retrievalCount?: number } = {}
-  ): Lesson => ({
+  ): MemoryItem => ({
     id,
     type: 'lesson',
     trigger: `trigger for ${insight}`,
@@ -85,7 +85,7 @@ describe('Compaction', () => {
   /**
    * Helper to create an old lesson (>90 days)
    */
-  const createOldLesson = (id: string, insight: string): Lesson => {
+  const createOldLesson = (id: string, insight: string): MemoryItem => {
     const oldDate = new Date();
     oldDate.setDate(oldDate.getDate() - 100); // 100 days ago
     return createLesson(id, insight, { created: oldDate.toISOString() });
@@ -217,7 +217,7 @@ describe('Compaction', () => {
       const lines = raw.trim().split('\n').filter(Boolean);
       expect(lines).toHaveLength(1);
 
-      const parsed = JSON.parse(lines[0]!) as Lesson;
+      const parsed = JSON.parse(lines[0]!) as MemoryItem;
       expect(parsed.id).toBe('L001');
     });
 
@@ -242,7 +242,7 @@ describe('Compaction', () => {
       const lines = raw.trim().split('\n').filter(Boolean);
       expect(lines).toHaveLength(1);
 
-      const parsed = JSON.parse(lines[0]!) as Lesson;
+      const parsed = JSON.parse(lines[0]!) as MemoryItem;
       expect(parsed.insight).toBe('updated');
     });
 
@@ -295,7 +295,7 @@ describe('Compaction', () => {
       // 30 days ago - not old enough
       const recentDate = new Date();
       recentDate.setDate(recentDate.getDate() - 30);
-      (recentLesson as Lesson).created = recentDate.toISOString();
+      (recentLesson as MemoryItem).created = recentDate.toISOString();
 
       await appendLesson(tempDir, recentLesson);
 
@@ -374,7 +374,7 @@ describe('Compaction', () => {
       oldDate.setDate(oldDate.getDate() - 100);
       const yearMonth = `${oldDate.getFullYear()}-${String(oldDate.getMonth() + 1).padStart(2, '0')}`;
       const archiveContent = await readArchive(tempDir, yearMonth);
-      const archived = JSON.parse(archiveContent.trim()) as Lesson;
+      const archived = JSON.parse(archiveContent.trim()) as MemoryItem;
 
       expect(archived.id).toBe('L001');
       expect(archived.tags).toEqual(['special', 'archive']);

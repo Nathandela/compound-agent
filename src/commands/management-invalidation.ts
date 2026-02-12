@@ -7,8 +7,8 @@
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
-import { appendLesson, readLessons } from '../memory/storage/index.js';
-import type { Lesson } from '../memory/types.js';
+import { appendMemoryItem, readMemoryItems } from '../memory/storage/index.js';
+import type { MemoryItem } from '../memory/types.js';
 
 import { out } from './shared.js';
 
@@ -33,10 +33,10 @@ export function registerInvalidationCommands(program: Command): void {
       const repoRoot = getRepoRoot();
 
       // Read all lessons
-      const { lessons } = await readLessons(repoRoot);
+      const { items } = await readMemoryItems(repoRoot);
 
       // Find the lesson
-      const lesson = lessons.find((l) => l.id === id);
+      const lesson = items.find((l) => l.id === id);
       if (!lesson) {
         out.error(`Lesson not found: ${id}`);
         process.exit(1);
@@ -49,14 +49,14 @@ export function registerInvalidationCommands(program: Command): void {
       }
 
       // Create updated lesson with invalidation
-      const updatedLesson: Lesson = {
+      const updatedItem: MemoryItem = {
         ...lesson,
         invalidatedAt: new Date().toISOString(),
         ...(options.reason !== undefined && { invalidationReason: options.reason }),
       };
 
       // Append the updated lesson (JSONL append-only pattern)
-      await appendLesson(repoRoot, updatedLesson);
+      await appendMemoryItem(repoRoot, updatedItem);
       out.success(`Lesson ${id} marked as invalid.`);
       if (options.reason) {
         console.log(`  Reason: ${options.reason}`);
@@ -77,10 +77,10 @@ export function registerInvalidationCommands(program: Command): void {
       const repoRoot = getRepoRoot();
 
       // Read all lessons
-      const { lessons } = await readLessons(repoRoot);
+      const { items } = await readMemoryItems(repoRoot);
 
       // Find the lesson
-      const lesson = lessons.find((l) => l.id === id);
+      const lesson = items.find((l) => l.id === id);
       if (!lesson) {
         out.error(`Lesson not found: ${id}`);
         process.exit(1);
@@ -92,33 +92,12 @@ export function registerInvalidationCommands(program: Command): void {
         return;
       }
 
-      // Create lesson without invalidation fields
-      const updatedLesson: Lesson = {
-        id: lesson.id,
-        type: lesson.type,
-        trigger: lesson.trigger,
-        insight: lesson.insight,
-        tags: lesson.tags,
-        source: lesson.source,
-        context: lesson.context,
-        created: lesson.created,
-        confirmed: lesson.confirmed,
-        supersedes: lesson.supersedes,
-        related: lesson.related,
-        // Include optional fields if present (excluding invalidation)
-        ...(lesson.evidence !== undefined && { evidence: lesson.evidence }),
-        ...(lesson.severity !== undefined && { severity: lesson.severity }),
-        ...(lesson.pattern !== undefined && { pattern: lesson.pattern }),
-        ...(lesson.deleted !== undefined && { deleted: lesson.deleted }),
-        ...(lesson.retrievalCount !== undefined && { retrievalCount: lesson.retrievalCount }),
-        ...(lesson.citation !== undefined && { citation: lesson.citation }),
-        ...(lesson.compactionLevel !== undefined && { compactionLevel: lesson.compactionLevel }),
-        ...(lesson.compactedAt !== undefined && { compactedAt: lesson.compactedAt }),
-        ...(lesson.lastRetrieved !== undefined && { lastRetrieved: lesson.lastRetrieved }),
-      };
+      // Remove invalidation fields (keep everything else)
+      const { invalidatedAt: _, invalidationReason: __, ...rest } = lesson;
+      const updatedItem = rest as MemoryItem;
 
       // Append the updated lesson (JSONL append-only pattern)
-      await appendLesson(repoRoot, updatedLesson);
+      await appendMemoryItem(repoRoot, updatedItem);
       out.success(`Lesson ${id} re-enabled (validated).`);
     });
 }

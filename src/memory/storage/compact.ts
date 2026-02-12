@@ -14,7 +14,7 @@ import { MemoryItemSchema } from '../types.js';
 import type { MemoryItem } from '../types.js';
 import { getLessonAgeDays } from '../../utils.js';
 
-import { LESSONS_PATH, readLessons } from './jsonl.js';
+import { LESSONS_PATH, readMemoryItems } from './jsonl.js';
 
 /** Relative path to archive directory from repo root */
 export const ARCHIVE_DIR = '.claude/lessons/archive';
@@ -114,7 +114,7 @@ export async function rewriteWithoutTombstones(repoRoot: string): Promise<number
   const tempPath = filePath + '.tmp';
 
   // Read deduplicated lessons (already handles last-write-wins)
-  const { lessons } = await readLessons(repoRoot);
+  const { items } = await readMemoryItems(repoRoot);
 
   // Count tombstones before rewrite
   const tombstoneCount = await countTombstones(repoRoot);
@@ -123,7 +123,7 @@ export async function rewriteWithoutTombstones(repoRoot: string): Promise<number
   await mkdir(dirname(filePath), { recursive: true });
 
   // Write clean lessons to temp file
-  const lines = lessons.map((lesson) => JSON.stringify(lesson) + '\n');
+  const lines = items.map((item) => JSON.stringify(item) + '\n');
   await writeFile(tempPath, lines.join(''), 'utf-8');
 
   // Atomic rename
@@ -152,16 +152,16 @@ function shouldArchive(lesson: MemoryItem): boolean {
  * Returns the number of lessons archived.
  */
 export async function archiveOldLessons(repoRoot: string): Promise<number> {
-  const { lessons } = await readLessons(repoRoot);
+  const { items } = await readMemoryItems(repoRoot);
 
   const toArchive: MemoryItem[] = [];
   const toKeep: MemoryItem[] = [];
 
-  for (const lesson of lessons) {
-    if (shouldArchive(lesson)) {
-      toArchive.push(lesson);
+  for (const item of items) {
+    if (shouldArchive(item)) {
+      toArchive.push(item);
     } else {
-      toKeep.push(lesson);
+      toKeep.push(item);
     }
   }
 

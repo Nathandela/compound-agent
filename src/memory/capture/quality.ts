@@ -10,7 +10,7 @@
  */
 
 import { searchKeyword, syncIfNeeded } from '../storage/index.js';
-import type { Lesson } from '../types.js';
+import type { MemoryItem } from '../types.js';
 
 /** Default similarity threshold for duplicate detection */
 const DEFAULT_SIMILARITY_THRESHOLD = 0.8;
@@ -69,7 +69,7 @@ export async function isNovel(
  */
 function checkSimilarity(
   insight: string,
-  lessons: Lesson[],
+  lessons: MemoryItem[],
   threshold: number
 ): NoveltyResult {
   const insightWords = new Set(insight.toLowerCase().split(/\s+/));

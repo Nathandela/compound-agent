@@ -2,7 +2,7 @@
  * SQLite search operations using FTS5 full-text search.
  */
 
-import type { Lesson, MemoryItem, MemoryItemType } from '../../types.js';
+import type { MemoryItem, MemoryItemType } from '../../types.js';
 
 import type { MemoryItemRow, RetrievalStat } from './types.js';
 import { openDb } from './connection.js';
@@ -94,7 +94,7 @@ export async function searchKeyword(
   query: string,
   limit: number,
   typeFilter?: MemoryItemType
-): Promise<Lesson[]> {
+): Promise<MemoryItem[]> {
   const database = openDb(repoRoot);
 
   const countResult = database.prepare('SELECT COUNT(*) as cnt FROM lessons').get() as {
@@ -116,7 +116,7 @@ export async function searchKeyword(
       `
       )
       .all(query, typeFilter, limit) as MemoryItemRow[];
-    return rows.map(rowToMemoryItem) as Lesson[];
+    return rows.map(rowToMemoryItem);
   }
 
   const rows = database
@@ -132,7 +132,7 @@ export async function searchKeyword(
     )
     .all(query, limit) as MemoryItemRow[];
 
-  return rows.map(rowToMemoryItem) as Lesson[];
+  return rows.map(rowToMemoryItem);
 }
 
 /**
