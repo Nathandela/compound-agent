@@ -310,12 +310,17 @@ export async function runStatus(repoRoot: string): Promise<void> {
 }
 
 /**
- * Register the one-shot setup action on the setup command.
- * Note: Does not use --json to avoid conflicts with subcommand options.
+ * Register the one-shot setup action as the default subcommand of setup.
+ * Using a default subcommand prevents its options (--uninstall, --dry-run)
+ * from being consumed by the parent when other subcommands like "claude"
+ * define the same flags.
  */
 export function registerSetupAllCommand(setupCommand: Command): void {
+  setupCommand.description('One-shot setup: init + hooks + MCP server + model');
+
   setupCommand
-    .description('One-shot setup: init + hooks + MCP server + model')
+    .command('all', { isDefault: true })
+    .description('Run full setup (default)')
     .option('--skip-model', 'Skip embedding model download')
     .option('--uninstall', 'Remove all generated files and configuration')
     .option('--update', 'Regenerate files (preserves user customizations)')
