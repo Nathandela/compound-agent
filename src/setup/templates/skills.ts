@@ -55,11 +55,12 @@ Create a concrete implementation plan by decomposing work into small, testable t
 ## Methodology
 1. Review brainstorm output for decisions and open questions
 2. Search memory with \`memory_search\` for architectural patterns and past mistakes
-3. Research codebase conventions (naming, file structure, patterns)
-4. Decompose into tasks small enough to verify individually
-5. Define acceptance criteria for each task
-6. Map dependencies between tasks
-7. Create beads issues: \`bd create --title="..." --type=task\`
+3. Spawn research agent team (repo-analyst for codebase, memory-analyst for deep memory search)
+4. Synthesize research findings into a coherent approach
+5. Decompose into tasks small enough to verify individually
+6. Define acceptance criteria for each task
+7. Map dependencies between tasks
+8. Create beads issues: \`bd create --title="..." --type=task\`
 
 ## Memory Integration
 - Call \`memory_search\` for patterns related to the feature area

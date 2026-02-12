@@ -33,28 +33,34 @@ Explore requirements through collaborative dialogue before committing to a plan.
 # Plan
 
 ## Purpose
-Create a structured implementation plan with concrete tasks and dependencies.
+Create a structured implementation plan enriched by semantic memory, with concrete tasks and dependencies.
 
 ## Workflow
 1. Parse the goal from \`$ARGUMENTS\`. If empty, ask the user what to plan.
-2. Call \`memory_search\` with the goal to find relevant past lessons.
-3. Analyze the codebase to understand current structure and constraints.
-4. Break the goal into concrete, ordered tasks with clear acceptance criteria.
-5. Identify dependencies between tasks.
-6. Create a beads issue for each task:
+2. Check for brainstorm output: run \`bd list\` to find a related brainstorm epic. If one exists, read its description for decisions and open questions.
+3. Call \`memory_search\` with the goal to retrieve relevant past lessons. Display retrieved memory items and incorporate them into planning context.
+4. Spawn research agent team:
+   - **Repo Analyst** (\`repo-analyst\`): explore codebase patterns, conventions, and architecture
+   - **Memory Analyst** (\`memory-analyst\`): deep dive into related memory items with multiple search queries
+5. Synthesize research findings from both agents into a coherent plan.
+6. Break the goal into concrete, ordered tasks with clear acceptance criteria.
+7. Create beads issues and map dependencies:
    \`\`\`bash
    bd create --title="<task>" --type=task --priority=<1-4>
+   bd dep add <dependent-task> <blocking-task>
    \`\`\`
-7. Output the plan as a structured list with task IDs and dependencies.
+8. Output the plan as a structured list with task IDs and dependency graph.
 
 ## Memory Integration
 - Call \`memory_search\` before planning to learn from past approaches.
 - Search for architectural patterns relevant to the goal.
+- Incorporate retrieved lessons into task descriptions as context.
 
 ## Beads Integration
 - Create one \`bd\` issue per task with \`bd create\`.
 - Set priority (1=critical, 4=low) based on dependency order.
-- Note blocking relationships in issue descriptions.
+- Map dependencies with \`bd dep add <dependent> <blocker>\`.
+- Each task should include acceptance criteria in its description.
 `,
 
   'work.md': `$ARGUMENTS
