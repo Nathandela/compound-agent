@@ -31,12 +31,12 @@ import type { RankedLesson } from '../memory/search/index.js';
 /**
  * Parse numeric limit and exit with user-friendly output on invalid input.
  */
-function parseLimitOrExit(rawLimit: string, optionName: string): number {
+function parseLimitOrExit(rawLimit: string, optionName: string, commandName: string): number {
   try {
     return parseLimit(rawLimit, optionName);
   } catch (err) {
     const message = err instanceof Error ? err.message : `Invalid ${optionName}`;
-    console.error(formatError('search', 'INVALID_LIMIT', message, `Use --${optionName} with a positive integer`));
+    console.error(formatError(commandName, 'INVALID_LIMIT', message, `Use --${optionName} with a positive integer`));
     process.exit(1);
   }
 }
@@ -155,7 +155,7 @@ export function registerRetrievalCommands(program: Command): void {
     .option('-n, --limit <number>', 'Maximum results', DEFAULT_SEARCH_LIMIT)
     .action(async function (this: Command, query: string, options: { limit: string }) {
       const repoRoot = getRepoRoot();
-      const limit = parseLimitOrExit(options.limit, 'limit');
+      const limit = parseLimitOrExit(options.limit, 'limit', 'search');
       const { verbose, quiet } = getGlobalOpts(this);
 
       // Sync index if JSONL has changed
@@ -202,7 +202,7 @@ export function registerRetrievalCommands(program: Command): void {
     .option('--invalidated', 'Show only invalidated lessons')
     .action(async function (this: Command, options: { limit: string; invalidated?: boolean }) {
       const repoRoot = getRepoRoot();
-      const limit = parseLimitOrExit(options.limit, 'limit');
+      const limit = parseLimitOrExit(options.limit, 'limit', 'list');
       const { verbose, quiet } = getGlobalOpts(this);
 
       const { items, skippedCount } = await readMemoryItems(repoRoot);
@@ -325,7 +325,7 @@ export function registerRetrievalCommands(program: Command): void {
     .option('-n, --limit <number>', 'Maximum results', DEFAULT_CHECK_PLAN_LIMIT)
     .action(async function (this: Command, options: { plan?: string; json?: boolean; limit: string }) {
       const repoRoot = getRepoRoot();
-      const limit = parseLimitOrExit(options.limit, 'limit');
+      const limit = parseLimitOrExit(options.limit, 'limit', 'check-plan');
       const { quiet } = getGlobalOpts(this);
 
       // Get plan text from --plan flag or stdin

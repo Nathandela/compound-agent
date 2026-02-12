@@ -157,6 +157,56 @@ describe('runRules', () => {
     const results = runRules(tmpDir, []);
     expect(results).toHaveLength(0);
   });
+
+  it('contains errors per-rule instead of crashing the whole run', () => {
+    const rules: Rule[] = [
+      {
+        id: 'bad-regex',
+        description: 'Invalid regex that should throw',
+        severity: 'error',
+        check: { type: 'file-pattern', glob: '**/*.ts', pattern: '(unclosed' },
+        remediation: 'Fix the regex.',
+      },
+      {
+        id: 'good-rule',
+        description: 'Always passes',
+        severity: 'info',
+        check: { type: 'script', command: 'true' },
+        remediation: 'n/a',
+      },
+    ];
+
+    // Should NOT throw -- errors are caught per-rule
+    const results = runRules(tmpDir, rules);
+    expect(results).toHaveLength(2);
+
+    // First rule should fail with an error violation
+    expect(results[0]!.passed).toBe(false);
+    expect(results[0]!.violations).toHaveLength(1);
+    expect(results[0]!.violations[0]!.message).toContain('Rule check error');
+
+    // Second rule should still run and pass
+    expect(results[1]!.passed).toBe(true);
+  });
+
+  it('runs script rules with correct cwd (baseDir)', () => {
+    // Create a marker file in tmpDir and check for it via script
+    writeFileSync(join(tmpDir, 'marker.txt'), 'exists');
+
+    const rules: Rule[] = [
+      {
+        id: 'cwd-check',
+        description: 'Script should run in baseDir',
+        severity: 'error',
+        check: { type: 'script', command: 'test -f marker.txt' },
+        remediation: 'Ensure cwd is set.',
+      },
+    ];
+
+    const results = runRules(tmpDir, rules);
+    expect(results).toHaveLength(1);
+    expect(results[0]!.passed).toBe(true);
+  });
 });
 
 // ============================================================================

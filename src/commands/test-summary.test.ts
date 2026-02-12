@@ -233,7 +233,7 @@ describe('formatTestSummary', () => {
     expect(output).not.toContain('FAIL ');
   });
 
-  it('should format summary with failures', async () => {
+  it('should format summary with failures showing only first failure', async () => {
     const { formatTestSummary } = await import('./test-summary.js');
 
     const summary: TestSummary = {
@@ -250,8 +250,12 @@ describe('formatTestSummary', () => {
 
     const output = formatTestSummary(summary, '/path/to/log');
     expect(output).toContain('TESTS: 17 passed, 3 failed, 0 skipped (1.23s)');
+    // Only first failure shown
     expect(output).toContain('FAIL src/rules/engine.test.ts > RuleEngine > should validate');
     expect(output).toContain('  AssertionError: expected true');
-    expect(output).toContain('FAIL src/rules/types.test.ts > RuleSchema > reject');
+    // Second failure NOT shown individually
+    expect(output).not.toContain('FAIL src/rules/types.test.ts > RuleSchema > reject');
+    // Remaining count shown
+    expect(output).toContain('... and 1 more failure(s)');
   });
 });

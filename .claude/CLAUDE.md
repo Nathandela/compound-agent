@@ -6,7 +6,7 @@
 **Name**: Compound Agent
 **Goal**: Learning system that helps Claude Code avoid repeating mistakes across sessions
 **Stack**: TypeScript + pnpm (deployable as dev dependency)
-**Status**: Spec finalized, ready to implement
+**Status**: Active development (core CLI + memory system functional)
 **Type**: shared-lib
 **Primary Language**: TypeScript
 
@@ -180,8 +180,8 @@ pnpm lint      # Zero violations
 
 | Resource | Module | Lifecycle |
 |----------|--------|-----------|
-| SQLite database | `src/storage/sqlite.ts` | Lazy init, one instance per process |
-| Embedding model | `src/embeddings/model.ts` | Lazy init, ~150MB RAM, one instance |
+| SQLite database | `src/memory/storage/sqlite/connection.ts` | Lazy init, one instance per process |
+| Embedding model | `src/memory/embeddings/model.ts` | Lazy init, ~150MB RAM, one instance |
 
 **Policy**: Singleton pattern required. Lazy initialization. Explicit cleanup via `closeDb()` / `unloadEmbedding()` before process exit. Singletons are internal implementation details (not global variables).
 

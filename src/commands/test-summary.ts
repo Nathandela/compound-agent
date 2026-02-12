@@ -36,8 +36,8 @@ export interface TestSummary {
 // Constants
 // ============================================================================
 
-/** Max length for error messages before truncation. */
-const MAX_ERROR_LENGTH = 200;
+/** Max length for a single error message line before truncation. */
+const MAX_ERROR_LINE_LENGTH = 200;
 
 /** Default log file path relative to repo root. */
 const LOG_REL_PATH = '.claude/.cache/last-test-run.log';
@@ -97,8 +97,8 @@ export function parseVitestOutput(output: string): TestSummary {
     // Skip location lines (start with ❯)
     if (errorLine.startsWith('\u276F')) continue;
 
-    const error = errorLine.length > MAX_ERROR_LENGTH
-      ? errorLine.slice(0, MAX_ERROR_LENGTH) + '...'
+    const error = errorLine.length > MAX_ERROR_LINE_LENGTH
+      ? errorLine.slice(0, MAX_ERROR_LINE_LENGTH) + '...'
       : errorLine;
 
     summary.failures.push({ name, error });
@@ -121,9 +121,13 @@ export function formatTestSummary(summary: TestSummary, logPath: string): string
     `TESTS: ${summary.passed} passed, ${summary.failed} failed, ${summary.skipped} skipped (${summary.duration})`
   );
 
-  for (const failure of summary.failures) {
-    lines.push(`FAIL ${failure.name}`);
-    lines.push(`  ${failure.error}`);
+  if (summary.failures.length > 0) {
+    const first = summary.failures[0]!;
+    lines.push(`FAIL ${first.name}`);
+    lines.push(`  ${first.error}`);
+    if (summary.failures.length > 1) {
+      lines.push(`  ... and ${summary.failures.length - 1} more failure(s)`);
+    }
   }
 
   lines.push(`LOG: Full output at ${logPath}`);

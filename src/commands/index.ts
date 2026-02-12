@@ -38,7 +38,9 @@ export function registerSetupCommands(program: Command): void {
   registerInitCommand(program);
   registerHooksCommand(program);
 
-  // Create the main setup command with one-shot action
+  // Create the main setup command. The "all" action is registered as the
+  // default subcommand so its options (--uninstall, --dry-run) don't
+  // conflict with identically-named options on the "claude" subcommand.
   const setupCommand = program.command('setup');
   registerSetupAllCommand(setupCommand);
 

@@ -9,6 +9,7 @@ import chalk from 'chalk';
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
+import { formatError } from '../cli-error-format.js';
 import { formatViolation, loadRuleConfig, runRules } from '../rules/index.js';
 
 import { getGlobalOpts, out } from './shared.js';
@@ -33,7 +34,7 @@ export function registerRulesCommands(program: Command): void {
         config = loadRuleConfig(repoRoot);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load rules config';
-        out.error(msg);
+        console.error(formatError('rules', 'CONFIG_ERROR', msg, 'Check .claude/rules.json syntax'));
         process.exit(1);
       }
 

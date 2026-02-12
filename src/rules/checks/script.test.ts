@@ -56,4 +56,24 @@ describe('runScriptCheck', () => {
     expect(violations).toHaveLength(1);
     expect(violations[0]!.message).toContain('exit code');
   });
+
+  it('runs command in the specified baseDir', () => {
+    const violations = runScriptCheck(
+      { type: 'script', command: 'test -f package.json' },
+      '/Users/Nathan/Documents/Code/learning_agent',
+    );
+
+    // package.json exists at the repo root, so this should pass
+    expect(violations).toHaveLength(0);
+  });
+
+  it('fails when baseDir does not contain expected file', () => {
+    const violations = runScriptCheck(
+      { type: 'script', command: 'test -f package.json' },
+      '/tmp',
+    );
+
+    // /tmp should not have a package.json
+    expect(violations).toHaveLength(1);
+  });
 });

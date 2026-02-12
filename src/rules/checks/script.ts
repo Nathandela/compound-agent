@@ -15,11 +15,11 @@ import type { Violation } from '../engine.js';
  * @param check - The script check configuration
  * @returns Array of violations (empty if command exits with expected code)
  */
-export function runScriptCheck(check: ScriptCheck): Violation[] {
+export function runScriptCheck(check: ScriptCheck, baseDir?: string): Violation[] {
   const expectedCode = check.expectExitCode ?? 0;
 
   try {
-    execSync(check.command, { stdio: ['pipe', 'pipe', 'pipe'] });
+    execSync(check.command, { stdio: ['pipe', 'pipe', 'pipe'], cwd: baseDir });
     // Exit code 0
     if (expectedCode !== 0) {
       return [{ message: `Script exited with exit code 0, expected ${expectedCode}` }];

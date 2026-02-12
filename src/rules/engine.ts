@@ -60,8 +60,13 @@ export function loadRuleConfig(baseDir: string): RuleConfig {
  */
 export function runRules(baseDir: string, rules: Rule[]): RuleResult[] {
   return rules.map((rule) => {
-    const violations = runCheck(baseDir, rule);
-    return { rule, violations, passed: violations.length === 0 };
+    try {
+      const violations = runCheck(baseDir, rule);
+      return { rule, violations, passed: violations.length === 0 };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Rule check failed';
+      return { rule, violations: [{ message: `Rule check error: ${message}` }], passed: false };
+    }
   });
 }
 
@@ -93,6 +98,6 @@ function runCheck(baseDir: string, rule: Rule): Violation[] {
     case 'file-size':
       return runFileSizeCheck(baseDir, rule.check);
     case 'script':
-      return runScriptCheck(rule.check);
+      return runScriptCheck(rule.check, baseDir);
   }
 }
