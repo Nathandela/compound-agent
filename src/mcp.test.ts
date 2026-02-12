@@ -20,12 +20,12 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fc, test } from '@fast-check/vitest';
 
-import type { Lesson } from './memory/types.js';
+import type { Lesson, MemoryItem, MemoryItemType } from './memory/types.js';
 
 // Test fixtures
 const SAMPLE_LESSON: Lesson = {
   id: 'L12345678',
-  type: 'quick',
+  type: 'lesson',
   trigger: 'Used wrong API version',
   insight: 'Always check API version in docs first',
   tags: ['api', 'documentation'],
@@ -39,7 +39,7 @@ const SAMPLE_LESSON: Lesson = {
 
 const HIGH_SEVERITY_LESSON: Lesson = {
   id: 'L87654321',
-  type: 'full',
+  type: 'lesson',
   trigger: 'Production outage from wrong config',
   insight: 'Always validate config before deploy',
   tags: ['config', 'production'],
@@ -51,6 +51,49 @@ const HIGH_SEVERITY_LESSON: Lesson = {
   related: [],
   severity: 'high',
   evidence: 'Deployment failed with invalid config error',
+};
+
+const SAMPLE_SOLUTION: MemoryItem = {
+  id: 'S12345678',
+  type: 'solution',
+  trigger: 'Database connection timeout on cold start',
+  insight: 'When the database connection fails, restart the connection pool',
+  tags: ['database', 'reliability'],
+  source: 'manual',
+  context: { tool: 'mcp', intent: 'solution capture' },
+  created: '2025-01-25T10:00:00Z',
+  confirmed: true,
+  supersedes: [],
+  related: [],
+};
+
+const SAMPLE_PATTERN: MemoryItem = {
+  id: 'P12345678',
+  type: 'pattern',
+  trigger: 'Saw pandas used for large CSV',
+  insight: 'Use Polars instead of pandas for files over 100MB',
+  pattern: { bad: 'import pandas as pd', good: 'import polars as pl' },
+  tags: ['performance', 'data'],
+  source: 'manual',
+  context: { tool: 'mcp', intent: 'pattern capture' },
+  created: '2025-01-26T10:00:00Z',
+  confirmed: true,
+  supersedes: [],
+  related: [],
+};
+
+const SAMPLE_PREFERENCE: MemoryItem = {
+  id: 'R12345678',
+  type: 'preference',
+  trigger: 'User asked to always use pnpm',
+  insight: 'Always use pnpm instead of npm in this project',
+  tags: ['workflow'],
+  source: 'manual',
+  context: { tool: 'mcp', intent: 'preference capture' },
+  created: '2025-01-27T10:00:00Z',
+  confirmed: true,
+  supersedes: [],
+  related: [],
 };
 
 describe('MCP Server', () => {
@@ -284,12 +327,12 @@ describe('MCP Server', () => {
       const mcpServer = createMcpServer(tempDir);
 
       const result = await mcpServer.callTool('memory_capture', {
-        insight: 'Always run tests before committing',
+        insight: 'The test suite takes about 6 seconds to run',
       });
 
       expect(result).toBeDefined();
       expect(result.lesson).toBeDefined();
-      expect(result.lesson.insight).toBe('Always run tests before committing');
+      expect(result.lesson.insight).toBe('The test suite takes about 6 seconds to run');
       expect(result.lesson.id).toMatch(/^L[a-f0-9]{8}$/);
     });
 
@@ -298,7 +341,7 @@ describe('MCP Server', () => {
       const { generateId } = await import('./memory/types.js');
       const mcpServer = createMcpServer(tempDir);
 
-      const insight = 'Always run tests before committing';
+      const insight = 'The test suite takes about 6 seconds to run';
       const expectedId = generateId(insight);
 
       const result = await mcpServer.callTool('memory_capture', { insight });
@@ -402,6 +445,192 @@ describe('MCP Server', () => {
       });
 
       expect(result.lesson.confirmed).toBe(true);
+    });
+  });
+
+  describe('memory_capture unified types', () => {
+    it('defaults to lesson type when no type specified', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'This project uses TypeScript with strict mode',
+      });
+
+      expect(result.item.type).toBe('lesson');
+      expect(result.item.id).toMatch(/^L/);
+    });
+
+    it('captures solution type when explicitly specified', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'When connection fails, restart the pool',
+        type: 'solution',
+      });
+
+      expect(result.item.type).toBe('solution');
+      expect(result.item.id).toMatch(/^S/);
+    });
+
+    it('captures pattern type with bad/good fields', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'Use Polars instead of pandas for large files',
+        type: 'pattern',
+        pattern: { bad: 'import pandas', good: 'import polars' },
+      });
+
+      expect(result.item.type).toBe('pattern');
+      expect(result.item.id).toMatch(/^P/);
+      expect(result.item.pattern).toEqual({ bad: 'import pandas', good: 'import polars' });
+    });
+
+    it('captures preference type when explicitly specified', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'Always use pnpm instead of npm in this project',
+        type: 'preference',
+      });
+
+      expect(result.item.type).toBe('preference');
+      expect(result.item.id).toMatch(/^R/);
+    });
+
+    it('infers pattern type when insight matches and pattern field given', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'Use vitest instead of jest for this project',
+        pattern: { bad: 'import jest', good: 'import vitest' },
+      });
+
+      expect(result.item.type).toBe('pattern');
+      expect(result.item.id).toMatch(/^P/);
+    });
+
+    it('falls back to lesson when pattern inferred but no pattern field', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      // Insight matches pattern heuristic but no pattern field provided
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'Use vitest instead of jest for this project',
+      });
+
+      // Falls back to lesson since PatternItemSchema requires pattern field
+      expect(result.item.type).toBe('lesson');
+      expect(result.item.id).toMatch(/^L/);
+    });
+
+    it('infers preference type from insight text when no type given', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'Always run pnpm lint before committing code changes',
+      });
+
+      expect(result.item.type).toBe('preference');
+      expect(result.item.id).toMatch(/^R/);
+    });
+
+    it('infers solution type from insight text when no type given', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'When the build fails, clear the cache first',
+      });
+
+      expect(result.item.type).toBe('solution');
+      expect(result.item.id).toMatch(/^S/);
+    });
+
+    it('persists non-lesson types to JSONL', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const { readMemoryItems } = await import('./memory/storage/index.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      await mcpServer.callTool('memory_capture', {
+        insight: 'When the test suite hangs, check for open handles',
+        type: 'solution',
+      });
+
+      const { items } = await readMemoryItems(tempDir);
+      expect(items.some((i) => i.type === 'solution')).toBe(true);
+    });
+
+    it('backward compat: result still has lesson field for lesson type', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'This project uses TypeScript with strict mode',
+        type: 'lesson',
+      });
+
+      // Both item and lesson should be present for backward compat
+      expect(result.item).toBeDefined();
+      expect(result.lesson).toBeDefined();
+      expect(result.item.type).toBe('lesson');
+    });
+  });
+
+  describe('memory_search type filter', () => {
+    beforeEach(async () => {
+      // Write mixed types to JSONL
+      const jsonlPath = join(tempDir, '.claude', 'lessons', 'index.jsonl');
+      await writeFile(
+        jsonlPath,
+        [
+          JSON.stringify(SAMPLE_LESSON),
+          JSON.stringify(SAMPLE_SOLUTION),
+          JSON.stringify(SAMPLE_PATTERN),
+          JSON.stringify(SAMPLE_PREFERENCE),
+        ].join('\n') + '\n'
+      );
+    });
+
+    it('returns all types when no type filter specified', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_search', {
+        query: 'project configuration',
+      });
+
+      // Should return results (may include any type)
+      expect(result.lessons).toBeDefined();
+      expect(Array.isArray(result.lessons)).toBe(true);
+    });
+
+    it('filters results by type when type parameter provided', async () => {
+      const searchModule = await import('./memory/search/index.js');
+      vi.spyOn(searchModule, 'searchVector').mockResolvedValue([
+        { lesson: SAMPLE_LESSON as Lesson, score: 0.9 },
+        { lesson: SAMPLE_SOLUTION as unknown as Lesson, score: 0.8 },
+        { lesson: SAMPLE_PATTERN as unknown as Lesson, score: 0.7 },
+      ]);
+
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_search', {
+        query: 'any query',
+        type: 'lesson',
+      });
+
+      // Should only return lesson-type items
+      for (const item of result.lessons) {
+        expect(item.lesson.type).toBe('lesson');
+      }
     });
   });
 
@@ -564,9 +793,9 @@ describe('MCP Server', () => {
       }
     });
 
-    it('delegates capture to appendLesson', async () => {
+    it('delegates capture to appendMemoryItem', async () => {
       const storageModule = await import('./memory/storage/index.js');
-      const appendLessonSpy = vi.spyOn(storageModule, 'appendLesson');
+      const appendMemoryItemSpy = vi.spyOn(storageModule, 'appendMemoryItem');
 
       const { createMcpServer } = await import('./mcp.js');
       const mcpServer = createMcpServer(tempDir);
@@ -575,7 +804,7 @@ describe('MCP Server', () => {
         insight: 'Test insight for spy',
       });
 
-      expect(appendLessonSpy).toHaveBeenCalled();
+      expect(appendMemoryItemSpy).toHaveBeenCalled();
     });
 
     it('delegates prime to loadSessionLessons', async () => {
@@ -923,6 +1152,199 @@ describe('MCP Server', () => {
         expect(retrieved?.insight).toBe(insight);
       }
     );
+  });
+
+  describe('unified memory types', () => {
+    it('memory_capture defaults to lesson type when no type specified', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'Default type should be lesson',
+      });
+
+      expect(result.lesson.type).toBe('lesson');
+      expect(result.lesson.id).toMatch(/^L[a-f0-9]{8}$/);
+    });
+
+    it('memory_capture creates solution type', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'Fix timeout by increasing retry count',
+        trigger: 'API timeout errors',
+        type: 'solution',
+      });
+
+      expect(result.lesson.type).toBe('solution');
+      expect(result.lesson.id).toMatch(/^S[a-f0-9]{8}$/);
+      expect(result.lesson.insight).toBe('Fix timeout by increasing retry count');
+    });
+
+    it('memory_capture creates pattern type with pattern field', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'Use map instead of forEach for transforms',
+        type: 'pattern',
+        pattern: { bad: 'arr.forEach(x => out.push(f(x)))', good: 'arr.map(f)' },
+      });
+
+      expect(result.lesson.type).toBe('pattern');
+      expect(result.lesson.id).toMatch(/^P[a-f0-9]{8}$/);
+      expect(result.lesson.pattern).toEqual({
+        bad: 'arr.forEach(x => out.push(f(x)))',
+        good: 'arr.map(f)',
+      });
+    });
+
+    it('memory_capture creates preference type', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'Always use pnpm instead of npm',
+        type: 'preference',
+      });
+
+      expect(result.lesson.type).toBe('preference');
+      expect(result.lesson.id).toMatch(/^R[a-f0-9]{8}$/);
+    });
+
+    it('memory_capture persists all types to JSONL', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const { readMemoryItems } = await import('./memory/storage/index.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      await mcpServer.callTool('memory_capture', {
+        insight: 'A lesson about testing memory types',
+        type: 'lesson',
+      });
+      await mcpServer.callTool('memory_capture', {
+        insight: 'A solution for timeout issues in tests',
+        type: 'solution',
+      });
+      await mcpServer.callTool('memory_capture', {
+        insight: 'A pattern for better code style choices',
+        type: 'pattern',
+        pattern: { bad: 'bad code', good: 'good code' },
+      });
+      await mcpServer.callTool('memory_capture', {
+        insight: 'A preference for tooling choices always',
+        type: 'preference',
+      });
+
+      const { items } = await readMemoryItems(tempDir);
+      const types = items.map((i) => i.type).sort();
+      expect(types).toEqual(['lesson', 'pattern', 'preference', 'solution']);
+    });
+
+    it('memory_capture rejects invalid type', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      await expect(
+        mcpServer.callTool('memory_capture', {
+          insight: 'This should fail with bad type',
+          type: 'invalid_type',
+        })
+      ).rejects.toThrow();
+    });
+
+    it('memory_capture requires pattern field for pattern type', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      // Pattern type without pattern field should fail validation
+      await expect(
+        mcpServer.callTool('memory_capture', {
+          insight: 'A pattern without pattern field',
+          type: 'pattern',
+        })
+      ).rejects.toThrow();
+    });
+
+    it('memory_search returns mixed types in results', async () => {
+      // Mock searchVector to return mixed-type results (embedding model not available in tests)
+      const solutionItem = {
+        ...SAMPLE_LESSON,
+        id: 'S12345678',
+        type: 'solution' as const,
+        insight: 'Fix timeout by retrying the request',
+      };
+      const preferenceItem = {
+        ...SAMPLE_LESSON,
+        id: 'R12345678',
+        type: 'preference' as const,
+        insight: 'Prefer pnpm in this project',
+      };
+
+      vi.resetModules();
+      vi.doMock('./memory/search/index.js', async () => {
+        const actual = await vi.importActual('./memory/search/index.js');
+        return {
+          ...actual as Record<string, unknown>,
+          searchVector: vi.fn().mockResolvedValue([
+            { lesson: SAMPLE_LESSON, score: 0.9 },
+            { lesson: solutionItem as Lesson, score: 0.8 },
+            { lesson: preferenceItem as Lesson, score: 0.7 },
+          ]),
+        };
+      });
+
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_search', {
+        query: 'testing mixed search results',
+      });
+
+      expect(result.lessons.length).toBe(3);
+      // Results should contain items of different types
+      const resultTypes = new Set(result.lessons.map((r: { lesson: MemoryItem }) => r.lesson.type));
+      expect(resultTypes.size).toBe(3);
+      expect(resultTypes.has('lesson')).toBe(true);
+      expect(resultTypes.has('solution')).toBe(true);
+      expect(resultTypes.has('preference')).toBe(true);
+    });
+
+    it('memory://prime includes high-severity items of all types', async () => {
+      const { appendMemoryItem } = await import('./memory/storage/index.js');
+      const { generateId } = await import('./memory/types.js');
+
+      // Add high-severity items of different types
+      const types: MemoryItemType[] = ['lesson', 'solution', 'preference'];
+      for (const t of types) {
+        const insight = `Critical ${t} for prime test`;
+        const item: MemoryItem = {
+          id: generateId(insight, t),
+          type: t,
+          trigger: `trigger for ${t}`,
+          insight,
+          tags: ['critical'],
+          source: 'manual',
+          context: { tool: 'test', intent: 'testing' },
+          created: new Date().toISOString(),
+          confirmed: true,
+          supersedes: [],
+          related: [],
+          severity: 'high',
+        } as MemoryItem;
+        await appendMemoryItem(tempDir, item);
+      }
+
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.readResource('memory://prime');
+
+      // Prime should contain insights from all high-severity types
+      expect(result.content).toContain('Critical lesson for prime test');
+      expect(result.content).toContain('Critical solution for prime test');
+      expect(result.content).toContain('Critical preference for prime test');
+    });
   });
 
   describe('signal handlers for cleanup', () => {

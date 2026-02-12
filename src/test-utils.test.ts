@@ -11,7 +11,7 @@ describe('test-utils', () => {
 
       expect(lesson.id).toBe('L001');
       expect(lesson.insight).toBe('test insight');
-      expect(lesson.type).toBe('quick');
+      expect(lesson.type).toBe('lesson');
       expect(lesson.trigger).toBe('trigger for test insight');
       expect(lesson.tags).toEqual([]);
       expect(lesson.source).toBe('manual');
@@ -38,8 +38,8 @@ describe('test-utils', () => {
     });
 
     it('uses provided type when specified', () => {
-      const lesson = createLesson({ type: 'full' });
-      expect(lesson.type).toBe('full');
+      const lesson = createLesson({ type: 'lesson' });
+      expect(lesson.type).toBe('lesson');
     });
 
     it('uses provided trigger when specified', () => {
@@ -162,7 +162,7 @@ describe('test-utils', () => {
       const lesson = createQuickLesson('Q001', 'Quick insight');
 
       expect(lesson.id).toBe('Q001');
-      expect(lesson.type).toBe('quick');
+      expect(lesson.type).toBe('lesson');
       expect(lesson.insight).toBe('Quick insight');
       expect(lesson.trigger).toBe('trigger for Quick insight');
       expect(lesson.tags).toEqual([]);
@@ -219,7 +219,7 @@ describe('test-utils', () => {
       const lesson = createFullLesson('F001', 'Full insight');
 
       expect(lesson.id).toBe('F001');
-      expect(lesson.type).toBe('full');
+      expect(lesson.type).toBe('lesson');
       expect(lesson.insight).toBe('Full insight');
       expect(lesson.evidence).toBe('Test evidence');
       expect(lesson.severity).toBe('medium');

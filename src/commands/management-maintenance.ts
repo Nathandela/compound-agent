@@ -16,7 +16,7 @@ import {
   getRetrievalStats,
   LESSONS_PATH,
   needsCompaction,
-  readLessons,
+  readMemoryItems,
   rebuildIndex,
   syncIfNeeded,
   TOMBSTONE_THRESHOLD,
@@ -118,10 +118,10 @@ export function registerMaintenanceCommands(program: Command): void {
       // Sync index to ensure accurate stats
       await syncIfNeeded(repoRoot);
 
-      // Read lessons from JSONL to get accurate counts
-      const { lessons } = await readLessons(repoRoot);
+      // Read all memory items from JSONL to get accurate counts
+      const { items } = await readMemoryItems(repoRoot);
       const deletedCount = await countTombstones(repoRoot);
-      const totalLessons = lessons.length;
+      const totalLessons = items.length;
 
       // Get retrieval stats from SQLite
       const retrievalStats = getRetrievalStats(repoRoot);
@@ -153,8 +153,8 @@ export function registerMaintenanceCommands(program: Command): void {
       let recentCount = 0;  // <30 days
       let mediumCount = 0;  // 30-90 days
       let oldCount = 0;     // >90 days
-      for (const lesson of lessons) {
-        const ageDays = getLessonAgeDays(lesson);
+      for (const item of items) {
+        const ageDays = getLessonAgeDays(item);
         if (ageDays < 30) {
           recentCount++;
         } else if (ageDays <= AGE_FLAG_THRESHOLD_DAYS) {
@@ -164,9 +164,24 @@ export function registerMaintenanceCommands(program: Command): void {
         }
       }
 
+      // Compute type breakdown
+      const typeCounts: Record<string, number> = {};
+      for (const item of items) {
+        typeCounts[item.type] = (typeCounts[item.type] ?? 0) + 1;
+      }
+
       // Format output
       const deletedInfo = deletedCount > 0 ? ` (${deletedCount} deleted)` : '';
       console.log(`Lessons: ${totalLessons} total${deletedInfo}`);
+
+      // Show type breakdown if more than one type exists
+      if (Object.keys(typeCounts).length > 1 || (Object.keys(typeCounts).length === 1 && !typeCounts['lesson'])) {
+        const breakdown = Object.entries(typeCounts)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([type, count]) => `${count} ${type}`)
+          .join(', ');
+        console.log(`Types: ${breakdown}`);
+      }
 
       // Show warning if lesson count exceeds threshold (context pollution prevention)
       if (totalLessons > LESSON_COUNT_WARNING_THRESHOLD) {

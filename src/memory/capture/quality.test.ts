@@ -255,6 +255,15 @@ describe('quality filters', () => {
       expect(result.shouldPropose).toBe(true);
     });
 
+    it('returns true for specific+novel but non-actionable insight', async () => {
+      // Actionability gate removed: capture aggressively, prune later
+      const result = await shouldPropose(
+        tempDir,
+        'The database sometimes has connection issues in development'
+      );
+      expect(result.shouldPropose).toBe(true);
+    });
+
     it('returns false for duplicate insight', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars instead of pandas for files'));
       await rebuildIndex(tempDir);
@@ -269,15 +278,6 @@ describe('quality filters', () => {
       const result = await shouldPropose(tempDir, 'Be careful when editing the database');
       expect(result.shouldPropose).toBe(false);
       expect(result.reason).toContain('vague');
-    });
-
-    it('returns false for non-actionable insight', async () => {
-      const result = await shouldPropose(
-        tempDir,
-        'The database sometimes has connection issues in development'
-      );
-      expect(result.shouldPropose).toBe(false);
-      expect(result.reason).toContain('action');
     });
 
     it('returns false for too short insight', async () => {

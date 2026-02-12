@@ -1,11 +1,14 @@
 /**
  * Capture module - Quality filters and trigger detection
  *
- * Quality filters ensure lessons are novel, specific, and actionable.
+ * Quality filters ensure memory items are novel and specific.
  * Trigger detection identifies learning opportunities from:
  * - User corrections
  * - Self-corrections
  * - Test failures
+ *
+ * Type inference classifies insights into memory item types:
+ * pattern, solution, preference, or lesson (default).
  */
 
 // Quality filters
@@ -18,8 +21,8 @@ export type {
   SpecificityResult,
 } from './quality.js';
 
-// Trigger detection
-export { detectSelfCorrection, detectTestFailure, detectUserCorrection } from './triggers.js';
+// Trigger detection & type inference
+export { detectSelfCorrection, detectTestFailure, detectUserCorrection, inferMemoryItemType } from './triggers.js';
 export type {
   CorrectionSignal,
   DetectedCorrection,

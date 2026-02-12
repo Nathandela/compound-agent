@@ -6,7 +6,7 @@
  */
 
 import { embedText } from '../embeddings/index.js';
-import { contentHash, getCachedEmbedding, readLessons, setCachedEmbedding } from '../storage/index.js';
+import { contentHash, getCachedEmbedding, readMemoryItems, setCachedEmbedding } from '../storage/index.js';
 import type { Lesson } from '../types.js';
 
 /**
@@ -34,11 +34,18 @@ export function cosineSimilarity(a: number[], b: number[]): number {
   return dotProduct / magnitude;
 }
 
-/** Lesson with similarity score */
+/**
+ * Memory item with similarity score.
+ * The `lesson` field holds any MemoryItem type (not just Lesson).
+ * Field name kept for backward compatibility.
+ */
 export interface ScoredLesson {
   lesson: Lesson;
   score: number;
 }
+
+/** Alias for ScoredLesson for unified memory API consumers. */
+export type ScoredMemoryItem = ScoredLesson;
 
 /** Options for vector search */
 export interface SearchVectorOptions {
@@ -60,33 +67,33 @@ export async function searchVector(
   options?: SearchVectorOptions
 ): Promise<ScoredLesson[]> {
   const limit = options?.limit ?? DEFAULT_LIMIT;
-  // Read all lessons
-  const { lessons } = await readLessons(repoRoot);
-  if (lessons.length === 0) return [];
+  // Read all memory items (all types)
+  const { items } = await readMemoryItems(repoRoot);
+  if (items.length === 0) return [];
 
   // Embed the query
   const queryVector = await embedText(query);
 
-  // Score each lesson, skipping invalidated ones
+  // Score each item, skipping invalidated ones
   const scored: ScoredLesson[] = [];
-  for (const lesson of lessons) {
-    // Skip invalidated lessons
-    if (lesson.invalidatedAt) continue;
+  for (const item of items) {
+    // Skip invalidated items
+    if (item.invalidatedAt) continue;
 
-    const lessonText = `${lesson.trigger} ${lesson.insight}`;
-    const hash = contentHash(lesson.trigger, lesson.insight);
+    const itemText = `${item.trigger} ${item.insight}`;
+    const hash = contentHash(item.trigger, item.insight);
 
     // Try cache first
-    let lessonVector = getCachedEmbedding(repoRoot, lesson.id, hash);
+    let itemVector = getCachedEmbedding(repoRoot, item.id, hash);
 
-    if (!lessonVector) {
+    if (!itemVector) {
       // Cache miss - compute and store
-      lessonVector = await embedText(lessonText);
-      setCachedEmbedding(repoRoot, lesson.id, lessonVector, hash);
+      itemVector = await embedText(itemText);
+      setCachedEmbedding(repoRoot, item.id, itemVector, hash);
     }
 
-    const score = cosineSimilarity(queryVector, lessonVector);
-    scored.push({ lesson, score });
+    const score = cosineSimilarity(queryVector, itemVector);
+    scored.push({ lesson: item as Lesson, score });
   }
 
   // Sort by score descending and take top N

@@ -9,7 +9,7 @@ import { appendLesson } from '../storage/jsonl.js';
 import { closeDb, getRetrievalStats, rebuildIndex } from '../storage/sqlite/index.js';
 import { createFullLesson, createQuickLesson, shouldSkipEmbeddingTests } from '../../test-utils.js';
 
-import { formatLessonsCheck, retrieveForPlan } from './plan.js';
+import { formatLessonsCheck, formatMemoryCheck, retrieveForPlan } from './plan.js';
 
 // Check if embedding tests should be skipped (env var, model unavailable, or runtime unusable)
 const modelAvailable = isModelAvailable();
@@ -113,6 +113,12 @@ describe('plan retrieval', () => {
       expect(message).toContain('Lessons Check');
       expect(message).toContain('Use JWT for auth');
       expect(message).toContain('Validate input always');
+    });
+  });
+
+  describe('formatMemoryCheck alias', () => {
+    it('is an alias for formatLessonsCheck', () => {
+      expect(formatMemoryCheck).toBe(formatLessonsCheck);
     });
   });
 

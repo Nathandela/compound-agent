@@ -16,10 +16,11 @@ import { z } from 'zod';
 
 import { getPrimeContext } from './commands/management-prime.js';
 import { VERSION } from './index.js';
+import { inferMemoryItemType } from './memory/capture/triggers.js';
 import { rankLessons, searchVector } from './memory/search/index.js';
-import { appendLesson, closeDb } from './memory/storage/index.js';
-import { generateId } from './memory/types.js';
-import type { Lesson } from './memory/types.js';
+import { appendMemoryItem, closeDb } from './memory/storage/index.js';
+import { generateId, MemoryItemTypeSchema, PatternSchema } from './memory/types.js';
+import type { Lesson, MemoryItem, MemoryItemType } from './memory/types.js';
 
 /** Default max results for search */
 const DEFAULT_MAX_RESULTS = 5;
@@ -63,6 +64,9 @@ export function isSearchError(result: SearchToolResult): result is SearchToolErr
 
 /** Result from memory_capture tool */
 interface CaptureToolResult {
+  /** Unified memory item (all types) */
+  item: MemoryItem;
+  /** Backward-compatible alias (same object as item) */
   lesson: Lesson;
 }
 
@@ -82,17 +86,22 @@ interface ResourceResult {
 async function handleSearch(
   repoRoot: string,
   query: string,
-  maxResults?: number
+  maxResults?: number,
+  typeFilter?: MemoryItemType
 ): Promise<SearchToolResult> {
   try {
     const limit = maxResults ?? DEFAULT_MAX_RESULTS;
     const results = await searchVector(repoRoot, query, { limit });
     const ranked = rankLessons(results);
-    const lessons: SearchResult[] = ranked.map((r) => ({
+    let lessons: SearchResult[] = ranked.map((r) => ({
       lesson: r.lesson,
       score: r.score,
       finalScore: r.finalScore,
     }));
+    // Filter by type if specified
+    if (typeFilter) {
+      lessons = lessons.filter((r) => r.lesson.type === typeFilter);
+    }
     return { lessons };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
@@ -108,32 +117,48 @@ async function handleSearch(
  * Shared capture logic for both MCP protocol and typed API paths.
  *
  * @param repoRoot - Repository root directory
- * @param insight - Lesson insight text
+ * @param insight - Memory item insight text
  * @param trigger - Optional trigger description
  * @param tags - Optional tags array
- * @returns Captured lesson
+ * @param type - Memory item type (default: 'lesson')
+ * @param pattern - Optional code pattern (required for 'pattern' type)
+ * @returns Captured memory item (in `lesson` field for backward compat)
  */
 async function handleCapture(
   repoRoot: string,
   insight: string,
   trigger?: string,
-  tags?: string[]
+  tags?: string[],
+  type?: MemoryItemType,
+  pattern?: { bad: string; good: string }
 ): Promise<CaptureToolResult> {
-  const lesson: Lesson = {
-    id: generateId(insight),
-    type: 'quick',
+  // Infer type from insight text if not explicitly provided
+  let itemType = type ?? inferMemoryItemType(insight);
+  // Require pattern field when type is explicitly 'pattern'
+  if (type === 'pattern' && !pattern) {
+    throw new Error('Pattern type requires a pattern field with { bad, good }');
+  }
+  // If inferred as 'pattern' but no pattern field, fall back to 'lesson'
+  // (PatternItemSchema requires pattern field)
+  if (itemType === 'pattern' && !pattern && !type) {
+    itemType = 'lesson';
+  }
+  const item: MemoryItem = {
+    type: itemType,
+    id: generateId(insight, itemType),
     trigger: trigger ?? 'Manual capture via MCP',
     insight,
     tags: tags ?? [],
     source: 'manual',
-    context: { tool: 'mcp', intent: 'lesson capture' },
+    context: { tool: 'mcp', intent: 'memory capture' },
     created: new Date().toISOString(),
     confirmed: true,
     supersedes: [],
     related: [],
-  };
-  await appendLesson(repoRoot, lesson);
-  return { lesson };
+    ...(pattern ? { pattern } : {}),
+  } as MemoryItem;
+  await appendMemoryItem(repoRoot, item);
+  return { item, lesson: item as Lesson };
 }
 
 /** MCP Server wrapper with typed tool/resource methods */
@@ -180,6 +205,7 @@ export function createMcpServer(repoRoot: string): CompoundAgentMcpServer {
   const searchInputSchema = {
     query: z.string().min(1, 'Query must be non-empty'),
     maxResults: z.number().int().positive().max(100).optional(),
+    type: MemoryItemTypeSchema.optional(),
   };
 
   server.registerTool(
@@ -194,8 +220,8 @@ export function createMcpServer(repoRoot: string): CompoundAgentMcpServer {
 Returns relevant memory items ranked by similarity and severity.`,
       inputSchema: searchInputSchema,
     },
-    async ({ query, maxResults }) => {
-      const output = await handleSearch(repoRoot, query, maxResults);
+    async ({ query, maxResults, type: typeFilter }) => {
+      const output = await handleSearch(repoRoot, query, maxResults, typeFilter);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(output) }],
       };
@@ -205,7 +231,7 @@ Returns relevant memory items ranked by similarity and severity.`,
   // Store handler for direct invocation
   toolHandlers['memory_search'] = async (params): Promise<SearchToolResult> => {
     const parsed = z.object(searchInputSchema).parse(params);
-    return handleSearch(repoRoot, parsed.query, parsed.maxResults);
+    return handleSearch(repoRoot, parsed.query, parsed.maxResults, parsed.type);
   };
 
   // =========================================================================
@@ -215,6 +241,8 @@ Returns relevant memory items ranked by similarity and severity.`,
     insight: z.string().min(MIN_INSIGHT_LENGTH, `Insight must be at least ${MIN_INSIGHT_LENGTH} characters`),
     trigger: z.string().min(1).optional(),
     tags: z.array(z.string().min(1)).optional(),
+    type: MemoryItemTypeSchema.optional(),
+    pattern: PatternSchema.optional(),
   };
 
   server.registerTool(
@@ -226,11 +254,12 @@ Returns relevant memory items ranked by similarity and severity.`,
 - Test fail → fix → pass cycles
 - Discovering project-specific knowledge
 
+Types: lesson (default), solution, pattern (requires pattern field), preference.
 Saves immediately and shows what was captured.`,
       inputSchema: captureInputSchema,
     },
-    async ({ insight, trigger, tags }) => {
-      const output = await handleCapture(repoRoot, insight, trigger, tags);
+    async ({ insight, trigger, tags, type, pattern }) => {
+      const output = await handleCapture(repoRoot, insight, trigger, tags, type, pattern);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(output) }],
       };
@@ -240,7 +269,7 @@ Saves immediately and shows what was captured.`,
   // Store handler for direct invocation
   toolHandlers['memory_capture'] = async (params): Promise<CaptureToolResult> => {
     const parsed = z.object(captureInputSchema).parse(params);
-    return handleCapture(repoRoot, parsed.insight, parsed.trigger, parsed.tags);
+    return handleCapture(repoRoot, parsed.insight, parsed.trigger, parsed.tags, parsed.type, parsed.pattern);
   };
 
   // =========================================================================

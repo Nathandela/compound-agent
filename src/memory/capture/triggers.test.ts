@@ -4,6 +4,7 @@ import {
   detectSelfCorrection,
   detectTestFailure,
   detectUserCorrection,
+  inferMemoryItemType,
 } from './triggers.js';
 import type { CorrectionSignal, EditHistory, TestResult } from './triggers.js';
 
@@ -291,6 +292,54 @@ describe('trigger detection', () => {
       expect(result).not.toBeNull();
       // All lines filtered out due to empty trim, falls back to empty string
       expect(result?.trigger).toBe('Test failure in src/app.test.ts: ');
+    });
+  });
+
+  describe('inferMemoryItemType', () => {
+    it('returns "pattern" for "use X instead of Y"', () => {
+      expect(inferMemoryItemType('Use Polars instead of pandas for large datasets')).toBe('pattern');
+    });
+
+    it('returns "pattern" for "prefer X over Y"', () => {
+      expect(inferMemoryItemType('Prefer async functions over callbacks in this codebase')).toBe('pattern');
+    });
+
+    it('returns "pattern" for "prefer X to Y"', () => {
+      expect(inferMemoryItemType('Prefer pnpm to npm for this project')).toBe('pattern');
+    });
+
+    it('returns "solution" for "when X happens, do Y"', () => {
+      expect(inferMemoryItemType('When the database connection fails, restart the pool')).toBe('solution');
+    });
+
+    it('returns "solution" for "if X then Y"', () => {
+      expect(inferMemoryItemType('If tests fail with ENOENT, check that fixtures exist')).toBe('solution');
+    });
+
+    it('returns "solution" for "to fix X, do Y"', () => {
+      expect(inferMemoryItemType('To fix the import error, add the .js extension')).toBe('solution');
+    });
+
+    it('returns "preference" for "always do X"', () => {
+      expect(inferMemoryItemType('Always run pnpm lint before committing code changes')).toBe('preference');
+    });
+
+    it('returns "preference" for "never do X"', () => {
+      expect(inferMemoryItemType('Never deploy without running the full test suite first')).toBe('preference');
+    });
+
+    it('returns "lesson" as default for observations', () => {
+      expect(inferMemoryItemType('The database sometimes has connection issues in development')).toBe('lesson');
+    });
+
+    it('returns "lesson" for generic statements', () => {
+      expect(inferMemoryItemType('This project uses TypeScript with strict mode enabled')).toBe('lesson');
+    });
+
+    it('is case insensitive', () => {
+      expect(inferMemoryItemType('USE vitest instead of jest for this project')).toBe('pattern');
+      expect(inferMemoryItemType('WHEN the build fails, clear the cache first')).toBe('solution');
+      expect(inferMemoryItemType('ALWAYS check types before pushing')).toBe('preference');
     });
   });
 });

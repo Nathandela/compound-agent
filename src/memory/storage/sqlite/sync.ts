@@ -6,8 +6,8 @@ import { statSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Database as DatabaseType } from 'better-sqlite3';
 
-import type { Lesson } from '../../types.js';
-import { LESSONS_PATH, readLessons } from '../jsonl.js';
+import type { MemoryItem } from '../../types.js';
+import { LESSONS_PATH, readMemoryItems } from '../jsonl.js';
 
 import type { SyncOptions } from './types.js';
 import { openDb } from './connection.js';
@@ -59,17 +59,17 @@ function setLastSyncMtime(database: DatabaseType, mtime: number): void {
 
 /**
  * Rebuild the SQLite index from JSONL source of truth.
- * Preserves cached embeddings when lesson content hasn't changed.
+ * Preserves cached embeddings when item content hasn't changed.
  * @param repoRoot - Absolute path to repository root
  */
 export async function rebuildIndex(repoRoot: string): Promise<void> {
   const database = openDb(repoRoot);
 
-  const { lessons } = await readLessons(repoRoot);
+  const { items } = await readMemoryItems(repoRoot);
   const cachedEmbeddings = collectCachedEmbeddings(database);
   database.exec('DELETE FROM lessons');
 
-  if (lessons.length === 0) {
+  if (items.length === 0) {
     const mtime = getJsonlMtime(repoRoot);
     if (mtime !== null) {
       setLastSyncMtime(database, mtime);
@@ -78,43 +78,43 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
   }
 
   const insert = database.prepare(INSERT_LESSON_SQL);
-  const insertMany = database.transaction((items: Lesson[]) => {
-    for (const lesson of items) {
-      const newHash = contentHash(lesson.trigger, lesson.insight);
-      const cached = cachedEmbeddings.get(lesson.id);
+  const insertMany = database.transaction((memoryItems: MemoryItem[]) => {
+    for (const item of memoryItems) {
+      const newHash = contentHash(item.trigger, item.insight);
+      const cached = cachedEmbeddings.get(item.id);
       const hasValidCache = cached && cached.contentHash === newHash;
 
       insert.run({
-        id: lesson.id,
-        type: lesson.type,
-        trigger: lesson.trigger,
-        insight: lesson.insight,
-        evidence: lesson.evidence ?? null,
-        severity: lesson.severity ?? null,
-        tags: lesson.tags.join(','),
-        source: lesson.source,
-        context: JSON.stringify(lesson.context),
-        supersedes: JSON.stringify(lesson.supersedes),
-        related: JSON.stringify(lesson.related),
-        created: lesson.created,
-        confirmed: lesson.confirmed ? 1 : 0,
-        deleted: lesson.deleted ? 1 : 0,
-        retrieval_count: lesson.retrievalCount ?? 0,
-        last_retrieved: lesson.lastRetrieved ?? null,
+        id: item.id,
+        type: item.type,
+        trigger: item.trigger,
+        insight: item.insight,
+        evidence: item.evidence ?? null,
+        severity: item.severity ?? null,
+        tags: item.tags.join(','),
+        source: item.source,
+        context: JSON.stringify(item.context),
+        supersedes: JSON.stringify(item.supersedes),
+        related: JSON.stringify(item.related),
+        created: item.created,
+        confirmed: item.confirmed ? 1 : 0,
+        deleted: item.deleted ? 1 : 0,
+        retrieval_count: item.retrievalCount ?? 0,
+        last_retrieved: item.lastRetrieved ?? null,
         embedding: hasValidCache ? cached.embedding : null,
         content_hash: hasValidCache ? cached.contentHash : null,
-        invalidated_at: lesson.invalidatedAt ?? null,
-        invalidation_reason: lesson.invalidationReason ?? null,
-        citation_file: lesson.citation?.file ?? null,
-        citation_line: lesson.citation?.line ?? null,
-        citation_commit: lesson.citation?.commit ?? null,
-        compaction_level: lesson.compactionLevel ?? 0,
-        compacted_at: lesson.compactedAt ?? null,
+        invalidated_at: item.invalidatedAt ?? null,
+        invalidation_reason: item.invalidationReason ?? null,
+        citation_file: item.citation?.file ?? null,
+        citation_line: item.citation?.line ?? null,
+        citation_commit: item.citation?.commit ?? null,
+        compaction_level: item.compactionLevel ?? 0,
+        compacted_at: item.compactedAt ?? null,
       });
     }
   });
 
-  insertMany(lessons);
+  insertMany(items);
 
   const mtime = getJsonlMtime(repoRoot);
   if (mtime !== null) {

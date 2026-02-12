@@ -237,7 +237,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       };
 
       expect(deletedRecord.id).toBe('DEL001');
-      expect(deletedRecord.type).toBe('quick');
+      expect(deletedRecord.type).toBe('lesson');
       expect(deletedRecord.trigger).toBeDefined();
       expect(deletedRecord.insight).toBe('First lesson to delete');
       expect(deletedRecord.source).toBe('manual');

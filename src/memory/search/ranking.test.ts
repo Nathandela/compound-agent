@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest';
 
-import { createFullLesson, createQuickLesson, daysAgo } from '../../test-utils.js';
+import { createFullLesson, createPattern, createPreference, createQuickLesson, createSolution, daysAgo } from '../../test-utils.js';
 
 import {
   calculateScore,
   confirmationBoost,
   rankLessons,
+  rankMemoryItems,
   recencyBoost,
   severityBoost,
 } from './ranking.js';
@@ -175,6 +176,80 @@ describe('ranking', () => {
         expect(item.finalScore).toBeDefined();
         expect(typeof item.finalScore).toBe('number');
       }
+    });
+  });
+
+  // =========================================================================
+  // Unified memory item support
+  // =========================================================================
+
+  describe('unified memory item support', () => {
+    describe('boost functions accept all memory item types', () => {
+      it('severityBoost works with solution items', () => {
+        const sol = { ...createSolution('S1', 'use pnpm'), severity: 'high' as const };
+        expect(severityBoost(sol)).toBe(1.5);
+      });
+
+      it('severityBoost returns 1.0 for items without severity', () => {
+        expect(severityBoost(createSolution('S1', 'use pnpm'))).toBe(1.0);
+        expect(severityBoost(createPreference('R1', 'dark mode'))).toBe(1.0);
+      });
+
+      it('recencyBoost works with pattern items', () => {
+        const pat = createPattern('P1', 'use const', 'let x', 'const x', { created: daysAgo(5) });
+        expect(recencyBoost(pat)).toBe(1.2);
+      });
+
+      it('confirmationBoost works with preference items', () => {
+        const pref = createPreference('R1', 'dark mode', { confirmed: true });
+        expect(confirmationBoost(pref)).toBe(1.3);
+      });
+    });
+
+    describe('calculateScore works with all memory item types', () => {
+      it('scores a solution item', () => {
+        const sol = { ...createSolution('S1', 'use pnpm', { confirmed: true, created: daysAgo(5) }), severity: 'high' as const };
+        const score = calculateScore(sol, 0.9);
+        // high(1.5) * recent(1.2) * confirmed(1.3) = 2.34 -> clamped to 1.8
+        expect(score).toBeCloseTo(0.9 * 1.8);
+      });
+
+      it('scores a pattern item without severity', () => {
+        const pat = createPattern('P1', 'use const', 'let x', 'const x', { confirmed: false, created: daysAgo(50) });
+        const score = calculateScore(pat, 0.8);
+        // no severity(1.0) * old(1.0) * unconfirmed(1.0) = 1.0
+        expect(score).toBeCloseTo(0.8);
+      });
+    });
+
+    describe('rankMemoryItems', () => {
+      it('is an alias for rankLessons', () => {
+        expect(rankMemoryItems).toBe(rankLessons);
+      });
+
+      it('ranks mixed memory item types by combined score', () => {
+        const items: ScoredLesson[] = [
+          { lesson: createSolution('S1', 'solution', { confirmed: false, created: daysAgo(50) }) as any, score: 0.9 },
+          { lesson: { ...createPattern('P1', 'pattern', 'bad', 'good', { confirmed: true, created: daysAgo(5) }), severity: 'high' as const } as any, score: 0.7 },
+          { lesson: createPreference('R1', 'preference', { confirmed: true, created: daysAgo(5) }) as any, score: 0.8 },
+        ];
+
+        const ranked = rankMemoryItems(items);
+        // P1 should rank first: 0.7 * min(1.5*1.2*1.3, 1.8) = 0.7 * 1.8 = 1.26
+        // R1: 0.8 * min(1.0*1.2*1.3, 1.8) = 0.8 * 1.56 = 1.248
+        // S1: 0.9 * 1.0 = 0.9
+        expect(ranked[0]!.lesson.id).toBe('P1');
+      });
+
+      it('returns ranked items with finalScore', () => {
+        const items: ScoredLesson[] = [
+          { lesson: createSolution('S1', 'test') as any, score: 0.5 },
+        ];
+
+        const ranked = rankMemoryItems(items);
+        expect(ranked[0]!.finalScore).toBeDefined();
+        expect(typeof ranked[0]!.finalScore).toBe('number');
+      });
     });
   });
 });

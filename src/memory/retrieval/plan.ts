@@ -79,3 +79,8 @@ export function formatLessonsCheck(lessons: ScoredLesson[]): string {
 
   return `${header}\n${lessonLines.join('\n')}`;
 }
+
+/**
+ * @deprecated Use formatMemoryCheck. Backward-compat alias.
+ */
+export const formatMemoryCheck = formatLessonsCheck;

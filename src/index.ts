@@ -86,14 +86,16 @@ export const VERSION: string = _pkg.version;
 // Storage API (JSONL source of truth + SQLite index)
 export {
   appendLesson,
+  appendMemoryItem,
   closeDb,
   DB_PATH,
   LESSONS_PATH,
   readLessons,
+  readMemoryItems,
   rebuildIndex,
   searchKeyword,
 } from './memory/storage/index.js';
-export type { ParseError, ReadLessonsOptions, ReadLessonsResult } from './memory/storage/index.js';
+export type { ParseError, ReadLessonsOptions, ReadLessonsResult, ReadMemoryItemsResult } from './memory/storage/index.js';
 
 // Embeddings API
 export {
@@ -115,11 +117,12 @@ export {
   confirmationBoost,
   cosineSimilarity,
   rankLessons,
+  rankMemoryItems,
   recencyBoost,
   searchVector,
   severityBoost,
 } from './memory/search/index.js';
-export type { RankedLesson, ScoredLesson, SearchVectorOptions } from './memory/search/index.js';
+export type { RankedLesson, RankedMemoryItem, ScoredLesson, ScoredMemoryItem, SearchVectorOptions } from './memory/search/index.js';
 
 // Capture API (quality filters + trigger detection)
 export {
@@ -147,7 +150,7 @@ export type {
 } from './memory/capture/index.js';
 
 // Retrieval API (session + plan time)
-export { formatLessonsCheck, loadSessionLessons, retrieveForPlan } from './memory/retrieval/index.js';
+export { formatLessonsCheck, formatMemoryCheck, loadSessionLessons, loadSessionMemory, retrieveForPlan } from './memory/retrieval/index.js';
 export type { PlanRetrievalResult } from './memory/retrieval/index.js';
 
 // Context recovery API (for MCP server integration)
@@ -156,15 +159,30 @@ export { getPrimeContext } from './commands/index.js';
 // Types and schemas
 export {
   generateId,
+  LegacyLessonSchema,
+  LegacyTombstoneSchema,
+  LessonItemSchema,
   LessonRecordSchema,
   LessonSchema,
   LessonTypeSchema,
+  MemoryItemRecordSchema,
+  MemoryItemSchema,
+  MemoryItemTypeSchema,
+  PatternItemSchema,
+  PreferenceItemSchema,
+  SolutionItemSchema,
 } from './memory/types.js';
 export type {
   Context,
   Lesson,
   LessonRecord,
   LessonType,
+  MemoryItem,
+  MemoryItemRecord,
+  MemoryItemType,
+  PatternItem,
+  Preference,
   Severity,
+  Solution,
   Source,
 } from './memory/types.js';

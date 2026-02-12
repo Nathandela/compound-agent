@@ -129,7 +129,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       const filePath = join(tempDir, LESSONS_PATH);
       const tombstone = JSON.stringify({
         id: 'L002',
-        type: 'quick',
+        type: 'lesson',
         trigger: 'deleted',
         insight: 'second lesson',
         tags: [],

@@ -37,8 +37,8 @@ describe('Retrieval Commands', () => {
 
     it('respects limit option', () => {
       const { combined } = runCli('list -n 1');
-      const lines = combined.trim().split('\n').filter((l: string) => l.includes('lesson'));
-      expect(lines.length).toBeLessThanOrEqual(2); // Header + 1 lesson
+      // With limit=1, output should show "Showing 1 of 3"
+      expect(combined).toMatch(/Showing 1 of 3/);
     });
 
     it('warns about corrupted lessons', async () => {

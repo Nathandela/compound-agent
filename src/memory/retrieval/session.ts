@@ -5,20 +5,20 @@
  * No vector search - just filter by severity and recency.
  */
 
-import { incrementRetrievalCount, readLessons } from '../storage/index.js';
-import type { Lesson, Severity } from '../types.js';
+import { incrementRetrievalCount, readMemoryItems } from '../storage/index.js';
+import type { Lesson, MemoryItem, Severity } from '../types.js';
 
 /** Default number of lessons to load at session start */
 const DEFAULT_LIMIT = 5;
 
-/** A full lesson with severity field present */
-type FullLesson = Lesson & { type: 'full'; severity: Severity };
+/** A memory item with severity field present */
+type LessonWithSeverity = Lesson & { severity: Severity };
 
 /**
- * Type guard to check if a lesson is a full lesson with severity
+ * Type guard to check if a memory item has severity set
  */
-function isFullLesson(lesson: Lesson): lesson is FullLesson {
-  return lesson.type === 'full' && lesson.severity !== undefined;
+function hasSeverity(item: MemoryItem): item is MemoryItem & { severity: Severity } {
+  return item.severity !== undefined;
 }
 
 /**
@@ -35,17 +35,17 @@ function isFullLesson(lesson: Lesson): lesson is FullLesson {
 export async function loadSessionLessons(
   repoRoot: string,
   limit: number = DEFAULT_LIMIT
-): Promise<FullLesson[]> {
-  const { lessons: allLessons } = await readLessons(repoRoot);
+): Promise<LessonWithSeverity[]> {
+  const { items } = await readMemoryItems(repoRoot);
 
-  // Filter for high-severity, confirmed, full lessons (excluding invalidated)
-  const highSeverityLessons = allLessons.filter(
-    (lesson): lesson is FullLesson =>
-      isFullLesson(lesson) &&
-      lesson.severity === 'high' &&
-      lesson.confirmed &&
-      !lesson.invalidatedAt
-  );
+  // Filter for high-severity, confirmed items of any type (excluding invalidated)
+  const highSeverityLessons = items.filter(
+    (item): item is MemoryItem & { severity: Severity } =>
+      hasSeverity(item) &&
+      item.severity === 'high' &&
+      item.confirmed &&
+      !item.invalidatedAt
+  ) as LessonWithSeverity[];
 
   // Sort by recency (most recent first)
   highSeverityLessons.sort((a, b) => {
@@ -62,3 +62,8 @@ export async function loadSessionLessons(
 
   return topLessons;
 }
+
+/**
+ * @deprecated Use loadSessionMemory. Backward-compat alias.
+ */
+export const loadSessionMemory = loadSessionLessons;

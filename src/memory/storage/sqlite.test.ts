@@ -264,8 +264,8 @@ describe('SQLite schema', () => {
         type: string;
       }>;
       expect(rows).toHaveLength(2);
-      expect(rows[0]!.type).toBe('quick');
-      expect(rows[1]!.type).toBe('full');
+      expect(rows[0]!.type).toBe('lesson');
+      expect(rows[1]!.type).toBe('lesson');
     });
   });
 
@@ -419,11 +419,9 @@ describe('SQLite schema', () => {
       const results = await searchKeyword(tempDir, 'always test', 10);
       expect(results).toHaveLength(1);
       const lesson = results[0]!;
-      expect(lesson.type).toBe('full');
-      if (lesson.type === 'full') {
-        expect(lesson.severity).toBe('high');
-        expect(lesson.evidence).toBe('Test evidence');
-      }
+      expect(lesson.type).toBe('lesson');
+      expect(lesson.severity).toBe('high');
+      expect(lesson.evidence).toBe('Test evidence');
     });
 
     it('handles empty index', async () => {

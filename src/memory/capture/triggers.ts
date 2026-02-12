@@ -1,13 +1,19 @@
 /**
- * Trigger detection for automatic lesson capture
+ * Trigger detection for automatic memory capture
  *
  * Detects patterns that indicate potential learning opportunities:
  * - User corrections
  * - Self-corrections
  * - Test failures
+ *
+ * Also infers memory item type from insight text:
+ * - pattern: "use X instead of Y", "prefer X over Y"
+ * - solution: "when X, do Y", "if X then Y", "to fix X"
+ * - preference: "always X", "never X"
+ * - lesson: default for unclassified insights
  */
 
-import type { Context } from '../types.js';
+import type { Context, MemoryItemType } from '../types.js';
 
 /** Signal data for correction detection */
 export interface CorrectionSignal {
@@ -163,4 +169,52 @@ export function detectTestFailure(testResult: TestResult): DetectedTestFailure |
     errorOutput: testResult.output,
     trigger: `Test failure in ${testResult.testFile}: ${errorLine.slice(0, 100)}`,
   };
+}
+
+/** Patterns indicating a code pattern (bad -> good transformation) */
+const PATTERN_INDICATORS = [
+  /\buse\s+.+\s+instead\s+of\b/i,
+  /\bprefer\s+.+\s+(over|to)\b/i,
+];
+
+/** Patterns indicating a solution (problem -> resolution) */
+const SOLUTION_INDICATORS = [
+  /\bwhen\s+.+,\s/i,
+  /\bif\s+.+\bthen\b/i,
+  /\bif\s+.+,\s/i,
+  /\bto\s+fix\b/i,
+];
+
+/** Patterns indicating a preference (user workflow choice) */
+const PREFERENCE_INDICATORS = [
+  /\balways\s+/i,
+  /\bnever\s+/i,
+];
+
+/**
+ * Infer the memory item type from insight text.
+ *
+ * Rules (checked in priority order):
+ * - "use X instead of Y" / "prefer X over Y" → pattern
+ * - "when X, do Y" / "if X then Y" / "to fix X" → solution
+ * - "always X" / "never X" → preference
+ * - Default → lesson
+ *
+ * @param insight - The insight text to classify
+ * @returns The inferred memory item type
+ */
+export function inferMemoryItemType(insight: string): MemoryItemType {
+  for (const pattern of PATTERN_INDICATORS) {
+    if (pattern.test(insight)) return 'pattern';
+  }
+
+  for (const pattern of SOLUTION_INDICATORS) {
+    if (pattern.test(insight)) return 'solution';
+  }
+
+  for (const pattern of PREFERENCE_INDICATORS) {
+    if (pattern.test(insight)) return 'preference';
+  }
+
+  return 'lesson';
 }

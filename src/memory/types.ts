@@ -1,10 +1,17 @@
 /**
- * Lesson type definitions using Zod schemas
+ * Memory item type definitions using Zod schemas.
+ *
+ * Supports 4 memory item types via discriminated union:
+ * - lesson: Knowledge learned from mistakes
+ * - solution: Problem-resolution pairs
+ * - pattern: Code pattern transformations (bad -> good)
+ * - preference: User workflow preferences
  *
  * Deletion model:
- * - Set `deleted: true` and `deletedAt` on a Lesson to mark it deleted
- * - LegacyTombstoneSchema (private) handles backward-compat reads of old
+ * - Set `deleted: true` and `deletedAt` on an item to mark it deleted
+ * - LegacyTombstoneSchema handles backward-compat reads of old
  *   minimal tombstone records { id, deleted: true, deletedAt }
+ * - LegacyLessonSchema handles old quick/full type records
  */
 
 import { createHash } from 'node:crypto';
@@ -47,25 +54,19 @@ export const CompactionLevelSchema = z.union([
   z.literal(2), // Archived
 ]);
 
-// Lesson type - semantic marker for lesson quality tier
+/** @deprecated Use MemoryItemTypeSchema instead. Kept for parsing old JSONL records. */
 export const LessonTypeSchema = z.enum(['quick', 'full']);
 
-/**
- * Unified Lesson schema.
- *
- * The `type` field is a semantic marker:
- * - 'quick': Minimal lesson for fast capture
- * - 'full': Important lesson (typically has evidence/severity)
- *
- * All fields except core identity are optional for flexibility.
- * Semantic meaning is preserved through convention, not schema enforcement.
- *
- * Deletion: set `deleted: true` and `deletedAt` to an ISO8601 timestamp.
- */
-export const LessonSchema = z.object({
+/** Memory item type enum: lesson, solution, pattern, preference. */
+export const MemoryItemTypeSchema = z.enum(['lesson', 'solution', 'pattern', 'preference']);
+
+// ---------------------------------------------------------------------------
+// Base fields shared by all memory item types
+// ---------------------------------------------------------------------------
+
+const baseFields = {
   // Core identity (required)
   id: z.string(),
-  type: LessonTypeSchema,
   trigger: z.string(),
   insight: z.string(),
 
@@ -80,10 +81,9 @@ export const LessonSchema = z.object({
   supersedes: z.array(z.string()),
   related: z.array(z.string()),
 
-  // Extended fields (optional - typically present for 'full' type)
+  // Extended fields (optional)
   evidence: z.string().optional(),
   severity: SeveritySchema.optional(),
-  pattern: PatternSchema.optional(),
 
   // Lifecycle fields (optional)
   deleted: z.boolean().optional(),
@@ -94,21 +94,106 @@ export const LessonSchema = z.object({
   citation: CitationSchema.optional(),
 
   // Age-based validity fields (optional)
-  compactionLevel: CompactionLevelSchema.optional(), // 0=active, 1=flagged, 2=archived
-  compactedAt: z.string().optional(),    // ISO8601 when compaction happened
-  lastRetrieved: z.string().optional(),  // ISO8601 last retrieval time
+  compactionLevel: CompactionLevelSchema.optional(),
+  compactedAt: z.string().optional(),
+  lastRetrieved: z.string().optional(),
 
-  // Invalidation fields (optional - for marking lessons as wrong)
-  invalidatedAt: z.string().optional(), // ISO8601
+  // Invalidation fields (optional)
+  invalidatedAt: z.string().optional(),
   invalidationReason: z.string().optional(),
+} as const;
+
+// ---------------------------------------------------------------------------
+// Type-specific schemas
+// ---------------------------------------------------------------------------
+
+/**
+ * Lesson memory item schema.
+ * Replaces the old quick/full distinction with a single 'lesson' type.
+ * Pattern field is optional for lessons.
+ */
+export const LessonItemSchema = z.object({
+  ...baseFields,
+  type: z.literal('lesson'),
+  pattern: PatternSchema.optional(),
 });
+
+/**
+ * Solution memory item schema.
+ * Uses trigger as "problem" and insight as "resolution".
+ * Pattern field is optional.
+ */
+export const SolutionItemSchema = z.object({
+  ...baseFields,
+  type: z.literal('solution'),
+  pattern: PatternSchema.optional(),
+});
+
+/**
+ * Pattern memory item schema.
+ * Pattern field is REQUIRED (bad -> good code transformation).
+ */
+export const PatternItemSchema = z.object({
+  ...baseFields,
+  type: z.literal('pattern'),
+  pattern: PatternSchema,
+});
+
+/**
+ * Preference memory item schema.
+ * Captures user workflow preferences.
+ * Pattern field is optional.
+ */
+export const PreferenceItemSchema = z.object({
+  ...baseFields,
+  type: z.literal('preference'),
+  pattern: PatternSchema.optional(),
+});
+
+// ---------------------------------------------------------------------------
+// Discriminated union of all memory item types
+// ---------------------------------------------------------------------------
+
+/**
+ * Unified memory item schema (discriminated union on 'type' field).
+ * Accepts: lesson, solution, pattern, preference.
+ */
+export const MemoryItemSchema = z.discriminatedUnion('type', [
+  LessonItemSchema,
+  SolutionItemSchema,
+  PatternItemSchema,
+  PreferenceItemSchema,
+]);
+
+// ---------------------------------------------------------------------------
+// Backward compatibility
+// ---------------------------------------------------------------------------
+
+/**
+ * Legacy lesson schema for reading old JSONL records with type: 'quick' | 'full'.
+ * Use this only for parsing existing data files; new records use MemoryItemSchema.
+ */
+export const LegacyLessonSchema = z.object({
+  ...baseFields,
+  type: LessonTypeSchema,
+  pattern: PatternSchema.optional(),
+});
+
+/**
+ * LessonSchema - now equivalent to LessonItemSchema.
+ *
+ * For backward compatibility, existing code that imports LessonSchema
+ * continues to work. The type field is now z.literal('lesson').
+ *
+ * To parse old quick/full records, use LegacyLessonSchema.
+ */
+export const LessonSchema = LessonItemSchema;
 
 /**
  * Legacy tombstone format for backward-compatible reads.
  * Old JSONL files may contain minimal { id, deleted, deletedAt } records.
- * Private -- not part of the public API.
  */
-const LegacyTombstoneSchema = z.object({
+export const LegacyTombstoneSchema = z.object({
   id: z.string(),
   deleted: z.literal(true),
   deletedAt: z.string(), // ISO8601
@@ -117,16 +202,29 @@ const LegacyTombstoneSchema = z.object({
 /**
  * LessonRecord schema - union for reading JSONL files.
  *
- * Accepts either:
- * 1. A full Lesson (with optional deleted/deletedAt fields)
- * 2. A legacy tombstone (minimal: { id, deleted: true, deletedAt })
- *
- * Use this schema when parsing JSONL records to handle both formats.
+ * Accepts:
+ * 1. Any new memory item type (lesson, solution, pattern, preference)
+ * 2. A legacy lesson (type: 'quick' | 'full')
+ * 3. A legacy tombstone (minimal: { id, deleted: true, deletedAt })
  */
-export const LessonRecordSchema = z.union([LessonSchema, LegacyTombstoneSchema]);
+export const LessonRecordSchema = z.union([
+  MemoryItemSchema,
+  LegacyLessonSchema,
+  LegacyTombstoneSchema,
+]);
 
+/**
+ * MemoryItemRecord schema - alias for LessonRecordSchema.
+ * Parses all memory item types plus legacy formats.
+ */
+export const MemoryItemRecordSchema = LessonRecordSchema;
+
+// ---------------------------------------------------------------------------
 // Type exports
+// ---------------------------------------------------------------------------
+
 export type Lesson = z.infer<typeof LessonSchema>;
+/** @deprecated Use MemoryItemType instead. */
 export type LessonType = z.infer<typeof LessonTypeSchema>;
 export type LessonRecord = z.infer<typeof LessonRecordSchema>;
 export type Source = z.infer<typeof SourceSchema>;
@@ -136,11 +234,41 @@ export type Pattern = z.infer<typeof PatternSchema>;
 export type Citation = z.infer<typeof CitationSchema>;
 export type CompactionLevel = z.infer<typeof CompactionLevelSchema>;
 
+/** Unified memory item type (discriminated union). */
+export type MemoryItem = z.infer<typeof MemoryItemSchema>;
+/** Memory item type enum: 'lesson' | 'solution' | 'pattern' | 'preference'. */
+export type MemoryItemType = z.infer<typeof MemoryItemTypeSchema>;
+/** Solution memory item. */
+export type Solution = z.infer<typeof SolutionItemSchema>;
+/** Pattern memory item (not to be confused with Pattern = {bad, good}). */
+export type PatternItem = z.infer<typeof PatternItemSchema>;
+/** Preference memory item. */
+export type Preference = z.infer<typeof PreferenceItemSchema>;
+/** Record type for reading JSONL files (all types + legacy). */
+export type MemoryItemRecord = z.infer<typeof MemoryItemRecordSchema>;
+
+// ---------------------------------------------------------------------------
+// ID generation
+// ---------------------------------------------------------------------------
+
+/** Prefix mapping for memory item types. */
+const TYPE_PREFIXES: Record<MemoryItemType, string> = {
+  lesson: 'L',
+  solution: 'S',
+  pattern: 'P',
+  preference: 'R',
+};
+
 /**
- * Generate deterministic lesson ID from insight text.
- * Format: L + 8 hex characters from SHA-256 hash
+ * Generate deterministic memory item ID from insight text.
+ * Format: {prefix} + 8 hex characters from SHA-256 hash.
+ *
+ * @param insight - The insight text to hash
+ * @param type - Memory item type (default: 'lesson' for backward compat)
+ * @returns ID string like L1a2b3c4d, S1a2b3c4d, P1a2b3c4d, or R1a2b3c4d
  */
-export function generateId(insight: string): string {
+export function generateId(insight: string, type?: MemoryItemType): string {
+  const prefix = TYPE_PREFIXES[type ?? 'lesson'];
   const hash = createHash('sha256').update(insight).digest('hex');
-  return `L${hash.slice(0, 8)}`;
+  return `${prefix}${hash.slice(0, 8)}`;
 }

@@ -8,9 +8,9 @@ import { readFile } from 'node:fs/promises';
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
-import { appendLesson, readLessons } from '../memory/storage/index.js';
-import { LessonSchema } from '../memory/types.js';
-import type { Lesson } from '../memory/types.js';
+import { appendMemoryItem, readMemoryItems } from '../memory/storage/index.js';
+import { MemoryItemSchema } from '../memory/types.js';
+import type { MemoryItem } from '../memory/types.js';
 
 import { JSON_INDENT_SPACES } from './shared.js';
 
@@ -33,9 +33,9 @@ export function registerIOCommands(program: Command): void {
     .action(async (options: { since?: string; tags?: string }) => {
       const repoRoot = getRepoRoot();
 
-      const { lessons } = await readLessons(repoRoot);
+      const { items } = await readMemoryItems(repoRoot);
 
-      let filtered = lessons;
+      let filtered = items;
 
       // Filter by date if --since provided
       if (options.since) {
@@ -44,13 +44,13 @@ export function registerIOCommands(program: Command): void {
           console.error(`Invalid date format: ${options.since}. Use ISO8601 format (e.g., 2024-01-15).`);
           process.exit(1);
         }
-        filtered = filtered.filter((lesson) => new Date(lesson.created) >= sinceDate);
+        filtered = filtered.filter((item) => new Date(item.created) >= sinceDate);
       }
 
       // Filter by tags if --tags provided (OR logic)
       if (options.tags) {
         const filterTags = options.tags.split(',').map((t) => t.trim());
-        filtered = filtered.filter((lesson) => lesson.tags.some((tag) => filterTags.includes(tag)));
+        filtered = filtered.filter((item) => item.tags.some((tag) => filterTags.includes(tag)));
       }
 
       // Output JSON to stdout (portable format for sharing)
@@ -82,9 +82,9 @@ export function registerIOCommands(program: Command): void {
         process.exit(1);
       }
 
-      // Get existing lesson IDs
-      const { lessons: existingLessons } = await readLessons(repoRoot);
-      const existingIds = new Set(existingLessons.map((l) => l.id));
+      // Get existing item IDs
+      const { items: existingItems } = await readMemoryItems(repoRoot);
+      const existingIds = new Set(existingItems.map((item) => item.id));
 
       // Parse and validate each line
       const lines = content.split('\n');
@@ -105,24 +105,24 @@ export function registerIOCommands(program: Command): void {
           continue;
         }
 
-        // Validate schema
-        const result = LessonSchema.safeParse(parsed);
+        // Validate schema (accepts all memory item types)
+        const result = MemoryItemSchema.safeParse(parsed);
         if (!result.success) {
           invalid++;
           continue;
         }
 
-        const lesson: Lesson = result.data;
+        const item: MemoryItem = result.data;
 
         // Skip if ID already exists
-        if (existingIds.has(lesson.id)) {
+        if (existingIds.has(item.id)) {
           skipped++;
           continue;
         }
 
-        // Append lesson
-        await appendLesson(repoRoot, lesson);
-        existingIds.add(lesson.id);
+        // Append memory item
+        await appendMemoryItem(repoRoot, item);
+        existingIds.add(item.id);
         imported++;
       }
 

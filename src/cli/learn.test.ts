@@ -52,7 +52,7 @@ describe('CLI', { tags: ['integration'] }, () => {
         const content = await readFile(filePath, 'utf-8');
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
 
-        expect(lesson.type).toBe('full');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('high');
       });
 
@@ -63,7 +63,7 @@ describe('CLI', { tags: ['integration'] }, () => {
         const content = await readFile(filePath, 'utf-8');
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
 
-        expect(lesson.type).toBe('full');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('medium');
       });
 
@@ -74,7 +74,7 @@ describe('CLI', { tags: ['integration'] }, () => {
         const content = await readFile(filePath, 'utf-8');
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
 
-        expect(lesson.type).toBe('full');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('low');
       });
 
@@ -85,7 +85,7 @@ describe('CLI', { tags: ['integration'] }, () => {
         const content = await readFile(filePath, 'utf-8');
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
 
-        expect(lesson.type).toBe('full');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('high');
       });
 
@@ -135,7 +135,7 @@ describe('CLI', { tags: ['integration'] }, () => {
         const content = await readFile(filePath, 'utf-8');
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
 
-        expect(lesson.type).toBe('quick');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBeUndefined();
       });
 
@@ -146,7 +146,7 @@ describe('CLI', { tags: ['integration'] }, () => {
         const content = await readFile(filePath, 'utf-8');
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string; confirmed: boolean };
 
-        expect(lesson.type).toBe('full');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('high');
         expect(lesson.confirmed).toBe(true);
       });
@@ -163,7 +163,7 @@ describe('CLI', { tags: ['integration'] }, () => {
           tags: string[];
         };
 
-        expect(lesson.type).toBe('full');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('high');
         expect(lesson.trigger).toBe('bug occurred');
         expect(lesson.tags).toContain('security');

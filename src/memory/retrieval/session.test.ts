@@ -3,11 +3,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { appendLesson } from '../storage/jsonl.js';
+import { appendLesson, appendMemoryItem } from '../storage/jsonl.js';
 import { closeDb, getRetrievalStats, rebuildIndex } from '../storage/sqlite/index.js';
-import { createFullLesson, createQuickLesson } from '../../test-utils.js';
+import { createFullLesson, createQuickLesson, createSolution } from '../../test-utils.js';
 
-import { loadSessionLessons } from './session.js';
+import { loadSessionLessons, loadSessionMemory } from './session.js';
 
 describe('session retrieval', () => {
   let tempDir: string;
@@ -164,6 +164,24 @@ describe('session retrieval', () => {
         // Should be sorted by recency, without the invalidated lesson
         expect(lessons.map((l) => l.insight)).toEqual(['newest valid', 'oldest valid']);
       });
+    });
+  });
+
+  describe('loadSessionMemory', () => {
+    it('is an alias for loadSessionLessons', () => {
+      expect(loadSessionMemory).toBe(loadSessionLessons);
+    });
+
+    it('returns high-severity items of any memory type', async () => {
+      await appendLesson(tempDir, createFullLesson('L001', 'lesson insight', 'high'));
+      const sol = { ...createSolution('S001', 'solution insight'), severity: 'high' as const, evidence: 'evidence' };
+      await appendMemoryItem(tempDir, sol);
+
+      const items = await loadSessionMemory(tempDir);
+      expect(items).toHaveLength(2);
+      const ids = items.map((i) => i.id);
+      expect(ids).toContain('L001');
+      expect(ids).toContain('S001');
     });
   });
 });

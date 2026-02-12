@@ -46,7 +46,7 @@ describe('getLessonAgeDays', () => {
   it('works with full Lesson objects', () => {
     const lesson = {
       id: 'L001',
-      type: 'quick' as const,
+      type: 'lesson' as const,
       trigger: 'test',
       insight: 'test',
       tags: [],
