@@ -12,6 +12,8 @@ import { appendMemoryItem, readMemoryItems } from '../memory/storage/index.js';
 import { MemoryItemSchema } from '../memory/types.js';
 import type { MemoryItem } from '../memory/types.js';
 
+import { formatError } from '../cli-error-format.js';
+
 import { JSON_INDENT_SPACES } from './shared.js';
 
 /**
@@ -41,7 +43,7 @@ export function registerIOCommands(program: Command): void {
       if (options.since) {
         const sinceDate = new Date(options.since);
         if (Number.isNaN(sinceDate.getTime())) {
-          console.error(`Invalid date format: ${options.since}. Use ISO8601 format (e.g., 2024-01-15).`);
+          console.error(formatError('export', 'INVALID_DATE', `Invalid date format: ${options.since}`, 'Use ISO8601 format (e.g., 2024-01-15)'));
           process.exit(1);
         }
         filtered = filtered.filter((item) => new Date(item.created) >= sinceDate);
@@ -75,9 +77,9 @@ export function registerIOCommands(program: Command): void {
       } catch (err) {
         const code = (err as NodeJS.ErrnoException).code;
         if (code === 'ENOENT') {
-          console.error(`Error: File not found: ${file}`);
+          console.error(formatError('import', 'FILE_NOT_FOUND', `File not found: ${file}`, 'Check the path and try again'));
         } else {
-          console.error(`Error reading file: ${(err as Error).message}`);
+          console.error(formatError('import', 'READ_ERROR', `Error reading file: ${(err as Error).message}`, 'Check file permissions'));
         }
         process.exit(1);
       }

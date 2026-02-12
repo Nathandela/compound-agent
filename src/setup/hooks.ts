@@ -7,7 +7,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
-import { out } from '../commands/shared.js';
+import { formatError } from '../cli-error-format.js';
 import {
   HOOK_MARKER,
   COMPOUND_AGENT_HOOK_BLOCK,
@@ -467,7 +467,7 @@ export function registerHooksCommand(program: Command): void {
         if (options.json) {
           console.log(JSON.stringify({ error: `Unknown hook: ${hook}` }));
         } else {
-          out.error(`Unknown hook: ${hook}`);
+          console.error(formatError('hooks', 'UNKNOWN_HOOK', `Unknown hook: ${hook}`, 'Valid hooks: pre-session, post-tool-failure, post-tool-success'));
         }
         process.exit(1);
       }

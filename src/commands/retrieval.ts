@@ -12,6 +12,8 @@ import { isModelUsable, loadSessionLessons, retrieveForPlan } from '../index.js'
 import { incrementRetrievalCount, readLessons, readMemoryItems, searchKeyword, syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem } from '../memory/types.js';
 
+import { formatError } from '../cli-error-format.js';
+
 import {
   AGE_FLAG_THRESHOLD_DAYS,
   DEFAULT_CHECK_PLAN_LIMIT,
@@ -34,7 +36,7 @@ function parseLimitOrExit(rawLimit: string, optionName: string): number {
     return parseLimit(rawLimit, optionName);
   } catch (err) {
     const message = err instanceof Error ? err.message : `Invalid ${optionName}`;
-    out.error(message);
+    console.error(formatError('search', 'INVALID_LIMIT', message, `Use --${optionName} with a positive integer`));
     process.exit(1);
   }
 }
@@ -330,7 +332,7 @@ export function registerRetrievalCommands(program: Command): void {
       const planText = options.plan ?? (await readPlanFromStdin());
 
       if (!planText) {
-        out.error('No plan provided. Use --plan <text> or pipe text to stdin.');
+        console.error(formatError('check-plan', 'NO_PLAN', 'No plan provided', 'Use --plan <text> or pipe text to stdin'));
         process.exit(1);
       }
 
@@ -346,9 +348,7 @@ export function registerRetrievalCommands(program: Command): void {
             action: usability.action,
           }));
         } else {
-          out.error(usability.reason);
-          console.log('');
-          console.log(usability.action);
+          console.error(formatError('check-plan', 'MODEL_UNAVAILABLE', usability.reason, usability.action));
         }
         process.exit(1);
       }
@@ -378,7 +378,7 @@ export function registerRetrievalCommands(program: Command): void {
             error: message,
           }));
         } else {
-          out.error(`Failed to check plan: ${message}`);
+          console.error(formatError('check-plan', 'PLAN_CHECK_FAILED', message, 'Check model installation and try again'));
         }
         process.exit(1);
       }

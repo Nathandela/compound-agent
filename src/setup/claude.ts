@@ -6,6 +6,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
+import { formatError } from '../cli-error-format.js';
 import { out } from '../commands/shared.js';
 import { getRepoRoot } from '../cli-utils.js';
 import {
@@ -60,7 +61,7 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
         if (options.json) {
           console.log(JSON.stringify({ error: 'Failed to parse settings file' }));
         } else {
-          out.error('Failed to parse settings file. Check if JSON is valid.');
+          console.error(formatError('setup', 'PARSE_ERROR', 'Failed to parse settings file', 'Check if JSON is valid'));
         }
         process.exit(1);
       }

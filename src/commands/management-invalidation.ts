@@ -10,6 +10,8 @@ import { getRepoRoot } from '../cli-utils.js';
 import { appendMemoryItem, readMemoryItems } from '../memory/storage/index.js';
 import type { MemoryItem } from '../memory/types.js';
 
+import { formatError } from '../cli-error-format.js';
+
 import { out } from './shared.js';
 
 /**
@@ -38,7 +40,7 @@ export function registerInvalidationCommands(program: Command): void {
       // Find the lesson
       const lesson = items.find((l) => l.id === id);
       if (!lesson) {
-        out.error(`Lesson not found: ${id}`);
+        console.error(formatError('wrong', 'NOT_FOUND', `Lesson not found: ${id}`, 'Use "ca list" to see available lessons'));
         process.exit(1);
       }
 
@@ -82,7 +84,7 @@ export function registerInvalidationCommands(program: Command): void {
       // Find the lesson
       const lesson = items.find((l) => l.id === id);
       if (!lesson) {
-        out.error(`Lesson not found: ${id}`);
+        console.error(formatError('validate', 'NOT_FOUND', `Lesson not found: ${id}`, 'Use "ca list" to see available lessons'));
         process.exit(1);
       }
 

@@ -11,6 +11,8 @@ import { appendMemoryItem, readMemoryItems, syncIfNeeded } from '../memory/stora
 import { MemoryItemSchema, SeveritySchema } from '../memory/types.js';
 import type { MemoryItem, Severity } from '../memory/types.js';
 
+import { formatError } from '../cli-error-format.js';
+
 import { out } from './shared.js';
 import { formatLessonHuman, wasLessonDeleted } from './management-helpers.js';
 
@@ -44,7 +46,8 @@ export function registerCrudCommands(program: Command): void {
         if (options.json) {
           console.log(JSON.stringify({ error: wasDeleted ? `Lesson ${id} not found (deleted)` : `Lesson ${id} not found` }));
         } else {
-          out.error(wasDeleted ? `Lesson ${id} not found (deleted)` : `Lesson ${id} not found`);
+          const msg = wasDeleted ? `Lesson ${id} not found (deleted)` : `Lesson ${id} not found`;
+          console.error(formatError('show', 'NOT_FOUND', msg, 'Use "ca list" to see available lessons'));
         }
         process.exit(1);
       }
@@ -95,7 +98,7 @@ export function registerCrudCommands(program: Command): void {
         if (options.json) {
           console.log(JSON.stringify({ error: 'No fields to update (specify at least one: --insight, --tags, --severity, ...)' }));
         } else {
-          out.error('No fields to update (specify at least one: --insight, --tags, --severity, ...)');
+          console.error(formatError('update', 'NO_FIELDS', 'No fields to update', 'Specify at least one: --insight, --tags, --severity, ...'));
         }
         process.exit(1);
       }
@@ -111,7 +114,8 @@ export function registerCrudCommands(program: Command): void {
         if (options.json) {
           console.log(JSON.stringify({ error: wasDeleted ? `Lesson ${id} is deleted` : `Lesson ${id} not found` }));
         } else {
-          out.error(wasDeleted ? `Lesson ${id} is deleted` : `Lesson ${id} not found`);
+          const msg = wasDeleted ? `Lesson ${id} is deleted` : `Lesson ${id} not found`;
+          console.error(formatError('update', 'NOT_FOUND', msg, 'Use "ca list" to see available lessons'));
         }
         process.exit(1);
       }
@@ -123,7 +127,7 @@ export function registerCrudCommands(program: Command): void {
           if (options.json) {
             console.log(JSON.stringify({ error: `Invalid severity '${options.severity}' (must be: high, medium, low)` }));
           } else {
-            out.error(`Invalid severity '${options.severity}' (must be: high, medium, low)`);
+            console.error(formatError('update', 'INVALID_SEVERITY', `Invalid severity: "${options.severity}"`, 'Use --severity high|medium|low'));
           }
           process.exit(1);
         }
@@ -153,7 +157,7 @@ export function registerCrudCommands(program: Command): void {
         if (options.json) {
           console.log(JSON.stringify({ error: `Schema validation failed: ${validationResult.error.message}` }));
         } else {
-          out.error(`Schema validation failed: ${validationResult.error.message}`);
+          console.error(formatError('update', 'VALIDATION_FAILED', `Schema validation failed: ${validationResult.error.message}`, 'Check field values and try again'));
         }
         process.exit(1);
       }

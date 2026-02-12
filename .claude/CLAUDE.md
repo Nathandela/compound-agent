@@ -18,6 +18,7 @@
 | `docs/CONTEXT.md` | Research and decisions |
 | `docs/PLAN.md` | Day-by-day implementation plan |
 | `docs/verification/` | Review workflow and criteria |
+| `docs/INDEX.md` | Full documentation map |
 
 ---
 
@@ -37,28 +38,28 @@ When in conflict, prioritize in this order. Never sacrifice correctness for simp
 
 | Level | Meaning | Override |
 |-------|---------|----------|
-| **🔴 Inviolable** | Never break | Cannot override |
-| **🟠 Strong Default** | Break only with explicit justification | Document why in PR |
-| **🟡 Soft Default** | Prefer unless context demands otherwise | Use judgment |
-| **🟢 Recommended** | Best practice, encouraged | Skip if simpler |
+| **Inviolable** | Never break | Cannot override |
+| **Strong Default** | Break only with explicit justification | Document why in PR |
+| **Soft Default** | Prefer unless context demands otherwise | Use judgment |
+| **Recommended** | Best practice, encouraged | Skip if simpler |
 
 ---
 
 ## Critical Constraints (DO NOT)
 
-### 🔴 Security (Inviolable)
+### Security (Inviolable)
 - **DO NOT** hardcode secrets or credentials
 - **DO NOT** use string interpolation for SQL queries
 - **DO NOT** log sensitive data (PII, tokens, passwords)
 - **DO NOT** change security configurations without human approval
 
-### 🔴 Code Quality (Inviolable)
+### Code Quality (Inviolable)
 - **DO NOT** write tests after implementation (TDD only)
 - **DO NOT** mock business logic in tests
 - **DO NOT** use global variables
 - **DO NOT** skip type annotations on public APIs
 
-### 🟠 Process (Strong Default)
+### Process (Strong Default)
 - **DO NOT** commit without running tests
 - **DO NOT** push without `bd sync`
 - **DO NOT** mark work complete without `/implementation-reviewer` approval
@@ -70,238 +71,61 @@ When in conflict, prioritize in this order. Never sacrifice correctness for simp
 **This project uses `bd` (beads) for issue tracking.**
 
 ```bash
-# Finding work
 bd ready                    # Show available tasks
 bd show <id>                # View issue details
-
-# Creating & updating
 bd create --title="..." --type=task --priority=2
 bd update <id> --status=in_progress
 bd close <id>
-
-# Sync
 bd sync                     # Sync with git remote
 ```
 
-### 🔴 Inviolable Rules
-- Use beads for ALL task tracking (NOT TodoWrite or markdown files)
-- Create issue BEFORE writing code
-- Close issues when work is complete
+**Inviolable**: Use beads for ALL task tracking. Create issue BEFORE writing code. Close issues when complete.
 
 ---
 
-## Closed-Loop TDD Workflow (Mandatory)
+## TDD Workflow (Mandatory)
 
 **Work is NOT complete until `/implementation-reviewer` returns APPROVED.**
 
-### 🔴 Subagent Sequence (Inviolable)
-
-Every implementation MUST follow this sequence:
+Every implementation MUST follow this subagent sequence:
 
 ```
-1. /invariant-designer     --> Define what must be true
-2. /test-first-enforcer    --> Verify tests written FIRST
-3. /property-test-generator --> Generate edge case tests
+1. /invariant-designer      --> Define what must be true
+2. /test-first-enforcer     --> Verify tests written FIRST
+3. /property-test-generator  --> Generate edge case tests
 4. /anti-cargo-cult-reviewer --> Reject fake tests
 5. /module-boundary-reviewer --> Validate module design
 6. /implementation-reviewer  --> FINAL gate (must be APPROVED)
 ```
 
-### Closed-Loop Process
+**Inviolable rules**: Tests before implementation. Real data, no mocked business logic. ALL subagents in sequence. On rejection, fix ALL issues before resubmitting.
 
-```
-+------------------+
-| 1. INVARIANTS    |  /invariant-designer
-| Define what must |  - Data invariants
-| always be true   |  - Safety properties
-+--------+---------+  - Liveness properties
-         |
-         v
-+------------------+
-| 2. TESTS FIRST   |  /test-first-enforcer
-| Write failing    |  /property-test-generator
-| tests that verify|  /anti-cargo-cult-reviewer
-| invariants       |
-+--------+---------+
-         |
-         v
-+------------------+
-| 3. IMPLEMENT     |  /module-boundary-reviewer
-| Minimal code to  |  - One test at a time
-| pass tests       |  - NEVER modify tests to pass
-+--------+---------+
-         |
-         v
-+------------------+
-| 4. REVIEW        |  /implementation-reviewer
-| Independent gate |  - Validates ALL criteria
-| FINAL authority  |  - Cannot be bypassed
-+--------+---------+
-         |
-    +----+----+
-    |         |
- APPROVED  REJECTED
-    |         |
-    v         v
-+-------+  +------------------+
-| DONE  |  | FIX ALL ISSUES   |
-+-------+  | Return to stage  |
-           | 2, 3, or 4       |
-           +--------+---------+
-                    |
-                    +-------> (loop back)
-```
-
-### Phase 1: Define Invariants
-Use `/invariant-designer` to document what must be true:
-- Data invariants (what must always be true about data)
-- Safety properties (what must never happen)
-- Liveness properties (what must eventually happen)
-
-### Phase 2: Write Tests FIRST
-- Use `/test-first-enforcer` to verify TDD adherence
-- Use `/property-test-generator` for edge cases
-- Use `/anti-cargo-cult-reviewer` to reject fake tests
-- Tests MUST fail before implementation exists
-
-### Phase 3: Implement
-- Write minimal code to pass tests
-- One test at a time
-- **NEVER** modify tests to make them pass
-- Use `/module-boundary-reviewer` for design validation
-
-### Phase 4: Review (Closed Loop)
-- Call `/implementation-reviewer` for final approval
-- If **REJECTED**: Fix ALL issues listed, return to appropriate stage, resubmit
-- If **APPROVED**: Work is complete
-- **Do NOT argue** — criteria are objective
-
-### 🔴 Inviolable TDD Rules
-- Tests must exist BEFORE implementation
-- Real data, real execution (no mocked business logic)
-- Tests must verify meaningful properties
-- ALL subagents in sequence must be used
-- Work is NOT complete until `/implementation-reviewer` returns APPROVED
-- On rejection, fix ALL issues before resubmitting (not just some)
+> **Full pipeline details**: See `docs/verification/subagent-pipeline.md`
+> **Exit criteria checklists**: See `docs/verification/exit-criteria.md`
 
 ---
 
 ## Quality Gates
-
-All code must pass these gates before completion:
 
 ```bash
 pnpm test      # 100% pass rate, no skipped tests
 pnpm lint      # Zero violations
 ```
 
-### 🔴 Exit Criteria (ALL Required)
-
-The `/implementation-reviewer` validates ALL 6 categories. **Every checkbox must pass.**
-
-#### 1. Tests (MUST ALL PASS)
-- [ ] `pnpm test` shows 100% pass rate
-- [ ] No unconditional test skips (business logic must always run)
-- [ ] Conditional skips (`skipIf`) allowed only for environment-native/hardware tests
-- [ ] No flaky tests
-
-#### 2. No Regressions
-- [ ] All previously passing tests still pass
-- [ ] No new test failures introduced
-
-#### 3. Code Quality
-- [ ] `pnpm lint` passes with zero violations
-- [ ] No commented-out code
-
-#### 4. Professional Standards
-- [ ] Type hints on all public APIs
-- [ ] JSDoc on all public functions
-- [ ] Clear, descriptive names
-- [ ] No magic numbers
-- [ ] Functions < 50 lines
-
-#### 5. No Bugs
-- [ ] Logic reviewed and sound
-- [ ] Edge cases handled
-- [ ] Error handling appropriate
-
-#### 6. Specification Met
-- [ ] Original requirements fulfilled
-- [ ] Invariants documented and tested
-
-### Rejection Protocol
-
-When `/implementation-reviewer` returns **REJECTED**:
-
-1. **Read ALL issues** — Every issue must be addressed
-2. **Return to appropriate stage** — May need new tests, new implementation, or just fixes
-3. **Fix completely** — Partial fixes will be rejected again
-4. **Resubmit** — Call `/implementation-reviewer` again
-5. **Repeat until APPROVED** — No shortcuts
+> **Full exit criteria**: See `docs/verification/exit-criteria.md`
 
 ---
 
 ## Code Organization
 
-### 🟠 Small Code Principle (Strong Default)
-
-- **Functions**: < 50 lines
-- **Files**: < 300 lines
-- **Modules**: Single clear responsibility
-- **Public API**: Minimal exports via `index.ts`
-
-### Module Design (Parnas Principles)
-
-```typescript
-// src/storage/index.ts - Public API only
-export { appendLesson, readLessons } from './jsonl.js';
-export { rebuildIndex, searchKeyword } from './sqlite.js';
-
-// Internal files NOT exported through index.ts
-```
-
-### Documentation Structure
-
-```
-docs/                       # All documentation
-├── SPEC.md                 # Complete specification
-├── CONTEXT.md              # Research and decisions
-├── PLAN.md                 # Implementation plan
-└── verification/           # Review workflow
-    ├── README.md
-    └── closed-loop-review-process.md
-
-src/                        # Code with inline JSDoc
-└── module/
-    └── index.ts            # Public API only
-```
-
----
-
-## Anti-Patterns (Avoid)
-
-### 🔴 Inviolable — Never Do
-- **Cargo-cult testing**: Tests that pass regardless of implementation
-- **Mocking business logic**: `vi.mock()` on the thing being tested
-- **Over-engineering**: Adding features/abstractions not requested
-- **Post-hoc tests**: Writing tests after implementation
-
-### 🟠 Strong Default — Avoid Unless Justified
-- **Utils/helpers modules**: Indicate unclear responsibility
-- **Magic numbers**: Use named constants
-- **Commented-out code**: Delete it
-- **Deep nesting**: Prefer early returns
-
-### 🟡 Soft Default — Generally Avoid
-- **Long functions**: Prefer < 50 lines
-- **Implicit dependencies**: Pass dependencies explicitly
-- **Emojis in code/comments**: Keep code professional
+> **Full details**: See `docs/standards/code-organization.md`
+> **Anti-patterns**: See `docs/standards/anti-patterns.md`
 
 ---
 
 ## Session Completion Protocol
 
-### 🔴 Inviolable — Before Saying "Done"
+### Inviolable -- Before Saying "Done"
 
 ```bash
 [ ] 1. git status           # Check what changed
@@ -354,154 +178,42 @@ src/                        # Code with inline JSDoc
 
 ### Heavyweight Resources (Singleton Pattern)
 
-This project uses two heavyweight resources that require careful management:
-
 | Resource | Module | Lifecycle |
 |----------|--------|-----------|
 | SQLite database | `src/storage/sqlite.ts` | Lazy init, one instance per process |
 | Embedding model | `src/embeddings/model.ts` | Lazy init, ~150MB RAM, one instance |
 
-**Policy:**
-- **Singleton pattern required**: One instance per process via module-level state
-- **Lazy initialization**: Resources acquired on first use, not at import
-- **Explicit cleanup**: Call `closeDb()` and `unloadEmbedding()` before process exit
-- **No global variables**: Singletons are internal implementation details
-
-**Why singletons here:**
-- SQLite: Multiple connections cause locking issues
-- Embedding model: ~150MB RAM, loading is slow (~2-3s)
-- Both are process-scoped by design
-
----
-
-## Verification Subagents
-
-### 🔴 Mandatory Sequence
-
-| Order | Agent | Purpose | When to Use |
-|-------|-------|---------|-------------|
-| 1 | `/invariant-designer` | Define invariants | Before writing ANY code |
-| 2 | `/test-first-enforcer` | Verify TDD adherence | Before implementing |
-| 3 | `/property-test-generator` | Generate property tests | For edge cases |
-| 4 | `/anti-cargo-cult-reviewer` | Reject fake tests | During test review |
-| 5 | `/module-boundary-reviewer` | Validate module design | After implementation |
-| 6 | `/implementation-reviewer` | **FINAL authority** | Before marking complete |
-
-### Subagent Authority
-
-The `/implementation-reviewer` has FINAL authority:
-
-**Can Do**:
-- REJECT implementations that do not meet criteria
-- REQUIRE specific fixes
-- PREVENT completion of substandard work
-
-**Cannot Be**:
-- Bypassed (no exceptions)
-- Overridden (criteria are objective)
-- Rushed (quality over speed)
+**Policy**: Singleton pattern required. Lazy initialization. Explicit cleanup via `closeDb()` / `unloadEmbedding()` before process exit. Singletons are internal implementation details (not global variables).
 
 ---
 
 ## Build & Test Commands
 
-### Build
 ```bash
-pnpm install    # Install dependencies
-pnpm build      # Build with tsup
-```
-
-### Test
-```bash
-pnpm test          # Full suite (1-2 minutes, comprehensive coverage)
-pnpm test:fast     # Skip CLI integration tests - faster feedback loop
+pnpm install       # Install dependencies
+pnpm build         # Build with tsup
+pnpm test          # Full suite (1-2 min)
+pnpm test:fast     # Skip CLI integration tests (~6s)
 pnpm test:changed  # Only tests affected by recent changes
 pnpm test:watch    # Watch mode
 pnpm test:all      # Full suite with model download
+pnpm dev           # Development mode
 ```
 
-**Recommended workflow:**
-1. Use `pnpm test:fast` during development for faster iteration
-2. Run `pnpm test` before committing to verify everything passes
-3. CI runs full suite with `pnpm test`
+**Recommended**: `pnpm test:fast` during development, `pnpm test` before committing.
 
-**Note:** Test suite is comprehensive (~1000 tests). Set tool timeouts accordingly (2+ minutes for full suite).
-
-### Run
-```bash
-pnpm dev        # Development mode
-```
-
----
-
-## Test Architecture
-
-### Test Organization
-
-Tests are organized for parallelization efficiency:
-
-```
-src/
-├── *.test.ts           # Unit tests (fast, run in parallel)
-├── cli/                # CLI integration tests (split for parallelization)
-│   ├── cli-test-utils.ts    # Shared test utilities
-│   ├── learn.test.ts        # learn command tests
-│   ├── search.test.ts       # search command tests
-│   └── ...                  # One file per command group
-├── storage/            # Storage layer tests
-├── search/             # Search algorithm tests
-├── capture/            # Lesson capture tests
-├── embeddings/         # Embedding model tests
-└── retrieval/          # Retrieval logic tests
-```
-
-### Why test:fast is fast
-
-`test:fast` skips CLI integration tests (`src/cli/*.test.ts`) which:
-- Spawn Node.js processes via `execSync`
-- Have ~400ms overhead per test (process startup + tsx compilation)
-- Account for ~95% of total test time
-
-The remaining 385 tests cover all business logic and run in ~6 seconds.
-
-### Known Limitations
-
-**Embedding model concurrency**: The `node-llama-cpp` native addon can crash under heavy parallel load. If you see native crashes during parallel test runs:
-- This is a known limitation of the underlying C++ library
-- Tests pass reliably when run serially or under moderate parallelism
-- The embedding tests use `skipIf(!modelAvailable)` to gracefully skip when model isn't installed
-
-### CI Strategy
-
-**Two test gates for release:**
-
-| Gate | Command | Purpose | When to Run |
-|------|---------|---------|-------------|
-| Business Logic | `pnpm test` | All tests; embedding tests skip if model unavailable | Every PR, local dev |
-| Full Suite | `pnpm test:all` | Downloads model, runs all tests including embedding | Release gate only |
-
-**Local Development:**
-- Use `pnpm test:fast` for rapid iteration (~6s)
-- Run `pnpm test` before committing
-
-**CI/CD:**
-- PR checks: `pnpm test` (skips gracefully if no model)
-- Release gate: `pnpm test:all` (requires compatible runner with native bindings)
-
-**Release is blocked until both gates pass.** See CONTRIBUTING.md for full pre-release checklist.
-
-### Test Quality Standards
-
-- **TDD enforced**: Tests must exist BEFORE implementation
-- **No mocked business logic**: Tests use real operations, not vi.mock() on the thing being tested
-- **Property-based tests**: `fast-check` generates edge cases automatically
-- **Timing tests use generous thresholds**: Avoid flaky tests on slow CI machines
+> **Test architecture details**: See `docs/standards/test-architecture.md`
 
 ---
 
 ## References
 
-- `docs/SPEC.md` — Full specification
-- `docs/CONTEXT.md` — Research and decisions
-- `docs/PLAN.md` — Implementation plan
-- `docs/verification/closed-loop-review-process.md` — Review workflow
+- `docs/SPEC.md` -- Full specification
+- `docs/CONTEXT.md` -- Research and decisions
+- `docs/PLAN.md` -- Implementation plan
+- `docs/verification/closed-loop-review-process.md` -- Review workflow
+- `docs/verification/subagent-pipeline.md` -- Subagent pipeline details
+- `docs/verification/exit-criteria.md` -- Exit criteria checklists
+- `docs/standards/code-organization.md` -- Code organization standards
+- `docs/standards/anti-patterns.md` -- Anti-patterns to avoid
+- `docs/standards/test-architecture.md` -- Test architecture details

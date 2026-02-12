@@ -17,6 +17,8 @@ import { registerInvalidationCommands } from './management-invalidation.js';
 import { registerIOCommands } from './management-io.js';
 import { registerMaintenanceCommands } from './management-maintenance.js';
 import { registerPrimeCommand } from './management-prime.js';
+import { registerRulesCommands } from './rules.js';
+import { registerTestSummaryCommand } from './test-summary.js';
 
 export { registerCaptureCommands } from './capture.js';
 export { registerRetrievalCommands } from './retrieval.js';
@@ -55,4 +57,6 @@ export function registerManagementCommands(program: Command): void {
   registerIOCommands(program);
   registerPrimeCommand(program);
   registerCrudCommands(program);
+  registerRulesCommands(program);
+  registerTestSummaryCommand(program);
 }

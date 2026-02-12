@@ -13,6 +13,8 @@ import { appendLesson } from '../memory/storage/index.js';
 import { generateId, SeveritySchema } from '../memory/types.js';
 import type { Lesson, Severity } from '../memory/types.js';
 
+import { formatError } from '../cli-error-format.js';
+
 import { getGlobalOpts, out } from './shared.js';
 
 // ============================================================================
@@ -124,7 +126,7 @@ export function registerCaptureCommands(program: Command): void {
       if (options.severity !== undefined) {
         const result = SeveritySchema.safeParse(options.severity);
         if (!result.success) {
-          out.error(`Invalid severity value: "${options.severity}". Valid values are: high, medium, low`);
+          console.error(formatError('learn', 'INVALID_SEVERITY', `Invalid severity: "${options.severity}"`, 'Use --severity high|medium|low'));
           process.exit(1);
         }
         severity = result.data;
@@ -200,8 +202,7 @@ export function registerCaptureCommands(program: Command): void {
           if (options.json) {
             console.log(JSON.stringify({ error: '--save requires --yes flag for confirmation' }));
           } else {
-            out.error('--save requires --yes flag for confirmation');
-            console.log('Use: detect --input <file> --save --yes');
+            console.error(formatError('detect', 'MISSING_FLAG', '--save requires --yes', 'Use: detect --input <file> --save --yes'));
           }
           process.exit(1);
         }
@@ -289,7 +290,11 @@ export function registerCaptureCommands(program: Command): void {
       } else {
         // Missing required options
         const msg = 'Provide either --trigger and --insight, or --input file.';
-        options.json ? console.log(JSON.stringify({ error: msg, saved: false })) : out.error(msg);
+        if (options.json) {
+          console.log(JSON.stringify({ error: msg, saved: false }));
+        } else {
+          console.error(formatError('capture', 'MISSING_OPTIONS', msg, 'Provide --trigger and --insight, or --input'));
+        }
         process.exit(1);
       }
 
@@ -298,8 +303,7 @@ export function registerCaptureCommands(program: Command): void {
         if (options.json) {
           console.log(JSON.stringify({ error: '--yes required in non-interactive mode', saved: false }));
         } else {
-          out.error('--yes required in non-interactive mode');
-          console.log('Use: capture --trigger "..." --insight "..." --yes');
+          console.error(formatError('capture', 'NON_INTERACTIVE', '--yes required in non-interactive mode', 'Use: capture --trigger "..." --insight "..." --yes'));
         }
         process.exit(1);
       }
