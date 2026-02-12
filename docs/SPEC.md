@@ -322,7 +322,7 @@ The package installs a CLI (`ca` / `learn`) that:
 
 ```
 compound_agent/
-├── doc/
+├── docs/
 │   ├── SPEC.md                 <- This file
 │   ├── CONTEXT.md              <- Research & decisions
 │   └── PLAN.md                 <- Detailed implementation plan

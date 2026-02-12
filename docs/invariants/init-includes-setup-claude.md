@@ -412,7 +412,7 @@ ALL of the following must be true for this feature to be complete:
 
 - Feature issue: `compound_agent-gql`
 - Related epic: `compound_agent-egt` (Release v0.2.1)
-- Related invariants: `doc/invariants/setup-claude-defaults.md`
+- Related invariants: `docs/invariants/setup-claude-defaults.md`
 - Current init implementation: `src/cli.ts` lines 598-651
 - Setup claude implementation: `src/cli.ts` lines 687-887
 - Current tests: `src/cli.test.ts`

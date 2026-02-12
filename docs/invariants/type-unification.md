@@ -244,8 +244,8 @@ pnpm lint
 **What**: All references to `QuickLesson`/`FullLesson` distinction must be updated.
 
 **Files to Update**:
-- `doc/SPEC.md`: Schema examples (lines 70-116)
-- `doc/PLAN.md`: Type definitions (lines 105-155)
+- `docs/SPEC.md`: Schema examples (lines 70-116)
+- `docs/PLAN.md`: Type definitions (lines 105-155)
 - `AGENTS.md`: Type documentation (line 27, 173-174)
 - `examples/basic-usage.ts`: Usage examples (lines 19-49)
 - `CONTRIBUTING.md`: Test examples (line 81)

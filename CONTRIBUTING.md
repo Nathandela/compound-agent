@@ -279,6 +279,6 @@ git push && git push --tags
 
 ## Questions?
 
-- Check [doc/SPEC.md](doc/SPEC.md) for the full specification
-- Check [doc/CONTEXT.md](doc/CONTEXT.md) for design decisions
+- Check [docs/SPEC.md](docs/SPEC.md) for the full specification
+- Check [docs/CONTEXT.md](docs/CONTEXT.md) for design decisions
 - Open an issue for questions or clarifications

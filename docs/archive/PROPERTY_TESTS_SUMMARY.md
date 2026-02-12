@@ -97,7 +97,7 @@ To make these tests pass, `src/storage/sqlite.ts` needs:
    - `rebuildIndex`: no-op if !sqliteAvailable
    - `syncIfNeeded`: return false if !sqliteAvailable
 
-See `doc/invariants/sqlite_graceful_degradation_invariants.md` for complete specification.
+See `docs/invariants/sqlite_graceful_degradation_invariants.md` for complete specification.
 
 ## Files Modified
 
@@ -106,7 +106,7 @@ See `doc/invariants/sqlite_graceful_degradation_invariants.md` for complete spec
 ## References
 
 - **Issue**: compound_agent-2f0 - Fix better-sqlite3 native bindings error
-- **Invariants**: `doc/invariants/sqlite_graceful_degradation_invariants.md`
+- **Invariants**: `docs/invariants/sqlite_graceful_degradation_invariants.md`
 - **Pattern reference**: `src/types.test.ts` (existing property-based tests)
 - **Fast-check docs**: https://fast-check.dev/
 

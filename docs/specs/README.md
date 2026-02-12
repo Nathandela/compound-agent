@@ -58,4 +58,4 @@ Examples:
 
 ## Location
 
-All specs live in `doc/specs/`. The main project spec is `doc/SPEC.md`.
+All specs live in `docs/specs/`. The main project spec is `docs/SPEC.md`.

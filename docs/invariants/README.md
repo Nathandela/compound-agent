@@ -57,4 +57,4 @@ Each invariant should be:
 
 - Lamport, L. "Specifying Concurrent Program Modules" (1983)
 - Liskov, B. & Wing, J. "A Behavioral Notion of Subtyping" (1994)
-- doc/verification/closed-loop-review-process.md
+- docs/verification/closed-loop-review-process.md

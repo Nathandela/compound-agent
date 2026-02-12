@@ -349,4 +349,4 @@ return { valid: true, distPath, cliPath };
 - package.json bin field (lines 8-11)
 - package.json files field (lines 18-21) - dist/ is published
 - src/commands/setup/hooks.ts - hook installation using npx
-- doc/specs/packaging.md - npm vs GitHub installation differences
+- docs/specs/packaging.md - npm vs GitHub installation differences

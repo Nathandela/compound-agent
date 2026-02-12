@@ -54,7 +54,7 @@ pnpm lint
 - [ ] Invariants documented and tested
 
 ### 7. Standards Compliance
-- [ ] Code follows all standards defined in `doc/standards/`
+- [ ] Code follows all standards defined in `docs/standards/`
 
 ## Your Review Process
 
@@ -64,7 +64,7 @@ pnpm lint
 4. **Review Documentation**: JSDoc on public functions?
 5. **Logical Review**: Trace critical paths
 6. **Verify Specification Met**: Requirements addressed?
-7. **Check Standards**: Read `doc/standards/` and verify compliance
+7. **Check Standards**: Read `docs/standards/` and verify compliance
 
 ## Response Format
 

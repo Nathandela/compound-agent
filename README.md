@@ -428,12 +428,12 @@ See [CHANGELOG.md](CHANGELOG.md) for details.
 
 | Document | Purpose |
 |----------|---------|
-| [doc/SPEC.md](doc/SPEC.md) | Complete specification |
-| [doc/CONTEXT.md](doc/CONTEXT.md) | Research and design decisions |
-| [doc/PLAN.md](doc/PLAN.md) | Implementation plan |
+| [docs/SPEC.md](docs/SPEC.md) | Complete specification |
+| [docs/CONTEXT.md](docs/CONTEXT.md) | Research and design decisions |
+| [docs/PLAN.md](docs/PLAN.md) | Implementation plan |
 | [AGENTS.md](AGENTS.md) | Agent instructions overview |
 | [.claude/CLAUDE.md](.claude/CLAUDE.md) | Claude Code project instructions |
-| [doc/test-optimization-baseline.md](doc/test-optimization-baseline.md) | Test performance metrics |
+| [docs/test-optimization-baseline.md](docs/test-optimization-baseline.md) | Test performance metrics |
 
 ## Testing
 

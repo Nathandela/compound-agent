@@ -216,6 +216,6 @@ fc.integer({ min: 1, max: 5 })  // Symlink test repetitions
 ## References
 
 - Implementation: `/Users/Nathan/Documents/Code/compound_agent/src/install-check.ts`
-- Invariants: `/Users/Nathan/Documents/Code/compound_agent/doc/invariants/install-check.md`
+- Invariants: `/Users/Nathan/Documents/Code/compound_agent/docs/invariants/install-check.md`
 - fast-check: https://fast-check.dev/
 - Property-based testing guide: https://fast-check.dev/docs/introduction/getting-started/

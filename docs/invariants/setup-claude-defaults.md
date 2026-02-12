@@ -317,6 +317,6 @@ ALL of the following must be true for this feature to be complete:
 ## References
 
 - Original issue: `compound_agent-9bw`
-- Related spec: `doc/SPEC.md` (CLI commands section)
+- Related spec: `docs/SPEC.md` (CLI commands section)
 - Current implementation: `src/cli.ts` lines 614-805
 - Current tests: `src/cli.test.ts` lines 1453-1672

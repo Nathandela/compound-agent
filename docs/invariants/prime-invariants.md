@@ -448,6 +448,6 @@ Before marking work complete, ALL must pass:
 ## References
 
 - `src/retrieval/session.ts` - `loadSessionLessons()` function
-- `doc/invariants/load-session-output.md` - Related output formatting
-- `doc/SPEC.md` - Trust language requirements from Beads integration
+- `docs/invariants/load-session-output.md` - Related output formatting
+- `docs/SPEC.md` - Trust language requirements from Beads integration
 - `.claude/CLAUDE.md` - Example trust language patterns

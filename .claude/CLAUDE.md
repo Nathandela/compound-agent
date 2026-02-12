@@ -14,10 +14,10 @@
 
 | Document | Purpose |
 |----------|---------|
-| `doc/SPEC.md` | Complete specification |
-| `doc/CONTEXT.md` | Research and decisions |
-| `doc/PLAN.md` | Day-by-day implementation plan |
-| `doc/verification/` | Review workflow and criteria |
+| `docs/SPEC.md` | Complete specification |
+| `docs/CONTEXT.md` | Research and decisions |
+| `docs/PLAN.md` | Day-by-day implementation plan |
+| `docs/verification/` | Review workflow and criteria |
 
 ---
 
@@ -263,7 +263,7 @@ export { rebuildIndex, searchKeyword } from './sqlite.js';
 ### Documentation Structure
 
 ```
-doc/                        # All documentation (singular)
+docs/                       # All documentation
 ├── SPEC.md                 # Complete specification
 ├── CONTEXT.md              # Research and decisions
 ├── PLAN.md                 # Implementation plan
@@ -501,7 +501,7 @@ The remaining 385 tests cover all business logic and run in ~6 seconds.
 
 ## References
 
-- `doc/SPEC.md` — Full specification
-- `doc/CONTEXT.md` — Research and decisions
-- `doc/PLAN.md` — Implementation plan
-- `doc/verification/closed-loop-review-process.md` — Review workflow
+- `docs/SPEC.md` — Full specification
+- `docs/CONTEXT.md` — Research and decisions
+- `docs/PLAN.md` — Implementation plan
+- `docs/verification/closed-loop-review-process.md` — Review workflow

@@ -412,9 +412,9 @@ Run `npx ca init` in a project root to configure:
 | Document | Purpose |
 |----------|---------|
 | `.claude/CLAUDE.md` | Detailed project rules and TDD workflow |
-| `doc/SPEC.md` | Complete specification |
-| `doc/CONTEXT.md` | Research and design decisions |
-| `doc/PLAN.md` | Implementation plan |
+| `docs/SPEC.md` | Complete specification |
+| `docs/CONTEXT.md` | Research and design decisions |
+| `docs/PLAN.md` | Implementation plan |
 
 ## Landing the Plane (Session Completion)
 
