@@ -2,7 +2,7 @@
  * SQLite search operations using FTS5 full-text search.
  */
 
-import type { Lesson } from '../../types.js';
+import type { Lesson, MemoryItemType } from '../../types.js';
 
 import type { LessonRow, RetrievalStat } from './types.js';
 import { openDb } from './connection.js';
@@ -15,7 +15,7 @@ import { openDb } from './connection.js';
 function rowToLesson(row: LessonRow): Lesson {
   const lesson: Lesson = {
     id: row.id,
-    type: row.type as 'quick' | 'full',
+    type: row.type as Lesson['type'],
     trigger: row.trigger,
     insight: row.insight,
     tags: row.tags ? row.tags.split(',').filter(Boolean) : [],
@@ -82,12 +82,14 @@ export function incrementRetrievalCount(repoRoot: string, lessonIds: string[]): 
  * @param repoRoot - Absolute path to repository root
  * @param query - FTS5 query string
  * @param limit - Maximum number of results
+ * @param typeFilter - Optional memory item type to filter by
  * @returns Matching lessons
  */
 export async function searchKeyword(
   repoRoot: string,
   query: string,
-  limit: number
+  limit: number,
+  typeFilter?: MemoryItemType
 ): Promise<Lesson[]> {
   const database = openDb(repoRoot);
 
@@ -95,6 +97,23 @@ export async function searchKeyword(
     cnt: number;
   };
   if (countResult.cnt === 0) return [];
+
+  if (typeFilter) {
+    const rows = database
+      .prepare(
+        `
+        SELECT l.*
+        FROM lessons l
+        JOIN lessons_fts fts ON l.rowid = fts.rowid
+        WHERE lessons_fts MATCH ?
+          AND l.invalidated_at IS NULL
+          AND l.type = ?
+        LIMIT ?
+      `
+      )
+      .all(query, typeFilter, limit) as LessonRow[];
+    return rows.map(rowToLesson);
+  }
 
   const rows = database
     .prepare(

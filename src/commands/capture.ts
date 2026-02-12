@@ -34,7 +34,7 @@ interface CaptureOptions {
 function createLessonFromFlags(trigger: string, insight: string, confirmed: boolean): Lesson {
   return {
     id: generateId(insight),
-    type: 'quick',
+    type: 'lesson',
     trigger,
     insight,
     tags: [],
@@ -79,7 +79,7 @@ function outputCapturePreview(lesson: Lesson): void {
 function createLessonFromInputFile(result: DetectionResult, confirmed: boolean): Lesson {
   return {
     id: generateId(result.proposedInsight),
-    type: 'quick',
+    type: 'lesson',
     trigger: result.trigger,
     insight: result.proposedInsight,
     tags: [],
@@ -130,8 +130,8 @@ export function registerCaptureCommands(program: Command): void {
         severity = result.data;
       }
 
-      // Data coupling invariant: severity !== undefined => type === 'full'
-      const lessonType = severity !== undefined ? 'full' : 'quick';
+      // All new lessons use type 'lesson' (old quick/full distinction removed)
+      const lessonType = 'lesson' as const;
 
       // Parse citation if provided
       let citation: { file: string; line?: number; commit?: string } | undefined;
@@ -231,7 +231,7 @@ export function registerCaptureCommands(program: Command): void {
         if (options.save && options.yes) {
           const lesson: Lesson = {
             id: generateId(result.proposedInsight),
-            type: 'quick',
+            type: 'lesson',
             trigger: result.trigger,
             insight: result.proposedInsight,
             tags: [],

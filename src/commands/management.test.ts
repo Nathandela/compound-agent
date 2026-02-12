@@ -10,9 +10,9 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { ARCHIVE_DIR } from '../memory/storage/compact.js';
-import { appendLesson, LESSONS_PATH } from '../memory/storage/jsonl.js';
+import { appendLesson, appendMemoryItem, LESSONS_PATH } from '../memory/storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
-import { createFullLesson, createQuickLesson, daysAgo, setupCliTestContext } from '../test-utils.js';
+import { createFullLesson, createPattern, createPreference, createQuickLesson, createSolution, daysAgo, setupCliTestContext } from '../test-utils.js';
 
 describe('Management Commands', () => {
   const { getTempDir, runCli } = setupCliTestContext();
@@ -128,7 +128,7 @@ describe('Management Commands', () => {
       const filePath = join(getTempDir(), LESSONS_PATH);
       const tombstone = JSON.stringify({
         id: 'L002',
-        type: 'quick',
+        type: 'lesson',
         trigger: 'deleted',
         insight: 'second lesson',
         tags: [],
@@ -725,7 +725,7 @@ describe('Management Commands', () => {
       };
 
       expect(deletedRecord.id).toBe('DEL001');
-      expect(deletedRecord.type).toBe('quick');
+      expect(deletedRecord.type).toBe('lesson');
       expect(deletedRecord.trigger).toBeDefined();
       expect(deletedRecord.insight).toBe('First lesson to delete');
       expect(deletedRecord.source).toBe('manual');
@@ -799,6 +799,77 @@ describe('Management Commands', () => {
 
       const { combined } = runCli('search "First lesson"');
       expect(combined).not.toContain('First lesson to delete');
+    });
+  });
+
+  describe('export with unified types', () => {
+    beforeEach(async () => {
+      await appendMemoryItem(getTempDir(), createQuickLesson('L001', 'lesson insight', { created: '2024-01-15T10:00:00Z' }));
+      await appendMemoryItem(getTempDir(), createSolution('S001', 'solution insight', { created: '2024-02-15T10:00:00Z' }));
+      await appendMemoryItem(getTempDir(), createPattern('P001', 'pattern insight', 'bad code', 'good code', { created: '2024-03-15T10:00:00Z' }));
+      await appendMemoryItem(getTempDir(), createPreference('R001', 'preference insight', { created: '2024-04-15T10:00:00Z' }));
+    });
+
+    it('exports all memory item types', () => {
+      const { stdout } = runCli('export');
+      const exported = JSON.parse(stdout) as unknown[];
+
+      expect(exported).toHaveLength(4);
+      const types = (exported as Array<{ type: string }>).map((e) => e.type).sort();
+      expect(types).toEqual(['lesson', 'pattern', 'preference', 'solution']);
+    });
+
+    it('includes pattern field for pattern type', () => {
+      const { stdout } = runCli('export');
+      const exported = JSON.parse(stdout) as Array<{ type: string; pattern?: { bad: string; good: string } }>;
+
+      const patternItem = exported.find((e) => e.type === 'pattern');
+      expect(patternItem).toBeDefined();
+      expect(patternItem!.pattern).toEqual({ bad: 'bad code', good: 'good code' });
+    });
+  });
+
+  describe('import with unified types', () => {
+    it('imports non-lesson types from JSONL file', async () => {
+      const sourceFile = join(getTempDir(), 'import-unified.jsonl');
+      await writeFile(
+        sourceFile,
+        [
+          JSON.stringify(createSolution('IMPS1', 'imported solution')),
+          JSON.stringify(createPattern('IMPP1', 'imported pattern', 'old way', 'new way')),
+          JSON.stringify(createPreference('IMPR1', 'imported preference')),
+        ].join('\n') + '\n'
+      );
+
+      const { combined } = runCli(`import ${sourceFile}`);
+      expect(combined).toMatch(/imported.*3/i);
+
+      // Verify all types were added
+      const filePath = join(getTempDir(), LESSONS_PATH);
+      const content = await readFile(filePath, 'utf-8');
+      expect(content).toContain('IMPS1');
+      expect(content).toContain('IMPP1');
+      expect(content).toContain('IMPR1');
+    });
+  });
+
+  describe('stats with unified types', () => {
+    it('shows type breakdown in stats', async () => {
+      await appendMemoryItem(getTempDir(), createQuickLesson('L001', 'lesson one'));
+      await appendMemoryItem(getTempDir(), createQuickLesson('L002', 'lesson two'));
+      await appendMemoryItem(getTempDir(), createSolution('S001', 'solution one'));
+      await appendMemoryItem(getTempDir(), createPattern('P001', 'pattern one', 'bad', 'good'));
+      await appendMemoryItem(getTempDir(), createPreference('R001', 'preference one'));
+      await rebuildIndex(getTempDir());
+      closeDb();
+
+      const { combined } = runCli('stats');
+      expect(combined).toContain('5 total');
+      // Should show per-type breakdown
+      expect(combined).toMatch(/lesson.*2|2.*lesson/i);
+      expect(combined).toMatch(/solution.*1|1.*solution/i);
+      expect(combined).toMatch(/pattern.*1|1.*pattern/i);
+      expect(combined).toMatch(/preference.*1|1.*preference/i);
     });
   });
 

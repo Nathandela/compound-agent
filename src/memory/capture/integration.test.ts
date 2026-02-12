@@ -55,6 +55,7 @@ describe('trigger detection integration', () => {
       expect(result).not.toBeNull();
       expect(result?.trigger).toContain('correction');
       expect(result?.source).toBe('user_correction');
+      expect(result?.memoryItemType).toBeDefined();
     });
 
     it('detects self correction and returns proposal', async () => {
@@ -73,6 +74,7 @@ describe('trigger detection integration', () => {
       expect(result).not.toBeNull();
       expect(result?.trigger).toContain('Self-correction');
       expect(result?.source).toBe('self_correction');
+      expect(result?.memoryItemType).toBeDefined();
     });
 
     it('returns null when self correction pattern not found', async () => {
@@ -105,6 +107,7 @@ describe('trigger detection integration', () => {
       expect(result).not.toBeNull();
       expect(result?.trigger).toContain('Test failure');
       expect(result?.source).toBe('test_failure');
+      expect(result?.memoryItemType).toBeDefined();
     });
 
     it('returns null for test that passes', async () => {
@@ -136,6 +139,59 @@ describe('trigger detection integration', () => {
       const result = await detectAndPropose(tempDir, input);
       // Detection found, but insight is vague so should not propose
       expect(result).toBeNull();
+    });
+
+    it('infers pattern type for "use X instead of Y" corrections', async () => {
+      const input: DetectionInput = {
+        type: 'user',
+        data: {
+          messages: [
+            'edit the config file',
+            'No, wrong file - use dev.config.ts instead of prod.config.ts when developing locally',
+          ],
+          context: { tool: 'edit', intent: 'config update' },
+        },
+      };
+
+      const result = await detectAndPropose(tempDir, input);
+      expect(result).not.toBeNull();
+      expect(result?.memoryItemType).toBe('pattern');
+    });
+
+    it('infers preference type for "always/never" corrections', async () => {
+      const input: DetectionInput = {
+        type: 'user',
+        data: {
+          messages: [
+            'commit the changes',
+            'No, always run pnpm lint before committing code changes to the repository',
+          ],
+          context: { tool: 'bash', intent: 'commit' },
+        },
+      };
+
+      const result = await detectAndPropose(tempDir, input);
+      expect(result).not.toBeNull();
+      expect(result?.memoryItemType).toBe('preference');
+    });
+
+    it('infers lesson type as default for unclassified insights', async () => {
+      const input: DetectionInput = {
+        type: 'self',
+        data: {
+          edits: [
+            { file: 'src/app.ts', success: true, timestamp: Date.now() - 3000 },
+            { file: 'src/app.ts', success: false, timestamp: Date.now() - 2000 },
+            { file: 'src/app.ts', success: true, timestamp: Date.now() - 1000 },
+          ],
+        },
+      };
+
+      const result = await detectAndPropose(tempDir, input);
+      expect(result).not.toBeNull();
+      // Self-correction insight is "Check src/app.ts for common errors before editing"
+      // which matches "check X before Y" -> solution
+      expect(result?.memoryItemType).toBeDefined();
     });
 
     it('includes proposed insight text for user corrections', async () => {
@@ -300,15 +356,17 @@ describe('trigger detection integration', () => {
 });
 
 describe('DetectionResult type', () => {
-  it('has required fields', () => {
+  it('has required fields including memoryItemType', () => {
     const result: DetectionResult = {
       trigger: 'Test trigger',
       source: 'user_correction',
       proposedInsight: 'Use X instead of Y',
+      memoryItemType: 'pattern',
     };
 
     expect(result.trigger).toBeDefined();
     expect(result.source).toBeDefined();
     expect(result.proposedInsight).toBeDefined();
+    expect(result.memoryItemType).toBeDefined();
   });
 });

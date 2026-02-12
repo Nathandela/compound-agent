@@ -1,7 +1,8 @@
 /**
  * Trigger detection integration
  *
- * Orchestrates detection -> quality filter -> lesson proposal flow.
+ * Orchestrates detection -> quality filter -> memory item proposal flow.
+ * Infers memory item type from insight content.
  * Provides a high-level API for CLI and hooks.
  */
 
@@ -10,12 +11,13 @@ import * as fs from 'node:fs/promises';
 import { z } from 'zod';
 
 import { ContextSchema } from '../types.js';
-import type { Source } from '../types.js';
+import type { MemoryItemType, Source } from '../types.js';
 import { shouldPropose } from './quality.js';
 import {
   detectUserCorrection,
   detectSelfCorrection,
   detectTestFailure,
+  inferMemoryItemType,
 } from './triggers.js';
 import type {
   CorrectionSignal,
@@ -52,6 +54,7 @@ export interface DetectionResult {
   trigger: string;
   source: Source;
   proposedInsight: string;
+  memoryItemType: MemoryItemType;
 }
 
 /**
@@ -82,7 +85,10 @@ export async function detectAndPropose(
     return null;
   }
 
-  return { trigger, source, proposedInsight };
+  // Infer memory item type from insight content
+  const memoryItemType = inferMemoryItemType(proposedInsight);
+
+  return { trigger, source, proposedInsight, memoryItemType };
 }
 
 /** Internal detection result before quality filtering */

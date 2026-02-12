@@ -4,7 +4,9 @@
  * Filters to ensure lessons are:
  * - Novel (not duplicate)
  * - Specific (not vague)
- * - Actionable (contains action words)
+ *
+ * Actionability check is available but not part of the capture gate.
+ * Strategy: capture aggressively, prune later.
  */
 
 import { searchKeyword, syncIfNeeded } from '../storage/index.js';
@@ -180,7 +182,8 @@ export interface ProposeResult {
 
 /**
  * Combined quality check for lesson proposals.
- * Returns true only if insight is novel, specific, AND actionable.
+ * Returns true only if insight is novel AND specific.
+ * Actionability gate removed: capture aggressively, prune later.
  */
 export async function shouldPropose(
   repoRoot: string,
@@ -190,12 +193,6 @@ export async function shouldPropose(
   const specificResult = isSpecific(insight);
   if (!specificResult.specific) {
     return { shouldPropose: false, reason: specificResult.reason };
-  }
-
-  // Check actionability (fast, no DB)
-  const actionableResult = isActionable(insight);
-  if (!actionableResult.actionable) {
-    return { shouldPropose: false, reason: actionableResult.reason };
   }
 
   // Check novelty (requires DB lookup)

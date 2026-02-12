@@ -77,7 +77,7 @@ describe('Capture Commands', () => {
         const content = await readFile(filePath, 'utf-8');
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
 
-        expect(lesson.type).toBe('full');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('high');
       });
 
@@ -88,7 +88,7 @@ describe('Capture Commands', () => {
         const content = await readFile(filePath, 'utf-8');
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
 
-        expect(lesson.type).toBe('full');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('medium');
       });
 
@@ -99,7 +99,7 @@ describe('Capture Commands', () => {
         const content = await readFile(filePath, 'utf-8');
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
 
-        expect(lesson.type).toBe('full');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('low');
       });
 
@@ -110,8 +110,8 @@ describe('Capture Commands', () => {
         const content = await readFile(filePath, 'utf-8');
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
 
-        // Coupling invariant: severity !== undefined implies type === 'full'
-        expect(lesson.type).toBe('full');
+        // All lessons now use type 'lesson' (old quick/full distinction removed)
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('high');
       });
 
@@ -167,7 +167,7 @@ describe('Capture Commands', () => {
         const content = await readFile(filePath, 'utf-8');
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string };
 
-        expect(lesson.type).toBe('quick');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBeUndefined();
       });
 
@@ -180,7 +180,7 @@ describe('Capture Commands', () => {
         const lesson = JSON.parse(content.trim()) as { type: string; severity?: string; confirmed: boolean };
 
         // Verify all required fields for loadSessionLessons filter
-        expect(lesson.type).toBe('full');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('high');
         expect(lesson.confirmed).toBe(true);
       });
@@ -197,7 +197,7 @@ describe('Capture Commands', () => {
           tags: string[];
         };
 
-        expect(lesson.type).toBe('full');
+        expect(lesson.type).toBe('lesson');
         expect(lesson.severity).toBe('high');
         expect(lesson.trigger).toBe('bug occurred');
         expect(lesson.tags).toContain('security');

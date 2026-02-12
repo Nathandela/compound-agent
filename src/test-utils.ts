@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach } from 'vitest';
 
 import { closeDb } from './memory/storage/sqlite/index.js';
-import type { Lesson, Severity, Source } from './memory/types.js';
+import type { Lesson, PatternItem, Preference, Severity, Solution, Source } from './memory/types.js';
 
 /**
  * Options for creating lesson fixtures.
@@ -48,13 +48,13 @@ export interface LessonOptions {
  * @example
  * ```ts
  * const lesson = createLesson({ id: 'L001', insight: 'Use Polars' });
- * const fullLesson = createLesson({ id: 'L002', type: 'full', severity: 'high' });
+ * const fullLesson = createLesson({ id: 'L002', severity: 'high' });
  * ```
  */
 export function createLesson(overrides: Partial<Lesson> = {}): Lesson {
   const id = overrides.id ?? 'L001';
   const insight = overrides.insight ?? 'test insight';
-  const type = overrides.type ?? 'quick';
+  const type = overrides.type ?? 'lesson';
 
   return {
     id,
@@ -82,7 +82,7 @@ export function createLesson(overrides: Partial<Lesson> = {}): Lesson {
  * @param id - Lesson ID
  * @param insight - Insight text
  * @param options - Additional options
- * @returns A Lesson object with type 'quick'
+ * @returns A Lesson object with type 'lesson' (no evidence/severity)
  *
  * @example
  * ```ts
@@ -99,7 +99,7 @@ export function createQuickLesson(
 
   return {
     id,
-    type: 'quick',
+    type: 'lesson',
     trigger: options.trigger ?? `trigger for ${insight}`,
     insight,
     tags: options.tags ?? [],
@@ -120,7 +120,7 @@ export function createQuickLesson(
  * @param insight - Insight text
  * @param severity - Severity level (default: 'medium')
  * @param options - Additional options
- * @returns A Lesson object with type 'full'
+ * @returns A Lesson object with type 'lesson' and evidence/severity set
  *
  * @example
  * ```ts
@@ -138,11 +138,110 @@ export function createFullLesson(
 
   return {
     id,
-    type: 'full',
+    type: 'lesson',
     trigger: options.trigger ?? `trigger for ${insight}`,
     insight,
     evidence: options.evidence ?? 'Test evidence',
     severity,
+    tags: options.tags ?? [],
+    source: options.source ?? 'manual',
+    context: { tool: 'test', intent: 'testing' },
+    created,
+    confirmed: options.confirmed ?? true,
+    supersedes: [],
+    related: [],
+    ...(options.deleted !== undefined && { deleted: options.deleted }),
+  };
+}
+
+/**
+ * Create a solution memory item for testing.
+ *
+ * @param id - Item ID (should start with 'S')
+ * @param insight - Resolution text
+ * @param options - Additional options
+ * @returns A Solution memory item
+ */
+export function createSolution(
+  id: string,
+  insight: string,
+  options: LessonOptions = {}
+): Solution {
+  const created = resolveCreatedDate(options.created);
+
+  return {
+    id,
+    type: 'solution',
+    trigger: options.trigger ?? `problem for ${insight}`,
+    insight,
+    tags: options.tags ?? [],
+    source: options.source ?? 'manual',
+    context: { tool: 'test', intent: 'testing' },
+    created,
+    confirmed: options.confirmed ?? true,
+    supersedes: [],
+    related: [],
+    ...(options.deleted !== undefined && { deleted: options.deleted }),
+  };
+}
+
+/**
+ * Create a pattern memory item for testing.
+ * Pattern field (bad -> good) is REQUIRED.
+ *
+ * @param id - Item ID (should start with 'P')
+ * @param insight - Pattern description
+ * @param bad - Bad code example
+ * @param good - Good code example
+ * @param options - Additional options
+ * @returns A PatternItem memory item
+ */
+export function createPattern(
+  id: string,
+  insight: string,
+  bad: string,
+  good: string,
+  options: LessonOptions = {}
+): PatternItem {
+  const created = resolveCreatedDate(options.created);
+
+  return {
+    id,
+    type: 'pattern',
+    trigger: options.trigger ?? `trigger for ${insight}`,
+    insight,
+    pattern: { bad, good },
+    tags: options.tags ?? [],
+    source: options.source ?? 'manual',
+    context: { tool: 'test', intent: 'testing' },
+    created,
+    confirmed: options.confirmed ?? true,
+    supersedes: [],
+    related: [],
+    ...(options.deleted !== undefined && { deleted: options.deleted }),
+  };
+}
+
+/**
+ * Create a preference memory item for testing.
+ *
+ * @param id - Item ID (should start with 'R')
+ * @param insight - Preference description
+ * @param options - Additional options
+ * @returns A Preference memory item
+ */
+export function createPreference(
+  id: string,
+  insight: string,
+  options: LessonOptions = {}
+): Preference {
+  const created = resolveCreatedDate(options.created);
+
+  return {
+    id,
+    type: 'preference',
+    trigger: options.trigger ?? `trigger for ${insight}`,
+    insight,
     tags: options.tags ?? [],
     source: options.source ?? 'manual',
     context: { tool: 'test', intent: 'testing' },

@@ -6,8 +6,8 @@
  */
 
 // JSONL storage (source of truth)
-export { appendLesson, LESSONS_PATH, readLessons } from './jsonl.js';
-export type { ParseError, ReadLessonsOptions, ReadLessonsResult } from './jsonl.js';
+export { appendLesson, appendMemoryItem, LESSONS_PATH, readLessons, readMemoryItems } from './jsonl.js';
+export type { ParseError, ReadLessonsOptions, ReadLessonsResult, ReadMemoryItemsResult } from './jsonl.js';
 
 // SQLite storage (rebuildable index)
 export {

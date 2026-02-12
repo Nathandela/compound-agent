@@ -69,7 +69,7 @@ describe('Compaction', () => {
     options: { created?: string; retrievalCount?: number } = {}
   ): Lesson => ({
     id,
-    type: 'quick',
+    type: 'lesson',
     trigger: `trigger for ${insight}`,
     insight,
     tags: ['test'],
