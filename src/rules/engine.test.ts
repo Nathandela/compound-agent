@@ -214,7 +214,7 @@ describe('runRules', () => {
 // ============================================================================
 
 describe('formatViolation', () => {
-  it('formats error violation with file and line', () => {
+  it('formats error violation with file, line, and message', () => {
     const rule: Rule = {
       id: 'no-console',
       description: 'No console.log',
@@ -232,10 +232,11 @@ describe('formatViolation', () => {
     expect(output).toContain('ERROR');
     expect(output).toContain('no-console');
     expect(output).toContain('src/cli.ts:45');
+    expect(output).toContain('Pattern console\\.log matched');
     expect(output).toContain('Use logger instead.');
   });
 
-  it('formats warning without line number', () => {
+  it('formats warning without file/line, includes message', () => {
     const rule: Rule = {
       id: 'lint-check',
       description: 'Lint must pass',
@@ -248,6 +249,7 @@ describe('formatViolation', () => {
     const output = formatViolation(rule, violation);
     expect(output).toContain('WARN');
     expect(output).toContain('lint-check');
+    expect(output).toContain('exit code 1');
     expect(output).toContain('Fix lint errors.');
   });
 
@@ -263,6 +265,21 @@ describe('formatViolation', () => {
 
     const output = formatViolation(rule, violation);
     expect(output).toContain('INFO');
+    expect(output).toContain('Pattern TODO matched');
+  });
+
+  it('formats caught error violation (no file/line, has message)', () => {
+    const rule: Rule = {
+      id: 'bad-regex',
+      description: 'Invalid regex',
+      severity: 'error',
+      check: { type: 'file-pattern', glob: '**/*.ts', pattern: '(unclosed' },
+      remediation: 'Fix the regex.',
+    };
+    const violation: Violation = { message: 'Rule check error: Invalid regular expression' };
+
+    const output = formatViolation(rule, violation);
+    expect(output).toBe('ERROR [rules] bad-regex: Rule check error: Invalid regular expression -- Fix the regex.');
   });
 });
 

@@ -87,7 +87,8 @@ export function formatViolation(rule: Rule, violation: Violation): string {
       : violation.file
     : '';
   const locationPart = location ? ` ${location} --` : '';
-  return `${label} [rules] ${rule.id}:${locationPart} ${rule.remediation}`;
+  const messagePart = violation.message ? ` ${violation.message} --` : '';
+  return `${label} [rules] ${rule.id}:${locationPart}${messagePart} ${rule.remediation}`;
 }
 
 /** Dispatch a rule check to the appropriate handler. */

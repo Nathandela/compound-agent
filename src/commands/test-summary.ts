@@ -36,8 +36,8 @@ export interface TestSummary {
 // Constants
 // ============================================================================
 
-/** Max length for a single error message line before truncation. */
-const MAX_ERROR_LINE_LENGTH = 200;
+/** Max lines to capture from a failure body. */
+const MAX_ERROR_BODY_LINES = 10;
 
 /** Default log file path relative to repo root. */
 const LOG_REL_PATH = '.claude/.cache/last-test-run.log';
@@ -86,22 +86,35 @@ export function parseVitestOutput(output: string): TestSummary {
     summary.duration = durationMatch[1]!;
   }
 
-  // Parse individual FAIL blocks
-  // Pattern: " FAIL  path > suite > test\nErrorMessage"
-  const failPattern = / FAIL\s+(.+?)(?:\s+\[.*?\])?\n(.+)/g;
-  let match;
-  while ((match = failPattern.exec(output)) !== null) {
-    const name = match[1]!.trim();
-    const errorLine = match[2]!.trim();
+  // Parse individual FAIL blocks with multiline body
+  const lines = output.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    const failMatch = lines[i]!.match(/^ FAIL\s+(.+?)(?:\s+\[.*?\])?$/);
+    if (!failMatch) continue;
 
-    // Skip location lines (start with ❯)
-    if (errorLine.startsWith('\u276F')) continue;
+    const name = failMatch[1]!.trim();
+    const bodyLines: string[] = [];
 
-    const error = errorLine.length > MAX_ERROR_LINE_LENGTH
-      ? errorLine.slice(0, MAX_ERROR_LINE_LENGTH) + '...'
-      : errorLine;
+    // Collect up to MAX_ERROR_BODY_LINES of the failure body
+    for (let j = i + 1; j < lines.length && bodyLines.length < MAX_ERROR_BODY_LINES; j++) {
+      const line = lines[j]!;
+      // Stop at location lines or section separators
+      if (line.trimStart().startsWith('\u276F') || line.match(/^⎯/)) break;
+      // Stop at next FAIL block
+      if (line.match(/^ FAIL\s+/)) break;
+      // Skip blank lines at the start
+      if (bodyLines.length === 0 && line.trim() === '') continue;
+      bodyLines.push(line);
+    }
 
-    summary.failures.push({ name, error });
+    // Trim trailing blank lines
+    while (bodyLines.length > 0 && bodyLines[bodyLines.length - 1]!.trim() === '') {
+      bodyLines.pop();
+    }
+
+    if (bodyLines.length === 0) continue;
+
+    summary.failures.push({ name, error: bodyLines.join('\n').trim() });
   }
 
   return summary;

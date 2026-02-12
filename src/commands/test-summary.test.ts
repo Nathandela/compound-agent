@@ -124,24 +124,23 @@ describe('parseVitestOutput', () => {
       expect(result.total).toBe(20);
     });
 
-    it('should extract failing test names and error messages', () => {
+    it('should extract failing test names and multiline error messages', () => {
       const result = parseVitestOutput(WITH_FAILURES);
       expect(result.failures).toHaveLength(3);
 
-      expect(result.failures[0]).toEqual({
-        name: 'src/rules/engine.test.ts > RuleEngine > should validate config',
-        error: 'AssertionError: expected true to be false',
-      });
+      // First failure: multiline body (error + diff lines)
+      expect(result.failures[0]!.name).toBe('src/rules/engine.test.ts > RuleEngine > should validate config');
+      expect(result.failures[0]!.error).toContain('AssertionError: expected true to be false');
+      expect(result.failures[0]!.error).toContain('- Expected');
+      expect(result.failures[0]!.error).toContain('+  true');
 
-      expect(result.failures[1]).toEqual({
-        name: 'src/rules/types.test.ts > RuleSchema > should reject invalid severity',
-        error: "ZodError: Invalid enum value. Expected 'high' | 'medium' | 'low', received 'critical'",
-      });
+      // Second failure
+      expect(result.failures[1]!.name).toBe('src/rules/types.test.ts > RuleSchema > should reject invalid severity');
+      expect(result.failures[1]!.error).toContain("ZodError: Invalid enum value. Expected 'high' | 'medium' | 'low', received 'critical'");
 
-      expect(result.failures[2]).toEqual({
-        name: 'src/rules/types.test.ts > RuleSchema > should parse valid rule',
-        error: "TypeError: Cannot read properties of undefined (reading 'parse')",
-      });
+      // Third failure
+      expect(result.failures[2]!.name).toBe('src/rules/types.test.ts > RuleSchema > should parse valid rule');
+      expect(result.failures[2]!.error).toContain("TypeError: Cannot read properties of undefined (reading 'parse')");
     });
   });
 
@@ -188,13 +187,13 @@ describe('parseVitestOutput', () => {
     });
   });
 
-  describe('error message truncation', () => {
-    it('should truncate long error messages', () => {
-      const longError = 'A'.repeat(300);
+  describe('multiline error body capture', () => {
+    it('should capture up to 10 lines of failure body', () => {
+      const lines = Array.from({ length: 15 }, (_, i) => `error line ${i + 1}`);
       const output = ` RUN  v2.1.9 /test
 
  FAIL  src/test.ts > test > it
-${longError}
+${lines.join('\n')}
 
  ❯ src/test.ts:1:1
 
@@ -205,9 +204,10 @@ ${longError}
 
       const result = parseVitestOutput(output);
       expect(result.failures).toHaveLength(1);
-      // Error message should be truncated with ellipsis
-      expect(result.failures[0]!.error.length).toBeLessThanOrEqual(203);
-      expect(result.failures[0]!.error).toMatch(/\.\.\.$/);
+      // Should capture first 10 lines, not all 15
+      expect(result.failures[0]!.error).toContain('error line 1');
+      expect(result.failures[0]!.error).toContain('error line 10');
+      expect(result.failures[0]!.error).not.toContain('error line 11');
     });
   });
 });
