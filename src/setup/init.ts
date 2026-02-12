@@ -16,6 +16,9 @@ import {
   createPluginManifest,
   createSlashCommands,
   ensureClaudeMdReference,
+  installAgentTemplates,
+  installPhaseSkills,
+  installWorkflowCommands,
   updateAgentsMd,
 } from './primitives.js';
 import type { ClaudeHooksResult } from './types.js';
@@ -78,6 +81,13 @@ export function registerInitCommand(program: Command): void {
       // Create plugin manifest (ctv)
       if (!options.skipAgents) {
         await createPluginManifest(repoRoot);
+      }
+
+      // Install agent templates, workflow commands, and phase skills
+      if (!options.skipAgents) {
+        await installAgentTemplates(repoRoot);
+        await installWorkflowCommands(repoRoot);
+        await installPhaseSkills(repoRoot);
       }
 
       // Install git hooks unless skipped

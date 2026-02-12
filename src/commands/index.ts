@@ -21,11 +21,9 @@ import { registerPrimeCommand } from './management-prime.js';
 export { registerCaptureCommands } from './capture.js';
 export { registerRetrievalCommands } from './retrieval.js';
 
-// Re-export types and helpers from setup and management modules
-export type { ClaudeHooksResult } from '../setup/types.js';
+// Re-export types and helpers from management modules
 export { formatLessonHuman, wasLessonDeleted } from './management-helpers.js';
 export { getPrimeContext } from './management-prime.js';
-export type { HookInstallResult } from '../setup/hooks.js';
 
 // Re-export shared utilities for use by cli.ts
 export { getGlobalOpts, out } from './shared.js';

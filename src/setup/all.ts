@@ -5,7 +5,7 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import type { Command } from 'commander';
 
@@ -20,14 +20,24 @@ import {
   hasClaudeHook,
   hasMcpServerInMcpJson,
   readClaudeSettings,
+  removeAgentsSection,
+  removeClaudeMdReference,
+  removeCompoundAgentHook,
+  removeMcpServerFromMcpJson,
   writeClaudeSettings,
 } from './claude-helpers.js';
 import {
   createPluginManifest,
   createSlashCommands,
   ensureClaudeMdReference,
+  GENERATED_MARKER,
+  installAgentTemplates,
+  installPhaseSkills,
+  installWorkflowCommands,
   updateAgentsMd,
 } from './primitives.js';
+import { SLASH_COMMANDS } from './templates.js';
+import { AGENT_TEMPLATES, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
 
 /** Result of one-shot setup */
 interface SetupResult {
@@ -102,6 +112,15 @@ export async function runSetup(options: { skipModel?: boolean }): Promise<SetupR
   // 5. Create slash commands
   await createSlashCommands(repoRoot);
 
+  // 5b. Install agent templates
+  await installAgentTemplates(repoRoot);
+
+  // 5c. Install workflow commands
+  await installWorkflowCommands(repoRoot);
+
+  // 5d. Install phase skills
+  await installPhaseSkills(repoRoot);
+
   // 6. Configure Claude settings (hooks in settings.json, MCP in .mcp.json)
   const { hooks, mcpServer } = await configureClaudeSettings(repoRoot);
 
@@ -131,6 +150,166 @@ export async function runSetup(options: { skipModel?: boolean }): Promise<SetupR
 }
 
 /**
+ * Remove all generated files and configuration.
+ * NEVER removes .claude/lessons/ (user data).
+ */
+export async function runUninstall(repoRoot: string, dryRun: boolean): Promise<string[]> {
+  const actions: string[] = [];
+
+  // Remove generated directories
+  const dirsToRemove = [
+    join(repoRoot, '.claude', 'agents', 'compound'),
+    join(repoRoot, '.claude', 'commands', 'compound'),
+    join(repoRoot, '.claude', 'skills', 'compound'),
+  ];
+  for (const dir of dirsToRemove) {
+    if (existsSync(dir)) {
+      if (!dryRun) await rm(dir, { recursive: true, force: true });
+      actions.push(`Removed ${dir}`);
+    }
+  }
+
+  // Remove base slash commands
+  for (const filename of Object.keys(SLASH_COMMANDS)) {
+    const filePath = join(repoRoot, '.claude', 'commands', filename);
+    if (existsSync(filePath)) {
+      if (!dryRun) await rm(filePath);
+      actions.push(`Removed ${filePath}`);
+    }
+  }
+
+  // Remove plugin.json
+  const pluginPath = join(repoRoot, '.claude', 'plugin.json');
+  if (existsSync(pluginPath)) {
+    if (!dryRun) await rm(pluginPath);
+    actions.push(`Removed ${pluginPath}`);
+  }
+
+  // Remove hooks from settings.json
+  const settingsPath = getClaudeSettingsPath(false);
+  try {
+    const settings = await readClaudeSettings(settingsPath);
+    if (hasClaudeHook(settings)) {
+      if (!dryRun) {
+        removeCompoundAgentHook(settings);
+        await writeClaudeSettings(settingsPath, settings);
+      }
+      actions.push('Removed compound-agent hooks from settings.json');
+    }
+  } catch {
+    // settings.json may not exist
+  }
+
+  // Remove MCP server from .mcp.json
+  if (await hasMcpServerInMcpJson(repoRoot)) {
+    if (!dryRun) await removeMcpServerFromMcpJson(repoRoot);
+    actions.push('Removed compound-agent from .mcp.json');
+  }
+
+  // Remove AGENTS.md section
+  if (!dryRun) {
+    const removed = await removeAgentsSection(repoRoot);
+    if (removed) actions.push('Removed compound-agent section from AGENTS.md');
+  } else {
+    const agentsPath = join(repoRoot, 'AGENTS.md');
+    if (existsSync(agentsPath)) {
+      const content = await readFile(agentsPath, 'utf-8');
+      if (content.includes('compound-agent:start')) {
+        actions.push('Removed compound-agent section from AGENTS.md');
+      }
+    }
+  }
+
+  // Remove CLAUDE.md reference
+  if (!dryRun) {
+    const removed = await removeClaudeMdReference(repoRoot);
+    if (removed) actions.push('Removed compound-agent reference from CLAUDE.md');
+  } else {
+    const claudeMdPath = join(repoRoot, '.claude', 'CLAUDE.md');
+    if (existsSync(claudeMdPath)) {
+      const content = await readFile(claudeMdPath, 'utf-8');
+      if (content.includes('compound-agent:claude-ref:start')) {
+        actions.push('Removed compound-agent reference from CLAUDE.md');
+      }
+    }
+  }
+
+  return actions;
+}
+
+/**
+ * Update generated files with latest templates.
+ * Files with GENERATED_MARKER are overwritten, user-customized files are skipped.
+ */
+export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{ updated: number; added: number; skipped: number }> {
+  let updated = 0;
+  let added = 0;
+  let skipped = 0;
+
+  async function processFile(filePath: string, content: string): Promise<void> {
+    const markedContent = GENERATED_MARKER + content;
+    if (!existsSync(filePath)) {
+      if (!dryRun) {
+        await mkdir(dirname(filePath), { recursive: true });
+        await writeFile(filePath, markedContent, 'utf-8');
+      }
+      added++;
+    } else {
+      const existing = await readFile(filePath, 'utf-8');
+      if (existing.startsWith(GENERATED_MARKER)) {
+        if (existing !== markedContent) {
+          if (!dryRun) await writeFile(filePath, markedContent, 'utf-8');
+          updated++;
+        }
+      } else {
+        skipped++;
+      }
+    }
+  }
+
+  for (const [filename, content] of Object.entries(AGENT_TEMPLATES)) {
+    await processFile(join(repoRoot, '.claude', 'agents', 'compound', filename), content);
+  }
+  for (const [filename, content] of Object.entries(WORKFLOW_COMMANDS)) {
+    await processFile(join(repoRoot, '.claude', 'commands', 'compound', filename), content);
+  }
+  for (const [phase, content] of Object.entries(PHASE_SKILLS)) {
+    await processFile(join(repoRoot, '.claude', 'skills', 'compound', phase, 'SKILL.md'), content);
+  }
+
+  return { updated, added, skipped };
+}
+
+/**
+ * Show installation status.
+ */
+export async function runStatus(repoRoot: string): Promise<void> {
+  const agentsDir = join(repoRoot, '.claude', 'agents', 'compound');
+  const commandsDir = join(repoRoot, '.claude', 'commands', 'compound');
+  const skillsDir = join(repoRoot, '.claude', 'skills', 'compound');
+  const pluginPath = join(repoRoot, '.claude', 'plugin.json');
+
+  console.log('Compound Agent Status:');
+  console.log(`  Agent templates:    ${existsSync(agentsDir) ? 'installed' : 'not installed'}`);
+  console.log(`  Workflow commands:  ${existsSync(commandsDir) ? 'installed' : 'not installed'}`);
+  console.log(`  Phase skills:       ${existsSync(skillsDir) ? 'installed' : 'not installed'}`);
+  console.log(`  Plugin manifest:    ${existsSync(pluginPath) ? 'installed' : 'not installed'}`);
+
+  const settingsPath = getClaudeSettingsPath(false);
+  let hooksInstalled = false;
+  try {
+    const settings = await readClaudeSettings(settingsPath);
+    hooksInstalled = hasClaudeHook(settings);
+  } catch {
+    // No settings
+  }
+  console.log(`  Hooks:              ${hooksInstalled ? 'installed' : 'not installed'}`);
+
+  const mcpInstalled = await hasMcpServerInMcpJson(repoRoot);
+  console.log(`  MCP server:         ${mcpInstalled ? 'installed' : 'not installed'}`);
+}
+
+/**
  * Register the one-shot setup action on the setup command.
  * Note: Does not use --json to avoid conflicts with subcommand options.
  */
@@ -138,10 +317,55 @@ export function registerSetupAllCommand(setupCommand: Command): void {
   setupCommand
     .description('One-shot setup: init + hooks + MCP server + model')
     .option('--skip-model', 'Skip embedding model download')
-    .action(async (options: { skipModel?: boolean }) => {
+    .option('--uninstall', 'Remove all generated files and configuration')
+    .option('--update', 'Regenerate files (preserves user customizations)')
+    .option('--status', 'Show installation status')
+    .option('--dry-run', 'Show what would change without changing')
+    .action(async (options: {
+      skipModel?: boolean;
+      uninstall?: boolean;
+      update?: boolean;
+      status?: boolean;
+      dryRun?: boolean;
+    }) => {
+      const repoRoot = getRepoRoot();
+      const dryRun = options.dryRun ?? false;
+
+      if (options.uninstall) {
+        const prefix = dryRun ? '[dry-run] Would have: ' : '';
+        const actions = await runUninstall(repoRoot, dryRun);
+        if (actions.length === 0) {
+          console.log('Nothing to uninstall.');
+        } else {
+          for (const action of actions) {
+            console.log(`  ${prefix}${action}`);
+          }
+          out.success(dryRun ? 'Dry run complete (no changes made)' : 'Uninstall complete');
+        }
+        return;
+      }
+
+      if (options.update) {
+        const result = await runUpdate(repoRoot, dryRun);
+        const prefix = dryRun ? '[dry-run] ' : '';
+        if (result.updated === 0 && result.added === 0) {
+          console.log(`${prefix}All generated files are up to date.`);
+        } else {
+          if (result.updated > 0) console.log(`  ${prefix}Updated: ${result.updated} file(s)`);
+          if (result.added > 0) console.log(`  ${prefix}Added: ${result.added} file(s)`);
+        }
+        if (result.skipped > 0) console.log(`  Skipped: ${result.skipped} user-customized file(s)`);
+        return;
+      }
+
+      if (options.status) {
+        await runStatus(repoRoot);
+        return;
+      }
+
+      // Default: full setup
       const result = await runSetup({ skipModel: options.skipModel });
 
-      // Always human-readable output for one-shot setup
       out.success('Compound agent setup complete');
       console.log(`  Lessons directory: ${result.lessonsDir}`);
       console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
