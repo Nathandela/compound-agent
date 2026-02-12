@@ -12,15 +12,17 @@ description: Divergent-then-convergent thinking to explore solution space
 # Brainstorm Skill
 
 ## Overview
-Explore the problem space before committing to a solution. This phase produces a structured brainstorm document with decisions and open questions.
+Explore the problem space before committing to a solution. This phase produces a structured brainstorm document with decisions, open questions, and a beads epic for handoff to planning.
 
 ## Methodology
 1. Ask "why" before "how" -- understand the real problem
-2. Divergent phase: generate multiple approaches without filtering
-3. Search memory with \`memory_search\` for similar past features and known constraints
-4. Identify constraints and non-functional requirements (performance, security, etc.)
-5. Convergent phase: evaluate approaches against constraints
-6. Document decisions with rationale and list open questions
+2. Search memory with \`memory_search\` for similar past features and known constraints
+3. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences
+4. Divergent phase: generate multiple approaches without filtering
+5. Optional: spawn Explore subagents for quick codebase research on relevant areas
+6. Identify constraints and non-functional requirements (performance, security, etc.)
+7. Convergent phase: evaluate approaches against constraints
+8. Document decisions with rationale, list open questions, and create a beads epic
 
 ## Memory Integration
 - Call \`memory_search\` with relevant keywords before generating approaches
@@ -33,13 +35,16 @@ Explore the problem space before committing to a solution. This phase produces a
 - Not searching memory for similar past features
 - Over-scoping: trying to solve everything at once
 - Skipping the "why" and diving into "how"
+- Not creating a beads epic from conclusions (losing brainstorm output)
 
 ## Quality Criteria
 - Multiple approaches were considered (at least 2-3)
 - Constraints and requirements are explicitly listed
 - Memory was searched for relevant context
+- User was engaged via \`AskUserQuestion\` for clarification
 - A clear decision was made with documented rationale
 - Open questions are captured for the plan phase
+- A beads epic was created from conclusions via \`bd create\`
 `,
 
   plan: `---

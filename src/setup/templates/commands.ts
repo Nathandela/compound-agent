@@ -12,12 +12,17 @@ Explore requirements through collaborative dialogue before committing to a plan.
 
 ## Workflow
 1. Parse the topic from \`$ARGUMENTS\`. If empty, ask the user what to brainstorm.
-2. Call \`memory_search\` with the topic to surface relevant past lessons.
-3. Ask clarifying questions about scope, constraints, and desired outcomes.
+2. Call \`memory_search\` with the topic to surface relevant past lessons. Display retrieved items and incorporate them into exploration.
+3. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences through structured dialogue.
 4. Explore edge cases and failure modes.
-5. Propose 2-3 alternative approaches with tradeoffs.
-6. Run \`bd ready\` to check if related tasks already exist.
-7. Summarize key decisions and open questions.
+5. Optional: spawn Explore subagents for quick codebase research on specific aspects relevant to the brainstorm.
+6. Propose 2-3 alternative approaches with tradeoffs.
+7. Run \`bd ready\` to check if related tasks already exist.
+8. Output a clear problem definition, chosen approach, and open questions.
+9. Create a beads epic from conclusions:
+   \`\`\`bash
+   bd create --title="<epic title>" --type=feature --description="<problem definition + approach + scope>"
+   \`\`\`
 
 ## Memory Integration
 - Call \`memory_search\` at the start to avoid repeating past mistakes.
@@ -25,7 +30,8 @@ Explore requirements through collaborative dialogue before committing to a plan.
 
 ## Beads Integration
 - Run \`bd ready\` to check for existing related work.
-- If the brainstorm identifies new tasks, suggest creating them with \`bd create\`.
+- Create a beads epic from brainstorm conclusions with \`bd create --type=feature\`.
+- If the brainstorm identifies sub-tasks, suggest creating them with \`bd create\`.
 `,
 
   'plan.md': `$ARGUMENTS
