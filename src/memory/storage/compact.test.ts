@@ -43,7 +43,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
     ...mod,
     readFile: async (...args: unknown[]) => {
       readFileSpy(args[0]);
-      return (mod.readFile as Function)(...args);
+      return (mod.readFile as (...a: unknown[]) => Promise<string>)(...args);
     },
   };
 });

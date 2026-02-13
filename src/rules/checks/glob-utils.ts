@@ -16,7 +16,7 @@ import { join, relative } from 'node:path';
  * @returns RegExp that matches the pattern
  */
 export function globToRegex(glob: string): RegExp {
-  let pattern = glob
+  const pattern = glob
     .replace(/\./g, '\\.')     // escape dots
     .replace(/\*\*\//g, '(.+/)?')  // ** matches any directory depth
     .replace(/\*/g, '[^/]*');  // * matches within a single segment
