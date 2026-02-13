@@ -89,43 +89,66 @@ Create a concrete implementation plan by decomposing work into small, testable t
 
   work: `---
 name: Work
-description: Implement with strict TDD -- Red, Green, Refactor
+description: Team-based TDD execution with adaptive complexity and agent delegation
 ---
 
 # Work Skill
 
 ## Overview
-Implement features using strict Test-Driven Development. Write tests first, make them pass with minimal code, then refactor.
+Execute implementation through an agent team using adaptive TDD. The lead coordinates and delegates -- agents write code.
 
 ## Methodology
-1. Pick the next task from the plan
-2. Search memory with \`memory_search\` before architectural decisions
-3. **Red**: Write a failing test that describes expected behavior
-4. Verify the test fails for the right reason (missing implementation, not syntax error)
-5. **Green**: Write the minimum code to make the test pass
-6. **Refactor**: Clean up while keeping tests green
-7. Repeat for the next test case
-8. After corrections or discoveries, call \`memory_capture\` to record the lesson
+1. Pick a task from \`bd ready\` or \`$ARGUMENTS\`
+2. Search memory with \`memory_search\` for relevant context
+3. Assess complexity (see below) and choose team strategy
+4. **Red**: Delegate to test-writer agent to write failing tests
+5. **Green**: Delegate to implementer agent to write minimal passing code
+6. **Refactor**: Review agent output, request cleanup if needed
+7. Iterate until all tests pass and code is clean
+8. Capture lessons with \`memory_capture\` after corrections or discoveries
+
+## Team Structure
+Adaptive TDD model based on task complexity:
+- **Trivial**: Single agent handles the change directly, no TDD ceremony
+- **Simple**: Sequential -- test-writer writes all tests, then implementer makes them pass
+- **Complex**: Iterative ping-pong -- test-writer and implementer alternate in cycles
+
+## Complexity Assessment
+- **Trivial**: Config changes, typos, renaming, one-line fixes. No new behavior.
+- **Simple**: Well-scoped feature or bug fix. Clear inputs/outputs. One module affected.
+- **Complex**: Cross-module changes, architectural decisions, ambiguous requirements.
+
+## Agent Delegation
+The lead coordinates but does not write code:
+- Spawn agents with task context and relevant memory items
+- Review agent outputs for correctness and consistency
+- Resolve conflicts between test expectations and implementation
+- Escalate to user if agents cannot converge
 
 ## Memory Integration
-- Call \`memory_search\` before making architectural decisions
-- Call \`memory_search\` when encountering unfamiliar patterns
-- Call \`memory_capture\` after user corrections or test-fail-fix cycles
-- Call \`memory_capture\` when discovering project-specific knowledge
+- Call \`memory_search\` before spawning agents to gather context
+- Inject retrieved memory items into each agent as task context
+- Call \`memory_capture\` after corrections or novel discoveries
+
+## Beads Lifecycle
+- \`bd ready\` to find available tasks
+- \`bd update <id> --status=in_progress\` when starting
+- \`bd close <id>\` when all tests pass
 
 ## Common Pitfalls
-- Skipping tests and writing implementation first
-- Writing too much code at once instead of one test at a time
-- Modifying tests to make them pass (fix the implementation instead)
-- Over-engineering: adding features or abstractions not requested
-- Not checking memory before architectural decisions
+- Lead writing code instead of delegating to agents
+- Skipping complexity assessment and always using full TDD for trivial changes
+- Not injecting memory context into agent prompts
+- Modifying tests to make them pass instead of fixing implementation
+- Not running the full test suite after agent work completes
 
 ## Quality Criteria
+- Complexity was assessed before choosing team strategy
 - Tests existed before implementation code
-- Each test describes a specific behavior (clear name)
-- Implementation is the minimum needed to pass tests
+- Agents received relevant memory context
+- Lead coordinated without writing implementation code
 - All tests pass after refactoring
-- Memory was consulted for relevant decisions
+- Task lifecycle tracked via beads (\`bd\`)
 `,
 
   review: `---

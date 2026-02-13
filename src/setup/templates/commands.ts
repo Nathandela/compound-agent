@@ -74,27 +74,34 @@ Create a structured implementation plan enriched by semantic memory, with concre
 # Work
 
 ## Purpose
-Execute implementation following strict TDD: tests first, then minimal code.
+Execute implementation by delegating to an agent team. The lead coordinates and does not code directly.
 
 ## Workflow
-1. Run \`bd ready\` to find available tasks. If \`$ARGUMENTS\` specifies a task ID, work on that.
-2. Mark the task in progress: \`bd update <id> --status=in_progress\`.
-3. Call \`memory_search\` with the task description before starting.
-4. Write failing tests FIRST that define the expected behavior.
-5. Verify tests fail for the right reason (missing implementation, not syntax errors).
-6. Write the minimal code to pass each test, one at a time.
-7. Refactor only after all tests pass.
+1. Parse task from \`$ARGUMENTS\`. If empty, run \`bd ready\` to find available tasks.
+2. Mark task in progress: \`bd update <id> --status=in_progress\`.
+3. Call \`memory_search\` with the task description to retrieve relevant lessons.
+4. Assess complexity to determine team strategy:
+   - **Trivial**: Config changes, typos, one-line fixes. Single agent, no TDD needed.
+   - **Simple**: Well-scoped feature or bug fix. Sequential TDD: spawn test-writer first, then implementer.
+   - **Complex**: Cross-cutting, architectural, or ambiguous scope. Iterative TDD: test-writer and implementer ping-pong until done.
+5. Spawn agent team based on complexity:
+   - Delegate to **test-writer** agent to write failing tests defining expected behavior.
+   - Delegate to **implementer** agent to write minimal code passing those tests.
+   - For complex tasks, iterate: implementer feedback may trigger new tests from test-writer.
+6. Inject memory context into each agent: pass retrieved memory items as context when spawning agents.
+7. Lead coordinates the cycle: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
 8. Run the full test suite to check for regressions.
 9. Close the task: \`bd close <id>\`.
 
 ## Memory Integration
-- Call \`memory_search\` before architectural decisions.
+- Call \`memory_search\` before spawning agents to gather relevant context.
+- Pass retrieved memory items to each agent as part of their task context.
 - After corrections or discoveries, call \`memory_capture\` to record them.
 
 ## Beads Integration
 - Start with \`bd ready\` to pick work.
 - Update status with \`bd update <id> --status=in_progress\`.
-- Close with \`bd close <id>\` when tests pass.
+- Close with \`bd close <id>\` when all tests pass.
 `,
 
   'review.md': `$ARGUMENTS
