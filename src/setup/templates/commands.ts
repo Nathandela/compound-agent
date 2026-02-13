@@ -147,30 +147,28 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
 # Compound
 
 ## Purpose
-Capture knowledge from completed work into the memory system.
+Multi-agent analysis to capture high-quality lessons from completed work into the memory system.
 
 ## Workflow
-1. Identify what was done from \`$ARGUMENTS\` or recent git history.
-2. Call \`memory_search\` to check what is already stored (avoid duplicates).
-3. Analyze the work for learnings:
-   - Mistakes made and corrections applied
-   - Project-specific patterns discovered
-   - Architectural decisions and their rationale
-   - Tool or library gotchas encountered
-4. For each novel lesson, call \`memory_capture\` with:
-   - A clear, actionable insight
-   - The trigger that caused the learning
-   - Relevant context (file paths, error messages)
-5. Run \`bd ready\` to check if any related issues should be updated.
-6. Output a summary of captured memory items.
-
-## Memory Integration
-- Call \`memory_search\` first to avoid storing duplicates.
-- Call \`memory_capture\` for each novel, actionable lesson.
+1. Parse what was done from \`$ARGUMENTS\` or recent git history (\`git diff\`, \`git log\`).
+2. Call \`memory_search\` with the topic to check what is already known (avoid duplicates).
+3. Spawn the compound analysis team in parallel:
+   - **context-analyzer**: summarize what happened (git diff, test results, plan context)
+   - **lesson-extractor**: identify mistakes, corrections, and discoveries
+   - **pattern-matcher**: match against existing memory, classify New/Duplicate/Reinforcement/Contradiction
+   - **solution-writer**: formulate structured items typed as lesson, solution, pattern, or preference
+4. Agents pass results to each other via direct messages so downstream agents build on upstream findings.
+5. Apply quality filter on each candidate item:
+   - **Novel**: skip if >0.85 similarity to existing memory
+   - **Specific**: reject vague or generic advice
+6. For approved items, store via \`memory_capture\` with supersedes/related linking to connect with existing memory.
+7. Confirm with user for high-severity or significant items; low/medium items are auto-stored.
+8. Run \`bd ready\` to check for related issues; \`bd close\` any resolved by captured knowledge.
+9. Output a summary of captured and skipped items with reasons.
 
 ## Beads Integration
 - Check \`bd ready\` for related open issues.
-- Close any issues resolved by the captured knowledge with \`bd close\`.
+- Close resolved issues with \`bd close\`.
 `,
 
   'lfg.md': `$ARGUMENTS

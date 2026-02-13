@@ -214,30 +214,34 @@ description: Reflect on the cycle and capture high-quality lessons for future se
 Extract and store lessons learned during the cycle. This is what makes the system compound -- each session leaves the next one better equipped.
 
 ## Methodology
-1. Reflect on what happened during this cycle
-2. Identify moments of learning: corrections, surprises, discoveries
-3. Search memory with \`memory_search\` to check for duplicates
-4. Apply quality filters: is the lesson novel, specific, and actionable?
-5. Capture with \`memory_capture\` MCP tool (not CLI)
-6. Verify the captured lesson reads well for a future session
-
-## Memory Integration
-- Call \`memory_search\` before capturing to avoid duplicates
-- Call \`memory_capture\` for each high-quality lesson
-- Focus on lessons that would change behavior in future sessions
+1. Review what happened during this cycle (git diff, test results, plan context)
+2. Spawn the compound analysis team in parallel:
+   - context-analyzer: gathers cycle context (diffs, test output)
+   - lesson-extractor: identifies corrections, surprises, discoveries
+   - pattern-matcher: checks \`memory_search\` for duplicates and related items
+   - solution-writer: drafts final memory items
+3. Agents pass results through the pipeline and share findings with each other
+4. Apply quality filters: novelty check (>0.85 similarity = skip), specificity check
+5. Classify each item by type: lesson, solution, pattern, or preference
+6. Store via \`memory_capture\` with supersedes/related links where applicable
+7. Ask user to confirm high-severity or critical items only
 
 ## Common Pitfalls
-- Capturing obvious or generic advice ("write good code")
-- Lessons that are too vague to act on ("be careful with X")
-- Not checking for duplicates before capturing
-- Capturing too many low-value lessons (quality over quantity)
-- Forgetting to capture -- this phase is easy to skip under time pressure
+- Not spawning the analysis team (analyzing solo misses cross-cutting patterns)
+- Capturing without checking for duplicates via \`memory_search\`
+- Skipping supersedes/related linking when an item updates prior knowledge
+- Requiring user confirmation for every item (only high-severity needs it)
+- Not classifying items by type (lesson/solution/pattern/preference)
+- Capturing vague lessons ("be careful with X") -- be specific and concrete
 
 ## Quality Criteria
-- Each lesson is novel (not already in memory)
-- Each lesson is specific (contains concrete guidance)
-- Each lesson is actionable (clear what to do differently)
-- Duplicates were checked with \`memory_search\`
-- Lessons are written for a future session that has no context about this one
+- Analysis team was spawned and agents coordinated via pipeline
+- Quality filters applied (novelty + specificity)
+- Duplicates checked via \`memory_search\` before capture
+- Items classified by type (lesson/solution/pattern/preference)
+- Supersedes/related links set where applicable
+- User confirmed high-severity items
+- Beads checked for related issues (\`bd\`)
+- Each item gives clear, concrete guidance for future sessions
 `,
 };
