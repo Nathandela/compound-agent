@@ -1,5 +1,10 @@
 import path from 'node:path'
 
+/** Strip .js/.ts/.jsx/.tsx extension from a path */
+function stripExt(p) {
+  return p.replace(/\.[jt]sx?$/, '')
+}
+
 const rule = {
   meta: {
     type: 'problem',
@@ -14,7 +19,7 @@ const rule = {
     schema: [],
   },
   create(context) {
-    const filename = context.filename || context.getFilename()
+    const filename = path.normalize(context.filename || context.getFilename())
 
     // Only apply to test files
     const testFileMatch = path.basename(filename).match(
@@ -25,6 +30,9 @@ const rule = {
     }
 
     const moduleUnderTest = testFileMatch[1]
+    const testDir = path.dirname(filename)
+    // The expected source file is adjacent to the test file
+    const expectedSource = path.resolve(testDir, moduleUnderTest)
 
     return {
       CallExpression(node) {
@@ -51,18 +59,10 @@ const rule = {
           return
         }
 
-        // Strip extension from mock path and extract basename
-        const mockBasename = path.basename(mockPath).replace(/\.[jt]sx?$/, '')
-        if (mockBasename !== moduleUnderTest) {
-          return
-        }
+        // Resolve mock path to absolute, strip extension, and compare
+        const resolvedMock = stripExt(path.resolve(testDir, mockPath))
 
-        // Check that the mock path only contains '..'/'.' traversals and the module name,
-        // with no intervening directory segments (e.g., '../search' is flagged but
-        // '../other-dir/search' is not since it's a different module with the same name)
-        const segments = mockPath.replace(/\.[jt]sx?$/, '').split('/')
-        const nonTraversalSegments = segments.filter(s => s !== '..' && s !== '.')
-        if (nonTraversalSegments.length === 1) {
+        if (resolvedMock === expectedSource) {
           context.report({
             node,
             messageId: 'noMockModuleUnderTest',

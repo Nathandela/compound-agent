@@ -48,13 +48,15 @@ export default tseslint.config(
     },
   },
 
-  // Test file rules
+  // Test file rules — relax type-strictness rules that are noisy in tests
   {
     files: ['**/*.test.ts', '**/*.test.js'],
     plugins: { vitest },
     rules: {
       'vitest/no-focused-tests': 'error',
       'vitest/no-disabled-tests': 'warn',
+      '@typescript-eslint/no-unused-vars': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 

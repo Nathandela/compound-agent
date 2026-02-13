@@ -41,19 +41,30 @@ ruleTester.run('no-mock-module-under-test', rule, {
       code: `vi.mock('./query')`,
       filename: '/project/src/search.test.ts',
     },
-    // Different directory, same basename — should NOT flag
+    // Different directory, same basename — resolved paths differ
     {
       code: `vi.mock('../other-dir/search')`,
       filename: '/project/src/search.test.ts',
     },
-    // Different directory deeper path, same basename — should NOT flag
+    // Different directory deeper path, same basename — resolved paths differ
     {
       code: `vi.mock('../../lib/search')`,
       filename: '/project/src/search.test.ts',
     },
+    // Parent dir reference from subdirectory — resolves to different file
+    // src/sub/search.test.ts mocking ../search resolves to src/search, not src/sub/search
+    {
+      code: `vi.mock('../search')`,
+      filename: '/project/src/sub/search.test.ts',
+    },
+    // Deep traversal to different location
+    {
+      code: `vi.mock('../../storage')`,
+      filename: '/project/tests/unit/storage.test.ts',
+    },
   ],
   invalid: [
-    // Direct match: vi.mock('./search') in search.test.ts
+    // Direct match: vi.mock('./search') in search.test.ts — same directory
     {
       code: `vi.mock('./search')`,
       filename: '/project/src/search.test.ts',
@@ -71,12 +82,6 @@ ruleTester.run('no-mock-module-under-test', rule, {
       filename: '/project/src/search.test.ts',
       errors: [{ messageId: 'noMockModuleUnderTest' }],
     },
-    // Parent directory reference
-    {
-      code: `vi.mock('../search')`,
-      filename: '/project/src/sub/search.test.ts',
-      errors: [{ messageId: 'noMockModuleUnderTest' }],
-    },
     // .test.js file
     {
       code: `vi.mock('./parser')`,
@@ -89,10 +94,10 @@ ruleTester.run('no-mock-module-under-test', rule, {
       filename: '/project/src/handler.spec.ts',
       errors: [{ messageId: 'noMockModuleUnderTest' }],
     },
-    // Deeper path with matching basename
+    // Nested test file mocking adjacent source
     {
-      code: `vi.mock('../../storage')`,
-      filename: '/project/tests/unit/storage.test.ts',
+      code: `vi.mock('./compact')`,
+      filename: '/project/src/memory/storage/compact.test.ts',
       errors: [{ messageId: 'noMockModuleUnderTest' }],
     },
   ],
