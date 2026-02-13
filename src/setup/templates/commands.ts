@@ -107,30 +107,39 @@ Execute implementation by delegating to an agent team. The lead coordinates and 
 # Review
 
 ## Purpose
-Multi-perspective code review covering security, architecture, performance, tests, and simplicity.
+Multi-agent code review with severity classification and a mandatory \`/implementation-reviewer\` gate.
 
 ## Workflow
 1. Identify what to review from \`$ARGUMENTS\` or recent changes (\`git diff\`).
-2. Call \`memory_search\` with the changed areas to find relevant past lessons.
-3. Review from each perspective:
-   - **Security**: Injection risks, auth issues, data exposure
-   - **Architecture**: Module boundaries, coupling, cohesion
-   - **Performance**: Unnecessary allocations, N+1 queries, blocking calls
-   - **Test coverage**: Missing edge cases, cargo-cult tests, mocked business logic
-   - **Simplicity**: Over-engineering, dead code, unnecessary abstractions
-4. For each finding, create a beads issue:
+2. Call \`memory_search\` with the changed areas to surface relevant past lessons.
+3. Spawn the reviewer agent team in parallel — one agent per perspective:
+   - **security-reviewer**: injection risks, auth issues, data exposure
+   - **architecture-reviewer**: module boundaries, coupling, cohesion
+   - **performance-reviewer**: unnecessary allocations, N+1 queries, blocking calls
+   - **test-coverage-reviewer**: missing edge cases, cargo-cult tests, mocked business logic
+   - **simplicity-reviewer**: over-engineering, dead code, unnecessary abstractions
+4. Reviewers communicate findings with each other via direct messages so cross-cutting issues (e.g., a security fix that impacts performance) are identified early.
+5. Collect all findings and classify by severity:
+   - **P1** (critical): security vulnerabilities, data loss, correctness bugs — P1 findings block completion
+   - **P2** (important): architectural violations, significant performance issues
+   - **P3** (minor): style nits, small improvements, non-urgent suggestions
+6. Synthesize and prioritize findings — deduplicate overlapping reports, consolidate related items, and rank by severity before creating issues.
+7. For P1 findings, create beads issues:
    \`\`\`bash
-   bd create --title="<finding>" --type=bug --priority=<1-4>
+   bd create --title="P1: <finding>" --type=bug --priority=1
    \`\`\`
-5. Output a review summary with pass/fail per perspective.
+8. Run quality gates: \`pnpm test\` and \`pnpm lint\` to verify no regressions.
+9. Submit to **\`/implementation-reviewer\`** as the mandatory gate — it has final authority on whether the review passes. All P1 findings must be resolved before approval.
+10. Output a review summary with pass/fail per perspective and severity breakdown.
 
 ## Memory Integration
-- Call \`memory_search\` for known issues in the changed areas.
-- After the review, call \`memory_capture\` for novel findings.
+- Call \`memory_search\` at the start for known issues in the changed areas.
+- After the review, call \`memory_capture\` with \`type=solution\` to store the review report for future sessions.
 
 ## Beads Integration
-- Create \`bd\` issues for each actionable finding with \`bd create --type=bug\`.
+- Create \`bd\` issues for P1 and P2 findings with \`bd create\`.
 - Reference the reviewed code in issue descriptions.
+- Close related issues with \`bd close\` when findings are resolved.
 `,
 
   'compound.md': `$ARGUMENTS
@@ -188,9 +197,11 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
    - Call \`memory_capture\` after corrections.
    - Close tasks as they complete.
 
-4. **Review phase**: Multi-perspective review.
-   - Check security, architecture, performance, tests, simplicity.
-   - Create issues for findings.
+4. **Review phase**: Multi-perspective review with severity classification.
+   - Classify findings as P1 (critical/blocking), P2 (important), P3 (minor).
+   - P1 findings must be fixed before proceeding — they block completion.
+   - Submit to \`/implementation-reviewer\` as the mandatory gate before moving on.
+   - Create beads issues for P1/P2 findings.
 
 5. **Compound phase**: Capture learnings.
    - Store novel insights via \`memory_capture\`.

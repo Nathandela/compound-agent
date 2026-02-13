@@ -157,41 +157,50 @@ The lead coordinates but does not write code:
 
   review: `---
 name: Review
-description: Multi-agent review covering security, architecture, and quality
+description: Multi-agent review with parallel specialized reviewers and severity classification
 ---
 
 # Review Skill
 
 ## Overview
-Perform thorough code review by spawning specialized reviewers in parallel, then consolidating and acting on findings.
+Perform thorough code review by spawning specialized reviewers in parallel, consolidating findings with severity classification (P1/P2/P3), and gating completion on implementation-reviewer approval.
 
 ## Methodology
-1. Run all quality gates: \`pnpm test && pnpm lint\`
-2. Spawn specialized reviewers in parallel (security, architecture, performance, etc.)
-3. Collect findings from all reviewers
-4. Deduplicate and prioritize findings by severity
-5. Create beads issues for actionable findings: \`bd create --title="..."\`
-6. Search memory with \`memory_search\` to check if findings match known patterns
-7. Fix critical issues before proceeding
+1. Run quality gates first: \`pnpm test && pnpm lint\`
+2. Search memory with \`memory_search\` for known patterns and recurring issues
+3. Spawn specialized reviewer agents in parallel (security, architecture, performance, test-coverage, simplicity)
+4. Reviewers communicate findings to each other via direct messages so later analysis benefits from earlier discoveries
+5. Collect and consolidate all findings, deduplicating overlaps across reviewers
+6. Classify each finding by severity:
+   - **P1** (critical): Security vulnerabilities, data loss, correctness bugs -- must fix before merge
+   - **P2** (important): Architecture issues, performance regressions -- should fix soon
+   - **P3** (minor): Style, naming, documentation -- track for later
+7. Create beads issues for P1 findings: \`bd create --title="P1: ..."\`
+8. Fix all P1 findings before proceeding
+9. Run \`/implementation-reviewer\` as mandatory gate -- it has final authority on whether code ships
+10. Capture novel findings with \`memory_capture\` for future sessions
 
 ## Memory Integration
-- Call \`memory_search\` to check if review findings match known patterns
-- Past reviews may have identified recurring issues worth checking
+- Call \`memory_search\` before review to check for known recurring issues
+- Past reviews may highlight patterns worth re-checking
 - Use \`memory_capture\` for novel review findings that future sessions should know
+- Capture the review report via \`memory_capture\` with \`type=solution\`
 
 ## Common Pitfalls
 - Ignoring reviewer feedback because "it works"
-- Not running all specialized reviewers
-- Treating all findings as equal priority (triage first)
-- Not creating issues for deferred fixes
-- Skipping the quality gates before review
+- Not running all specialized reviewers (skipping perspectives)
+- Treating all findings as equal priority (classify P1/P2/P3 first)
+- Not creating beads issues for deferred fixes
+- Skipping quality gates before review
+- Bypassing the implementation-reviewer gate
 
 ## Quality Criteria
-- All quality gates pass (tests, lint)
-- Multiple review perspectives were applied
-- Findings are prioritized and actionable
-- Critical issues are fixed, others tracked as issues
-- Memory was checked for recurring patterns
+- All quality gates pass (\`pnpm test\`, lint)
+- All 5 reviewer perspectives were applied in parallel
+- Findings are classified P1/P2/P3 and deduplicated
+- All P1 findings are fixed before \`/implementation-reviewer\` approval
+- \`/implementation-reviewer\` approved as mandatory gate
+- Memory was searched and novel findings captured
 `,
 
   compound: `---

@@ -101,6 +101,9 @@ Review code changes for security vulnerabilities including OWASP top 10, injecti
 6. Verify error messages do not leak sensitive info
 7. Check dependency versions for known CVEs
 
+## Collaboration
+- Share cross-cutting findings via direct message: security issues impacting architecture go to architecture-reviewer; secrets in test fixtures go to test-coverage-reviewer.
+
 ## Tools Available
 - Read, Grep for code analysis
 - Bash for running security linters if available
@@ -136,6 +139,9 @@ Review code for architectural consistency, pattern compliance, module boundary i
 5. Ensure new code follows existing conventions
 6. Check that dependencies flow in the correct direction
 
+## Collaboration
+- Share cross-cutting findings via direct message: architecture issues with performance implications go to performance-reviewer; structural violations creating security risks go to security-reviewer.
+
 ## Tools Available
 - Read, Grep, Glob for codebase analysis
 - \`memory_search\` for past architectural decisions
@@ -169,6 +175,9 @@ Review code for performance bottlenecks, algorithmic complexity issues, unnecess
 4. Verify I/O operations are batched where possible
 5. Check for missing indexes on database queries
 6. Verify resources are properly closed/released
+
+## Collaboration
+- Share cross-cutting findings via direct message: performance issues needing test coverage go to test-coverage-reviewer; performance fixes requiring architectural changes go to architecture-reviewer.
 
 ## Tools Available
 - Read, Grep for code analysis
@@ -205,6 +214,9 @@ Review tests for meaningful assertions, edge case coverage, and absence of cargo
 6. Check test names describe expected behavior
 7. Ensure property-based tests exist for pure functions
 
+## Collaboration
+- Share cross-cutting findings via direct message: cargo-cult tests hiding security issues go to security-reviewer; unnecessary test complexity goes to simplicity-reviewer.
+
 ## Tools Available
 - Read, Grep for test analysis
 - Bash for running tests with coverage
@@ -239,6 +251,9 @@ Review code for unnecessary complexity, over-engineering, premature abstraction,
 4. Flag unnecessary indirection or wrapper layers
 5. Flag feature flags or config for single-use cases
 6. Verify no "just in case" code exists
+
+## Collaboration
+- Share cross-cutting findings via direct message: over-engineering obscuring security concerns goes to security-reviewer; premature abstractions creating wrong module boundaries goes to architecture-reviewer.
 
 ## Tools Available
 - Read, Grep for code analysis
