@@ -27,15 +27,12 @@ export default tseslint.config(
       'no-else-return': 'error',
       // New rules (warn first, fix later)
       '@typescript-eslint/no-explicit-any': 'warn',
-      'max-lines-per-function': ['warn', { max: 75, skipBlankLines: true, skipComments: true }],
-      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
       'max-depth': ['warn', 4],
       'import-x/no-cycle': 'warn',
       'import-x/no-commonjs': 'warn',
       'compound-agent/no-sql-interpolation': 'warn',
       'compound-agent/no-mock-module-under-test': 'warn',
       'compound-agent/no-utils-helpers-dirs': 'warn',
-      'compound-agent/enforce-barrel-exports': 'warn',
     },
   },
 
@@ -45,6 +42,9 @@ export default tseslint.config(
     ignores: ['**/*.test.ts'],
     rules: {
       '@typescript-eslint/explicit-module-boundary-types': 'warn',
+      'max-lines-per-function': ['warn', { max: 75, skipBlankLines: true, skipComments: true }],
+      'max-lines': ['warn', { max: 400, skipBlankLines: true, skipComments: true }],
+      'compound-agent/enforce-barrel-exports': 'warn',
     },
   },
 

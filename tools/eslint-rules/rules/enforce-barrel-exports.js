@@ -1,19 +1,21 @@
 import path from 'node:path'
 
+const srcMarker = path.sep + 'src' + path.sep
+
 /**
  * Extract the top-level module name from a file path.
  * Given /project/src/commands/capture.ts, returns "commands".
  * Given /project/src/index.ts, returns null (root level, not inside a module).
  */
 function getTopLevelModule(filepath) {
-  const srcIndex = filepath.lastIndexOf('/src/')
+  const srcIndex = filepath.lastIndexOf(srcMarker)
   if (srcIndex === -1) return null
 
-  const afterSrc = filepath.slice(srcIndex + '/src/'.length)
-  const firstSlash = afterSrc.indexOf('/')
-  if (firstSlash === -1) return null // File directly in src/, not in a module
+  const afterSrc = filepath.slice(srcIndex + srcMarker.length)
+  const firstSep = afterSrc.indexOf(path.sep)
+  if (firstSep === -1) return null // File directly in src/, not in a module
 
-  return afterSrc.slice(0, firstSlash)
+  return afterSrc.slice(0, firstSep)
 }
 
 /**
@@ -28,26 +30,23 @@ function getImportTargetModule(importSource, importerPath) {
 }
 
 /**
- * Check if an import path ends with index.js, index, or is just a bare directory
- * (which would resolve to index).
+ * Check if a resolved absolute path points to a barrel import (module root or sub-barrel).
+ * A barrel import is one where the resolved path is:
+ *   - src/<module> (bare directory)
+ *   - any path ending in /index[.ext] (barrel re-export at any depth)
  */
-function isBarrelImport(importSource) {
-  // Ends with /index.js or /index.ts or /index
-  if (/\/index(\.[jt]sx?)?$/.test(importSource)) return true
+function isBarrelImport(resolvedPath) {
+  const srcIndex = resolvedPath.lastIndexOf(srcMarker)
+  if (srcIndex === -1) return true // not in src, skip
 
-  // No file extension and no further path after module name — bare directory import
-  // e.g., '../memory' (no slash after module name, no extension)
-  const segments = importSource.split('/')
+  const afterSrc = resolvedPath.slice(srcIndex + srcMarker.length)
+  const segments = afterSrc.split(path.sep).filter(Boolean)
+
+  // src/<module> (bare dir)
+  if (segments.length === 1) return true
+  // Any path ending in index[.ext] is a barrel re-export
   const lastSegment = segments[segments.length - 1]
-  if (!lastSegment.includes('.')) {
-    // Could be a bare directory import like '../memory'
-    // We need to check it's not going deeper: count path segments after the first
-    // non-dot segment. '../memory' has 1 real segment. '../memory/storage/jsonl' has 3.
-    // But '../memory' should be allowed — it resolves to the module barrel.
-    // We consider it a barrel if the import only goes one level deep into the
-    // target module's directory.
-    return true
-  }
+  if (/^index(\.[jt]sx?)?$/.test(lastSegment)) return true
 
   return false
 }
@@ -97,7 +96,9 @@ const rule = {
         }
 
         // Cross-module import: must be a barrel import
-        if (!isBarrelImport(importSource)) {
+        const importerDir = path.dirname(filename)
+        const resolvedImport = path.resolve(importerDir, importSource)
+        if (!isBarrelImport(resolvedImport)) {
           context.report({
             node,
             messageId: 'enforceBarrelExport',

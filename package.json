@@ -36,7 +36,7 @@
     "test:watch": "vitest",
     "test:changed": "vitest run --changed HEAD~1",
     "test:all": "pnpm download-model && vitest run",
-    "lint": "tsc --noEmit && eslint .",
+    "lint": "tsc --noEmit && eslint . --max-warnings=70",
     "download-model": "node ./dist/cli.js download-model",
     "prepublishOnly": "pnpm build"
   },

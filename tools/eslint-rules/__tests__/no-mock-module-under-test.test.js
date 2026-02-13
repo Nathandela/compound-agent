@@ -41,6 +41,16 @@ ruleTester.run('no-mock-module-under-test', rule, {
       code: `vi.mock('./query')`,
       filename: '/project/src/search.test.ts',
     },
+    // Different directory, same basename — should NOT flag
+    {
+      code: `vi.mock('../other-dir/search')`,
+      filename: '/project/src/search.test.ts',
+    },
+    // Different directory deeper path, same basename — should NOT flag
+    {
+      code: `vi.mock('../../lib/search')`,
+      filename: '/project/src/search.test.ts',
+    },
   ],
   invalid: [
     // Direct match: vi.mock('./search') in search.test.ts

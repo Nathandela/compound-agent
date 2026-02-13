@@ -43,11 +43,21 @@ function collectDirs(dir: string): { name: string; path: string }[] {
   return results;
 }
 
-/** Whether `dir` has .ts source files (not tests, not declarations). */
-function hasTsSourceFiles(dir: string): boolean {
-  return readdirSync(dir).some(
-    (f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('.d.ts'),
-  );
+/** Whether `dir` or any descendant has .ts source files (not tests, not declarations). */
+function hasTsDescendants(dir: string): boolean {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory() && entry.name !== 'node_modules') {
+      if (hasTsDescendants(join(dir, entry.name))) return true;
+    } else if (
+      entry.isFile() &&
+      entry.name.endsWith('.ts') &&
+      !entry.name.endsWith('.test.ts') &&
+      !entry.name.endsWith('.d.ts')
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -60,7 +70,7 @@ function hasBarrelExport(dir: string): boolean {
   const subs = readdirSync(dir, { withFileTypes: true })
     .filter((e) => e.isDirectory())
     .map((e) => join(dir, e.name))
-    .filter(hasTsSourceFiles);
+    .filter(hasTsDescendants);
 
   return subs.length > 0 && subs.every(hasBarrelExport);
 }
@@ -80,7 +90,7 @@ describe('module barrel exports', () => {
   const moduleDirs = readdirSync(SRC, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !EXCEPTIONS.has(e.name))
     .map((e) => e.name)
-    .filter((name) => hasTsSourceFiles(join(SRC, name)));
+    .filter((name) => hasTsDescendants(join(SRC, name)));
 
   it.each(moduleDirs)(
     'src/%s has barrel export (index.ts at root or in all subdirectories)',
@@ -112,39 +122,32 @@ describe('barrel exports are re-export only', () => {
       const content = readFileSync(filePath, 'utf-8');
       const lines = content.split('\n');
 
-      const implementationPatterns = [
-        /^\s*(?:export\s+)?(?:async\s+)?function\s+\w+/, // function declarations
-        /^\s*(?:export\s+)?class\s+\w+/,                  // class declarations
-        /^\s*(?:export\s+)?(?:const|let|var)\s+\w+\s*=/,  // variable assignments
-        /^\s*if\s*\(/,                                     // control flow
-        /^\s*for\s*\(/,                                    // loops
-        /^\s*while\s*\(/,                                  // loops
-        /^\s*switch\s*\(/,                                 // switch statements
+      const BARREL_ALLOWED_PATTERNS = [
+        /^\s*export\s+\{/,       // export { x } from
+        /^\s*export\s+\*/,        // export * from
+        /^\s*export\s+type\s+\{/, // export type { x } from
+        /^\s*export\s+type\s+\*/, // export type * from
+        /^\s*import\s+/,          // import statements (used for re-export)
+        /^\s*\/\//,               // single-line comments
+        /^\s*\/\*/,               // multi-line comment start
+        /^\s*\*/,                 // multi-line comment body/end
+        /^\s*$/,                  // blank lines
+        /^\s*\w+\s*,?\s*$/,      // continuation line in multi-line export (identifier with optional comma)
+        /^\s*}\s*from\s+/,       // closing brace of multi-line export
       ];
 
+      const violations: string[] = [];
       for (const line of lines) {
-        const trimmed = line.trim();
-        // Skip blank lines, comments, pure export/import statements
-        if (
-          trimmed === '' ||
-          trimmed.startsWith('//') ||
-          trimmed.startsWith('/*') ||
-          trimmed.startsWith('*') ||
-          trimmed.startsWith('export {') ||
-          trimmed.startsWith('export *') ||
-          trimmed.startsWith('export type') ||
-          trimmed.startsWith('import ')
-        ) {
-          continue;
-        }
-
-        for (const pattern of implementationPatterns) {
-          expect(
-            pattern.test(trimmed),
-            `Barrel file ${rel(filePath)} contains implementation logic: "${trimmed}"`,
-          ).toBe(false);
+        const isAllowed = BARREL_ALLOWED_PATTERNS.some((p) => p.test(line));
+        if (!isAllowed) {
+          violations.push(`${rel(filePath)}: ${line.trim()}`);
         }
       }
+
+      expect(
+        violations,
+        `Barrel file ${rel(filePath)} contains non-export lines`,
+      ).toEqual([]);
     },
   );
 });
@@ -197,10 +200,12 @@ describe('package.json configuration', () => {
 
 describe('test hygiene', () => {
   const THIS_FILE = resolve(SRC, '__structural__/project-structure.test.ts');
+  const TOOLS = join(ROOT, 'tools');
 
-  const testFiles = collectFiles(SRC, (name) => name.endsWith('.test.ts')).filter(
-    (f) => resolve(f) !== THIS_FILE,
-  );
+  const testFiles = [
+    ...collectFiles(SRC, (name) => name.endsWith('.test.ts')),
+    ...(existsSync(TOOLS) ? collectFiles(TOOLS, (name) => name.endsWith('.test.js')) : []),
+  ].filter((f) => resolve(f) !== THIS_FILE);
 
   it('no test file uses .only()', () => {
     const violations: string[] = [];

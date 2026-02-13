@@ -51,6 +51,11 @@ ruleTester.run('enforce-barrel-exports', rule, {
       code: "import { something } from '../memory'",
       filename: '/project/src/commands/capture.ts',
     },
+    // Bare module name (extensionless single segment) is OK
+    {
+      code: "import { x } from '../memory'",
+      filename: '/project/src/commands/capture.ts',
+    },
     // Import from parent index.js
     {
       code: "import { something } from '../index.js'",
@@ -90,6 +95,18 @@ ruleTester.run('enforce-barrel-exports', rule, {
     {
       code: "import { Config } from '../setup/types.js'",
       filename: '/project/src/commands/status.ts',
+      errors: [{ messageId: 'enforceBarrelExport' }],
+    },
+    // Extensionless deep import should be flagged
+    {
+      code: "import { x } from '../memory/storage/sqlite/search'",
+      filename: '/project/src/commands/capture.ts',
+      errors: [{ messageId: 'enforceBarrelExport' }],
+    },
+    // Extensionless two-segment deep import
+    {
+      code: "import { x } from '../memory/storage'",
+      filename: '/project/src/commands/capture.ts',
       errors: [{ messageId: 'enforceBarrelExport' }],
     },
     // Multiple invalid imports in one file — each gets its own error

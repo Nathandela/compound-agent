@@ -1,3 +1,5 @@
+import path from 'node:path'
+
 const BANNED_DIRS = new Set(['utils', 'helpers', 'shared', 'common', 'misc'])
 
 const rule = {
@@ -24,7 +26,7 @@ const rule = {
           return
         }
 
-        const segments = filename.split('/')
+        const segments = path.normalize(filename).split(path.sep)
 
         for (const segment of segments) {
           if (BANNED_DIRS.has(segment)) {

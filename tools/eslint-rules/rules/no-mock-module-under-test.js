@@ -51,10 +51,18 @@ const rule = {
           return
         }
 
-        // Extract basename and strip extension
+        // Strip extension from mock path and extract basename
         const mockBasename = path.basename(mockPath).replace(/\.[jt]sx?$/, '')
+        if (mockBasename !== moduleUnderTest) {
+          return
+        }
 
-        if (mockBasename === moduleUnderTest) {
+        // Check that the mock path only contains '..'/'.' traversals and the module name,
+        // with no intervening directory segments (e.g., '../search' is flagged but
+        // '../other-dir/search' is not since it's a different module with the same name)
+        const segments = mockPath.replace(/\.[jt]sx?$/, '').split('/')
+        const nonTraversalSegments = segments.filter(s => s !== '..' && s !== '.')
+        if (nonTraversalSegments.length === 1) {
           context.report({
             node,
             messageId: 'noMockModuleUnderTest',
