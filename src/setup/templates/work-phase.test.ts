@@ -272,4 +272,71 @@ describe('Work Phase Integration', () => {
       expect(implementer).toMatch(/never.*modify.*test/i);
     });
   });
+
+  describe('branch-contract checks', () => {
+    // --- F1: Workflow must have explicit conditional branching ---
+    it('work.md workflow uses explicit conditional branching for complexity paths', () => {
+      // The workflow section must contain explicit if/conditional structure
+      // that separates trivial from simple/complex paths
+      const workflowMatch = workCommand.match(/## Workflow[^]*?(?=##|$)/i);
+      expect(workflowMatch).not.toBeNull();
+      const workflow = workflowMatch![0];
+      // Must have genuine conditional language — "If trivial" / "If simple" / "If complex"
+      // not just "**Trivial**:" label definitions
+      expect(workflow).toMatch(/\bif\b.*\btrivial\b/i);
+      expect(workflow).toMatch(/\bif\b.*\bsimple\b/i);
+    });
+
+    it('work.md trivial workflow path excludes test-writer/implementer spawning', () => {
+      // After explicit branching, the trivial path should NOT mention spawning pair agents
+      // Look for a trivial-specific instruction block in the workflow
+      const workflowMatch = workCommand.match(/## Workflow[^]*?(?=##|$)/i);
+      expect(workflowMatch).not.toBeNull();
+      const workflow = workflowMatch![0];
+      // Find the trivial branch content (between trivial conditional and simple conditional)
+      const trivialBranch = workflow.match(/(?:if|when).*trivial[^]*?(?=(?:if|when).*(?:simple|complex)|$)/i);
+      expect(trivialBranch).not.toBeNull();
+      const trivialText = trivialBranch![0].toLowerCase();
+      expect(trivialText).not.toMatch(/spawn.*test.writer|delegate.*test.writer|test.writer.*agent/);
+      expect(trivialText).not.toMatch(/spawn.*implementer|delegate.*implementer/);
+    });
+
+    it('work SKILL.md methodology uses conditional branching for complexity', () => {
+      const methodologyMatch = workSkill.match(/## Methodology[^]*?(?=##|$)/i);
+      expect(methodologyMatch).not.toBeNull();
+      const methodology = methodologyMatch![0];
+      // Must have explicit conditional structure separating trivial from pair flow
+      expect(methodology).toMatch(/if.*(trivial|simple|complex)|trivial.*:|when.*(trivial|simple|complex)/i);
+    });
+
+    // --- F2: Per-agent memory must be per-subtask ---
+    it('work.md describes per-subtask memory search, not single broadcast', () => {
+      expect(workCommand).toMatch(
+        /memory_search.*(per (agent|subtask|delegated)|each (agent|subtask|delegated).*task|for each.*memory_search)/i
+      );
+    });
+
+    it('work SKILL.md describes per-subtask memory retrieval', () => {
+      expect(workSkill).toMatch(
+        /per (agent|subtask|delegated)|each (agent|subtask).*search|search.*per.*task/i
+      );
+    });
+
+    // --- F4: Architecture-lock assertions ---
+    it('work.md references agent overlap communication', () => {
+      expect(workCommand).toMatch(/communicat.*overlap|overlap.*communicat|agents.*communicat.*task/i);
+    });
+
+    it('work.md references incremental commits', () => {
+      expect(workCommand).toMatch(/incremental.*commit|commit.*as.*test.*pass|commit.*incremental/i);
+    });
+
+    it('work SKILL.md references agent overlap communication', () => {
+      expect(workSkill).toMatch(/communicat.*overlap|overlap.*communicat|agents.*communicat/i);
+    });
+
+    it('work SKILL.md references incremental commits', () => {
+      expect(workSkill).toMatch(/incremental.*commit|commit.*as.*test.*pass|commit.*incremental/i);
+    });
+  });
 });

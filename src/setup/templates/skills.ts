@@ -99,12 +99,15 @@ Execute implementation through an agent team using adaptive TDD. The lead coordi
 
 ## Methodology
 1. Pick a task from \`bd ready\` or \`$ARGUMENTS\`
-2. Search memory with \`memory_search\` for relevant context
+2. Search memory with \`memory_search\` per agent/subtask for targeted context
 3. Assess complexity (see below) and choose team strategy
-4. **Red**: Delegate to test-writer agent to write failing tests
-5. **Green**: Delegate to implementer agent to write minimal passing code
+4. Execute based on complexity:
+   - If trivial: single agent handles directly, no TDD ceremony. Skip to step 7.
+   - If simple: **Red** — delegate to test-writer for full test suite, then **Green** — delegate to implementer to make them pass.
+   - If complex: **Red/Green ping-pong** — test-writer and implementer alternate in cycles until done.
+5. When agents work on overlapping areas, they communicate directly to coordinate
 6. **Refactor**: Review agent output, request cleanup if needed
-7. Iterate until all tests pass and code is clean
+7. Commit incrementally as tests pass — do not batch all commits to the end
 8. Capture lessons with \`memory_capture\` after corrections or discoveries
 
 ## Team Structure
@@ -126,8 +129,8 @@ The lead coordinates but does not write code:
 - Escalate to user if agents cannot converge
 
 ## Memory Integration
-- Call \`memory_search\` before spawning agents to gather context
-- Inject retrieved memory items into each agent as task context
+- Call \`memory_search\` per delegated subtask with the subtask's specific description
+- Each agent receives memory items tailored to their assigned task, not a shared blob
 - Call \`memory_capture\` after corrections or novel discoveries
 
 ## Beads Lifecycle
@@ -147,6 +150,7 @@ The lead coordinates but does not write code:
 - Tests existed before implementation code
 - Agents received relevant memory context
 - Lead coordinated without writing implementation code
+- Incremental commits made as tests pass
 - All tests pass after refactoring
 - Task lifecycle tracked via beads (\`bd\`)
 `,

@@ -79,23 +79,21 @@ Execute implementation by delegating to an agent team. The lead coordinates and 
 ## Workflow
 1. Parse task from \`$ARGUMENTS\`. If empty, run \`bd ready\` to find available tasks.
 2. Mark task in progress: \`bd update <id> --status=in_progress\`.
-3. Call \`memory_search\` with the task description to retrieve relevant lessons.
-4. Assess complexity to determine team strategy:
-   - **Trivial**: Config changes, typos, one-line fixes. Single agent, no TDD needed.
-   - **Simple**: Well-scoped feature or bug fix. Sequential TDD: spawn test-writer first, then implementer.
-   - **Complex**: Cross-cutting, architectural, or ambiguous scope. Iterative TDD: test-writer and implementer ping-pong until done.
-5. Spawn agent team based on complexity:
-   - Delegate to **test-writer** agent to write failing tests defining expected behavior.
-   - Delegate to **implementer** agent to write minimal code passing those tests.
-   - For complex tasks, iterate: implementer feedback may trigger new tests from test-writer.
-6. Inject memory context into each agent: pass retrieved memory items as context when spawning agents.
+3. Call \`memory_search\` with the task description to retrieve relevant lessons. Run \`memory_search\` per agent/subtask so each gets targeted context.
+4. Assess complexity to determine team strategy.
+5. Execute based on assessed complexity:
+   - If **trivial** (config changes, typos, one-line fixes): handle directly with a single agent. No TDD pair needed. Skip to step 8.
+   - If **simple** (well-scoped feature or bug fix): sequential TDD — delegate to **test-writer** agent to write failing tests, then delegate to **implementer** agent to make them pass.
+   - If **complex** (cross-cutting or ambiguous scope): iterative TDD — delegate to **test-writer** and **implementer** in ping-pong cycles until done.
+6. When agents work on overlapping areas, they communicate directly to coordinate and avoid conflicts.
 7. Lead coordinates the cycle: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-8. Run the full test suite to check for regressions.
-9. Close the task: \`bd close <id>\`.
+8. Commit incrementally as tests pass — do not batch all commits to the end.
+9. Run the full test suite to check for regressions.
+10. Close the task: \`bd close <id>\`.
 
 ## Memory Integration
-- Call \`memory_search\` before spawning agents to gather relevant context.
-- Pass retrieved memory items to each agent as part of their task context.
+- Call \`memory_search\` per delegated subtask with the subtask's specific description, not one shared query.
+- Each agent receives memory items tailored to their assigned task.
 - After corrections or discoveries, call \`memory_capture\` to record them.
 
 ## Beads Integration
