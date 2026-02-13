@@ -285,6 +285,7 @@ describe('Work Phase Integration', () => {
       // not just "**Trivial**:" label definitions
       expect(workflow).toMatch(/\bif\b.*\btrivial\b/i);
       expect(workflow).toMatch(/\bif\b.*\bsimple\b/i);
+      expect(workflow).toMatch(/\bif\b.*\bcomplex\b/i);
     });
 
     it('work.md trivial workflow path excludes test-writer/implementer spawning', () => {
@@ -305,8 +306,8 @@ describe('Work Phase Integration', () => {
       const methodologyMatch = workSkill.match(/## Methodology[^]*?(?=##|$)/i);
       expect(methodologyMatch).not.toBeNull();
       const methodology = methodologyMatch![0];
-      // Must have explicit conditional structure separating trivial from pair flow
-      expect(methodology).toMatch(/if.*(trivial|simple|complex)|trivial.*:|when.*(trivial|simple|complex)/i);
+      // Must have genuine conditional language, not just label definitions
+      expect(methodology).toMatch(/\bif\b.*\btrivial\b/i);
     });
 
     // --- F2: Per-agent memory must be per-subtask ---

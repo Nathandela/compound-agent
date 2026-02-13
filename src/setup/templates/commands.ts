@@ -82,7 +82,7 @@ Execute implementation by delegating to an agent team. The lead coordinates and 
 3. Call \`memory_search\` with the task description to retrieve relevant lessons. Run \`memory_search\` per agent/subtask so each gets targeted context.
 4. Assess complexity to determine team strategy.
 5. Execute based on assessed complexity:
-   - If **trivial** (config changes, typos, one-line fixes): handle directly with a single agent. No TDD pair needed. Skip to step 8.
+   - If **trivial** (config changes, typos, one-line fixes): handle directly with a single agent. No TDD pair needed. Proceed to verification and close.
    - If **simple** (well-scoped feature or bug fix): sequential TDD — delegate to **test-writer** agent to write failing tests, then delegate to **implementer** agent to make them pass.
    - If **complex** (cross-cutting or ambiguous scope): iterative TDD — delegate to **test-writer** and **implementer** in ping-pong cycles until done.
 6. When agents work on overlapping areas, they communicate directly to coordinate and avoid conflicts.
