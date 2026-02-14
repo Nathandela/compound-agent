@@ -67,6 +67,7 @@ describe('runAudit', () => {
       const report = await runAudit(dir);
       expect(report.findings.length).toBeGreaterThan(0);
       expect(report.summary.errors).toBeGreaterThan(0);
+      expect(report.summary.filesChecked).toBeGreaterThanOrEqual(1);
     } finally {
       await cleanup();
     }

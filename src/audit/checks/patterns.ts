@@ -9,26 +9,26 @@ import { join } from 'node:path';
 
 import { readMemoryItems } from '../../memory/storage/index.js';
 import { findFiles } from '../../rules/checks/glob-utils.js';
-import type { AuditFinding } from '../types.js';
+import type { AuditCheckResult } from '../types.js';
 
 /**
  * Check for bad patterns in source files.
  *
  * @param repoRoot - Repository root directory
- * @returns Array of audit findings where bad patterns were found
+ * @returns Audit check result with findings and filesChecked
  */
-export async function checkPatterns(repoRoot: string): Promise<AuditFinding[]> {
+export async function checkPatterns(repoRoot: string): Promise<AuditCheckResult> {
   const { items } = await readMemoryItems(repoRoot);
-  const findings: AuditFinding[] = [];
 
   // Filter items that have pattern.bad defined
   const patterned = items.filter((item) => item.pattern?.bad);
   if (patterned.length === 0) {
-    return [];
+    return { findings: [], filesChecked: [] };
   }
 
   // Find source files to scan
   const sourceFiles = findFiles(repoRoot, '**/*.ts');
+  const findings: AuditCheckResult['findings'] = [];
 
   for (const item of patterned) {
     const bad = item.pattern!.bad;
@@ -47,5 +47,5 @@ export async function checkPatterns(repoRoot: string): Promise<AuditFinding[]> {
     }
   }
 
-  return findings;
+  return { findings, filesChecked: sourceFiles };
 }

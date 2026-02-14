@@ -30,8 +30,9 @@ describe('checkLessons', () => {
   it('returns empty findings when no memory items exist', async () => {
     const dir = await setup();
     try {
-      const findings = await checkLessons(dir);
-      expect(findings).toEqual([]);
+      const result = await checkLessons(dir);
+      expect(result.findings).toEqual([]);
+      expect(result.filesChecked).toEqual([]);
     } finally {
       await cleanup();
     }
@@ -43,13 +44,16 @@ describe('checkLessons', () => {
       const lesson = createFullLesson('L001', 'Always validate input', 'high');
       await appendMemoryItem(dir, lesson);
 
-      const findings = await checkLessons(dir);
-      expect(findings.length).toBe(1);
+      const result = await checkLessons(dir);
+      expect(result.findings.length).toBe(1);
 
-      const finding = findings[0]!;
+      const finding = result.findings[0]!;
       expect(finding.source).toBe('lesson');
       expect(finding.severity).toBe('info');
       expect(finding.relatedLessonId).toBe('L001');
+
+      // filesChecked should include the JSONL path
+      expect(result.filesChecked.length).toBe(1);
     } finally {
       await cleanup();
     }
@@ -61,8 +65,8 @@ describe('checkLessons', () => {
       const lesson = createFullLesson('L002', 'Minor style preference', 'low');
       await appendMemoryItem(dir, lesson);
 
-      const findings = await checkLessons(dir);
-      expect(findings).toEqual([]);
+      const result = await checkLessons(dir);
+      expect(result.findings).toEqual([]);
     } finally {
       await cleanup();
     }
@@ -74,8 +78,8 @@ describe('checkLessons', () => {
       const lesson = createFullLesson('L003', 'Medium importance', 'medium');
       await appendMemoryItem(dir, lesson);
 
-      const findings = await checkLessons(dir);
-      expect(findings).toEqual([]);
+      const result = await checkLessons(dir);
+      expect(result.findings).toEqual([]);
     } finally {
       await cleanup();
     }
@@ -87,8 +91,8 @@ describe('checkLessons', () => {
       const lesson = createFullLesson('L004', 'Deleted lesson', 'high', { deleted: true });
       await appendMemoryItem(dir, lesson);
 
-      const findings = await checkLessons(dir);
-      expect(findings).toEqual([]);
+      const result = await checkLessons(dir);
+      expect(result.findings).toEqual([]);
     } finally {
       await cleanup();
     }

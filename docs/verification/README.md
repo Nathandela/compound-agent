@@ -13,11 +13,13 @@ This directory contains documentation for the systematic code verification pract
 ### TDD Workflow
 
 1. `/invariant-designer` - Define what must be true
-2. `/test-first-enforcer` - Verify tests written first
-3. `/property-test-generator` - Generate property tests
-4. Implement minimal code
-5. `/module-boundary-reviewer` - Check module design
-6. `/implementation-reviewer` - Final approval
+2. `/cct-subagent` - Inject mistake-derived test requirements
+3. `/test-first-enforcer` - Verify tests written first
+4. `/property-test-generator` - Generate property tests
+5. `/anti-cargo-cult-reviewer` - Reject fake tests
+6. `/module-boundary-reviewer` - Check module design
+7. `/drift-detector` - Check constraint drift
+8. `/implementation-reviewer` - Final approval
 
 ### Exit Criteria
 

@@ -229,6 +229,15 @@ LegacyLessonSchema, LegacyTombstoneSchema
 
 // Constants
 VERSION
+
+// Audit API
+runAudit, AuditFindingSchema, AuditReportSchema
+type AuditFinding, AuditReport, AuditOptions
+
+// Compound API (clustering, synthesis, pattern I/O)
+buildSimilarityMatrix, CCT_PATTERNS_PATH, CctPatternSchema
+clusterBySimilarity, readCctPatterns, synthesizePattern, writeCctPatterns
+type CctPattern, ClusterResult
 ```
 
 ### Function Signatures
@@ -253,6 +262,18 @@ detectUserCorrection(message: string): DetectedCorrection | null
 loadSessionMemory(repoRoot: string): Promise<string>
 retrieveForPlan(repoRoot: string, planText: string): Promise<PlanRetrievalResult>
 getPrimeContext(repoRoot: string): Promise<string>
+
+// Audit: (repoRoot, options?) -> Promise<AuditReport>
+runAudit(repoRoot: string, options?: AuditOptions): Promise<AuditReport>
+
+// Compound: clustering and synthesis
+buildSimilarityMatrix(embeddings: number[][]): number[][]
+clusterBySimilarity(items: MemoryItem[], embeddings: number[][], threshold?: number): ClusterResult
+synthesizePattern(cluster: MemoryItem[], clusterId: string): CctPattern
+
+// Compound I/O: (repoRoot) -> Promise<CctPattern[]>
+readCctPatterns(repoRoot: string): Promise<CctPattern[]>
+writeCctPatterns(repoRoot: string, patterns: CctPattern[]): Promise<void>
 ```
 
 ---

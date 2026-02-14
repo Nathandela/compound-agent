@@ -5,31 +5,44 @@
  */
 
 import { loadRuleConfig, runRules } from '../../rules/index.js';
-import type { AuditFinding } from '../types.js';
+import type { AuditCheckResult } from '../types.js';
 
 /**
- * Check rules and return findings.
+ * Check rules and return findings with files checked.
  *
  * @param repoRoot - Repository root directory
- * @returns Array of audit findings from rule violations
+ * @returns Audit check result with findings and filesChecked
  */
-export function checkRules(repoRoot: string): AuditFinding[] {
+export function checkRules(repoRoot: string): AuditCheckResult {
   let config;
   try {
     config = loadRuleConfig(repoRoot);
-  } catch {
-    return [];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load rules config';
+    return {
+      findings: [{
+        file: '.claude/rules.json',
+        issue: `Invalid rules configuration: ${message}`,
+        severity: 'error',
+        source: 'rule',
+      }],
+      filesChecked: [],
+    };
   }
 
   if (config.rules.length === 0) {
-    return [];
+    return { findings: [], filesChecked: [] };
   }
 
   const results = runRules(repoRoot, config.rules);
-  const findings: AuditFinding[] = [];
+  const findings: AuditCheckResult['findings'] = [];
+  const filesCheckedSet = new Set<string>();
 
   for (const result of results) {
     for (const violation of result.violations) {
+      if (violation.file) {
+        filesCheckedSet.add(violation.file);
+      }
       findings.push({
         file: violation.file ?? '',
         issue: violation.message,
@@ -40,5 +53,5 @@ export function checkRules(repoRoot: string): AuditFinding[] {
     }
   }
 
-  return findings;
+  return { findings, filesChecked: [...filesCheckedSet] };
 }

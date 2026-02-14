@@ -5,7 +5,7 @@
 import { checkLessons } from './checks/lessons.js';
 import { checkPatterns } from './checks/patterns.js';
 import { checkRules } from './checks/rules.js';
-import type { AuditFinding, AuditOptions, AuditReport } from './types.js';
+import type { AuditCheckResult, AuditFinding, AuditOptions, AuditReport } from './types.js';
 
 /**
  * Run audit checks and build a report.
@@ -21,17 +21,25 @@ export async function runAudit(
   const { includeRules = true, includePatterns = true, includeLessons = true } = options;
 
   const findings: AuditFinding[] = [];
+  const allCheckedFiles = new Set<string>();
+
+  function collect(result: AuditCheckResult): void {
+    findings.push(...result.findings);
+    for (const f of result.filesChecked) {
+      allCheckedFiles.add(f);
+    }
+  }
 
   if (includeRules) {
-    findings.push(...checkRules(repoRoot));
+    collect(checkRules(repoRoot));
   }
 
   if (includePatterns) {
-    findings.push(...(await checkPatterns(repoRoot)));
+    collect(await checkPatterns(repoRoot));
   }
 
   if (includeLessons) {
-    findings.push(...(await checkLessons(repoRoot)));
+    collect(await checkLessons(repoRoot));
   }
 
   const errors = findings.filter((f) => f.severity === 'error').length;
@@ -40,7 +48,7 @@ export async function runAudit(
 
   return {
     findings,
-    summary: { errors, warnings, infos, filesChecked: 0 },
+    summary: { errors, warnings, infos, filesChecked: allCheckedFiles.size },
     timestamp: new Date().toISOString(),
   };
 }

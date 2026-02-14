@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { checkRules } from './rules.js';
-import type { AuditFinding } from '../types.js';
+import type { AuditCheckResult } from '../types.js';
 
 describe('checkRules', () => {
   let tempDir: string;
@@ -29,8 +29,9 @@ describe('checkRules', () => {
   it('returns empty findings when no rules config exists', async () => {
     const dir = await setup();
     try {
-      const findings = checkRules(dir);
-      expect(findings).toEqual([]);
+      const result = checkRules(dir);
+      expect(result.findings).toEqual([]);
+      expect(result.filesChecked).toEqual([]);
     } finally {
       await cleanup();
     }
@@ -42,8 +43,9 @@ describe('checkRules', () => {
       await mkdir(join(dir, '.claude'), { recursive: true });
       await writeFile(join(dir, '.claude', 'rules.json'), JSON.stringify({ rules: [] }));
 
-      const findings = checkRules(dir);
-      expect(findings).toEqual([]);
+      const result = checkRules(dir);
+      expect(result.findings).toEqual([]);
+      expect(result.filesChecked).toEqual([]);
     } finally {
       await cleanup();
     }
@@ -72,14 +74,17 @@ describe('checkRules', () => {
         })
       );
 
-      const findings = checkRules(dir);
-      expect(findings.length).toBeGreaterThan(0);
+      const result = checkRules(dir);
+      expect(result.findings.length).toBeGreaterThan(0);
 
-      const finding = findings[0]!;
+      const finding = result.findings[0]!;
       expect(finding.source).toBe('rule');
       expect(finding.severity).toBe('error');
       expect(finding.file).toBeDefined();
       expect(finding.issue).toBeDefined();
+
+      // filesChecked should include the violating file
+      expect(result.filesChecked.length).toBeGreaterThan(0);
     } finally {
       await cleanup();
     }
@@ -107,9 +112,9 @@ describe('checkRules', () => {
         })
       );
 
-      const findings = checkRules(dir);
-      expect(findings.length).toBeGreaterThan(0);
-      expect(findings[0]!.severity).toBe('warning');
+      const result = checkRules(dir);
+      expect(result.findings.length).toBeGreaterThan(0);
+      expect(result.findings[0]!.severity).toBe('warning');
     } finally {
       await cleanup();
     }
@@ -138,11 +143,46 @@ describe('checkRules', () => {
         })
       );
 
-      const findings = checkRules(dir);
-      expect(findings.length).toBeGreaterThanOrEqual(2);
-      for (const f of findings) {
+      const result = checkRules(dir);
+      expect(result.findings.length).toBeGreaterThanOrEqual(2);
+      for (const f of result.findings) {
         expect(f.source).toBe('rule');
       }
+      // Both violating files should be in filesChecked
+      expect(result.filesChecked.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('returns error finding for malformed rules config', async () => {
+    const dir = await setup();
+    try {
+      await mkdir(join(dir, '.claude'), { recursive: true });
+      await writeFile(join(dir, '.claude', 'rules.json'), '{ not valid json !!!');
+
+      const result = checkRules(dir);
+      expect(result.findings.length).toBe(1);
+      expect(result.findings[0]!.severity).toBe('error');
+      expect(result.findings[0]!.source).toBe('rule');
+      expect(result.findings[0]!.file).toBe('.claude/rules.json');
+      expect(result.findings[0]!.issue).toMatch(/Invalid rules configuration/);
+    } finally {
+      await cleanup();
+    }
+  });
+
+  it('returns error finding for schema-invalid rules config', async () => {
+    const dir = await setup();
+    try {
+      await mkdir(join(dir, '.claude'), { recursive: true });
+      // Valid JSON but invalid schema (missing required fields)
+      await writeFile(join(dir, '.claude', 'rules.json'), JSON.stringify({ rules: [{ bad: true }] }));
+
+      const result = checkRules(dir);
+      expect(result.findings.length).toBe(1);
+      expect(result.findings[0]!.severity).toBe('error');
+      expect(result.findings[0]!.source).toBe('rule');
     } finally {
       await cleanup();
     }

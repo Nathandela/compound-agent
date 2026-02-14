@@ -91,6 +91,10 @@ Execute implementation by delegating to an agent team. The lead coordinates and 
 9. Run the full test suite to check for regressions.
 10. Close the task: \`bd close <id>\`.
 
+## Verification Gate
+Before marking work complete, run the 8-step TDD verification pipeline:
+1. /invariant-designer → 2. /cct-subagent → 3. /test-first-enforcer → 4. /property-test-generator → 5. /anti-cargo-cult-reviewer → 6. /module-boundary-reviewer → 7. /drift-detector → 8. /implementation-reviewer
+
 ## Memory Integration
 - Call \`memory_search\` per delegated subtask with the subtask's specific description, not one shared query.
 - Each agent receives memory items tailored to their assigned task.
@@ -166,9 +170,15 @@ Multi-agent analysis to capture high-quality lessons from completed work into th
    - **Medium**: workflow changes, pattern corrections, tooling preferences
    - **Low**: style preferences, minor optimizations, reinforcements
 7. For approved items, store via \`memory_capture\` with supersedes/related linking to connect with existing memory.
-8. Confirm with user for high-severity items only; medium/low items are auto-stored.
-9. Run \`bd ready\` to check for related issues; \`bd close\` any resolved by captured knowledge.
-10. Output a summary of captured and skipped items with reasons.
+8. After storing new items, run compounding synthesis:
+   - Read all lessons from \`.claude/lessons/index.jsonl\`
+   - Cluster by embedding similarity (threshold 0.75)
+   - Synthesize CCT patterns from clusters of 2+ items
+   - Write patterns to \`.claude/lessons/cct-patterns.jsonl\`
+   - Skip if fewer than 5 total lessons exist (not enough signal)
+9. Confirm with user for high-severity items only; medium/low items are auto-stored.
+10. Run \`bd ready\` to check for related issues; \`bd close\` any resolved by captured knowledge.
+11. Output a summary of captured and skipped items with reasons.
 
 ## Beads Integration
 - Check \`bd ready\` for related open issues.

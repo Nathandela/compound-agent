@@ -89,11 +89,13 @@ Every implementation MUST follow this subagent sequence:
 
 ```
 1. /invariant-designer      --> Define what must be true
-2. /test-first-enforcer     --> Verify tests written FIRST
-3. /property-test-generator  --> Generate edge case tests
-4. /anti-cargo-cult-reviewer --> Reject fake tests
-5. /module-boundary-reviewer --> Validate module design
-6. /implementation-reviewer  --> FINAL gate (must be APPROVED)
+2. /cct-subagent            --> Inject mistake-derived test requirements
+3. /test-first-enforcer     --> Verify tests written FIRST
+4. /property-test-generator  --> Generate edge case tests
+5. /anti-cargo-cult-reviewer --> Reject fake tests
+6. /module-boundary-reviewer --> Validate module design
+7. /drift-detector          --> Check constraint drift
+8. /implementation-reviewer  --> FINAL gate (must be APPROVED)
 ```
 
 **Inviolable rules**: Tests before implementation. Real data, no mocked business logic. ALL subagents in sequence. On rejection, fix ALL issues before resubmitting.

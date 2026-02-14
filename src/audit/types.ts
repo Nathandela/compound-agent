@@ -33,6 +33,12 @@ export type AuditFinding = z.infer<typeof AuditFindingSchema>;
 export type AuditSummary = z.infer<typeof AuditSummarySchema>;
 export type AuditReport = z.infer<typeof AuditReportSchema>;
 
+/** Return type for individual audit check functions. */
+export interface AuditCheckResult {
+  findings: AuditFinding[];
+  filesChecked: string[];
+}
+
 /** Options to toggle individual audit checks. */
 export interface AuditOptions {
   includeRules?: boolean;

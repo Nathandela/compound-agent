@@ -30,8 +30,9 @@ describe('checkPatterns', () => {
   it('returns empty findings when no memory items exist', async () => {
     const dir = await setup();
     try {
-      const findings = await checkPatterns(dir);
-      expect(findings).toEqual([]);
+      const result = await checkPatterns(dir);
+      expect(result.findings).toEqual([]);
+      expect(result.filesChecked).toEqual([]);
     } finally {
       await cleanup();
     }
@@ -43,8 +44,8 @@ describe('checkPatterns', () => {
       const lesson = createLesson({ id: 'L001', insight: 'some insight' });
       await appendMemoryItem(dir, lesson);
 
-      const findings = await checkPatterns(dir);
-      expect(findings).toEqual([]);
+      const result = await checkPatterns(dir);
+      expect(result.findings).toEqual([]);
     } finally {
       await cleanup();
     }
@@ -61,14 +62,17 @@ describe('checkPatterns', () => {
       await mkdir(join(dir, 'src'), { recursive: true });
       await writeFile(join(dir, 'src', 'example.ts'), 'var x = 1;\n');
 
-      const findings = await checkPatterns(dir);
-      expect(findings.length).toBeGreaterThan(0);
+      const result = await checkPatterns(dir);
+      expect(result.findings.length).toBeGreaterThan(0);
 
-      const finding = findings[0]!;
+      const finding = result.findings[0]!;
       expect(finding.source).toBe('pattern');
       expect(finding.relatedLessonId).toBe('P001');
       expect(finding.severity).toBe('warning');
       expect(finding.file).toContain('example.ts');
+
+      // filesChecked should include scanned source files
+      expect(result.filesChecked.length).toBeGreaterThan(0);
     } finally {
       await cleanup();
     }
@@ -84,8 +88,8 @@ describe('checkPatterns', () => {
       await mkdir(join(dir, 'src'), { recursive: true });
       await writeFile(join(dir, 'src', 'file.ts'), 'some code\n');
 
-      const findings = await checkPatterns(dir);
-      expect(findings).toEqual([]);
+      const result = await checkPatterns(dir);
+      expect(result.findings).toEqual([]);
     } finally {
       await cleanup();
     }
@@ -100,9 +104,9 @@ describe('checkPatterns', () => {
       await mkdir(join(dir, 'src'), { recursive: true });
       await writeFile(join(dir, 'src', 'types.ts'), 'const val: any = 1;\n');
 
-      const findings = await checkPatterns(dir);
-      expect(findings.length).toBeGreaterThan(0);
-      expect(findings[0]!.relatedLessonId).toBe('P042');
+      const result = await checkPatterns(dir);
+      expect(result.findings.length).toBeGreaterThan(0);
+      expect(result.findings[0]!.relatedLessonId).toBe('P042');
     } finally {
       await cleanup();
     }

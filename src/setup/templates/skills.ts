@@ -133,6 +133,10 @@ The lead coordinates but does not write code:
 - Each agent receives memory items tailored to their assigned task, not a shared blob
 - Call \`memory_capture\` after corrections or novel discoveries
 
+## Verification Gate
+Before marking work complete, run the 8-step TDD verification pipeline:
+1. /invariant-designer → 2. /cct-subagent → 3. /test-first-enforcer → 4. /property-test-generator → 5. /anti-cargo-cult-reviewer → 6. /module-boundary-reviewer → 7. /drift-detector → 8. /implementation-reviewer
+
 ## Beads Lifecycle
 - \`bd ready\` to find available tasks
 - \`bd update <id> --status=in_progress\` when starting
@@ -225,7 +229,8 @@ Extract and store lessons learned during the cycle. This is what makes the syste
 5. Classify each item by type: lesson, solution, pattern, or preference
 6. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
 7. Store via \`memory_capture\` with supersedes/related links where applicable
-8. Ask user to confirm high-severity items only; medium/low are auto-stored
+8. Run compounding synthesis: cluster accumulated lessons by similarity and write CCT patterns to \`.claude/lessons/cct-patterns.jsonl\`
+9. Ask user to confirm high-severity items only; medium/low are auto-stored
 
 ## Common Pitfalls
 - Not spawning the analysis team (analyzing solo misses cross-cutting patterns)

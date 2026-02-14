@@ -4,4 +4,4 @@
 
 export { runAudit } from './engine.js';
 export { AuditFindingSchema, AuditReportSchema, AuditSummarySchema } from './types.js';
-export type { AuditFinding, AuditOptions, AuditReport, AuditSummary } from './types.js';
+export type { AuditCheckResult, AuditFinding, AuditOptions, AuditReport, AuditSummary } from './types.js';

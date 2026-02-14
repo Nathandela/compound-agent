@@ -4,18 +4,19 @@
  * Surfaces high-severity lessons as info-level findings.
  */
 
+import { LESSONS_PATH } from '../../memory/storage/jsonl.js';
 import { readMemoryItems } from '../../memory/storage/index.js';
-import type { AuditFinding } from '../types.js';
+import type { AuditCheckResult } from '../types.js';
 
 /**
  * Check for high-severity lessons and return as info findings.
  *
  * @param repoRoot - Repository root directory
- * @returns Array of info-level findings for high-severity lessons
+ * @returns Audit check result with findings and filesChecked
  */
-export async function checkLessons(repoRoot: string): Promise<AuditFinding[]> {
+export async function checkLessons(repoRoot: string): Promise<AuditCheckResult> {
   const { items } = await readMemoryItems(repoRoot);
-  const findings: AuditFinding[] = [];
+  const findings: AuditCheckResult['findings'] = [];
 
   for (const item of items) {
     if (item.severity === 'high') {
@@ -29,5 +30,6 @@ export async function checkLessons(repoRoot: string): Promise<AuditFinding[]> {
     }
   }
 
-  return findings;
+  const filesChecked = items.length > 0 ? [LESSONS_PATH] : [];
+  return { findings, filesChecked };
 }
