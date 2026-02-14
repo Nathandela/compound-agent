@@ -6,19 +6,17 @@
 **Name**: Compound Agent
 **Goal**: Learning system that helps Claude Code avoid repeating mistakes across sessions
 **Stack**: TypeScript + pnpm (deployable as dev dependency)
-**Status**: Active development (core CLI + memory system functional)
-**Type**: shared-lib
+**CLI**: `ca` (alias: `compound-agent`)
 **Primary Language**: TypeScript
 
 ### Key Documentation
 
 | Document | Purpose |
 |----------|---------|
-| `docs/SPEC.md` | Complete specification |
-| `docs/CONTEXT.md` | Research and decisions |
-| `docs/PLAN.md` | Day-by-day implementation plan |
-| `docs/verification/` | Review workflow and criteria |
 | `docs/INDEX.md` | Full documentation map |
+| `docs/verification/` | Review workflow and criteria |
+| `docs/standards/` | Coding standards and anti-patterns |
+| `docs/archive/SPEC-v1.md` | Original specification (archived) |
 
 ---
 
@@ -154,9 +152,10 @@ pnpm lint      # Zero violations
 | Build | tsup |
 | Testing | Vitest + fast-check (property tests) |
 | Storage | better-sqlite3 + FTS5 |
-| Embeddings | node-llama-cpp + nomic-embed-text-v1.5 |
+| Embeddings | node-llama-cpp + EmbeddingGemma-300M |
 | CLI | Commander.js |
 | Schema | Zod |
+| MCP | @modelcontextprotocol/sdk |
 
 ---
 
@@ -165,9 +164,10 @@ pnpm lint      # Zero violations
 ```
 .claude/                        (repository scope)
 ├── CLAUDE.md                   <- Always loaded (permanent rules)
+├── agents/                     <- Subagent definitions (TDD pipeline)
+├── commands/                   <- Custom slash commands
 ├── lessons/
-│   ├── index.jsonl             <- Source of truth (git-tracked)
-│   └── archive/                <- Old lessons (compacted)
+│   └── index.jsonl             <- Source of truth (git-tracked)
 └── .cache/
     └── lessons.sqlite          <- Rebuildable index (.gitignore)
 ```
@@ -181,7 +181,7 @@ pnpm lint      # Zero violations
 | Resource | Module | Lifecycle |
 |----------|--------|-----------|
 | SQLite database | `src/memory/storage/sqlite/connection.ts` | Lazy init, one instance per process |
-| Embedding model | `src/memory/embeddings/model.ts` | Lazy init, ~150MB RAM, one instance |
+| Embedding model | `src/memory/embeddings/nomic.ts` | Lazy init, one instance per process |
 
 **Policy**: Singleton pattern required. Lazy initialization. Explicit cleanup via `closeDb()` / `unloadEmbedding()` before process exit. Singletons are internal implementation details (not global variables).
 
@@ -192,12 +192,12 @@ pnpm lint      # Zero violations
 ```bash
 pnpm install       # Install dependencies
 pnpm build         # Build with tsup
-pnpm test          # Full suite (1-2 min)
-pnpm test:fast     # Skip CLI integration tests (~6s)
+pnpm test          # Full suite
+pnpm test:fast     # Skip CLI integration tests
 pnpm test:changed  # Only tests affected by recent changes
 pnpm test:watch    # Watch mode
 pnpm test:all      # Full suite with model download
-pnpm dev           # Development mode
+pnpm dev           # Development mode (watch)
 ```
 
 **Recommended**: `pnpm test:fast` during development, `pnpm test` before committing.
@@ -208,12 +208,9 @@ pnpm dev           # Development mode
 
 ## References
 
-- `docs/SPEC.md` -- Full specification
-- `docs/CONTEXT.md` -- Research and decisions
-- `docs/PLAN.md` -- Implementation plan
-- `docs/verification/closed-loop-review-process.md` -- Review workflow
-- `docs/verification/subagent-pipeline.md` -- Subagent pipeline details
-- `docs/verification/exit-criteria.md` -- Exit criteria checklists
-- `docs/standards/code-organization.md` -- Code organization standards
-- `docs/standards/anti-patterns.md` -- Anti-patterns to avoid
-- `docs/standards/test-architecture.md` -- Test architecture details
+- `docs/INDEX.md` -- Full documentation map
+- `docs/verification/` -- Review workflow and criteria
+- `docs/standards/` -- Coding standards and anti-patterns
+- `docs/ARCHITECTURE-V2.md` -- V2 architecture vision
+- `docs/RESOURCE_LIFECYCLE.md` -- Resource lifecycle management
+- `docs/LANDSCAPE.md` -- Competitive landscape analysis

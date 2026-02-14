@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-02-14
+
+### Added
+
+- **Unified memory types**: lesson, solution, pattern, preference -- all share one store, schema, and search mechanism
+- **5-phase compound workflow**: brainstorm, plan, work, review, compound -- each with dedicated slash commands, SKILL.md files, and agent definitions
+- **`/compound:lfg` command**: Chains all 5 phases sequentially for end-to-end workflow
+- **Agent teams with inter-communication**: Specialized agents (reviewers, researchers, analysts) collaborate at each phase
+- **MCP server**: `memory_search` and `memory_capture` tools, `memory://prime` resource for workflow context
+- **Rule engine**: Config-driven validation for memory item quality
+- **Embedding model**: EmbeddingGemma-300M via node-llama-cpp for local semantic search
+- **Full-cycle integration tests**: 41 tests covering the complete compound workflow
+- **Setup command (`ca setup`)**: One-shot configuration of hooks, MCP server, agents, commands, and skills
+
+### Changed
+
+- **Renamed** from learning-agent (CLI: `lna`) to compound-agent (CLI: `ca`)
+- **Architecture**: 3-layer design (Beads foundation, Semantic Memory, Workflows)
+- **MCP-first integration**: MCP tools are the primary interface; CLI serves as fallback
+- **Memory storage**: Items stored in `.claude/lessons/index.jsonl` (backward compatible with v0.x lessons)
+- **Hook system**: UserPromptSubmit and PostToolUse hooks for context-aware memory injection
+
 ## [0.2.9] - 2026-02-07
 
 ### Fixed
@@ -365,7 +387,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.9...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/Nathandela/learning_agent/compare/v0.2.9...v1.0.0
 [0.2.9]: https://github.com/Nathandela/learning_agent/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/Nathandela/learning_agent/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/Nathandela/learning_agent/compare/v0.2.6...v0.2.7

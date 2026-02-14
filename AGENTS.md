@@ -45,7 +45,7 @@ For detailed project rules and TDD workflow, see `.claude/CLAUDE.md`.
   .cache/
     lessons.sqlite              <- Rebuildable index (.gitignore)
 
-~/.cache/compound-agent/models/ <- Global embedding model cache
+~/.node-llama-cpp/models/       <- Global embedding model cache
 ```
 
 ---
@@ -297,12 +297,24 @@ This section explains HOW and WHEN Claude should interact with the compound-agen
 
 ### MCP Tools (Primary)
 
-| Tool | Purpose |
-|------|---------|
-| `memory_search` | Search lessons by query (semantic + keyword) |
-| `memory_capture` | Capture a new lesson after user confirmation |
+| Tool / Resource | Purpose |
+|-----------------|---------|
+| `memory_search` | Search memory items by query (semantic + keyword) |
+| `memory_capture` | Capture a new memory item after user confirmation |
+| `memory://prime` | Resource: workflow context with high-severity memory items |
 
 MCP tools are the preferred interface. Use CLI only as fallback.
+
+### Workflow Commands
+
+| Command | Phase | Description |
+|---------|-------|-------------|
+| `/compound:brainstorm` | Brainstorm | Explore requirements through collaborative dialogue |
+| `/compound:plan` | Plan | Create structured plan enriched by semantic memory |
+| `/compound:work` | Work | Execute plan with agent teams and TDD |
+| `/compound:review` | Review | Multi-agent review with inter-communication |
+| `/compound:compound` | Compound | Capture knowledge, feed back into memory |
+| `/compound:lfg` | All | Chain all 5 phases sequentially |
 
 ### CLI (fallback only)
 
@@ -412,9 +424,9 @@ Run `npx ca init` in a project root to configure:
 | Document | Purpose |
 |----------|---------|
 | `.claude/CLAUDE.md` | Detailed project rules and TDD workflow |
-| `docs/SPEC.md` | Complete specification |
-| `docs/CONTEXT.md` | Research and design decisions |
-| `docs/PLAN.md` | Implementation plan |
+| `docs/ARCHITECTURE-V2.md` | Architecture vision and workflow design |
+| `docs/INDEX.md` | Full documentation map |
+| `CHANGELOG.md` | Version history and release notes |
 
 ## Landing the Plane (Session Completion)
 

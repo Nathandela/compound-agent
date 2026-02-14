@@ -17,7 +17,7 @@ import { createMcpServer } from '../mcp.js';
 import type { CompoundAgentMcpServer } from '../mcp.js';
 import { isModelUsable } from '../memory/embeddings/model.js';
 import { isModelAvailable } from '../memory/embeddings/nomic.js';
-import { closeDb, getRetrievalStats } from '../memory/storage/index.js';
+import { closeDb, getRetrievalStats, rebuildIndex } from '../memory/storage/index.js';
 import { retrieveForPlan } from '../memory/retrieval/plan.js';
 import { readMemoryItems } from '../memory/storage/jsonl.js';
 import { shouldSkipEmbeddingTests } from '../test-utils.js';
@@ -280,6 +280,9 @@ describe.skipIf(skipEmbeddings)('plan-influence: capture -> retrieveForPlan', ()
       tags: ['security', 'database'],
       confirmed: true,
     });
+
+    // Sync JSONL to SQLite so incrementRetrievalCount can find the row
+    rebuildIndex(tempDir);
 
     const result = await retrieveForPlan(tempDir, 'implement database query layer with SQL');
     expect(result.lessons.length).toBeGreaterThan(0);

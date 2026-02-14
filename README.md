@@ -1,61 +1,86 @@
 # Compound Agent
 
-A repository-scoped learning system that helps Claude Code avoid repeating mistakes across sessions. Captures lessons from corrections and retrieves them when relevant.
+Semantically-intelligent workflow plugin for Claude Code. Every unit of work compounds -- mistakes become lessons, solutions become searchable knowledge, and each cycle makes subsequent work smarter.
 
 ## Overview
 
-Claude Code forgets lessons between sessions. This leads to:
-- Repeated mistakes across sessions
-- Users re-explaining preferences
-- No memory of what worked or failed
+Claude Code forgets everything between sessions. Compound Agent fixes this with a three-layer system: issue tracking (Beads) at the foundation, semantic memory with vector search in the middle, and structured workflow phases on top. It captures knowledge from corrections, discoveries, and completed work, then retrieves it precisely when relevant -- at session start, during planning, and before architectural decisions.
 
-Compound Agent solves this by capturing lessons when corrections happen and retrieving relevant ones at session start and plan time.
+## Architecture
+
+```
+LAYER 3: WORKFLOWS
+  /compound:brainstorm, /compound:plan, /compound:work,
+  /compound:review, /compound:compound, /compound:lfg
+  Agent teams at each phase with inter-communication
+
+LAYER 2: SEMANTIC MEMORY
+  4 types: lesson | solution | pattern | preference
+  JSONL source of truth + SQLite FTS5 index + vector embeddings
+  Ranked retrieval: similarity * severity * recency * confirmation
+
+LAYER 1: BEADS (Foundation)
+  Issue tracking + dependency graph
+  Git-backed persistence + distributed sync
+```
+
+### Storage Layout
+
+```
+project_root/
++-- .mcp.json                    <- MCP server config
++-- AGENTS.md                    <- Workflow instructions for Claude
++-- .claude/
+    +-- settings.json            <- Claude Code hooks
+    +-- lessons/
+    |   +-- index.jsonl          <- Source of truth (git-tracked)
+    |   +-- archive/             <- Compacted old items
+    +-- .cache/
+        +-- lessons.sqlite       <- Rebuildable index (.gitignore)
+```
+
+### The Compound Loop
+
+```
+COMPOUND --> writes to --> MEMORY
+                             |
+                      searched by
+                             |
+                           PLAN --> creates context for --> WORK
+                                                             |
+                                                      produces for
+                                                             |
+                                                          REVIEW
+                                                             |
+                                                    generates for
+                                                             |
+                                                         COMPOUND
+```
+
+Every cycle through the loop makes subsequent cycles smarter. A bug found in review becomes a lesson. That lesson surfaces during planning of similar work. The plan accounts for the known issue. Work avoids the mistake.
 
 ## Installation
 
 ```bash
-# Using pnpm (recommended)
+# Install as dev dependency
 pnpm add -D compound-agent
 
-# Using npm
-npm install --save-dev compound-agent
-```
-
-> **Warning**: Do NOT install from GitHub URL (e.g., `pnpm add github:user/compound-agent`).
-> GitHub installs don't include the compiled `dist/` folder, which will cause all CLI
-> commands and hooks to fail. Always install from npm registry as shown above.
-
-### One-Shot Setup (Recommended)
-
-After installation, run the setup command to configure everything:
-
-```bash
+# One-shot setup (creates dirs, hooks, MCP server, downloads model)
 npx ca setup
-```
 
-This single command:
-- Creates `.claude/lessons/` directory
-- Adds AGENTS.md with workflow instructions (prioritizes MCP over CLI)
-- Installs Claude Code hooks (SessionStart, PreCompact) in `.claude/settings.json`
-- Registers MCP server in `.mcp.json` for `lesson_search` and `lesson_capture` tools
-- Installs git pre-commit hook for lesson reminders
-- Downloads the embedding model (~278MB)
-
-To skip the model download (if you'll do it later):
-
-```bash
+# Skip the ~278MB model download (do it later)
 npx ca setup --skip-model
 ```
 
 ### Requirements
 
 - Node.js >= 20
-- ~278MB disk space for embedding model
-- ~150MB RAM for embedding operations
+- ~278MB disk space for the embedding model
+- ~150MB RAM during embedding operations
 
 ### pnpm Users
 
-pnpm v9+ blocks native addon builds by default. Add `better-sqlite3` to your project's `package.json`:
+pnpm v9+ blocks native addon builds by default. Add to your `package.json`:
 
 ```json
 {
@@ -65,268 +90,175 @@ pnpm v9+ blocks native addon builds by default. Add `better-sqlite3` to your pro
 }
 ```
 
-Then run `pnpm install`. Without this, the SQLite native addon won't compile and search will fail.
+Then run `pnpm install`.
+
+### What `setup` Does
+
+| Action | Location | Purpose |
+|--------|----------|---------|
+| Create lessons store | `.claude/lessons/` | JSONL + cache directory |
+| Install AGENTS.md | project root | Workflow instructions for Claude |
+| Configure hooks | `.claude/settings.json` | SessionStart, PreCompact |
+| Register MCP server | `.mcp.json` | `memory_search`, `memory_capture` tools |
+| Install workflow commands | `.claude/commands/compound/` | Slash commands for each phase |
+| Install agent definitions | `.claude/agents/compound/` | Specialized agent roles |
+| Install phase skills | `.claude/skills/compound/` | Process instructions per phase |
+| Download embedding model | `~/.node-llama-cpp/models/` | First-use only, ~278MB |
+| Install git pre-commit hook | `.git/hooks/pre-commit` | Lesson capture reminder |
 
 ## Quick Start
 
-```bash
-# Install dependencies
-pnpm install
-
-# Build
-pnpm build
-
-# Run tests
-pnpm test
-
-# Download embedding model (first use)
-pnpm download-model
-```
-
-## Development
-
-### Test Scripts
-
-| Script | Duration | Tests | Use Case |
-|--------|----------|-------|----------|
-| `pnpm test:fast` | ~6s | 385 | **Rapid feedback during development** |
-| `pnpm test` | ~60s | 653 | Full suite before committing |
-| `pnpm test:changed` | varies | varies | Only tests affected by recent changes |
-| `pnpm test:watch` | - | - | Watch mode for TDD workflow |
-| `pnpm test:all` | ~60s | 653 | Full suite with model download |
-
-**Recommended workflow:**
-1. Use `pnpm test:fast` while coding for rapid feedback
-2. Run `pnpm test` before committing
-3. CI runs the full suite
-
-### Why test:fast is fast
-
-The CLI integration tests spawn Node.js processes (~400ms overhead each) and account for 95% of test time. `test:fast` skips these, running only unit tests that verify all business logic.
-
-## Architecture
+The five-phase workflow:
 
 ```
-project_root/
-|-- .mcp.json                   <- MCP server config (project scope)
-|-- AGENTS.md                   <- Workflow instructions for Claude
-+-- .claude/
-    |-- settings.json           <- Claude Code hooks (SessionStart, PreCompact)
-    |-- CLAUDE.md               <- Always loaded (permanent rules)
-    |-- lessons/
-    |   |-- index.jsonl         <- Source of truth (git-tracked)
-    |   +-- archive/            <- Old lessons (compacted)
-    +-- .cache/
-        +-- lessons.sqlite      <- Rebuildable index (.gitignore)
+1. /compound:brainstorm  -->  Explore the problem, clarify scope
+2. /compound:plan        -->  Create tasks enriched by memory search
+3. /compound:work        -->  Execute with agent teams + TDD
+4. /compound:review      -->  Multi-agent review with inter-communication
+5. /compound:compound    -->  Capture what was learned into memory
 ```
 
-### Data Flow
+Or run all phases sequentially:
 
 ```
-+----------+    +----------+    +----------+    +----------+
-| Mistake  |--->| Claude   |--->| Quick    |--->| Stored   |
-| happens  |    | notices  |    | confirm  |    | lesson   |
-+----------+    +----------+    +----------+    +----------+
-                     |              |
-                (or user        (MCP or
-                 corrects)      --yes)
-
-+----------+    +----------+    +----------+
-|  Next    |<---| Retrieve |<---| Session  |
-|  task    |    | relevant |    |  start   |
-+----------+    +----------+    +----------+
+/compound:lfg "Add auth to API"
 ```
 
-## Features
+Each phase searches memory for relevant past knowledge and injects it into agent context. The compound phase captures new knowledge, closing the loop.
 
-- **MCP Integration**: Native Claude tools (`lesson_search`, `lesson_capture`) via MCP server
-- **Lesson Capture**: Capture lessons after user corrections, self-corrections, or discoveries
-- **Quality Filter**: Prevents vague or obvious lessons (must be novel, specific, actionable)
-- **Vector Search**: Local semantic search using EmbeddingGemma-300M via node-llama-cpp
-- **Hybrid Storage**: JSONL source of truth (git-tracked) with SQLite FTS5 index (rebuildable)
-- **Offline First**: No external API dependencies; works completely offline
-- **Hook System**: SessionStart/PreCompact load context, git pre-commit reminds to capture
+## CLI Reference
 
-## CLI Usage
+The CLI binary is `ca` (alias: `compound-agent`).
 
-```bash
-# Capture a lesson manually
-pnpm learn "Use Polars for large files, not pandas"
+### Capture
 
-# Capture with citation (file:line provenance)
-ca learn "API requires auth header" --citation src/api.ts:42
+| Command | Description |
+|---------|-------------|
+| `ca learn "<insight>"` | Capture a memory item manually |
+| `ca learn "<insight>" --trigger "<context>"` | Capture with trigger context |
+| `ca learn "<insight>" --severity high` | Set severity level |
+| `ca learn "<insight>" --citation src/api.ts:42` | Attach file provenance |
+| `ca capture --input <file>` | Capture from structured input file |
+| `ca detect --input <file>` | Detect correction patterns in input |
 
-# Search lessons
-ca search "data processing"
+### Retrieval
 
-# List all lessons
-ca list
+| Command | Description |
+|---------|-------------|
+| `ca search "<query>"` | Semantic search across memory |
+| `ca list` | List all memory items |
+| `ca list --invalidated` | List only invalidated items |
+| `ca check-plan "<query>"` | Plan-time retrieval with context |
+| `ca load-session` | Load high-severity items for session start |
 
-# List only invalidated lessons
-ca list --invalidated
+### Management
 
-# Mark a lesson as wrong/invalid
-ca wrong L12345678 --reason "This advice was incorrect"
+| Command | Description |
+|---------|-------------|
+| `ca show <id>` | Display item details |
+| `ca update <id> --insight "..."` | Modify item fields |
+| `ca delete <id>` | Soft-delete an item |
+| `ca wrong <id>` | Mark item as invalid |
+| `ca wrong <id> --reason "..."` | Mark invalid with reason |
+| `ca validate <id>` | Re-enable an invalidated item |
+| `ca stats` | Database health and age distribution |
+| `ca rebuild` | Rebuild SQLite index from JSONL |
+| `ca compact` | Archive old items, remove tombstones |
+| `ca export` | Export items as JSON |
+| `ca import <file>` | Import items from JSONL file |
+| `ca prime` | Load workflow context (used by hooks) |
+| `ca rules check` | Run repository-defined rule checks |
 
-# Re-enable an invalidated lesson
-ca validate L12345678
+### Setup
 
-# Show database stats (includes age distribution)
-ca stats
+| Command | Description |
+|---------|-------------|
+| `ca setup` | One-shot setup (hooks + MCP + model) |
+| `ca setup --skip-model` | Setup without model download |
+| `ca setup --uninstall` | Remove all generated files |
+| `ca setup claude --status` | Check integration health |
+| `ca setup claude --uninstall` | Remove Claude hooks only |
+| `ca download-model` | Download the embedding model |
 
-# Rebuild index from JSONL
-ca rebuild
+## MCP Tools
 
-# Compact and archive old lessons
-ca compact
-```
+Compound Agent exposes three MCP endpoints. These are the primary interface for Claude -- preferred over CLI commands.
 
-## Claude Code Integration
+| Endpoint | Type | Purpose |
+|----------|------|---------|
+| `memory_search` | Tool | Search memory items by semantic similarity. Supports `query`, `maxResults`, and `type` filter. |
+| `memory_capture` | Tool | Capture a new memory item. Accepts `insight`, `trigger`, `tags`, `type`, `severity`, `pattern`, and relationship fields. |
+| `memory://prime` | Resource | Workflow context with high-severity memory items for session start. |
 
-### Automatic Setup (Recommended)
+## Workflow Commands
 
-The `ca setup` command configures everything automatically:
+Installed to `.claude/commands/compound/` during setup. Invoked as slash commands in Claude Code.
 
-```bash
-npx ca setup
-```
+| Command | Phase | Description |
+|---------|-------|-------------|
+| `/compound:brainstorm` | Brainstorm | Explore the problem, iterate with user, create beads epic |
+| `/compound:plan` | Plan | Create detailed plan with memory retrieval + research agents |
+| `/compound:work` | Work | Execute with agent teams, adaptive TDD per task complexity |
+| `/compound:review` | Review | Multi-agent review (security, architecture, performance, tests, simplicity) |
+| `/compound:compound` | Compound | Capture lessons, solutions, patterns into memory |
+| `/compound:lfg` | All | Chain all phases sequentially |
 
-This installs:
-- **MCP Server**: Exposes `lesson_search` and `lesson_capture` as native Claude tools
-- **SessionStart hook**: Loads workflow context when Claude starts
-- **PreCompact hook**: Reloads context before compaction
-- **Git pre-commit hook**: Reminds to capture lessons before commits
+## Memory Types
 
-### Manual Hook Configuration
+All types share one store, one schema, one search mechanism. A query returns the most relevant items regardless of type.
 
-If you prefer to configure hooks manually, add to `.claude/settings.json`:
+| Type | Trigger means | Insight means | Example |
+|------|---------------|---------------|---------|
+| `lesson` | What happened | What was learned | "Polars 10x faster than pandas for large files" |
+| `solution` | The problem | The resolution | "Auth 401 fix: add X-Request-ID header" |
+| `pattern` | When it applies | Why it matters | `{ bad: "await in loop", good: "Promise.all" }` |
+| `preference` | The context | The preference | "Use uv over pip in this project" |
 
-```json
-{
-  "hooks": {
-    "SessionStart": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "npx ca prime 2>/dev/null || true" }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "matcher": "",
-        "hooks": [
-          { "type": "command", "command": "npx ca prime 2>/dev/null || true" }
-        ]
-      }
-    ]
-  },
-  "mcpServers": {
-    "compound-agent": {
-      "command": "npx",
-      "args": ["compound-agent-mcp"]
-    }
-  }
-}
-```
+## Memory Item Schema
 
-The git pre-commit hook is installed separately via `npx ca init` and runs `ca remind-capture` before commits.
-```
-
-### MCP Tools
-
-| Tool | Purpose |
-|------|---------|
-| `lesson_search` | Search lessons before architectural decisions |
-| `lesson_capture` | Capture lessons after corrections or discoveries |
-
-### Hook Commands
-
-| Command | Purpose |
-|---------|---------|
-| `prime` | Load workflow context and high-severity lessons |
-| `remind-capture` | Prompt to capture lessons before commit |
-
-### Managing Hooks
-
-```bash
-# Check integration status
-npx ca setup claude --status
-
-# Remove hooks
-npx ca setup claude --uninstall
-
-# Preview changes
-npx ca setup claude --dry-run
-```
-
-## API Reference
-
-```typescript
-import {
-  // Storage
-  appendLesson, readLessons, searchKeyword, rebuildIndex, closeDb,
-
-  // Search
-  searchVector, cosineSimilarity, rankLessons,
-
-  // Capture
-  shouldPropose, isNovel, isSpecific, isActionable,
-  detectUserCorrection, detectSelfCorrection, detectTestFailure,
-
-  // Retrieval
-  loadSessionLessons, retrieveForPlan, formatLessonsCheck,
-
-  // Types
-  type Lesson, LessonSchema, generateId,
-} from 'compound-agent';
-```
-
-See [examples/](examples/) for usage examples.
-
-## Lesson Schema
-
-Lessons are stored as JSONL records with the following schema:
+All memory items share a common schema with a discriminated union on the `type` field.
 
 ### Required Fields
 
-All lessons must have these fields:
-
 | Field | Type | Description |
 |-------|------|-------------|
-| `id` | string | Unique identifier (e.g., "L12345678") |
-| `type` | "quick" \| "full" | Lesson complexity level |
-| `trigger` | string | What caused the lesson (context/situation) |
-| `insight` | string | What was learned (the takeaway) |
+| `id` | string | Hash-based unique identifier |
+| `type` | `"lesson"` \| `"solution"` \| `"pattern"` \| `"preference"` | Item type |
+| `trigger` | string | What caused/prompted this |
+| `insight` | string | What was learned |
 | `tags` | string[] | Categorization tags |
-| `source` | string | How it was captured (user_correction, self_correction, test_failure, manual) |
-| `context` | object | Tool/intent context |
+| `source` | string | How captured: `user_correction`, `self_correction`, `test_failure`, `manual` |
+| `context` | `{ tool, intent }` | Capture context |
 | `created` | ISO string | Creation timestamp |
-| `confirmed` | boolean | Whether user confirmed the lesson |
+| `confirmed` | boolean | Whether user confirmed |
+| `supersedes` | string[] | IDs of items this replaces |
+| `related` | string[] | IDs of related items |
 
 ### Optional Fields
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `evidence` | string | Supporting evidence (full lessons only) |
-| `severity` | "high" \| "medium" \| "low" | Importance level (separate from type) |
-| `citation` | object | File/line reference (file, line, commit) |
+| `evidence` | string | Supporting evidence |
+| `severity` | `"high"` \| `"medium"` \| `"low"` | Importance level |
+| `citation` | `{ file, line?, commit? }` | File/line provenance |
+| `pattern` | `{ bad, good }` | Code pattern (required for `pattern` type) |
 
-**Note**: The `severity` field is separate from `type`. A quick lesson can have high severity, and a full lesson can have low severity.
+### Retrieval Ranking
 
-### Session-Start Loading
+```
+score = vector_similarity(query, item)
+      * severity_boost     (high=1.5, medium=1.0, low=0.8)
+      * recency_boost      (last 30d=1.2, older=1.0)
+      * confirmation_boost (confirmed=1.3)
+      * retrieval_boost    (frequently retrieved=1.1)
+```
 
-At session start, lessons are loaded based on:
-- **High severity** lessons are always loaded
-- **Confirmed** lessons are prioritized
-- Only non-invalidated lessons are included
-
-### Complete JSON Example
+### Example
 
 ```json
 {
-  "id": "L12345678",
-  "type": "full",
+  "id": "M-a1b2c3d4",
+  "type": "solution",
   "trigger": "API returned 401 despite valid JWT token",
   "insight": "Auth API requires X-Request-ID header in all requests",
   "evidence": "Traced in network tab, discovered missing header requirement",
@@ -334,59 +266,34 @@ At session start, lessons are loaded based on:
   "tags": ["api", "auth", "headers"],
   "source": "test_failure",
   "context": { "tool": "fetch", "intent": "API authentication" },
-  "created": "2024-01-15T10:30:00.000Z",
+  "created": "2026-01-15T10:30:00.000Z",
   "confirmed": true,
+  "supersedes": [],
+  "related": [],
   "citation": { "file": "src/api/client.ts", "line": 42 }
 }
 ```
 
-## Lesson Types
+## Development
 
-### Quick Lesson (fast capture)
-```json
-{
-  "id": "L001",
-  "type": "quick",
-  "trigger": "Used pandas for 500MB file",
-  "insight": "Polars 10x faster",
-  "tags": ["performance", "polars"],
-  "source": "user_correction"
-}
+```bash
+pnpm install          # Install dependencies
+pnpm build            # Build with tsup
+pnpm dev              # Watch mode (rebuild on changes)
+pnpm lint             # Type check + ESLint
 ```
 
-### Full Lesson (detailed, high-severity)
-```json
-{
-  "id": "L002",
-  "type": "full",
-  "trigger": "Auth API returned 401 despite valid token",
-  "insight": "API requires X-Request-ID header",
-  "evidence": "Traced in network tab, header missing",
-  "severity": "high",
-  "source": "test_failure"
-}
-```
+### Test Scripts
 
-### Deleted Lesson Record
-```json
-{
-  "id": "L001",
-  "type": "quick",
-  "trigger": "Used pandas for 500MB file",
-  "insight": "Polars 10x faster",
-  "tags": ["performance", "polars"],
-  "source": "user_correction",
-  "deleted": true,
-  "deletedAt": "2026-01-30T12:00:00Z"
-}
-```
+| Script | Duration | Use Case |
+|--------|----------|----------|
+| `pnpm test:fast` | ~6s | Rapid feedback during development (skips CLI integration tests) |
+| `pnpm test` | ~60s | Full suite before committing |
+| `pnpm test:changed` | varies | Only tests affected by recent changes |
+| `pnpm test:watch` | - | Watch mode for TDD workflow |
+| `pnpm test:all` | ~60s | Full suite with model download |
 
-Deletion is append-only: a lesson is soft-deleted by appending a full lesson record with `deleted: true` and `deletedAt`.
-For backward compatibility, legacy minimal tombstones (`{ id, deleted: true, deletedAt }`) are still accepted on read.
-
-**Schema types:**
-- `LessonSchema`: Full lesson structure
-- `LessonRecordSchema`: Union of `LessonSchema` and legacy minimal tombstone format (used when reading JSONL)
+**Recommended**: Use `pnpm test:fast` while coding, `pnpm test` before committing.
 
 ## Technology Stack
 
@@ -395,70 +302,23 @@ For backward compatibility, legacy minimal tombstones (`{ id, deleted: true, del
 | Language | TypeScript (ESM) |
 | Package Manager | pnpm |
 | Build | tsup |
-| Testing | Vitest |
+| Testing | Vitest + fast-check (property tests) |
 | Storage | better-sqlite3 + FTS5 |
 | Embeddings | node-llama-cpp + nomic-embed-text-v1.5 |
 | CLI | Commander.js |
 | Schema | Zod |
-
-## Development
-
-```bash
-# Watch mode (rebuild on changes)
-pnpm dev
-
-# Run tests in watch mode
-pnpm test:watch
-
-# Type checking
-pnpm lint
-```
-
-## Project Status
-
-Version 0.2.9 - Reliability fixes and codebase simplification. Key features:
-- **MCP Server**: `lesson_search` and `lesson_capture` as native Claude tools (primary interface)
-- **Smart hooks**: UserPromptSubmit (correction/planning detection), PostToolUseFailure (smart failure tracking)
-- **Pre-commit checkpoint**: Checklist-format reflection prompt before commits
-- **MCP-first workflow**: AGENTS.md and prime output prioritize MCP tools over CLI
-
-See [CHANGELOG.md](CHANGELOG.md) for details.
+| MCP | @modelcontextprotocol/sdk |
+| Issue Tracking | Beads (bd) |
 
 ## Documentation
 
 | Document | Purpose |
 |----------|---------|
-| [docs/SPEC.md](docs/SPEC.md) | Complete specification |
-| [docs/CONTEXT.md](docs/CONTEXT.md) | Research and design decisions |
-| [docs/PLAN.md](docs/PLAN.md) | Implementation plan |
-| [AGENTS.md](AGENTS.md) | Agent instructions overview |
+| [docs/ARCHITECTURE-V2.md](docs/ARCHITECTURE-V2.md) | Three-layer architecture design |
+| [docs/MIGRATION.md](docs/MIGRATION.md) | Migration guide from learning-agent |
+| [CHANGELOG.md](CHANGELOG.md) | Version history |
+| [AGENTS.md](AGENTS.md) | Agent workflow instructions |
 | [.claude/CLAUDE.md](.claude/CLAUDE.md) | Claude Code project instructions |
-| [docs/test-optimization-baseline.md](docs/test-optimization-baseline.md) | Test performance metrics |
-
-## Testing
-
-### Test Organization
-
-Tests are organized for parallelization:
-
-```
-src/
-├── *.test.ts           # Unit tests (fast)
-├── cli/                # CLI integration tests (split by command)
-│   ├── cli-test-utils.ts    # Shared utilities
-│   ├── learn.test.ts
-│   ├── search.test.ts
-│   └── ...
-├── storage/            # Storage layer tests
-├── embeddings/         # Embedding model tests (skipped if model unavailable)
-└── ...
-```
-
-### Known Limitations
-
-**Embedding concurrency**: The `node-llama-cpp` native addon may crash under heavy parallel load. This is a known limitation of the underlying C++ library. Tests pass reliably under normal conditions.
-
-**Timing-based tests**: Some tests verify performance thresholds. These use generous limits (5000ms) to avoid flakiness on slow CI machines.
 
 ## License
 

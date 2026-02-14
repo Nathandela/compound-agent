@@ -184,10 +184,12 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(readmeContent).toMatch(/required.*field|field.*required/i);
     });
 
-    it('explains difference between type=quick and type=full', () => {
+    it('explains different memory item types', () => {
       expect(readmeContent).toContain('type');
-      expect(readmeContent).toContain('quick');
-      expect(readmeContent).toContain('full');
+      expect(readmeContent).toContain('lesson');
+      expect(readmeContent).toContain('solution');
+      expect(readmeContent).toContain('pattern');
+      expect(readmeContent).toContain('preference');
     });
 
     it('documents that severity is a SEPARATE field from type', () => {
@@ -210,8 +212,8 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(readmeContent).toContain('"confirmed"');
     });
 
-    it('has a dedicated Lesson Schema section', () => {
-      expect(readmeContent).toMatch(/##.*lesson.*schema|##.*lesson.*format/i);
+    it('has a dedicated Memory Item Schema section', () => {
+      expect(readmeContent).toMatch(/##.*memory.*item.*schema|##.*lesson.*schema|##.*lesson.*format/i);
     });
   });
 });
