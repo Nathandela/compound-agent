@@ -481,6 +481,42 @@ describe('Capture Commands', () => {
     });
   });
 
+  describe('detect command error handling', () => {
+    it('shows friendly error for invalid JSON input file', async () => {
+      const inputPath = join(getTempDir(), 'bad.json');
+      await writeFile(inputPath, 'not valid json at all', 'utf-8');
+
+      const { combined } = runCli(`detect --input ${inputPath}`);
+      expect(combined).toMatch(/error/i);
+      // Should NOT contain raw stack trace (no "at Object.parse" etc.)
+      expect(combined).not.toMatch(/^\s+at /m);
+    });
+
+    it('shows friendly error for nonexistent input file', () => {
+      const { combined } = runCli('detect --input /nonexistent/file.json');
+      expect(combined).toMatch(/error/i);
+      expect(combined).not.toMatch(/^\s+at /m);
+    });
+  });
+
+  describe('capture command error handling', () => {
+    it('shows friendly error for invalid JSON input file', async () => {
+      const inputPath = join(getTempDir(), 'bad.json');
+      await writeFile(inputPath, '{broken json', 'utf-8');
+
+      const { combined } = runCli(`capture --input ${inputPath} --yes`);
+      expect(combined).toMatch(/error/i);
+      // Should NOT contain raw stack trace
+      expect(combined).not.toMatch(/^\s+at /m);
+    });
+
+    it('shows friendly error for nonexistent input file', () => {
+      const { combined } = runCli('capture --input /nonexistent/file.json --yes');
+      expect(combined).toMatch(/error/i);
+      expect(combined).not.toMatch(/^\s+at /m);
+    });
+  });
+
   describe('hooks run command', () => {
     it('outputs lesson reminder prompt for pre-commit hook', () => {
       const { combined } = runCli('hooks run pre-commit');

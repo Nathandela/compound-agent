@@ -434,6 +434,38 @@ describe('Compaction', () => {
       expect(result.tombstonesRemoved).toBe(0);
       expect(result.lessonsRemaining).toBe(0);
     });
+
+    it('tracks count of invalid records dropped during compaction', async () => {
+      // Write a JSONL file with mix of valid and invalid-schema records
+      const filePath = join(tempDir, LESSONS_PATH);
+      await mkdir(join(tempDir, '.claude', 'lessons'), { recursive: true });
+
+      const validLesson = createLesson('L001', 'valid lesson');
+      // Invalid: missing required fields like insight, type, etc.
+      const invalidRecord = { id: 'L002', foo: 'bar' };
+      // Another invalid: has id but not valid MemoryItem schema
+      const invalidRecord2 = { id: 'L003', type: 'unknown_type', insight: 'nope' };
+
+      await writeFile(
+        filePath,
+        [JSON.stringify(validLesson), JSON.stringify(invalidRecord), JSON.stringify(invalidRecord2)].join('\n') + '\n',
+        'utf-8'
+      );
+
+      const result = await compact(tempDir);
+
+      expect(result.droppedInvalid).toBe(2);
+      expect(result.lessonsRemaining).toBe(1);
+    });
+
+    it('returns droppedInvalid of 0 when all records are valid', async () => {
+      await appendLesson(tempDir, createLesson('L001', 'valid1'));
+      await appendLesson(tempDir, createLesson('L002', 'valid2'));
+
+      const result = await compact(tempDir);
+
+      expect(result.droppedInvalid).toBe(0);
+    });
   });
 
   describe('TOCTOU safety', () => {

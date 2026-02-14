@@ -76,6 +76,14 @@ describe('Work Phase Integration', () => {
     it('describes memory_capture for corrections or discoveries', () => {
       expect(workCommand).toContain('memory_capture');
     });
+
+    it('includes explicit Verification Gate section with 8-step pipeline', () => {
+      expect(workCommand).toContain('## Verification Gate');
+      expect(workCommand).toMatch(/invariant-designer/i);
+      expect(workCommand).toMatch(/cct-subagent/i);
+      expect(workCommand).toMatch(/drift-detector/i);
+      expect(workCommand).toMatch(/implementation-reviewer/i);
+    });
   });
 
   describe('work SKILL.md template', () => {
@@ -132,6 +140,14 @@ describe('Work Phase Integration', () => {
 
     it('describes memory_capture for corrections or discoveries', () => {
       expect(workSkill).toContain('memory_capture');
+    });
+
+    it('includes explicit Verification Gate section with 8-step pipeline', () => {
+      expect(workSkill).toContain('## Verification Gate');
+      expect(workSkill).toMatch(/invariant-designer/i);
+      expect(workSkill).toMatch(/cct-subagent/i);
+      expect(workSkill).toMatch(/drift-detector/i);
+      expect(workSkill).toMatch(/implementation-reviewer/i);
     });
   });
 

@@ -255,5 +255,50 @@ describe('vector search', () => {
         expect(embedMock).toHaveBeenCalledWith('trigger for valid lesson valid lesson');
       });
     });
+
+    describe('per-item error handling', () => {
+      it('returns partial results when embedText fails for some items', async () => {
+        await appendLesson(tempDir, createQuickLesson('L001', 'good lesson'));
+        await appendLesson(tempDir, createQuickLesson('L002', 'bad lesson'));
+        await appendLesson(tempDir, createQuickLesson('L003', 'another good lesson'));
+        await rebuildIndex(tempDir);
+
+        // Mock embedText to throw for the "bad" item
+        const embedMock = vi.fn().mockImplementation(async (text: string) => {
+          if (text.includes('bad')) throw new Error('embedding failed');
+          return [1, 0, 0];
+        });
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
+
+        const results = await searchVector(tempDir, 'test query', { limit: 10 });
+
+        // Should return 2 results (L001 and L003), skipping L002
+        expect(results).toHaveLength(2);
+        const ids = results.map((r) => r.lesson.id);
+        expect(ids).toContain('L001');
+        expect(ids).toContain('L003');
+        expect(ids).not.toContain('L002');
+      });
+
+      it('returns empty results when all items fail embedding', async () => {
+        await appendLesson(tempDir, createQuickLesson('L001', 'lesson one'));
+        await appendLesson(tempDir, createQuickLesson('L002', 'lesson two'));
+        await rebuildIndex(tempDir);
+
+        let callCount = 0;
+        const embedMock = vi.fn().mockImplementation(async (_text: string) => {
+          callCount++;
+          // First call is the query - let it succeed
+          if (callCount === 1) return [1, 0, 0];
+          // All item embeddings fail
+          throw new Error('embedding failed');
+        });
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
+
+        const results = await searchVector(tempDir, 'test query', { limit: 10 });
+
+        expect(results).toEqual([]);
+      });
+    });
   });
 });

@@ -41,6 +41,8 @@ export interface CompactResult {
   tombstonesRemoved: number;
   /** Number of lessons remaining in index.jsonl */
   lessonsRemaining: number;
+  /** Number of records dropped due to invalid schema */
+  droppedInvalid: number;
 }
 
 /**
@@ -215,12 +217,13 @@ export async function compact(repoRoot: string): Promise<CompactResult> {
   try {
     content = await readFile(filePath, 'utf-8');
   } catch {
-    return { archived: 0, tombstonesRemoved: 0, lessonsRemaining: 0 };
+    return { archived: 0, tombstonesRemoved: 0, lessonsRemaining: 0, droppedInvalid: 0 };
   }
 
   // 2. Parse all records in-memory with last-write-wins dedup
   const lessonMap = new Map<string, MemoryItem>();
   let tombstoneCount = 0;
+  let droppedCount = 0;
 
   for (const rawLine of content.split('\n')) {
     const trimmed = rawLine.trim();
@@ -240,6 +243,8 @@ export async function compact(repoRoot: string): Promise<CompactResult> {
       const result = MemoryItemSchema.safeParse(parsed);
       if (result.success) {
         lessonMap.set(result.data.id, result.data);
+      } else {
+        droppedCount++;
       }
     }
   }
@@ -287,5 +292,6 @@ export async function compact(repoRoot: string): Promise<CompactResult> {
     archived: toArchive.length,
     tombstonesRemoved: tombstoneCount,
     lessonsRemaining: toKeep.length,
+    droppedInvalid: droppedCount,
   };
 }

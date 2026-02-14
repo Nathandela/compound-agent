@@ -207,7 +207,14 @@ export function registerCaptureCommands(program: Command): void {
           process.exit(1);
         }
 
-        const input = await parseInputFile(options.input);
+        let input;
+        try {
+          input = await parseInputFile(options.input);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Failed to parse input file';
+          console.error(formatError('detect', 'INVALID_INPUT', message, 'Check the file is valid JSON matching the expected schema'));
+          process.exit(1);
+        }
         const result = await detectAndPropose(repoRoot, input);
 
         if (!result) {
@@ -275,7 +282,18 @@ export function registerCaptureCommands(program: Command): void {
 
       // Mode 1: From --input file
       if (options.input) {
-        const input = await parseInputFile(options.input);
+        let input;
+        try {
+          input = await parseInputFile(options.input);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : 'Failed to parse input file';
+          if (options.json) {
+            console.log(JSON.stringify({ error: message, saved: false }));
+          } else {
+            console.error(formatError('capture', 'INVALID_INPUT', message, 'Check the file is valid JSON matching the expected schema'));
+          }
+          process.exit(1);
+        }
         const result = await detectAndPropose(repoRoot, input);
         if (!result) {
           options.json

@@ -496,7 +496,7 @@ describe('SQLite schema', () => {
       const db = openDb(tempDir);
       db.prepare(`
         INSERT INTO lessons (id, type, trigger, insight, tags, source, context, supersedes, related, created, confirmed, deleted)
-        VALUES ('L001', 'lesson', 'test trigger', 'test insight', 'tag1', 'manual', '{}', '[]', '[]', '2026-01-30', 1, 1)
+        VALUES ('L001', 'lesson', 'test trigger', 'test insight', 'tag1', 'manual', '{"tool":"test","intent":"testing"}', '[]', '[]', '2026-01-30', 1, 1)
       `).run();
 
       // Query directly to get the deleted lesson through rowToLesson

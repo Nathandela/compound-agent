@@ -80,20 +80,25 @@ export async function searchVector(
     // Skip invalidated items
     if (item.invalidatedAt) continue;
 
-    const itemText = `${item.trigger} ${item.insight}`;
-    const hash = contentHash(item.trigger, item.insight);
+    try {
+      const itemText = `${item.trigger} ${item.insight}`;
+      const hash = contentHash(item.trigger, item.insight);
 
-    // Try cache first
-    let itemVector = getCachedEmbedding(repoRoot, item.id, hash);
+      // Try cache first
+      let itemVector = getCachedEmbedding(repoRoot, item.id, hash);
 
-    if (!itemVector) {
-      // Cache miss - compute and store
-      itemVector = await embedText(itemText);
-      setCachedEmbedding(repoRoot, item.id, itemVector, hash);
+      if (!itemVector) {
+        // Cache miss - compute and store
+        itemVector = await embedText(itemText);
+        setCachedEmbedding(repoRoot, item.id, itemVector, hash);
+      }
+
+      const score = cosineSimilarity(queryVector, itemVector);
+      scored.push({ lesson: item, score });
+    } catch {
+      // Skip items that fail embedding — return partial results
+      continue;
     }
-
-    const score = cosineSimilarity(queryVector, itemVector);
-    scored.push({ lesson: item, score });
   }
 
   // Sort by score descending and take top N

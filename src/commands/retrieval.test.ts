@@ -98,6 +98,15 @@ describe('Retrieval Commands', () => {
     });
   });
 
+  describe('search command error handling', () => {
+    it('shows friendly error for bad query syntax instead of raw SQLite error', () => {
+      // A query that triggers FTS5 syntax errors (unmatched quotes)
+      const { combined } = runCli('search "\\"unclosed');
+      // Should either show friendly error or no-results message, not raw SQLite stack
+      expect(combined).not.toMatch(/^\s+at /m);
+    });
+  });
+
   describe('check-plan command', () => {
     beforeEach(async () => {
       // Create some lessons for vector search

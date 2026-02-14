@@ -18,7 +18,7 @@ import { getPrimeContext } from './commands/management-prime.js';
 import { VERSION } from './index.js';
 import { inferMemoryItemType } from './memory/capture/triggers.js';
 import { rankLessons, searchVector } from './memory/search/index.js';
-import { appendMemoryItem, closeDb } from './memory/storage/index.js';
+import { appendMemoryItem, closeDb, incrementRetrievalCount } from './memory/storage/index.js';
 import { generateId, MemoryItemTypeSchema, PatternSchema } from './memory/types.js';
 import type { MemoryItem, MemoryItemType } from './memory/types.js';
 
@@ -91,16 +91,22 @@ async function handleSearch(
 ): Promise<SearchToolResult> {
   try {
     const limit = maxResults ?? DEFAULT_MAX_RESULTS;
-    const results = await searchVector(repoRoot, query, { limit });
+    const searchLimit = typeFilter ? limit * 3 : limit;
+    const results = await searchVector(repoRoot, query, { limit: searchLimit });
     const ranked = rankLessons(results);
     let lessons: SearchResult[] = ranked.map((r) => ({
       lesson: r.lesson,
       score: r.score,
       finalScore: r.finalScore,
     }));
-    // Filter by type if specified
     if (typeFilter) {
       lessons = lessons.filter((r) => r.lesson.type === typeFilter);
+    }
+    lessons = lessons.slice(0, limit);
+    // Track retrieval counts
+    const ids = lessons.map((r) => r.lesson.id);
+    if (ids.length > 0) {
+      incrementRetrievalCount(repoRoot, ids);
     }
     return { lessons };
   } catch (err) {

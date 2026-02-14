@@ -161,7 +161,14 @@ export function registerRetrievalCommands(program: Command): void {
       // Sync index if JSONL has changed
       await syncIfNeeded(repoRoot);
 
-      const results = await searchKeyword(repoRoot, query, limit);
+      let results;
+      try {
+        results = await searchKeyword(repoRoot, query, limit);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Search failed';
+        console.error(formatError('search', 'SEARCH_FAILED', message, 'Check your query syntax'));
+        process.exit(1);
+      }
       if (results.length > 0) {
         incrementRetrievalCount(repoRoot, results.map((lesson) => lesson.id));
       }

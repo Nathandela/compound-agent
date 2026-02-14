@@ -762,6 +762,114 @@ describe('MCP Server', () => {
         expect(item.lesson.type).toBe('lesson');
       }
     });
+
+    it('fetches more results when typeFilter is specified to compensate for filtering', async () => {
+      const searchModule = await import('./memory/search/index.js');
+      const searchVectorSpy = vi.spyOn(searchModule, 'searchVector').mockResolvedValue([]);
+
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      await mcpServer.callTool('memory_search', {
+        query: 'any query',
+        maxResults: 5,
+        type: 'lesson',
+      });
+
+      // With typeFilter, searchVector should be called with limit * 3 = 15
+      expect(searchVectorSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        'any query',
+        { limit: 15 },
+      );
+    });
+
+    it('does not over-fetch when no typeFilter is specified', async () => {
+      const searchModule = await import('./memory/search/index.js');
+      const searchVectorSpy = vi.spyOn(searchModule, 'searchVector').mockResolvedValue([]);
+
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      await mcpServer.callTool('memory_search', {
+        query: 'any query',
+        maxResults: 5,
+      });
+
+      // Without typeFilter, searchVector should be called with exact limit
+      expect(searchVectorSpy).toHaveBeenCalledWith(
+        expect.any(String),
+        'any query',
+        { limit: 5 },
+      );
+    });
+
+    it('slices results to original limit after type filtering', async () => {
+      // Create 10 lessons that will all pass the type filter
+      const manyLessons = Array.from({ length: 10 }, (_, i) => ({
+        ...SAMPLE_LESSON,
+        id: `L${String(i).padStart(8, '0')}`,
+        insight: `Lesson ${i} about testing`,
+        score: 0.9 - i * 0.05,
+      }));
+
+      const searchModule = await import('./memory/search/index.js');
+      vi.spyOn(searchModule, 'searchVector').mockResolvedValue(
+        manyLessons.map((l) => ({ lesson: l, score: l.score }))
+      );
+
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_search', {
+        query: 'testing',
+        maxResults: 3,
+        type: 'lesson',
+      });
+
+      // Should be sliced to maxResults even after filtering
+      expect(result.lessons.length).toBeLessThanOrEqual(3);
+    });
+
+    it('calls incrementRetrievalCount for returned search results', async () => {
+      const searchModule = await import('./memory/search/index.js');
+      vi.spyOn(searchModule, 'searchVector').mockResolvedValue([
+        { lesson: SAMPLE_LESSON, score: 0.9 },
+        { lesson: SAMPLE_SOLUTION, score: 0.8 },
+      ]);
+
+      const storageModule = await import('./memory/storage/index.js');
+      const incrementSpy = vi.spyOn(storageModule, 'incrementRetrievalCount').mockImplementation(() => {});
+
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      await mcpServer.callTool('memory_search', {
+        query: 'any query',
+      });
+
+      expect(incrementSpy).toHaveBeenCalledWith(
+        tempDir,
+        [SAMPLE_LESSON.id, SAMPLE_SOLUTION.id],
+      );
+    });
+
+    it('does not call incrementRetrievalCount when no results', async () => {
+      const searchModule = await import('./memory/search/index.js');
+      vi.spyOn(searchModule, 'searchVector').mockResolvedValue([]);
+
+      const storageModule = await import('./memory/storage/index.js');
+      const incrementSpy = vi.spyOn(storageModule, 'incrementRetrievalCount').mockImplementation(() => {});
+
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      await mcpServer.callTool('memory_search', {
+        query: 'nothing here',
+      });
+
+      expect(incrementSpy).not.toHaveBeenCalled();
+    });
   });
 
   describe('memory://prime resource', () => {

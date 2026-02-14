@@ -161,6 +161,7 @@ Multi-agent analysis to capture high-quality lessons from completed work into th
    - **lesson-extractor**: identify mistakes, corrections, and discoveries
    - **pattern-matcher**: match against existing memory, classify New/Duplicate/Reinforcement/Contradiction
    - **solution-writer**: formulate structured items typed as lesson, solution, pattern, or preference
+   - **compounding**: synthesize accumulated lessons into CCT patterns for test reuse
 4. Agents pass results to each other via direct messages so downstream agents build on upstream findings.
 5. Apply quality filter on each candidate item:
    - **Novel**: skip if >0.85 similarity to existing memory
@@ -170,7 +171,7 @@ Multi-agent analysis to capture high-quality lessons from completed work into th
    - **Medium**: workflow changes, pattern corrections, tooling preferences
    - **Low**: style preferences, minor optimizations, reinforcements
 7. For approved items, store via \`memory_capture\` with supersedes/related linking to connect with existing memory.
-8. After storing new items, run compounding synthesis:
+8. After storing new items, delegate to the **compounding** subagent to run compounding synthesis:
    - Read all lessons from \`.claude/lessons/index.jsonl\`
    - Cluster by embedding similarity (threshold 0.75)
    - Synthesize CCT patterns from clusters of 2+ items

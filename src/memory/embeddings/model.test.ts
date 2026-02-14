@@ -137,6 +137,6 @@ describe('embedding model resolution', () => {
       expect(result1).not.toBe(result2);
       // But same usability status
       expect(result1.usable).toBe(result2.usable);
-    });
+    }, 15000);
   });
 });

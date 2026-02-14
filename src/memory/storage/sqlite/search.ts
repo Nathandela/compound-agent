@@ -2,6 +2,7 @@
  * SQLite search operations using FTS5 full-text search.
  */
 
+import { MemoryItemSchema } from '../../types.js';
 import type { MemoryItem, MemoryItemType } from '../../types.js';
 
 import type { MemoryItemRow, RetrievalStat } from './types.js';
@@ -12,23 +13,23 @@ import { openDb } from './connection.js';
  * @param row - Database row
  * @returns MemoryItem object
  */
-function rowToMemoryItem(row: MemoryItemRow): MemoryItem {
-  const item: MemoryItem = {
+function rowToMemoryItem(row: MemoryItemRow): MemoryItem | null {
+  const item = {
     id: row.id,
-    type: row.type as MemoryItem['type'],
+    type: row.type,
     trigger: row.trigger,
     insight: row.insight,
     tags: row.tags ? row.tags.split(',').filter(Boolean) : [],
-    source: row.source as MemoryItem['source'],
-    context: JSON.parse(row.context) as MemoryItem['context'],
-    supersedes: JSON.parse(row.supersedes) as string[],
-    related: JSON.parse(row.related) as string[],
+    source: row.source,
+    context: JSON.parse(row.context),
+    supersedes: JSON.parse(row.supersedes),
+    related: JSON.parse(row.related),
     created: row.created,
     confirmed: row.confirmed === 1,
-  } as MemoryItem;
+  } as Record<string, unknown>;
 
   if (row.evidence !== null) item.evidence = row.evidence;
-  if (row.severity !== null) item.severity = row.severity as 'high' | 'medium' | 'low';
+  if (row.severity !== null) item.severity = row.severity;
   if (row.deleted === 1) item.deleted = true;
   if (row.retrieval_count > 0) item.retrievalCount = row.retrieval_count;
   if (row.invalidated_at !== null) item.invalidatedAt = row.invalidated_at;
@@ -41,7 +42,7 @@ function rowToMemoryItem(row: MemoryItemRow): MemoryItem {
     };
   }
   if (row.compaction_level !== null && row.compaction_level !== 0) {
-    item.compactionLevel = row.compaction_level as 0 | 1 | 2;
+    item.compactionLevel = row.compaction_level;
   }
   if (row.compacted_at !== null) item.compactedAt = row.compacted_at;
   if (row.last_retrieved !== null) item.lastRetrieved = row.last_retrieved;
@@ -49,9 +50,30 @@ function rowToMemoryItem(row: MemoryItemRow): MemoryItem {
     item.pattern = { bad: row.pattern_bad, good: row.pattern_good };
   }
 
-  return item;
+  const result = MemoryItemSchema.safeParse(item);
+  if (!result.success) return null;
+  return result.data;
 }
 
+
+/** FTS5 operator tokens to remove */
+const FTS_OPERATORS = new Set(['AND', 'OR', 'NOT', 'NEAR']);
+
+/**
+ * Sanitize a query string for safe use with FTS5 MATCH.
+ * Strips special FTS5 syntax characters and operators.
+ * @param query - Raw user query
+ * @returns Sanitized query safe for FTS5
+ */
+export function sanitizeFtsQuery(query: string): string {
+  // Strip FTS5 special chars: " * ^ - +
+  const stripped = query.replace(/["*^+-]/g, '');
+  // Tokenize by whitespace, remove FTS operators, filter empty
+  const tokens = stripped
+    .split(/\s+/)
+    .filter((t) => t.length > 0 && !FTS_OPERATORS.has(t));
+  return tokens.join(' ');
+}
 
 /**
  * Increment retrieval count for lessons.
@@ -102,7 +124,27 @@ export async function searchKeyword(
   };
   if (countResult.cnt === 0) return [];
 
-  if (typeFilter) {
+  const sanitized = sanitizeFtsQuery(query);
+  if (sanitized === '') return [];
+
+  try {
+    if (typeFilter) {
+      const rows = database
+        .prepare(
+          `
+          SELECT l.*
+          FROM lessons l
+          JOIN lessons_fts fts ON l.rowid = fts.rowid
+          WHERE lessons_fts MATCH ?
+            AND l.invalidated_at IS NULL
+            AND l.type = ?
+          LIMIT ?
+        `
+        )
+        .all(sanitized, typeFilter, limit) as MemoryItemRow[];
+      return rows.map(rowToMemoryItem).filter((x): x is MemoryItem => x !== null);
+    }
+
     const rows = database
       .prepare(
         `
@@ -111,28 +153,15 @@ export async function searchKeyword(
         JOIN lessons_fts fts ON l.rowid = fts.rowid
         WHERE lessons_fts MATCH ?
           AND l.invalidated_at IS NULL
-          AND l.type = ?
         LIMIT ?
       `
       )
-      .all(query, typeFilter, limit) as MemoryItemRow[];
-    return rows.map(rowToMemoryItem);
+      .all(sanitized, limit) as MemoryItemRow[];
+
+    return rows.map(rowToMemoryItem).filter((x): x is MemoryItem => x !== null);
+  } catch {
+    return [];
   }
-
-  const rows = database
-    .prepare(
-      `
-      SELECT l.*
-      FROM lessons l
-      JOIN lessons_fts fts ON l.rowid = fts.rowid
-      WHERE lessons_fts MATCH ?
-        AND l.invalidated_at IS NULL
-      LIMIT ?
-    `
-    )
-    .all(query, limit) as MemoryItemRow[];
-
-  return rows.map(rowToMemoryItem);
 }
 
 /**

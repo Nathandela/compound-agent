@@ -13,9 +13,10 @@ import { createSchema, SCHEMA_VERSION } from './schema.js';
 /** Relative path to database file from repo root */
 export const DB_PATH = '.claude/.cache/lessons.sqlite';
 
-/** Database singleton */
-let db: DatabaseType | null = null;
-let dbIsInMemory = false;
+/** Database connections keyed by resolved DB path */
+const dbMap = new Map<string, DatabaseType>();
+/** Last opened DB path for backward-compat getDb() */
+let lastDbPath: string | null = null;
 
 /**
  * Check if the database has the expected schema version.
@@ -38,49 +39,48 @@ function hasExpectedVersion(database: DatabaseType): boolean {
 export function openDb(repoRoot: string, options: DbOptions = {}): DatabaseType {
   const { inMemory = false } = options;
 
-  if (db) {
-    if (inMemory !== dbIsInMemory) {
-      closeDb();
-    } else {
-      return db;
-    }
+  const key = inMemory ? ':memory:' : join(repoRoot, DB_PATH);
+
+  const cached = dbMap.get(key);
+  if (cached) {
+    lastDbPath = key;
+    return cached;
   }
 
   const Database = getDatabaseConstructor();
+  let database: DatabaseType;
 
   if (inMemory) {
-    db = new Database(':memory:');
-    dbIsInMemory = true;
+    database = new Database(':memory:');
   } else {
-    const dbPath = join(repoRoot, DB_PATH);
-    const dir = dirname(dbPath);
+    const dir = dirname(key);
     mkdirSync(dir, { recursive: true });
-    db = new Database(dbPath);
-    dbIsInMemory = false;
+    database = new Database(key);
 
-    if (!hasExpectedVersion(db)) {
-      db.close();
-      db = null;
-      unlinkSync(dbPath);
-      db = new Database(dbPath);
+    if (!hasExpectedVersion(database)) {
+      database.close();
+      unlinkSync(key);
+      database = new Database(key);
     }
 
-    db.pragma('journal_mode = WAL');
+    database.pragma('journal_mode = WAL');
   }
 
-  createSchema(db);
-  return db;
+  createSchema(database);
+  dbMap.set(key, database);
+  lastDbPath = key;
+  return database;
 }
 
 /**
  * Close the SQLite database connection.
  */
 export function closeDb(): void {
-  if (db) {
-    db.close();
-    db = null;
-    dbIsInMemory = false;
+  for (const database of dbMap.values()) {
+    database.close();
   }
+  dbMap.clear();
+  lastDbPath = null;
 }
 
 /**
@@ -88,5 +88,6 @@ export function closeDb(): void {
  * @returns Current database instance or null
  */
 export function getDb(): DatabaseType | null {
-  return db;
+  if (!lastDbPath) return null;
+  return dbMap.get(lastDbPath) ?? null;
 }

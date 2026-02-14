@@ -55,6 +55,13 @@ export function getCachedEmbedding(
 
 /**
  * Cache embedding for a lesson in SQLite.
+ *
+ * Uses UPDATE-only (not INSERT) — the row must already exist in the
+ * lessons table. If the row hasn't been synced from JSONL yet, the
+ * write is a silent no-op and the embedding will be recomputed on
+ * next access. This is by-design: the cache is an optional
+ * optimization, not the source of truth.
+ *
  * @param repoRoot - Absolute path to repository root
  * @param lessonId - ID of the lesson
  * @param embedding - Embedding vector (Float32Array or number array)

@@ -62,6 +62,11 @@ describe('Compound Phase Integration', () => {
       expect(compoundCommand).toMatch(/solution.writer/i);
     });
 
+    it('references compounding subagent for CCT synthesis delegation', () => {
+      expect(compoundCommand).toMatch(/compounding/i);
+      expect(compoundCommand).toMatch(/cct-patterns\.jsonl|synthesis|synthesize/i);
+    });
+
     // --- Team coordination ---
     it('describes agents communicating and sharing findings', () => {
       expect(compoundCommand).toMatch(
@@ -157,6 +162,11 @@ describe('Compound Phase Integration', () => {
     it('describes spawning analysis team', () => {
       expect(compoundSkill).toMatch(/spawn|launch|parallel/i);
       expect(compoundSkill).toMatch(/agent|team|analyst|analyzer/i);
+    });
+
+    it('references compounding subagent for CCT synthesis delegation', () => {
+      expect(compoundSkill).toMatch(/compounding/i);
+      expect(compoundSkill).toMatch(/cct-patterns\.jsonl|synthesis|synthesize/i);
     });
 
     it('describes agent communication pattern', () => {

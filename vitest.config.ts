@@ -1,15 +1,15 @@
 import { defineConfig } from 'vitest/config';
 
+// NOTE: vitest.workspace.ts takes priority when present.
+// This file is kept as fallback and for coverage configuration.
 export default defineConfig({
-  // Caching (Vite-level config)
   cacheDir: 'node_modules/.vitest',
 
   test: {
     globals: true,
     environment: 'node',
-    include: ['src/**/*.test.ts', 'tests/**/*.test.ts', 'tools/**/*.test.js'],
+    include: ['src/**/*.test.ts', 'tools/**/*.test.js'],
 
-    // Parallelization
     pool: 'threads',
     poolOptions: {
       threads: {
@@ -27,8 +27,8 @@ export default defineConfig({
         'node_modules',
         'dist',
         '**/*.test.ts',
-        '**/index.ts', // Re-export barrels have no logic
-        'src/cli.ts', // Integration tested via execSync (55 tests)
+        '**/index.ts',
+        'src/cli.ts',
       ],
     },
   },

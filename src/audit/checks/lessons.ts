@@ -4,8 +4,7 @@
  * Surfaces high-severity lessons as info-level findings.
  */
 
-import { LESSONS_PATH } from '../../memory/storage/jsonl.js';
-import { readMemoryItems } from '../../memory/storage/index.js';
+import { LESSONS_PATH, readMemoryItems } from '../../memory/storage/index.js';
 import type { AuditCheckResult } from '../types.js';
 
 /**
