@@ -201,6 +201,28 @@ describe('LFG Phase Integration', () => {
     });
   });
 
+  describe('phase control', () => {
+    it('has ## Phase Control section', () => {
+      expect(lfgCommand).toContain('## Phase Control');
+    });
+
+    it('describes skip-phase behavior', () => {
+      expect(lfgCommand).toMatch(/skip.*phase|from.*phase/i);
+    });
+
+    it('describes progress reporting', () => {
+      expect(lfgCommand).toMatch(/progress|announce|current.*phase|\[Phase/i);
+    });
+
+    it('describes retry on failure', () => {
+      expect(lfgCommand).toMatch(/retry.*fail|fail.*retry/i);
+    });
+
+    it('describes resume after interruption', () => {
+      expect(lfgCommand).toMatch(/resume|interrupt/i);
+    });
+  });
+
   describe('beads integration', () => {
     it('work phase mentions task tracking', () => {
       const workMatch = lfgCommand.match(/work.*?phase[^]*?(?=\d+\.\s\*\*Review|$)/i);

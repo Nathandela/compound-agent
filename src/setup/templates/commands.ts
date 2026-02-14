@@ -209,6 +209,12 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
    - Store novel insights via \`memory_capture\`.
    - Avoid duplicates by searching first with \`memory_search\`.
 
+## Phase Control
+- **Skip phases**: Parse \`$ARGUMENTS\` for "from <phase>" (e.g., "from plan"). Skip all phases before the named one.
+- **Progress**: Announce the current phase before starting it (e.g., "[Phase 2/5] Plan").
+- **Retry**: If a phase fails, report the failure and ask the user whether to retry, skip, or abort.
+- **Resume**: After interruption, check \`bd list --status=in_progress\` to find where work stopped and resume from that phase.
+
 ## Stop Conditions
 - Stop if brainstorm reveals the goal is unclear (ask user).
 - Stop if any test phase produces failures that cannot be resolved.
