@@ -106,7 +106,11 @@ describe('Compound Phase Integration', () => {
 
     // --- Type classification ---
     it('references type classification', () => {
-      expect(compoundCommand).toMatch(/type.*classif|classif.*type|lesson|solution|pattern|preference/i);
+      expect(compoundCommand).toMatch(/type.*classif|classif.*type|classify/i);
+      expect(compoundCommand).toMatch(/lesson/i);
+      expect(compoundCommand).toMatch(/solution/i);
+      expect(compoundCommand).toMatch(/pattern/i);
+      expect(compoundCommand).toMatch(/preference/i);
     });
   });
 
@@ -244,7 +248,7 @@ describe('Compound Phase Integration', () => {
       });
 
       it('references test output or test results', () => {
-        expect(contextAnalyzer).toMatch(/test.*output|test.*result|test/i);
+        expect(contextAnalyzer).toMatch(/test.*output|test.*result/i);
       });
     });
 
@@ -259,6 +263,16 @@ describe('Compound Phase Integration', () => {
 
       it('references discoveries', () => {
         expect(lessonExtractor).toMatch(/discover/i);
+      });
+
+      it('does NOT require actionable as hard gate', () => {
+        // Should not mandate "specific and actionable" as joint requirement
+        expect(lessonExtractor).not.toMatch(/specific and actionable/i);
+      });
+
+      it('uses soft language for actionability preference', () => {
+        // Should say "prefer actionable" rather than mandating it
+        expect(lessonExtractor).toMatch(/prefer.*actionable/i);
       });
     });
 
@@ -283,6 +297,22 @@ describe('Compound Phase Integration', () => {
       it('references quality filters', () => {
         expect(solutionWriter).toMatch(/quality.*filter|filter|novel|specific/i);
       });
+
+      it('references severity assignment', () => {
+        expect(solutionWriter).toMatch(/severity/i);
+      });
+    });
+  });
+
+  describe('severity rubric', () => {
+    it('compound command contains severity rubric', () => {
+      expect(compoundCommand).toMatch(/high/i);
+      expect(compoundCommand).toMatch(/medium/i);
+      expect(compoundCommand).toMatch(/low/i);
+    });
+
+    it('compound skill references severity classification', () => {
+      expect(compoundSkill).toMatch(/severity|high.*medium.*low|classify/i);
     });
   });
 

@@ -223,8 +223,9 @@ Extract and store lessons learned during the cycle. This is what makes the syste
 3. Agents pass results through the pipeline and share findings with each other
 4. Apply quality filters: novelty check (>0.85 similarity = skip), specificity check
 5. Classify each item by type: lesson, solution, pattern, or preference
-6. Store via \`memory_capture\` with supersedes/related links where applicable
-7. Ask user to confirm high-severity or critical items only
+6. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
+7. Store via \`memory_capture\` with supersedes/related links where applicable
+8. Ask user to confirm high-severity items only; medium/low are auto-stored
 
 ## Common Pitfalls
 - Not spawning the analysis team (analyzing solo misses cross-cutting patterns)

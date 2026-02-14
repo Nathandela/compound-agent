@@ -161,10 +161,14 @@ Multi-agent analysis to capture high-quality lessons from completed work into th
 5. Apply quality filter on each candidate item:
    - **Novel**: skip if >0.85 similarity to existing memory
    - **Specific**: reject vague or generic advice
-6. For approved items, store via \`memory_capture\` with supersedes/related linking to connect with existing memory.
-7. Confirm with user for high-severity or significant items; low/medium items are auto-stored.
-8. Run \`bd ready\` to check for related issues; \`bd close\` any resolved by captured knowledge.
-9. Output a summary of captured and skipped items with reasons.
+6. Classify severity for each approved item:
+   - **High**: data loss risk, security implications, contradicts established patterns
+   - **Medium**: workflow changes, pattern corrections, tooling preferences
+   - **Low**: style preferences, minor optimizations, reinforcements
+7. For approved items, store via \`memory_capture\` with supersedes/related linking to connect with existing memory.
+8. Confirm with user for high-severity items only; medium/low items are auto-stored.
+9. Run \`bd ready\` to check for related issues; \`bd close\` any resolved by captured knowledge.
+10. Output a summary of captured and skipped items with reasons.
 
 ## Beads Integration
 - Check \`bd ready\` for related open issues.

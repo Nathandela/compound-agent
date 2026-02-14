@@ -130,7 +130,11 @@ async function handleCapture(
   trigger?: string,
   tags?: string[],
   type?: MemoryItemType,
-  pattern?: { bad: string; good: string }
+  pattern?: { bad: string; good: string },
+  severity?: 'high' | 'medium' | 'low',
+  confirmed?: boolean,
+  supersedes?: string[],
+  related?: string[]
 ): Promise<CaptureToolResult> {
   // Infer type from insight text if not explicitly provided
   let itemType = type ?? inferMemoryItemType(insight);
@@ -150,11 +154,11 @@ async function handleCapture(
     insight,
     tags: tags ?? [],
     source: 'manual',
-    context: { tool: 'mcp', intent: 'memory capture' },
+    context: { tool: 'mcp', intent: 'memory capture', ...(severity ? { severity } : {}) },
     created: new Date().toISOString(),
-    confirmed: true,
-    supersedes: [],
-    related: [],
+    confirmed: confirmed ?? true,
+    supersedes: supersedes ?? [],
+    related: related ?? [],
     ...(pattern ? { pattern } : {}),
   } as MemoryItem;
   await appendMemoryItem(repoRoot, item);
@@ -243,6 +247,10 @@ Returns relevant memory items ranked by similarity and severity.`,
     tags: z.array(z.string().min(1)).optional(),
     type: MemoryItemTypeSchema.optional(),
     pattern: PatternSchema.optional(),
+    severity: z.enum(['high', 'medium', 'low']).optional(),
+    confirmed: z.boolean().optional(),
+    supersedes: z.array(z.string()).optional(),
+    related: z.array(z.string()).optional(),
   };
 
   server.registerTool(
@@ -258,8 +266,8 @@ Types: lesson (default), solution, pattern (requires pattern field), preference.
 Saves immediately and shows what was captured.`,
       inputSchema: captureInputSchema,
     },
-    async ({ insight, trigger, tags, type, pattern }) => {
-      const output = await handleCapture(repoRoot, insight, trigger, tags, type, pattern);
+    async ({ insight, trigger, tags, type, pattern, severity, confirmed, supersedes, related }) => {
+      const output = await handleCapture(repoRoot, insight, trigger, tags, type, pattern, severity, confirmed, supersedes, related);
       return {
         content: [{ type: 'text' as const, text: JSON.stringify(output) }],
       };
@@ -269,7 +277,7 @@ Saves immediately and shows what was captured.`,
   // Store handler for direct invocation
   toolHandlers['memory_capture'] = async (params): Promise<CaptureToolResult> => {
     const parsed = z.object(captureInputSchema).parse(params);
-    return handleCapture(repoRoot, parsed.insight, parsed.trigger, parsed.tags, parsed.type, parsed.pattern);
+    return handleCapture(repoRoot, parsed.insight, parsed.trigger, parsed.tags, parsed.type, parsed.pattern, parsed.severity, parsed.confirmed, parsed.supersedes, parsed.related);
   };
 
   // =========================================================================

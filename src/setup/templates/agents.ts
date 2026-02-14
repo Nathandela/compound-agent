@@ -313,7 +313,7 @@ Extract actionable, specific lessons from analyzed work context. Identify correc
 4. Use \`memory_search\` to check for duplicate lessons
 5. For each problem/correction, ask: "What should be done differently next time?"
 6. Filter out lessons that are too generic or obvious
-7. Ensure each lesson is specific and actionable
+7. Each lesson must be specific; prefer actionable guidance when possible
 
 ## Collaboration
 - Share findings with pattern-matcher and solution-writer via direct message so they can classify and store the lessons.
@@ -379,8 +379,9 @@ Transform approved lessons into properly formatted memory items that follow the 
 3. Apply quality filters:
    - Is it novel? (not already stored)
    - Is it specific? (not vague advice)
-4. Set supersedes or related links when the lesson updates existing knowledge
-5. Store via \`memory_capture\` MCP tool
+4. Assign severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
+5. Set supersedes or related links when the lesson updates existing knowledge
+6. Store via \`memory_capture\` MCP tool
 
 ## Collaboration
 - Share findings with other agents via direct message to communicate storage outcomes.

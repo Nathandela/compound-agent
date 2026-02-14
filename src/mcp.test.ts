@@ -448,6 +448,140 @@ describe('MCP Server', () => {
     });
   });
 
+  describe('memory_capture extended fields (severity, confirmed, supersedes, related)', () => {
+    it('accepts severity field with valid values', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      for (const sev of ['high', 'medium', 'low'] as const) {
+        const result = await mcpServer.callTool('memory_capture', {
+          insight: `Severity test with ${sev} level value`,
+          severity: sev,
+        });
+        expect(result.item.context).toEqual(
+          expect.objectContaining({ severity: sev })
+        );
+      }
+    });
+
+    it('rejects invalid severity values', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      await expect(
+        mcpServer.callTool('memory_capture', {
+          insight: 'Invalid severity test value',
+          severity: 'critical',
+        })
+      ).rejects.toThrow();
+    });
+
+    it('accepts confirmed field as boolean', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const resultFalse = await mcpServer.callTool('memory_capture', {
+        insight: 'Unconfirmed capture via MCP tool',
+        confirmed: false,
+      });
+      expect(resultFalse.item.confirmed).toBe(false);
+
+      const resultTrue = await mcpServer.callTool('memory_capture', {
+        insight: 'Confirmed capture via MCP tool explicitly',
+        confirmed: true,
+      });
+      expect(resultTrue.item.confirmed).toBe(true);
+    });
+
+    it('defaults confirmed to true when omitted', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'No confirmed field provided here',
+      });
+      expect(result.item.confirmed).toBe(true);
+    });
+
+    it('accepts supersedes field as array of strings', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'This supersedes older memory items',
+        supersedes: ['L12345678', 'L87654321'],
+      });
+      expect(result.item.supersedes).toEqual(['L12345678', 'L87654321']);
+    });
+
+    it('defaults supersedes to empty array when omitted', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'No supersedes field provided here',
+      });
+      expect(result.item.supersedes).toEqual([]);
+    });
+
+    it('accepts related field as array of strings', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'This relates to other memory items',
+        related: ['S12345678', 'P87654321'],
+      });
+      expect(result.item.related).toEqual(['S12345678', 'P87654321']);
+    });
+
+    it('defaults related to empty array when omitted', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'No related field provided here test',
+      });
+      expect(result.item.related).toEqual([]);
+    });
+
+    it('backwards compatible: existing calls without new fields still work', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'Legacy call without new fields at all',
+        trigger: 'Old trigger',
+        tags: ['old'],
+      });
+
+      expect(result.item.confirmed).toBe(true);
+      expect(result.item.supersedes).toEqual([]);
+      expect(result.item.related).toEqual([]);
+      expect(result.item.insight).toBe('Legacy call without new fields at all');
+    });
+
+    it('all new fields work together in a single call', async () => {
+      const { createMcpServer } = await import('./mcp.js');
+      const mcpServer = createMcpServer(tempDir);
+
+      const result = await mcpServer.callTool('memory_capture', {
+        insight: 'Combined new fields test for memory capture',
+        severity: 'high',
+        confirmed: false,
+        supersedes: ['L00000001'],
+        related: ['S00000002'],
+      });
+
+      expect(result.item.confirmed).toBe(false);
+      expect(result.item.supersedes).toEqual(['L00000001']);
+      expect(result.item.related).toEqual(['S00000002']);
+      expect(result.item.context).toEqual(
+        expect.objectContaining({ severity: 'high' })
+      );
+    });
+  });
+
   describe('memory_capture unified types', () => {
     it('defaults to lesson type when no type specified', async () => {
       const { createMcpServer } = await import('./mcp.js');

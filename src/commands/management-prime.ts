@@ -38,7 +38,7 @@ const TRUST_LANGUAGE_TEMPLATE = `# Compound Agent Active
 **Prohibited**: NEVER edit .claude/lessons/ files directly
 
 **Default**: Propose lessons freely after corrections
-**Prohibited**: NEVER propose without quality gate (novel + specific + actionable)
+**Prohibited**: NEVER propose without quality gate (novel + specific; prefer actionable)
 
 ## Retrieval Protocol
 

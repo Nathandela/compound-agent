@@ -194,7 +194,7 @@ Call \`memory_capture\` AFTER:
 Before capturing, verify the lesson is:
 - **Novel** - Not already stored
 - **Specific** - Clear guidance
-- **Actionable** - Obvious what to do
+- **Actionable** (preferred) - Obvious what to do
 
 ### Never Edit JSONL Directly
 

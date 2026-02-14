@@ -1062,11 +1062,12 @@ describe('Management Commands', () => {
       expect(stdout).not.toContain('ca stats');
     });
 
-    it('includes quality gate (novel, specific, actionable)', () => {
+    it('includes quality gate (novel, specific; actionable as soft preference)', () => {
       const { stdout } = runCli('prime');
       expect(stdout.toLowerCase()).toContain('novel');
       expect(stdout.toLowerCase()).toContain('specific');
-      expect(stdout.toLowerCase()).toContain('actionable');
+      // Actionable should be soft/preferred, not a mandatory gate
+      expect(stdout.toLowerCase()).toMatch(/actionable.*preferred|prefer.*actionable/);
     });
 
     it('outputs nothing to stderr on success', () => {
