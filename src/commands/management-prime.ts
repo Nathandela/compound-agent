@@ -55,10 +55,10 @@ Call \`memory_capture\` AFTER:
 - You self-correct after iteration failures
 - Test fails then you fix it
 
-**Quality gate** (ALL must pass before capturing):
+**Quality gate** (must pass before capturing):
 - Novel (not already stored)
 - Specific (clear guidance)
-- Actionable (obvious what to do)
+- Actionable (preferred, not mandatory)
 
 **Workflow**: Search BEFORE deciding, capture AFTER learning.
 

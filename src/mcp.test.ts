@@ -458,9 +458,7 @@ describe('MCP Server', () => {
           insight: `Severity test with ${sev} level value`,
           severity: sev,
         });
-        expect(result.item.context).toEqual(
-          expect.objectContaining({ severity: sev })
-        );
+        expect(result.item.severity).toBe(sev);
       }
     });
 
@@ -576,9 +574,7 @@ describe('MCP Server', () => {
       expect(result.item.confirmed).toBe(false);
       expect(result.item.supersedes).toEqual(['L00000001']);
       expect(result.item.related).toEqual(['S00000002']);
-      expect(result.item.context).toEqual(
-        expect.objectContaining({ severity: 'high' })
-      );
+      expect(result.item.severity).toBe('high');
     });
   });
 
