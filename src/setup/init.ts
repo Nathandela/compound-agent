@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
-import { getGlobalOpts, out } from '../commands/shared.js';
+import { getGlobalOpts, out } from '../commands/index.js';
 import { installClaudeHooksForInit } from './claude-helpers.js';
 import { installPreCommitHook, type HookInstallResult } from './hooks.js';
 import {
@@ -41,6 +41,127 @@ async function createIndexFile(repoRoot: string): Promise<void> {
   }
 }
 
+// ============================================================================
+// Action Handler
+// ============================================================================
+
+async function initAction(
+  cmd: Command,
+  options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; json?: boolean }
+): Promise<void> {
+  const repoRoot = getRepoRoot();
+  const { quiet } = getGlobalOpts(cmd);
+
+  await createLessonsDirectory(repoRoot);
+  await createIndexFile(repoRoot);
+  const lessonsDir = dirname(join(repoRoot, LESSONS_PATH));
+
+  let agentsMdUpdated = false;
+  if (!options.skipAgents) {
+    agentsMdUpdated = await updateAgentsMd(repoRoot);
+  }
+
+  if (!options.skipAgents) {
+    await ensureClaudeMdReference(repoRoot);
+  }
+
+  let slashCommandsCreated = false;
+  if (!options.skipAgents) {
+    slashCommandsCreated = await createSlashCommands(repoRoot);
+  }
+
+  if (!options.skipAgents) {
+    await createPluginManifest(repoRoot);
+    await installAgentTemplates(repoRoot);
+    await installWorkflowCommands(repoRoot);
+    await installPhaseSkills(repoRoot);
+  }
+
+  let hookResult: HookInstallResult | null = null;
+  if (!options.skipHooks) {
+    hookResult = await installPreCommitHook(repoRoot);
+  }
+
+  let claudeHooksResult: ClaudeHooksResult = { installed: false, action: 'error', error: 'skipped' };
+  if (!options.skipClaude) {
+    claudeHooksResult = await installClaudeHooksForInit(repoRoot);
+  }
+
+  if (options.json) {
+    const claudeHooksInstalled = claudeHooksResult.action === 'installed';
+    const hooksChanged = hookResult?.status === 'installed' || hookResult?.status === 'appended';
+    console.log(JSON.stringify({
+      initialized: true,
+      lessonsDir,
+      agentsMd: agentsMdUpdated,
+      slashCommands: slashCommandsCreated || !options.skipAgents,
+      hooks: hooksChanged,
+      hookStatus: hookResult?.status ?? 'skipped',
+      claudeHooks: claudeHooksInstalled,
+    }));
+    return;
+  }
+
+  if (quiet) return;
+
+  out.success('Compound agent initialized');
+  console.log(`  Lessons directory: ${lessonsDir}`);
+  printAgentsMdStatus(agentsMdUpdated, options.skipAgents);
+  printSlashCommandsStatus(slashCommandsCreated, options.skipAgents);
+  printHookStatus(hookResult, options.skipHooks);
+  printClaudeHooksStatus(claudeHooksResult, options.skipClaude);
+}
+
+function printAgentsMdStatus(updated: boolean, skipped?: boolean): void {
+  if (updated) {
+    console.log('  AGENTS.md: Updated with Compound Agent section');
+  } else if (skipped) {
+    console.log('  AGENTS.md: Skipped (--skip-agents)');
+  } else {
+    console.log('  AGENTS.md: Already has Compound Agent section');
+  }
+}
+
+function printSlashCommandsStatus(created: boolean, skipped?: boolean): void {
+  if (created) {
+    console.log('  Slash commands: Created (/learn, /show, /wrong, /stats)');
+  } else if (skipped) {
+    console.log('  Slash commands: Skipped (--skip-agents)');
+  } else {
+    console.log('  Slash commands: Already exist');
+  }
+}
+
+function printHookStatus(hookResult: HookInstallResult | null, skipped?: boolean): void {
+  if (skipped) {
+    console.log('  Git hooks: Skipped (--skip-hooks)');
+  } else if (hookResult?.status === 'installed') {
+    console.log('  Git hooks: Installed');
+  } else if (hookResult?.status === 'appended') {
+    console.log('  Git hooks: Appended to existing pre-commit hook');
+  } else if (hookResult?.status === 'already_installed') {
+    console.log('  Git hooks: Already installed');
+  } else if (hookResult?.status === 'not_git_repo') {
+    console.log('  Git hooks: Skipped (not a git repository)');
+  }
+}
+
+function printClaudeHooksStatus(result: ClaudeHooksResult, skipped?: boolean): void {
+  if (skipped) {
+    console.log('  Claude hooks: Skipped (--skip-claude)');
+  } else if (result.action === 'installed') {
+    console.log('  Claude hooks: Installed to .claude/settings.json');
+  } else if (result.action === 'already_installed') {
+    console.log('  Claude hooks: Already installed');
+  } else if (result.error) {
+    console.log(`  Claude hooks: Error - ${result.error}`);
+  }
+}
+
+// ============================================================================
+// Command Registration
+// ============================================================================
+
 /**
  * Register the init command on the program.
  */
@@ -53,108 +174,6 @@ export function registerInitCommand(program: Command): void {
     .option('--skip-claude', 'Skip Claude Code hooks installation')
     .option('--json', 'Output result as JSON')
     .action(async function (this: Command, options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; json?: boolean }) {
-      const repoRoot = getRepoRoot();
-      const { quiet } = getGlobalOpts(this);
-
-      // Create directory structure
-      await createLessonsDirectory(repoRoot);
-      await createIndexFile(repoRoot);
-      const lessonsDir = dirname(join(repoRoot, LESSONS_PATH));
-
-      // Update AGENTS.md unless skipped
-      let agentsMdUpdated = false;
-      if (!options.skipAgents) {
-        agentsMdUpdated = await updateAgentsMd(repoRoot);
-      }
-
-      // Ensure CLAUDE.md has reference to AGENTS.md (lfy)
-      if (!options.skipAgents) {
-        await ensureClaudeMdReference(repoRoot);
-      }
-
-      // Create slash commands unless skipped (8lp, 6nw)
-      let slashCommandsCreated = false;
-      if (!options.skipAgents) {
-        slashCommandsCreated = await createSlashCommands(repoRoot);
-      }
-
-      // Create plugin manifest (ctv)
-      if (!options.skipAgents) {
-        await createPluginManifest(repoRoot);
-      }
-
-      // Install agent templates, workflow commands, and phase skills
-      if (!options.skipAgents) {
-        await installAgentTemplates(repoRoot);
-        await installWorkflowCommands(repoRoot);
-        await installPhaseSkills(repoRoot);
-      }
-
-      // Install git hooks unless skipped
-      let hookResult: HookInstallResult | null = null;
-      if (!options.skipHooks) {
-        hookResult = await installPreCommitHook(repoRoot);
-      }
-
-      // Install Claude hooks unless skipped (f8a)
-      let claudeHooksResult: ClaudeHooksResult = { installed: false, action: 'error', error: 'skipped' };
-      if (!options.skipClaude) {
-        claudeHooksResult = await installClaudeHooksForInit(repoRoot);
-      }
-
-      // Output
-      if (options.json) {
-        // claudeHooks: true only if we actually installed (not already_installed)
-        const claudeHooksInstalled = claudeHooksResult.action === 'installed';
-        // hooks: true if we installed or appended (made changes)
-        const hooksChanged = hookResult?.status === 'installed' || hookResult?.status === 'appended';
-        console.log(JSON.stringify({
-          initialized: true,
-          lessonsDir,
-          agentsMd: agentsMdUpdated,
-          slashCommands: slashCommandsCreated || !options.skipAgents,
-          hooks: hooksChanged,
-          hookStatus: hookResult?.status ?? 'skipped',
-          claudeHooks: claudeHooksInstalled,
-        }));
-      } else if (!quiet) {
-        out.success('Compound agent initialized');
-        console.log(`  Lessons directory: ${lessonsDir}`);
-        if (agentsMdUpdated) {
-          console.log('  AGENTS.md: Updated with Compound Agent section');
-        } else if (options.skipAgents) {
-          console.log('  AGENTS.md: Skipped (--skip-agents)');
-        } else {
-          console.log('  AGENTS.md: Already has Compound Agent section');
-        }
-        if (slashCommandsCreated) {
-          console.log('  Slash commands: Created (/learn, /show, /wrong, /stats)');
-        } else if (options.skipAgents) {
-          console.log('  Slash commands: Skipped (--skip-agents)');
-        } else {
-          console.log('  Slash commands: Already exist');
-        }
-        if (options.skipHooks) {
-          console.log('  Git hooks: Skipped (--skip-hooks)');
-        } else if (hookResult?.status === 'installed') {
-          console.log('  Git hooks: Installed');
-        } else if (hookResult?.status === 'appended') {
-          console.log('  Git hooks: Appended to existing pre-commit hook');
-        } else if (hookResult?.status === 'already_installed') {
-          console.log('  Git hooks: Already installed');
-        } else if (hookResult?.status === 'not_git_repo') {
-          console.log('  Git hooks: Skipped (not a git repository)');
-        }
-        // Claude hooks status
-        if (options.skipClaude) {
-          console.log('  Claude hooks: Skipped (--skip-claude)');
-        } else if (claudeHooksResult.action === 'installed') {
-          console.log('  Claude hooks: Installed to .claude/settings.json');
-        } else if (claudeHooksResult.action === 'already_installed') {
-          console.log('  Claude hooks: Already installed');
-        } else if (claudeHooksResult.error) {
-          console.log(`  Claude hooks: Error - ${claudeHooksResult.error}`);
-        }
-      }
+      await initAction(this, options);
     });
 }

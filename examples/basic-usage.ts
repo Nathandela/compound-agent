@@ -102,7 +102,7 @@ async function main() {
     for (const { lesson, score } of vectorResults) {
       console.log(`  [${lesson.id}] (score: ${score.toFixed(3)}) ${lesson.insight}`);
     }
-  } catch (error) {
+  } catch {
     console.log('\nVector search skipped - model not downloaded');
     console.log('Run: pnpm download-model');
   }

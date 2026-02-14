@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { LESSONS_PATH } from '../memory/storage/index.js';
-import type { MemoryItem } from '../memory/types.js';
+import type { MemoryItem } from '../memory/index.js';
 
 /**
  * Format a memory item for human-readable display.

@@ -10,7 +10,7 @@ import type { Command } from 'commander';
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { isModelUsable, loadSessionLessons, retrieveForPlan } from '../index.js';
 import { incrementRetrievalCount, readLessons, readMemoryItems, searchKeyword, syncIfNeeded } from '../memory/storage/index.js';
-import type { MemoryItem } from '../memory/types.js';
+import type { MemoryItem } from '../memory/index.js';
 
 import { formatError } from '../cli-error-format.js';
 
@@ -136,6 +136,198 @@ function outputSessionLessonsHuman(lessons: MemoryItem[], quiet: boolean): void 
 }
 
 // ============================================================================
+// Action Handlers
+// ============================================================================
+
+async function searchAction(cmd: Command, query: string, options: { limit: string }): Promise<void> {
+  const repoRoot = getRepoRoot();
+  const limit = parseLimitOrExit(options.limit, 'limit', 'search');
+  const { verbose, quiet } = getGlobalOpts(cmd);
+
+  await syncIfNeeded(repoRoot);
+
+  let results;
+  try {
+    results = await searchKeyword(repoRoot, query, limit);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Search failed';
+    console.error(formatError('search', 'SEARCH_FAILED', message, 'Check your query syntax'));
+    process.exit(1);
+  }
+  if (results.length > 0) {
+    incrementRetrievalCount(repoRoot, results.map((lesson) => lesson.id));
+  }
+
+  if (results.length === 0) {
+    console.log('No lessons match your search. Try a different query or use "list" to see all lessons.');
+    return;
+  }
+
+  if (!quiet) {
+    out.info(`Found ${results.length} lesson(s):\n`);
+  }
+  for (const lesson of results) {
+    console.log(`[${chalk.cyan(lesson.id)}] ${lesson.insight}`);
+    console.log(`  Trigger: ${lesson.trigger}`);
+    if (verbose && lesson.context) {
+      console.log(`  Context: ${lesson.context.tool} - ${lesson.context.intent}`);
+      console.log(`  Created: ${lesson.created}`);
+    }
+    if (lesson.tags.length > 0) {
+      console.log(`  Tags: ${lesson.tags.join(', ')}`);
+    }
+    console.log();
+  }
+}
+
+async function listAction(cmd: Command, options: { limit: string; invalidated?: boolean }): Promise<void> {
+  const repoRoot = getRepoRoot();
+  const limit = parseLimitOrExit(options.limit, 'limit', 'list');
+  const { verbose, quiet } = getGlobalOpts(cmd);
+
+  const { items, skippedCount } = await readMemoryItems(repoRoot);
+
+  const filteredItems = options.invalidated
+    ? items.filter((i) => i.invalidatedAt)
+    : items;
+
+  if (filteredItems.length === 0) {
+    if (options.invalidated) {
+      console.log('No invalidated lessons found.');
+    } else {
+      console.log('No lessons found. Get started with: learn "Your first lesson"');
+    }
+    if (skippedCount > 0) {
+      out.warn(`${skippedCount} corrupted lesson(s) skipped.`);
+    }
+    return;
+  }
+
+  const toShow = filteredItems.slice(0, limit);
+
+  if (!quiet) {
+    const label = options.invalidated ? 'invalidated lesson(s)' : 'item(s)';
+    out.info(`Showing ${toShow.length} of ${filteredItems.length} ${label}:\n`);
+  }
+
+  for (const item of toShow) {
+    const invalidMarker = item.invalidatedAt ? chalk.red('[INVALID] ') : '';
+    console.log(`[${chalk.cyan(item.id)}] ${invalidMarker}${item.insight}`);
+    if (verbose) {
+      console.log(`  Type: ${item.type} | Source: ${item.source}`);
+      console.log(`  Created: ${item.created}`);
+      if (item.context) {
+        console.log(`  Context: ${item.context.tool} - ${item.context.intent}`);
+      }
+      if (item.invalidatedAt) {
+        console.log(`  Invalidated: ${item.invalidatedAt}`);
+        if (item.invalidationReason) {
+          console.log(`  Reason: ${item.invalidationReason}`);
+        }
+      }
+    } else {
+      console.log(`  Type: ${item.type} | Source: ${item.source}`);
+    }
+    if (item.tags.length > 0) {
+      console.log(`  Tags: ${item.tags.join(', ')}`);
+    }
+    console.log();
+  }
+
+  if (skippedCount > 0) {
+    out.warn(`${skippedCount} corrupted lesson(s) skipped.`);
+  }
+}
+
+async function loadSessionAction(cmd: Command, options: { json?: boolean }): Promise<void> {
+  const repoRoot = getRepoRoot();
+  const { quiet } = getGlobalOpts(cmd);
+  const lessons = await loadSessionLessons(repoRoot);
+
+  const { lessons: allLessons } = await readLessons(repoRoot);
+  const totalCount = allLessons.length;
+
+  if (options.json) {
+    console.log(JSON.stringify({ lessons, count: lessons.length, totalCount }));
+    return;
+  }
+
+  if (lessons.length === 0) {
+    console.log('No high-severity lessons found.');
+    return;
+  }
+
+  outputSessionLessonsHuman(lessons, quiet);
+
+  if (totalCount > LESSON_COUNT_WARNING_THRESHOLD) {
+    console.log('');
+    out.info(`${totalCount} lessons in index. Consider \`ca compact\` to reduce context pollution.`);
+  }
+
+  const oldLessons = lessons.filter((l) => getLessonAgeDays(l) > AGE_FLAG_THRESHOLD_DAYS);
+  if (oldLessons.length > 0) {
+    console.log('');
+    out.warn(`${oldLessons.length} lesson(s) are over ${AGE_FLAG_THRESHOLD_DAYS} days old. Review for continued validity.`);
+  }
+}
+
+async function checkPlanAction(cmd: Command, options: { plan?: string; json?: boolean; limit: string }): Promise<void> {
+  const repoRoot = getRepoRoot();
+  const limit = parseLimitOrExit(options.limit, 'limit', 'check-plan');
+  const { quiet } = getGlobalOpts(cmd);
+
+  const planText = options.plan ?? (await readPlanFromStdin());
+
+  if (!planText) {
+    console.error(formatError('check-plan', 'NO_PLAN', 'No plan provided', 'Use --plan <text> or pipe text to stdin'));
+    process.exit(1);
+  }
+
+  const usability = await isModelUsable();
+  if (!usability.usable) {
+    if (options.json) {
+      console.log(JSON.stringify({
+        lessons: [],
+        count: 0,
+        error: usability.reason,
+        action: usability.action,
+      }));
+    } else {
+      console.error(formatError('check-plan', 'MODEL_UNAVAILABLE', usability.reason, usability.action));
+    }
+    process.exit(1);
+  }
+
+  try {
+    const result = await retrieveForPlan(repoRoot, planText, limit);
+
+    if (options.json) {
+      outputCheckPlanJson(result.lessons);
+      return;
+    }
+
+    if (result.lessons.length === 0) {
+      console.log('No relevant lessons found for this plan.');
+      return;
+    }
+
+    outputCheckPlanHuman(result.lessons, quiet);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (options.json) {
+      console.log(JSON.stringify({
+        lessons: [],
+        count: 0,
+        error: message,
+      }));
+    } else {
+      console.error(formatError('check-plan', 'PLAN_CHECK_FAILED', message, 'Check model installation and try again'));
+    }
+    process.exit(1);
+  }
+}
+
+// ============================================================================
 // Command Registration
 // ============================================================================
 
@@ -143,187 +335,31 @@ function outputSessionLessonsHuman(lessons: MemoryItem[], quiet: boolean): void 
  * Register retrieval commands (search, list, check-plan, load-session) on the program.
  */
 export function registerRetrievalCommands(program: Command): void {
-  /**
-   * Search command - Search lessons by keyword.
-   *
-   * @example npx ca search "Polars"
-   * @example npx ca search "authentication" --limit 5
-   */
   program
     .command('search <query>')
     .description('Search lessons by keyword')
     .option('-n, --limit <number>', 'Maximum results', DEFAULT_SEARCH_LIMIT)
     .action(async function (this: Command, query: string, options: { limit: string }) {
-      const repoRoot = getRepoRoot();
-      const limit = parseLimitOrExit(options.limit, 'limit', 'search');
-      const { verbose, quiet } = getGlobalOpts(this);
-
-      // Sync index if JSONL has changed
-      await syncIfNeeded(repoRoot);
-
-      let results;
-      try {
-        results = await searchKeyword(repoRoot, query, limit);
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Search failed';
-        console.error(formatError('search', 'SEARCH_FAILED', message, 'Check your query syntax'));
-        process.exit(1);
-      }
-      if (results.length > 0) {
-        incrementRetrievalCount(repoRoot, results.map((lesson) => lesson.id));
-      }
-
-      if (results.length === 0) {
-        console.log('No lessons match your search. Try a different query or use "list" to see all lessons.');
-        return;
-      }
-
-      if (!quiet) {
-        out.info(`Found ${results.length} lesson(s):\n`);
-      }
-      for (const lesson of results) {
-        console.log(`[${chalk.cyan(lesson.id)}] ${lesson.insight}`);
-        console.log(`  Trigger: ${lesson.trigger}`);
-        if (verbose && lesson.context) {
-          console.log(`  Context: ${lesson.context.tool} - ${lesson.context.intent}`);
-          console.log(`  Created: ${lesson.created}`);
-        }
-        if (lesson.tags.length > 0) {
-          console.log(`  Tags: ${lesson.tags.join(', ')}`);
-        }
-        console.log();
-      }
+      await searchAction(this, query, options);
     });
 
-  /**
-   * List command - List all lessons.
-   *
-   * @example npx ca list
-   * @example npx ca list --limit 10
-   * @example npx ca list --invalidated
-   */
   program
     .command('list')
     .description('List all lessons')
     .option('-n, --limit <number>', 'Maximum results', DEFAULT_LIST_LIMIT)
     .option('--invalidated', 'Show only invalidated lessons')
     .action(async function (this: Command, options: { limit: string; invalidated?: boolean }) {
-      const repoRoot = getRepoRoot();
-      const limit = parseLimitOrExit(options.limit, 'limit', 'list');
-      const { verbose, quiet } = getGlobalOpts(this);
-
-      const { items, skippedCount } = await readMemoryItems(repoRoot);
-
-      // Filter for invalidated items if flag is set
-      const filteredItems = options.invalidated
-        ? items.filter((i) => i.invalidatedAt)
-        : items;
-
-      if (filteredItems.length === 0) {
-        if (options.invalidated) {
-          console.log('No invalidated lessons found.');
-        } else {
-          console.log('No lessons found. Get started with: learn "Your first lesson"');
-        }
-        if (skippedCount > 0) {
-          out.warn(`${skippedCount} corrupted lesson(s) skipped.`);
-        }
-        return;
-      }
-
-      const toShow = filteredItems.slice(0, limit);
-
-      // Show summary unless quiet mode
-      if (!quiet) {
-        const label = options.invalidated ? 'invalidated lesson(s)' : 'item(s)';
-        out.info(`Showing ${toShow.length} of ${filteredItems.length} ${label}:\n`);
-      }
-
-      for (const item of toShow) {
-        const invalidMarker = item.invalidatedAt ? chalk.red('[INVALID] ') : '';
-        console.log(`[${chalk.cyan(item.id)}] ${invalidMarker}${item.insight}`);
-        if (verbose) {
-          console.log(`  Type: ${item.type} | Source: ${item.source}`);
-          console.log(`  Created: ${item.created}`);
-          if (item.context) {
-            console.log(`  Context: ${item.context.tool} - ${item.context.intent}`);
-          }
-          if (item.invalidatedAt) {
-            console.log(`  Invalidated: ${item.invalidatedAt}`);
-            if (item.invalidationReason) {
-              console.log(`  Reason: ${item.invalidationReason}`);
-            }
-          }
-        } else {
-          console.log(`  Type: ${item.type} | Source: ${item.source}`);
-        }
-        if (item.tags.length > 0) {
-          console.log(`  Tags: ${item.tags.join(', ')}`);
-        }
-        console.log();
-      }
-
-      if (skippedCount > 0) {
-        out.warn(`${skippedCount} corrupted lesson(s) skipped.`);
-      }
+      await listAction(this, options);
     });
 
-  /**
-   * Load-session command - Load high-severity lessons for session startup.
-   *
-   * Used by Claude Code hooks to inject critical lessons at session start.
-   * Returns lessons sorted by severity/recency for immediate context.
-   *
-   * @example npx ca load-session --json
-   */
   program
     .command('load-session')
     .description('Load high-severity lessons for session context')
     .option('--json', 'Output as JSON')
     .action(async function (this: Command, options: { json?: boolean }) {
-      const repoRoot = getRepoRoot();
-      const { quiet } = getGlobalOpts(this);
-      const lessons = await loadSessionLessons(repoRoot);
-
-      // Get total lesson count for context pollution warning
-      const { lessons: allLessons } = await readLessons(repoRoot);
-      const totalCount = allLessons.length;
-
-      if (options.json) {
-        console.log(JSON.stringify({ lessons, count: lessons.length, totalCount }));
-        return;
-      }
-
-      if (lessons.length === 0) {
-        console.log('No high-severity lessons found.');
-        return;
-      }
-
-      outputSessionLessonsHuman(lessons, quiet);
-
-      // Show count note if total lessons exceed threshold
-      if (totalCount > LESSON_COUNT_WARNING_THRESHOLD) {
-        console.log('');
-        out.info(`${totalCount} lessons in index. Consider \`ca compact\` to reduce context pollution.`);
-      }
-
-      // Show age warnings for old lessons
-      const oldLessons = lessons.filter((l) => getLessonAgeDays(l) > AGE_FLAG_THRESHOLD_DAYS);
-      if (oldLessons.length > 0) {
-        console.log('');
-        out.warn(`${oldLessons.length} lesson(s) are over ${AGE_FLAG_THRESHOLD_DAYS} days old. Review for continued validity.`);
-      }
+      await loadSessionAction(this, options);
     });
 
-  /**
-   * Check-plan command - Check a plan against relevant lessons.
-   *
-   * Used by Claude Code hooks during plan mode to retrieve lessons
-   * that are semantically relevant to the proposed implementation.
-   *
-   * @example echo "Add authentication" | npx ca check-plan --json
-   * @example npx ca check-plan --plan "Refactor the API"
-   */
   program
     .command('check-plan')
     .description('Check plan against relevant lessons')
@@ -331,63 +367,6 @@ export function registerRetrievalCommands(program: Command): void {
     .option('--json', 'Output as JSON')
     .option('-n, --limit <number>', 'Maximum results', DEFAULT_CHECK_PLAN_LIMIT)
     .action(async function (this: Command, options: { plan?: string; json?: boolean; limit: string }) {
-      const repoRoot = getRepoRoot();
-      const limit = parseLimitOrExit(options.limit, 'limit', 'check-plan');
-      const { quiet } = getGlobalOpts(this);
-
-      // Get plan text from --plan flag or stdin
-      const planText = options.plan ?? (await readPlanFromStdin());
-
-      if (!planText) {
-        console.error(formatError('check-plan', 'NO_PLAN', 'No plan provided', 'Use --plan <text> or pipe text to stdin'));
-        process.exit(1);
-      }
-
-      // Check model usability - return stable error response if not usable
-      const usability = await isModelUsable();
-      if (!usability.usable) {
-        if (options.json) {
-          // Stable envelope: always include lessons/count, add error/action
-          console.log(JSON.stringify({
-            lessons: [],
-            count: 0,
-            error: usability.reason,
-            action: usability.action,
-          }));
-        } else {
-          console.error(formatError('check-plan', 'MODEL_UNAVAILABLE', usability.reason, usability.action));
-        }
-        process.exit(1);
-      }
-
-      try {
-        const result = await retrieveForPlan(repoRoot, planText, limit);
-
-        if (options.json) {
-          outputCheckPlanJson(result.lessons);
-          return;
-        }
-
-        if (result.lessons.length === 0) {
-          console.log('No relevant lessons found for this plan.');
-          return;
-        }
-
-        outputCheckPlanHuman(result.lessons, quiet);
-      } catch (err) {
-        // Don't mask errors - surface them clearly
-        const message = err instanceof Error ? err.message : 'Unknown error';
-        if (options.json) {
-          // Stable envelope: always include lessons/count, add error
-          console.log(JSON.stringify({
-            lessons: [],
-            count: 0,
-            error: message,
-          }));
-        } else {
-          console.error(formatError('check-plan', 'PLAN_CHECK_FAILED', message, 'Check model installation and try again'));
-        }
-        process.exit(1);
-      }
+      await checkPlanAction(this, options);
     });
 }

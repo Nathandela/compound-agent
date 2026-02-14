@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { loadSessionLessons } from '../memory/retrieval/index.js';
-import type { MemoryItem, Source } from '../memory/types.js';
+import type { MemoryItem, Source } from '../memory/index.js';
 
 /**
  * Beads-style trust language template.

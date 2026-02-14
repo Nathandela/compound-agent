@@ -77,11 +77,6 @@ interface ResourceResult {
 
 /**
  * Shared search logic for both MCP protocol and typed API paths.
- *
- * @param repoRoot - Repository root directory
- * @param query - Search query string
- * @param maxResults - Max results to return (default: DEFAULT_MAX_RESULTS)
- * @returns Ranked search results or error response
  */
 async function handleSearch(
   repoRoot: string,
@@ -103,7 +98,6 @@ async function handleSearch(
       lessons = lessons.filter((r) => r.lesson.type === typeFilter);
     }
     lessons = lessons.slice(0, limit);
-    // Track retrieval counts
     const ids = lessons.map((r) => r.lesson.id);
     if (ids.length > 0) {
       incrementRetrievalCount(repoRoot, ids);
@@ -121,14 +115,6 @@ async function handleSearch(
 
 /**
  * Shared capture logic for both MCP protocol and typed API paths.
- *
- * @param repoRoot - Repository root directory
- * @param insight - Memory item insight text
- * @param trigger - Optional trigger description
- * @param tags - Optional tags array
- * @param type - Memory item type (default: 'lesson')
- * @param pattern - Optional code pattern (required for 'pattern' type)
- * @returns Captured memory item (in `lesson` field for backward compat)
  */
 async function handleCapture(
   repoRoot: string,
@@ -142,14 +128,10 @@ async function handleCapture(
   supersedes?: string[],
   related?: string[]
 ): Promise<CaptureToolResult> {
-  // Infer type from insight text if not explicitly provided
   let itemType = type ?? inferMemoryItemType(insight);
-  // Require pattern field when type is explicitly 'pattern'
   if (type === 'pattern' && !pattern) {
     throw new Error('Pattern type requires a pattern field with { bad, good }');
   }
-  // If inferred as 'pattern' but no pattern field, fall back to 'lesson'
-  // (PatternItemSchema requires pattern field)
   if (itemType === 'pattern' && !pattern && !type) {
     itemType = 'lesson';
   }
@@ -178,47 +160,40 @@ export interface CompoundAgentMcpServer {
   server: McpServer;
   /** Repository root path (immutable after creation) */
   repoRoot: string;
-  /**
-   * Call a tool by name with parameters.
-   * - memory_search: { query: string, maxResults?: number } → SearchToolResult
-   * - memory_capture: { insight: string, trigger?: string, tags?: string[] } → CaptureToolResult
-   */
   callTool<T = SearchToolResult | CaptureToolResult>(
     name: string,
     params: Record<string, unknown>
   ): Promise<T>;
-  /**
-   * Read a resource by URI.
-   * - memory://prime → ResourceResult with workflow context
-   */
   readResource(uri: string): Promise<ResourceResult>;
 }
 
-/**
- * Create an MCP server for compound-agent.
- *
- * @param repoRoot - Repository root directory (immutable after creation)
- * @returns MCP server wrapper with typed tool/resource methods
- */
-export function createMcpServer(repoRoot: string): CompoundAgentMcpServer {
-  const server = new McpServer({
-    name: 'compound-agent',
-    version: VERSION,
-  });
+// ============================================================================
+// Tool/resource registration helpers
+// ============================================================================
 
-  // Store tool handlers for direct invocation in tests
-  const toolHandlers: Record<string, (params: Record<string, unknown>) => Promise<unknown>> = {};
-  const resourceHandlers: Record<string, () => Promise<ResourceResult>> = {};
+const searchInputSchema = {
+  query: z.string().min(1, 'Query must be non-empty'),
+  maxResults: z.number().int().positive().max(100).optional(),
+  type: MemoryItemTypeSchema.optional(),
+};
 
-  // =========================================================================
-  // memory_search tool
-  // =========================================================================
-  const searchInputSchema = {
-    query: z.string().min(1, 'Query must be non-empty'),
-    maxResults: z.number().int().positive().max(100).optional(),
-    type: MemoryItemTypeSchema.optional(),
-  };
+const captureInputSchema = {
+  insight: z.string().min(MIN_INSIGHT_LENGTH, `Insight must be at least ${MIN_INSIGHT_LENGTH} characters`),
+  trigger: z.string().min(1).optional(),
+  tags: z.array(z.string().min(1)).optional(),
+  type: MemoryItemTypeSchema.optional(),
+  pattern: PatternSchema.optional(),
+  severity: z.enum(['high', 'medium', 'low']).optional(),
+  confirmed: z.boolean().optional(),
+  supersedes: z.array(z.string()).optional(),
+  related: z.array(z.string()).optional(),
+};
 
+function registerSearchTool(
+  server: McpServer,
+  repoRoot: string,
+  toolHandlers: Record<string, (params: Record<string, unknown>) => Promise<unknown>>
+): void {
   server.registerTool(
     'memory_search',
     {
@@ -239,34 +214,24 @@ Returns relevant memory items ranked by similarity and severity.`,
     }
   );
 
-  // Store handler for direct invocation
   toolHandlers['memory_search'] = async (params): Promise<SearchToolResult> => {
     const parsed = z.object(searchInputSchema).parse(params);
     return handleSearch(repoRoot, parsed.query, parsed.maxResults, parsed.type);
   };
+}
 
-  // =========================================================================
-  // memory_capture tool
-  // =========================================================================
-  const captureInputSchema = {
-    insight: z.string().min(MIN_INSIGHT_LENGTH, `Insight must be at least ${MIN_INSIGHT_LENGTH} characters`),
-    trigger: z.string().min(1).optional(),
-    tags: z.array(z.string().min(1)).optional(),
-    type: MemoryItemTypeSchema.optional(),
-    pattern: PatternSchema.optional(),
-    severity: z.enum(['high', 'medium', 'low']).optional(),
-    confirmed: z.boolean().optional(),
-    supersedes: z.array(z.string()).optional(),
-    related: z.array(z.string()).optional(),
-  };
-
+function registerCaptureTool(
+  server: McpServer,
+  repoRoot: string,
+  toolHandlers: Record<string, (params: Record<string, unknown>) => Promise<unknown>>
+): void {
   server.registerTool(
     'memory_capture',
     {
       title: 'Capture Memory',
       description: `Capture a memory item AFTER:
 - User corrects you ("no", "actually...", "use X instead")
-- Test fail → fix → pass cycles
+- Test fail -> fix -> pass cycles
 - Discovering project-specific knowledge
 
 Types: lesson (default), solution, pattern (requires pattern field), preference.
@@ -281,15 +246,17 @@ Saves immediately and shows what was captured.`,
     }
   );
 
-  // Store handler for direct invocation
   toolHandlers['memory_capture'] = async (params): Promise<CaptureToolResult> => {
     const parsed = z.object(captureInputSchema).parse(params);
     return handleCapture(repoRoot, parsed.insight, parsed.trigger, parsed.tags, parsed.type, parsed.pattern, parsed.severity, parsed.confirmed, parsed.supersedes, parsed.related);
   };
+}
 
-  // =========================================================================
-  // memory://prime resource
-  // =========================================================================
+function registerPrimeResource(
+  server: McpServer,
+  repoRoot: string,
+  resourceHandlers: Record<string, () => Promise<ResourceResult>>
+): void {
   server.registerResource(
     'prime',
     'memory://prime',
@@ -299,7 +266,6 @@ Saves immediately and shows what was captured.`,
       mimeType: 'text/plain',
     },
     async (uri) => {
-      // Delegate to the single source of truth for prime context
       const content = await getPrimeContext(repoRoot);
       return {
         contents: [{ uri: uri.href, text: content }],
@@ -307,15 +273,35 @@ Saves immediately and shows what was captured.`,
     }
   );
 
-  // Store handler for direct invocation
   resourceHandlers['memory://prime'] = async () => {
     const content = await getPrimeContext(repoRoot);
     return { content };
   };
+}
 
-  // =========================================================================
-  // Return wrapper with typed methods
-  // =========================================================================
+// ============================================================================
+// Public API
+// ============================================================================
+
+/**
+ * Create an MCP server for compound-agent.
+ *
+ * @param repoRoot - Repository root directory (immutable after creation)
+ * @returns MCP server wrapper with typed tool/resource methods
+ */
+export function createMcpServer(repoRoot: string): CompoundAgentMcpServer {
+  const server = new McpServer({
+    name: 'compound-agent',
+    version: VERSION,
+  });
+
+  const toolHandlers: Record<string, (params: Record<string, unknown>) => Promise<unknown>> = {};
+  const resourceHandlers: Record<string, () => Promise<ResourceResult>> = {};
+
+  registerSearchTool(server, repoRoot, toolHandlers);
+  registerCaptureTool(server, repoRoot, toolHandlers);
+  registerPrimeResource(server, repoRoot, resourceHandlers);
+
   return {
     server,
     repoRoot,
@@ -344,10 +330,6 @@ Saves immediately and shows what was captured.`,
 /**
  * Register signal handlers for clean resource cleanup.
  * Mirrors the CLI pattern in src/cli.ts.
- *
- * Note: We only close the SQLite database here. The embedding model
- * (node-llama-cpp) handles its own cleanup and calling unloadEmbedding()
- * during signal handlers can cause issues with the native addon.
  */
 export function registerMcpCleanup(): void {
   const cleanup = (): void => {

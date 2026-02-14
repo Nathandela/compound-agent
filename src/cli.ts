@@ -13,6 +13,7 @@
 
 import { Command } from 'commander';
 
+import { registerCompoundCommands } from './commands/compound.js';
 import {
   registerCaptureCommands,
   registerManagementCommands,
@@ -77,6 +78,7 @@ registerCaptureCommands(program);
 registerRetrievalCommands(program);
 registerManagementCommands(program);
 registerSetupCommands(program);
+registerCompoundCommands(program);
 
 // ============================================================================
 // Parse and Execute

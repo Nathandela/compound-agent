@@ -8,7 +8,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
-import type { MemoryItem } from '../memory/types.js';
+import type { MemoryItem } from '../memory/index.js';
 
 /** Relative path to CCT patterns file from repo root */
 export const CCT_PATTERNS_PATH = '.claude/lessons/cct-patterns.jsonl';

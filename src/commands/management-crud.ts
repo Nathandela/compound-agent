@@ -8,8 +8,8 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { appendMemoryItem, readMemoryItems, syncIfNeeded } from '../memory/storage/index.js';
-import { MemoryItemSchema, SeveritySchema } from '../memory/types.js';
-import type { MemoryItem, Severity } from '../memory/types.js';
+import { MemoryItemSchema, SeveritySchema } from '../memory/index.js';
+import type { MemoryItem, Severity } from '../memory/index.js';
 
 import { formatError } from '../cli-error-format.js';
 
@@ -19,52 +19,194 @@ import { formatLessonHuman, wasLessonDeleted } from './management-helpers.js';
 /** JSON indentation for show output */
 const SHOW_JSON_INDENT = 2;
 
+// ============================================================================
+// Action Handlers
+// ============================================================================
+
+async function showAction(id: string, options: { json?: boolean }): Promise<void> {
+  const repoRoot = getRepoRoot();
+
+  const { items } = await readMemoryItems(repoRoot);
+  const item = items.find((i) => i.id === id);
+
+  if (!item) {
+    const wasDeleted = await wasLessonDeleted(repoRoot, id);
+
+    if (options.json) {
+      console.log(JSON.stringify({ error: wasDeleted ? `Lesson ${id} not found (deleted)` : `Lesson ${id} not found` }));
+    } else {
+      const msg = wasDeleted ? `Lesson ${id} not found (deleted)` : `Lesson ${id} not found`;
+      console.error(formatError('show', 'NOT_FOUND', msg, 'Use "ca list" to see available lessons'));
+    }
+    process.exit(1);
+  }
+
+  if (options.json) {
+    console.log(JSON.stringify(item, null, SHOW_JSON_INDENT));
+  } else {
+    console.log(formatLessonHuman(item));
+  }
+}
+
+interface UpdateOptions {
+  insight?: string;
+  trigger?: string;
+  evidence?: string;
+  severity?: string;
+  tags?: string;
+  confirmed?: string;
+  json?: boolean;
+}
+
+function buildUpdatedItem(item: MemoryItem, options: UpdateOptions): MemoryItem {
+  return {
+    ...item,
+    ...(options.insight !== undefined && { insight: options.insight }),
+    ...(options.trigger !== undefined && { trigger: options.trigger }),
+    ...(options.evidence !== undefined && { evidence: options.evidence }),
+    ...(options.severity !== undefined && { severity: options.severity as Severity }),
+    ...(options.tags !== undefined && {
+      tags: [...new Set(
+        options.tags
+          .split(',')
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0)
+      )],
+    }),
+    ...(options.confirmed !== undefined && { confirmed: options.confirmed === 'true' }),
+  };
+}
+
+async function updateAction(id: string, options: UpdateOptions): Promise<void> {
+  const repoRoot = getRepoRoot();
+
+  const hasUpdates = options.insight !== undefined
+    || options.trigger !== undefined
+    || options.evidence !== undefined
+    || options.severity !== undefined
+    || options.tags !== undefined
+    || options.confirmed !== undefined;
+
+  if (!hasUpdates) {
+    if (options.json) {
+      console.log(JSON.stringify({ error: 'No fields to update (specify at least one: --insight, --tags, --severity, ...)' }));
+    } else {
+      console.error(formatError('update', 'NO_FIELDS', 'No fields to update', 'Specify at least one: --insight, --tags, --severity, ...'));
+    }
+    process.exit(1);
+  }
+
+  const { items } = await readMemoryItems(repoRoot);
+  const item = items.find((i) => i.id === id);
+
+  if (!item) {
+    const wasDeleted = await wasLessonDeleted(repoRoot, id);
+    if (options.json) {
+      console.log(JSON.stringify({ error: wasDeleted ? `Lesson ${id} is deleted` : `Lesson ${id} not found` }));
+    } else {
+      const msg = wasDeleted ? `Lesson ${id} is deleted` : `Lesson ${id} not found`;
+      console.error(formatError('update', 'NOT_FOUND', msg, 'Use "ca list" to see available lessons'));
+    }
+    process.exit(1);
+  }
+
+  if (options.severity !== undefined) {
+    const result = SeveritySchema.safeParse(options.severity);
+    if (!result.success) {
+      if (options.json) {
+        console.log(JSON.stringify({ error: `Invalid severity '${options.severity}' (must be: high, medium, low)` }));
+      } else {
+        console.error(formatError('update', 'INVALID_SEVERITY', `Invalid severity: "${options.severity}"`, 'Use --severity high|medium|low'));
+      }
+      process.exit(1);
+    }
+  }
+
+  const updatedItem = buildUpdatedItem(item, options);
+
+  const validationResult = MemoryItemSchema.safeParse(updatedItem);
+  if (!validationResult.success) {
+    if (options.json) {
+      console.log(JSON.stringify({ error: `Schema validation failed: ${validationResult.error.message}` }));
+    } else {
+      console.error(formatError('update', 'VALIDATION_FAILED', `Schema validation failed: ${validationResult.error.message}`, 'Check field values and try again'));
+    }
+    process.exit(1);
+  }
+
+  await appendMemoryItem(repoRoot, updatedItem);
+  await syncIfNeeded(repoRoot);
+
+  if (options.json) {
+    console.log(JSON.stringify(updatedItem, null, SHOW_JSON_INDENT));
+  } else {
+    out.success(`Updated lesson ${id}`);
+  }
+}
+
+async function deleteAction(ids: string[], options: { json?: boolean }): Promise<void> {
+  const repoRoot = getRepoRoot();
+
+  const { items } = await readMemoryItems(repoRoot);
+  const itemMap = new Map(items.map((i) => [i.id, i]));
+
+  const deleted: string[] = [];
+  const warnings: Array<{ id: string; message: string }> = [];
+
+  for (const id of ids) {
+    const item = itemMap.get(id);
+
+    if (!item) {
+      const wasDeleted = await wasLessonDeleted(repoRoot, id);
+      warnings.push({ id, message: wasDeleted ? 'already deleted' : 'not found' });
+      continue;
+    }
+
+    const deletedItem: MemoryItem = {
+      ...item,
+      deleted: true,
+      deletedAt: new Date().toISOString(),
+    };
+
+    await appendMemoryItem(repoRoot, deletedItem);
+    deleted.push(id);
+  }
+
+  if (deleted.length > 0) {
+    await syncIfNeeded(repoRoot);
+  }
+
+  if (options.json) {
+    console.log(JSON.stringify({ deleted, warnings }));
+  } else {
+    if (deleted.length > 0) {
+      out.success(`Deleted ${deleted.length} lesson(s): ${deleted.join(', ')}`);
+    }
+    for (const warning of warnings) {
+      out.warn(`${warning.id}: ${warning.message}`);
+    }
+    if (deleted.length === 0 && warnings.length > 0) {
+      process.exit(1);
+    }
+  }
+}
+
+// ============================================================================
+// Command Registration
+// ============================================================================
+
 /**
  * Register CRUD commands on the program.
  */
 export function registerCrudCommands(program: Command): void {
-  /**
-   * Show command - Display details of a specific lesson.
-   *
-   * @example npx ca show L12345678
-   * @example npx ca show L12345678 --json
-   */
   program
     .command('show <id>')
     .description('Show details of a specific lesson')
     .option('--json', 'Output as JSON')
     .action(async (id: string, options: { json?: boolean }) => {
-      const repoRoot = getRepoRoot();
-
-      const { items } = await readMemoryItems(repoRoot);
-      const item = items.find((i) => i.id === id);
-
-      if (!item) {
-        // Check if item was deleted (tombstone)
-        const wasDeleted = await wasLessonDeleted(repoRoot, id);
-
-        if (options.json) {
-          console.log(JSON.stringify({ error: wasDeleted ? `Lesson ${id} not found (deleted)` : `Lesson ${id} not found` }));
-        } else {
-          const msg = wasDeleted ? `Lesson ${id} not found (deleted)` : `Lesson ${id} not found`;
-          console.error(formatError('show', 'NOT_FOUND', msg, 'Use "ca list" to see available lessons'));
-        }
-        process.exit(1);
-      }
-
-      if (options.json) {
-        console.log(JSON.stringify(item, null, SHOW_JSON_INDENT));
-      } else {
-        console.log(formatLessonHuman(item));
-      }
+      await showAction(id, options);
     });
 
-  /**
-   * Update command - Update a lesson's mutable fields.
-   *
-   * @example npx ca update L12345678 --insight "New insight"
-   * @example npx ca update L12345678 --severity high --tags "api,auth"
-   */
   program
     .command('update <id>')
     .description('Update a lesson')
@@ -84,155 +226,14 @@ export function registerCrudCommands(program: Command): void {
       confirmed?: string;
       json?: boolean;
     }) => {
-      const repoRoot = getRepoRoot();
-
-      // Check if any update options provided
-      const hasUpdates = options.insight !== undefined
-        || options.trigger !== undefined
-        || options.evidence !== undefined
-        || options.severity !== undefined
-        || options.tags !== undefined
-        || options.confirmed !== undefined;
-
-      if (!hasUpdates) {
-        if (options.json) {
-          console.log(JSON.stringify({ error: 'No fields to update (specify at least one: --insight, --tags, --severity, ...)' }));
-        } else {
-          console.error(formatError('update', 'NO_FIELDS', 'No fields to update', 'Specify at least one: --insight, --tags, --severity, ...'));
-        }
-        process.exit(1);
-      }
-
-      // Read current items
-      const { items } = await readMemoryItems(repoRoot);
-      const item = items.find((i) => i.id === id);
-
-      if (!item) {
-        // Check if deleted
-        const wasDeleted = await wasLessonDeleted(repoRoot, id);
-
-        if (options.json) {
-          console.log(JSON.stringify({ error: wasDeleted ? `Lesson ${id} is deleted` : `Lesson ${id} not found` }));
-        } else {
-          const msg = wasDeleted ? `Lesson ${id} is deleted` : `Lesson ${id} not found`;
-          console.error(formatError('update', 'NOT_FOUND', msg, 'Use "ca list" to see available lessons'));
-        }
-        process.exit(1);
-      }
-
-      // Validate severity if provided
-      if (options.severity !== undefined) {
-        const result = SeveritySchema.safeParse(options.severity);
-        if (!result.success) {
-          if (options.json) {
-            console.log(JSON.stringify({ error: `Invalid severity '${options.severity}' (must be: high, medium, low)` }));
-          } else {
-            console.error(formatError('update', 'INVALID_SEVERITY', `Invalid severity: "${options.severity}"`, 'Use --severity high|medium|low'));
-          }
-          process.exit(1);
-        }
-      }
-
-      // Build updated item
-      const updatedItem: MemoryItem = {
-        ...item,
-        ...(options.insight !== undefined && { insight: options.insight }),
-        ...(options.trigger !== undefined && { trigger: options.trigger }),
-        ...(options.evidence !== undefined && { evidence: options.evidence }),
-        ...(options.severity !== undefined && { severity: options.severity as Severity }),
-        ...(options.tags !== undefined && {
-          tags: [...new Set(
-            options.tags
-              .split(',')
-              .map((t) => t.trim())
-              .filter((t) => t.length > 0)
-          )],
-        }),
-        ...(options.confirmed !== undefined && { confirmed: options.confirmed === 'true' }),
-      };
-
-      // Validate updated item against schema
-      const validationResult = MemoryItemSchema.safeParse(updatedItem);
-      if (!validationResult.success) {
-        if (options.json) {
-          console.log(JSON.stringify({ error: `Schema validation failed: ${validationResult.error.message}` }));
-        } else {
-          console.error(formatError('update', 'VALIDATION_FAILED', `Schema validation failed: ${validationResult.error.message}`, 'Check field values and try again'));
-        }
-        process.exit(1);
-      }
-
-      // Append updated item (last-write-wins)
-      await appendMemoryItem(repoRoot, updatedItem);
-      await syncIfNeeded(repoRoot);
-
-      if (options.json) {
-        console.log(JSON.stringify(updatedItem, null, SHOW_JSON_INDENT));
-      } else {
-        out.success(`Updated lesson ${id}`);
-      }
+      await updateAction(id, options);
     });
 
-  /**
-   * Delete command - Soft delete lessons.
-   *
-   * Appends the full lesson with `deleted: true` and `deletedAt`.
-   *
-   * @example npx ca delete L12345678
-   * @example npx ca delete L001 L002 L003
-   */
   program
     .command('delete <ids...>')
     .description('Soft delete lessons (creates tombstone)')
     .option('--json', 'Output as JSON')
     .action(async (ids: string[], options: { json?: boolean }) => {
-      const repoRoot = getRepoRoot();
-
-      const { items } = await readMemoryItems(repoRoot);
-      const itemMap = new Map(items.map((i) => [i.id, i]));
-
-      const deleted: string[] = [];
-      const warnings: Array<{ id: string; message: string }> = [];
-
-      for (const id of ids) {
-        const item = itemMap.get(id);
-
-        if (!item) {
-          // Check if already deleted or never existed
-          const wasDeleted = await wasLessonDeleted(repoRoot, id);
-          warnings.push({ id, message: wasDeleted ? 'already deleted' : 'not found' });
-          continue;
-        }
-
-        // Mark item as deleted (full record with deleted flag)
-        const deletedItem: MemoryItem = {
-          ...item,
-          deleted: true,
-          deletedAt: new Date().toISOString(),
-        };
-
-        await appendMemoryItem(repoRoot, deletedItem);
-
-        deleted.push(id);
-      }
-
-      // Sync once at end
-      if (deleted.length > 0) {
-        await syncIfNeeded(repoRoot);
-      }
-
-      if (options.json) {
-        console.log(JSON.stringify({ deleted, warnings }));
-      } else {
-        if (deleted.length > 0) {
-          out.success(`Deleted ${deleted.length} lesson(s): ${deleted.join(', ')}`);
-        }
-        for (const warning of warnings) {
-          out.warn(`${warning.id}: ${warning.message}`);
-        }
-        if (deleted.length === 0 && warnings.length > 0) {
-          process.exit(1);
-        }
-      }
+      await deleteAction(ids, options);
     });
 }

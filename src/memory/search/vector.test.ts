@@ -1,8 +1,9 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
+import { CCT_PATTERNS_PATH } from '../../compound/types.js';
 import { appendLesson } from '../storage/jsonl.js';
 import {
   closeDb,
@@ -298,6 +299,72 @@ describe('vector search', () => {
         const results = await searchVector(tempDir, 'test query', { limit: 10 });
 
         expect(results).toEqual([]);
+      });
+    });
+
+    describe('CCT pattern inclusion', () => {
+      it('includes CCT patterns in search results when file exists', async () => {
+        // Add a regular lesson
+        await appendLesson(tempDir, createQuickLesson('L001', 'use const over let'));
+        await rebuildIndex(tempDir);
+
+        // Write a CCT pattern file
+        const cctPath = join(tempDir, CCT_PATTERNS_PATH);
+        await mkdir(dirname(cctPath), { recursive: true });
+        const pattern = {
+          id: 'CCT-abcd1234',
+          name: 'typescript, style',
+          description: 'Always prefer const over let',
+          frequency: 3,
+          testable: false,
+          sourceIds: ['L001', 'L002', 'L003'],
+          created: '2026-01-01T00:00:00Z',
+        };
+        await writeFile(cctPath, JSON.stringify(pattern) + '\n', 'utf-8');
+
+        // Mock embedText
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+
+        const results = await searchVector(tempDir, 'const vs let', { limit: 10 });
+        // Should include both the lesson and the CCT pattern
+        const ids = results.map((r) => r.lesson.id);
+        expect(ids).toContain('L001');
+        expect(ids).toContain('CCT-abcd1234');
+      });
+
+      it('works when cct-patterns.jsonl does not exist', async () => {
+        await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
+        await rebuildIndex(tempDir);
+
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+
+        const results = await searchVector(tempDir, 'test', { limit: 10 });
+        expect(results).toHaveLength(1);
+        expect(results[0]!.lesson.id).toBe('L001');
+      });
+
+      it('CCT patterns respect limit', async () => {
+        // Write many CCT patterns
+        const cctPath = join(tempDir, CCT_PATTERNS_PATH);
+        await mkdir(dirname(cctPath), { recursive: true });
+        const lines: string[] = [];
+        for (let i = 0; i < 5; i++) {
+          lines.push(JSON.stringify({
+            id: `CCT-0000000${i}`,
+            name: `pattern ${i}`,
+            description: `pattern description ${i}`,
+            frequency: 2,
+            testable: false,
+            sourceIds: [`L00${i}`],
+            created: '2026-01-01T00:00:00Z',
+          }));
+        }
+        await writeFile(cctPath, lines.join('\n') + '\n', 'utf-8');
+
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+
+        const results = await searchVector(tempDir, 'pattern', { limit: 3 });
+        expect(results.length).toBeLessThanOrEqual(3);
       });
     });
   });

@@ -5,7 +5,7 @@
  * summarizing the common theme.
  */
 
-import type { MemoryItem } from '../memory/types.js';
+import type { MemoryItem } from '../memory/index.js';
 import { generateCctId, type CctPattern } from './types.js';
 
 /**

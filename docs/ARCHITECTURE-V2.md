@@ -81,11 +81,11 @@ All types share one store, one schema, one search mechanism. A query returns the
 
 ```
 .claude/
-  memory/
-    items.jsonl          # Source of truth (git-tracked, append-only)
+  lessons/
+    index.jsonl          # Source of truth (git-tracked, append-only)
     archive/             # Compacted old items
   .cache/
-    memory.sqlite        # Rebuildable index with FTS5 + embeddings (gitignored)
+    lessons.sqlite       # Rebuildable index with FTS5 + embeddings (gitignored)
 ```
 
 This is the same proven three-layer model from beads (fast local DB + portable JSONL + git distribution) applied to knowledge.
@@ -126,10 +126,13 @@ interface MemoryItem {
 **Retrieval:**
 
 ```
-score = vector_similarity(query, item)
-      * severity_boost    (high=1.5, medium=1.0, low=0.8)
-      * recency_boost     (last 30d=1.2, older=1.0)
-      * confirmation_boost (confirmed=1.3)
+boost  = severity_boost * recency_boost * confirmation_boost
+         clamped to max 1.8
+score  = vector_similarity(query, item) * boost
+
+severity_boost:     high=1.5, medium=1.0, low=0.8
+recency_boost:      last 30d=1.2, older=1.0
+confirmation_boost: confirmed=1.3, unconfirmed=1.0
 ```
 
 **Capture quality (lower bar, prune later):**
@@ -261,7 +264,7 @@ The compound engineering cycle, triggered by explicit slash commands.
 4. High-severity items require user confirmation
 5. Low/medium-severity items auto-stored (pruned later)
 6. Update existing items: set `supersedes` and `related` links
-7. Output: new memory items in `items.jsonl`
+7. Output: new memory items in `index.jsonl`
 
 **Agent model**: Small team (3-4 analysts). Lead writes final items.
 
@@ -336,19 +339,19 @@ Skills can reference each other and can be project-specific or shared.
 {
   "hooks": {
     "SessionStart": [
-      { "type": "command", "command": "npx compound-agent prime" }
+      { "type": "command", "command": "npx ca prime" }
     ],
     "PreCompact": [
-      { "type": "command", "command": "npx compound-agent prime" }
+      { "type": "command", "command": "npx ca prime" }
     ],
     "UserPromptSubmit": [
-      { "type": "command", "command": "npx compound-agent context" }
+      { "type": "command", "command": "npx ca hooks run user-prompt" }
     ]
   }
 }
 ```
 
-- **SessionStart/PreCompact**: Load high-severity memory items + active beads tasks
+- **SessionStart/PreCompact**: Load high-severity memory items + workflow context
 - **UserPromptSubmit**: Detect correction/planning language, inject relevant memory
 
 ### MCP Tools
@@ -357,7 +360,6 @@ Skills can reference each other and can be project-specific or shared.
 |------|---------|
 | `memory_search` | Search memory items (semantic) |
 | `memory_capture` | Store new memory item |
-| `workflow_status` | Current workflow phase + progress |
 
 ### Slash Commands
 
@@ -408,8 +410,8 @@ The transition preserves all existing investment:
 
 | Current | Compound Agent | Migration |
 |---------|---------------|-----------|
-| `lessons/index.jsonl` | `memory/items.jsonl` | Rename + schema extension (backward compatible) |
-| `lessons.sqlite` | `memory.sqlite` | Rebuild from JSONL |
+| `lessons/index.jsonl` | `lessons/index.jsonl` | Schema extension (backward compatible) |
+| `lessons.sqlite` | `lessons.sqlite` | Rebuild from JSONL |
 | `learn` CLI | `compound-agent capture` | Alias preserved |
 | `search` CLI | `compound-agent search` | Same interface |
 | `lesson_search` MCP | `memory_search` MCP | Renamed |
@@ -492,7 +494,7 @@ User: /compound:compound
         |  lesson: "Security review caught issue that tests missed"
         +-------+--------+
                 |
-        Stored in memory/items.jsonl
+        Stored in .claude/lessons/index.jsonl
         Available for next /compound:plan cycle
 ```
 
@@ -535,10 +537,10 @@ npx compound-agent setup
 | Drop agent definitions | `.claude/agents/compound/*.md` | Specialized agent roles (reviewers, researchers, etc.) |
 | Drop slash commands | `.claude/commands/compound/*.md` | `/compound:plan`, `/compound:work`, etc. |
 | Drop phase skills | `.claude/skills/compound/*.md` | Process instructions for each workflow phase |
-| Configure hooks | `.claude/settings.json` | SessionStart, PreCompact, UserPromptSubmit |
+| Configure hooks | `.claude/settings.json` | SessionStart, PreCompact, UserPromptSubmit, PostToolUse hooks |
 | Register MCP server | `.mcp.json` | `memory_search`, `memory_capture` tools |
-| Create memory store | `.claude/memory/` | JSONL + cache directory |
-| Download embedding model | `~/.cache/compound-agent/models/` | First-use only, ~278MB |
+| Create memory store | `.claude/lessons/` | JSONL + cache directory |
+| Download embedding model | `~/.node-llama-cpp/models/` | First-use only, ~278MB |
 
 ### What the npm Package Provides
 

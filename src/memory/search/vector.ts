@@ -5,6 +5,7 @@
  * Uses SQLite cache to avoid recomputing embeddings.
  */
 
+import { readCctPatterns, type CctPattern } from '../../compound/index.js';
 import { embedText } from '../embeddings/index.js';
 import { contentHash, getCachedEmbedding, readMemoryItems, setCachedEmbedding } from '../storage/index.js';
 import type { MemoryItem } from '../types.js';
@@ -61,6 +62,25 @@ const DEFAULT_LIMIT = 10;
  * Returns top N lessons sorted by similarity score (descending).
  * Uses embedding cache to avoid recomputing embeddings.
  */
+/**
+ * Convert a CctPattern to a MemoryItem-like shape for search results.
+ */
+function cctToMemoryItem(pattern: CctPattern): MemoryItem {
+  return {
+    id: pattern.id,
+    type: 'lesson',
+    trigger: pattern.name,
+    insight: pattern.description,
+    tags: [],
+    source: 'manual',
+    context: { tool: 'compound', intent: 'synthesis' },
+    created: pattern.created,
+    confirmed: true,
+    supersedes: [],
+    related: pattern.sourceIds,
+  };
+}
+
 export async function searchVector(
   repoRoot: string,
   query: string,
@@ -69,7 +89,16 @@ export async function searchVector(
   const limit = options?.limit ?? DEFAULT_LIMIT;
   // Read all memory items (all types)
   const { items } = await readMemoryItems(repoRoot);
-  if (items.length === 0) return [];
+
+  // Read CCT patterns if available
+  let cctPatterns: CctPattern[] = [];
+  try {
+    cctPatterns = await readCctPatterns(repoRoot);
+  } catch {
+    // File doesn't exist or is unreadable — proceed without CCT patterns
+  }
+
+  if (items.length === 0 && cctPatterns.length === 0) return [];
 
   // Embed the query
   const queryVector = await embedText(query);
@@ -97,6 +126,18 @@ export async function searchVector(
       scored.push({ lesson: item, score });
     } catch {
       // Skip items that fail embedding — return partial results
+      continue;
+    }
+  }
+
+  // Score CCT patterns
+  for (const pattern of cctPatterns) {
+    try {
+      const text = `${pattern.name} ${pattern.description}`;
+      const vec = await embedText(text);
+      const score = cosineSimilarity(queryVector, vec);
+      scored.push({ lesson: cctToMemoryItem(pattern), score });
+    } catch {
       continue;
     }
   }

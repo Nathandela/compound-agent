@@ -10,9 +10,9 @@ import { dirname, join } from 'node:path';
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
-import { isModelAvailable, resolveModel } from '../memory/embeddings/model.js';
+import { isModelAvailable, resolveModel } from '../memory/embeddings/index.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
-import { out } from '../commands/shared.js';
+import { out } from '../commands/index.js';
 import {
   addAllCompoundAgentHooks,
   addMcpServerToMcpJson,

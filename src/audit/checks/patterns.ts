@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { readMemoryItems } from '../../memory/storage/index.js';
-import { findFiles } from '../../rules/checks/glob-utils.js';
+import { findFiles } from '../../rules/index.js';
 import type { AuditCheckResult } from '../types.js';
 
 /**

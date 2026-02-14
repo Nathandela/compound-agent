@@ -85,7 +85,7 @@ pnpm v9+ blocks native addon builds by default. Add to your `package.json`:
 ```json
 {
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3"]
+    "onlyBuiltDependencies": ["better-sqlite3", "node-llama-cpp"]
   }
 }
 ```
@@ -98,13 +98,12 @@ Then run `pnpm install`.
 |--------|----------|---------|
 | Create lessons store | `.claude/lessons/` | JSONL + cache directory |
 | Install AGENTS.md | project root | Workflow instructions for Claude |
-| Configure hooks | `.claude/settings.json` | SessionStart, PreCompact |
+| Configure hooks | `.claude/settings.json` | SessionStart, PreCompact, UserPromptSubmit, PostToolUse hooks |
 | Register MCP server | `.mcp.json` | `memory_search`, `memory_capture` tools |
 | Install workflow commands | `.claude/commands/compound/` | Slash commands for each phase |
 | Install agent definitions | `.claude/agents/compound/` | Specialized agent roles |
 | Install phase skills | `.claude/skills/compound/` | Process instructions per phase |
 | Download embedding model | `~/.node-llama-cpp/models/` | First-use only, ~278MB |
-| Install git pre-commit hook | `.git/hooks/pre-commit` | Lesson capture reminder |
 
 ## Quick Start
 
@@ -145,10 +144,10 @@ The CLI binary is `ca` (alias: `compound-agent`).
 
 | Command | Description |
 |---------|-------------|
-| `ca search "<query>"` | Semantic search across memory |
+| `ca search "<query>"` | Keyword search across memory (FTS5) |
 | `ca list` | List all memory items |
 | `ca list --invalidated` | List only invalidated items |
-| `ca check-plan "<query>"` | Plan-time retrieval with context |
+| `ca check-plan --plan "<text>"` | Semantic search for plan-time retrieval |
 | `ca load-session` | Load high-severity items for session start |
 
 ### Management
@@ -167,7 +166,9 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca export` | Export items as JSON |
 | `ca import <file>` | Import items from JSONL file |
 | `ca prime` | Load workflow context (used by hooks) |
+| `ca audit` | Run audit checks against the codebase |
 | `ca rules check` | Run repository-defined rule checks |
+| `ca test-summary` | Run tests and output a compact summary |
 
 ### Setup
 
@@ -176,7 +177,10 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca setup` | One-shot setup (hooks + MCP + model) |
 | `ca setup --skip-model` | Setup without model download |
 | `ca setup --uninstall` | Remove all generated files |
-| `ca setup claude --status` | Check integration health |
+| `ca setup --update` | Regenerate files (preserves user customizations) |
+| `ca setup --status` | Show installation status |
+| `ca setup --dry-run` | Show what would change without changing |
+| `ca setup claude --status` | Check Claude Code integration health |
 | `ca setup claude --uninstall` | Remove Claude hooks only |
 | `ca download-model` | Download the embedding model |
 
@@ -246,10 +250,13 @@ All memory items share a common schema with a discriminated union on the `type` 
 ### Retrieval Ranking
 
 ```
-score = vector_similarity(query, item)
-      * severity_boost     (high=1.5, medium=1.0, low=0.8)
-      * recency_boost      (last 30d=1.2, older=1.0)
-      * confirmation_boost (confirmed=1.3)
+boost  = severity_boost * recency_boost * confirmation_boost
+         clamped to max 1.8
+score  = vector_similarity(query, item) * boost
+
+severity_boost:     high=1.5, medium=1.0, low=0.8
+recency_boost:      last 30d=1.2, older=1.0
+confirmation_boost: confirmed=1.3, unconfirmed=1.0
 ```
 
 ### Example

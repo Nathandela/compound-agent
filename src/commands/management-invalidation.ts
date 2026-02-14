@@ -8,7 +8,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { appendMemoryItem, readMemoryItems } from '../memory/storage/index.js';
-import type { MemoryItem } from '../memory/types.js';
+import type { MemoryItem } from '../memory/index.js';
 
 import { formatError } from '../cli-error-format.js';
 
@@ -95,8 +95,11 @@ export function registerInvalidationCommands(program: Command): void {
       }
 
       // Remove invalidation fields (keep everything else)
-      const { invalidatedAt: _, invalidationReason: __, ...rest } = lesson;
-      const updatedItem = rest as MemoryItem;
+      const updatedItem: MemoryItem = {
+        ...lesson,
+        invalidatedAt: undefined,
+        invalidationReason: undefined,
+      };
 
       // Append the updated lesson (JSONL append-only pattern)
       await appendMemoryItem(repoRoot, updatedItem);

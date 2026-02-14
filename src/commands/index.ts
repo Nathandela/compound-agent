@@ -6,11 +6,13 @@
 
 import type { Command } from 'commander';
 
-import { registerClaudeSubcommand } from '../setup/claude.js';
-import { registerDownloadModelCommand } from '../setup/download-model.js';
-import { registerHooksCommand } from '../setup/hooks.js';
-import { registerInitCommand } from '../setup/init.js';
-import { registerSetupAllCommand } from '../setup/all.js';
+import {
+  registerClaudeSubcommand,
+  registerDownloadModelCommand,
+  registerHooksCommand,
+  registerInitCommand,
+  registerSetupAllCommand,
+} from '../setup/index.js';
 
 import { registerCrudCommands } from './management-crud.js';
 import { registerInvalidationCommands } from './management-invalidation.js';

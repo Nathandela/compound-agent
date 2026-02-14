@@ -224,6 +224,98 @@ describe('Capture Commands', () => {
         expect(combined).toMatch(/low/i);
       });
     });
+
+    // --type flag tests (memory item types)
+    describe('--type flag', () => {
+      it('defaults to type=lesson when --type is omitted (backward compat)', async () => {
+        runCli('learn "Default type insight" --yes');
+
+        const filePath = join(getTempDir(), LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const item = JSON.parse(content.trim()) as { type: string };
+        expect(item.type).toBe('lesson');
+      });
+
+      it('captures a solution when --type solution is used', async () => {
+        runCli('learn "Fix by restarting service" --type solution --yes');
+
+        const filePath = join(getTempDir(), LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const item = JSON.parse(content.trim()) as { type: string };
+        expect(item.type).toBe('solution');
+      });
+
+      it('captures a preference when --type preference is used', async () => {
+        runCli('learn "Always use dark mode" --type preference --yes');
+
+        const filePath = join(getTempDir(), LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const item = JSON.parse(content.trim()) as { type: string };
+        expect(item.type).toBe('preference');
+      });
+
+      it('captures a pattern with --type pattern and both pattern flags', async () => {
+        runCli('learn "Use const over let" --type pattern --pattern-bad "let x = 1" --pattern-good "const x = 1" --yes');
+
+        const filePath = join(getTempDir(), LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const item = JSON.parse(content.trim()) as { type: string; pattern?: { bad: string; good: string } };
+        expect(item.type).toBe('pattern');
+        expect(item.pattern).toBeDefined();
+        expect(item.pattern?.bad).toBe('let x = 1');
+        expect(item.pattern?.good).toBe('const x = 1');
+      });
+
+      it('errors when --type pattern is used without pattern flags', () => {
+        const { combined } = runCli('learn "Missing pattern flags" --type pattern --yes');
+        expect(combined.toLowerCase()).toMatch(/error|required/i);
+        expect(combined).toMatch(/pattern-bad/i);
+        expect(combined).toMatch(/pattern-good/i);
+      });
+
+      it('rejects invalid --type value', () => {
+        const { combined } = runCli('learn "Bad type" --type invalid --yes');
+        expect(combined.toLowerCase()).toMatch(/error|invalid/i);
+        expect(combined).toMatch(/type/i);
+      });
+
+      it('uses correct ID prefix for solution type', async () => {
+        runCli('learn "Solution insight" --type solution --yes');
+
+        const filePath = join(getTempDir(), LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const item = JSON.parse(content.trim()) as { id: string };
+        expect(item.id).toMatch(/^S/);
+      });
+
+      it('uses correct ID prefix for pattern type', async () => {
+        runCli('learn "Pattern insight" --type pattern --pattern-bad "old" --pattern-good "new" --yes');
+
+        const filePath = join(getTempDir(), LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const item = JSON.parse(content.trim()) as { id: string };
+        expect(item.id).toMatch(/^P/);
+      });
+
+      it('uses correct ID prefix for preference type', async () => {
+        runCli('learn "Preference insight" --type preference --yes');
+
+        const filePath = join(getTempDir(), LESSONS_PATH);
+        const content = await readFile(filePath, 'utf-8');
+        const item = JSON.parse(content.trim()) as { id: string };
+        expect(item.id).toMatch(/^R/);
+      });
+
+      it('says "Captured" for non-lesson types', async () => {
+        const { combined } = runCli('learn "A solution" --type solution --yes');
+        expect(combined).toMatch(/Captured/);
+      });
+
+      it('says "Learned" for lesson type (default)', async () => {
+        const { combined } = runCli('learn "A lesson" --yes');
+        expect(combined).toMatch(/Learned/);
+      });
+    });
   });
 
   describe('detect command', () => {

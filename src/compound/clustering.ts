@@ -5,7 +5,7 @@
  */
 
 import { cosineSimilarity } from '../memory/search/index.js';
-import type { MemoryItem } from '../memory/types.js';
+import type { MemoryItem } from '../memory/index.js';
 import type { ClusterResult } from './types.js';
 
 /** Default similarity threshold for clustering */

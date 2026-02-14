@@ -9,3 +9,4 @@ export { formatViolation, loadRuleConfig, runRules } from './engine.js';
 export type { RuleResult, Violation } from './engine.js';
 export { RuleCheckSchema, RuleConfigSchema, RuleSchema, SeveritySchema } from './types.js';
 export type { Rule, RuleCheck, RuleConfig, Severity } from './types.js';
+export { findFiles } from './checks/glob-utils.js';

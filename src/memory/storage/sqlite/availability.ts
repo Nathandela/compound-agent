@@ -23,7 +23,6 @@ export function ensureSqliteAvailable(): void {
   if (checked) return;
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const module = require('better-sqlite3');
     const Constructor = module.default || module;
     const testDb = new Constructor(':memory:');

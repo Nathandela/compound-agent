@@ -16,10 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`/compound:lfg` command**: Chains all 5 phases sequentially for end-to-end workflow
 - **Agent teams with inter-communication**: Specialized agents (reviewers, researchers, analysts) collaborate at each phase
 - **MCP server**: `memory_search` and `memory_capture` tools, `memory://prime` resource for workflow context
-- **Rule engine**: Config-driven validation for memory item quality
+- **Rule engine**: Config-driven validation for memory item quality via `ca rules check`
+- **Audit system**: `ca audit` command runs pattern, rule, and lesson quality checks against the codebase
+- **Test summary**: `ca test-summary` command runs tests and outputs a compact pass/fail summary
+- **Intelligent compounding**: CCT pattern detection with similarity clustering and automatic synthesis
 - **Embedding model**: EmbeddingGemma-300M via node-llama-cpp for local semantic search
 - **Full-cycle integration tests**: 41 tests covering the complete compound workflow
 - **Setup command (`ca setup`)**: One-shot configuration of hooks, MCP server, agents, commands, and skills
+- **Setup update**: `ca setup --update` regenerates generated files while preserving user customizations
+- **Setup status**: `ca setup --status` shows installation status of all components
 
 ### Changed
 
@@ -28,6 +33,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **MCP-first integration**: MCP tools are the primary interface; CLI serves as fallback
 - **Memory storage**: Items stored in `.claude/lessons/index.jsonl` (backward compatible with v0.x lessons)
 - **Hook system**: UserPromptSubmit and PostToolUse hooks for context-aware memory injection
+- **MCP `memory_capture`**: Supports all memory types (lesson, solution, pattern, preference), severity, confirmation, supersedes, and related fields
+
+### Fixed
+
+- **Version state**: VERSION now reads from package.json at runtime
+- **Model names**: Embedding model references use consistent naming
+- **DB isolation**: Test suites use isolated database instances
+- **Error visibility**: Structured error format with codes across all CLI commands
 
 ## [0.2.9] - 2026-02-07
 
