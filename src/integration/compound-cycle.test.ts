@@ -17,7 +17,7 @@ import { createMcpServer } from '../mcp.js';
 import type { CompoundAgentMcpServer } from '../mcp.js';
 import { isModelUsable } from '../memory/embeddings/model.js';
 import { isModelAvailable } from '../memory/embeddings/nomic.js';
-import { closeDb } from '../memory/storage/index.js';
+import { closeDb, getRetrievalStats } from '../memory/storage/index.js';
 import { retrieveForPlan } from '../memory/retrieval/plan.js';
 import { readMemoryItems } from '../memory/storage/jsonl.js';
 import { shouldSkipEmbeddingTests } from '../test-utils.js';
@@ -273,7 +273,7 @@ describe.skipIf(skipEmbeddings)('plan-influence: capture -> retrieveForPlan', ()
   });
 
   it('retrieveForPlan increments retrieval count for surfaced items', async () => {
-    await mcp.callTool('memory_capture', {
+    const captured = await mcp.callTool('memory_capture', {
       insight: 'Use parameterized queries to prevent SQL injection attacks',
       type: 'lesson',
       severity: 'high',
@@ -281,13 +281,13 @@ describe.skipIf(skipEmbeddings)('plan-influence: capture -> retrieveForPlan', ()
       confirmed: true,
     });
 
-    await retrieveForPlan(tempDir, 'implement database query layer with SQL');
+    const result = await retrieveForPlan(tempDir, 'implement database query layer with SQL');
+    expect(result.lessons.length).toBeGreaterThan(0);
 
-    // Read back the item to check retrieval count was incremented
-    const { items } = await readMemoryItems(tempDir);
-    // Note: retrievalCount may be tracked in SQLite, not JSONL
-    // The important assertion is that retrieveForPlan returned results
-    // and didn't error
-    expect(items.length).toBeGreaterThan(0);
+    // Retrieval count is tracked in SQLite, not JSONL
+    const stats = getRetrievalStats(tempDir);
+    const stat = stats.find((s) => s.id === captured.item.id);
+    expect(stat).toBeDefined();
+    expect(stat!.count).toBeGreaterThanOrEqual(1);
   });
 });
