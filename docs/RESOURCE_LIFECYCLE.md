@@ -219,8 +219,8 @@ Before first embedding call, the model must be downloaded:
 npx compound-agent download-model
 
 # Or programmatically
-import { ensureModel } from 'compound-agent';
-await ensureModel();
+import { resolveModel } from 'compound-agent';
+await resolveModel();
 ```
 
 Without the model, embedding functions will throw an error directing you to download it.

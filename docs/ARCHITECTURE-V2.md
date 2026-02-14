@@ -130,7 +130,6 @@ score = vector_similarity(query, item)
       * severity_boost    (high=1.5, medium=1.0, low=0.8)
       * recency_boost     (last 30d=1.2, older=1.0)
       * confirmation_boost (confirmed=1.3)
-      * retrieval_boost   (frequently retrieved=1.1)
 ```
 
 **Capture quality (lower bar, prune later):**
