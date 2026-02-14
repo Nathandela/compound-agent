@@ -212,7 +212,11 @@ export function registerCaptureCommands(program: Command): void {
           input = await parseInputFile(options.input);
         } catch (err) {
           const message = err instanceof Error ? err.message : 'Failed to parse input file';
-          console.error(formatError('detect', 'INVALID_INPUT', message, 'Check the file is valid JSON matching the expected schema'));
+          if (options.json) {
+            console.log(JSON.stringify({ error: message, detected: false }));
+          } else {
+            console.error(formatError('detect', 'INVALID_INPUT', message, 'Check the file is valid JSON matching the expected schema'));
+          }
           process.exit(1);
         }
         const result = await detectAndPropose(repoRoot, input);

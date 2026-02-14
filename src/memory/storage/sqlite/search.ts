@@ -159,7 +159,11 @@ export async function searchKeyword(
       .all(sanitized, limit) as MemoryItemRow[];
 
     return rows.map(rowToMemoryItem).filter((x): x is MemoryItem => x !== null);
-  } catch {
+  } catch (err) {
+    // Log for debugging — sanitization should prevent most FTS5 errors,
+    // but real issues (e.g. DB corruption) should not be fully silent
+    const message = err instanceof Error ? err.message : 'Unknown FTS5 error';
+    console.error(`[compound-agent] search error: ${message}`);
     return [];
   }
 }

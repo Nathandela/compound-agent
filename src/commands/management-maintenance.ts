@@ -72,6 +72,9 @@ export function registerMaintenanceCommands(program: Command): void {
       console.log(`  Archived: ${result.archived} lesson(s)`);
       console.log(`  Tombstones removed: ${result.tombstonesRemoved}`);
       console.log(`  Lessons remaining: ${result.lessonsRemaining}`);
+      if (result.droppedInvalid > 0) {
+        console.log(`  Invalid records dropped: ${result.droppedInvalid}`);
+      }
 
       // Rebuild SQLite index after compaction
       await rebuildIndex(repoRoot);

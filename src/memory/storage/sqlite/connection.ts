@@ -39,7 +39,8 @@ function hasExpectedVersion(database: DatabaseType): boolean {
 export function openDb(repoRoot: string, options: DbOptions = {}): DatabaseType {
   const { inMemory = false } = options;
 
-  const key = inMemory ? ':memory:' : join(repoRoot, DB_PATH);
+  // In-memory DBs are keyed by repoRoot so different repos stay isolated
+  const key = inMemory ? `:memory:${repoRoot}` : join(repoRoot, DB_PATH);
 
   const cached = dbMap.get(key);
   if (cached) {
@@ -85,6 +86,7 @@ export function closeDb(): void {
 
 /**
  * Get the current database instance (for internal use).
+ * @deprecated Prefer openDb(repoRoot) for explicit repo-scoped access.
  * @returns Current database instance or null
  */
 export function getDb(): DatabaseType | null {
