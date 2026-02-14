@@ -508,7 +508,7 @@ User: /compound:compound
 | Build | tsup | Same |
 | Testing | Vitest + fast-check | Same |
 | Storage | better-sqlite3 + FTS5 | Same |
-| Embeddings | node-llama-cpp + nomic-embed-text | Same |
+| Embeddings | node-llama-cpp + EmbeddingGemma-300M | Same |
 | CLI | Commander.js | Same |
 | Schema | Zod | Same |
 | Issue tracking | Beads (bd) | Foundation layer |

@@ -2,7 +2,7 @@
 
 ## Overview
 
-The project was renamed from **learning-agent** to **compound-agent** in v1.0.0. The CLI command changed from `lna` to `ca`, MCP tools were renamed, and the internal data model evolved from "lessons" to "memory items." Your existing lesson data is fully compatible -- no data migration is needed.
+The project was renamed from **learning-agent** to **compound-agent** in the compound-agent rename. The CLI command changed from `lna` to `ca`, MCP tools were renamed, and the internal data model evolved from "lessons" to "memory items." Your existing lesson data is fully compatible -- no data migration is needed.
 
 ## What Changed
 
@@ -118,7 +118,7 @@ All commands work the same way -- only the binary name changed.
 | `lna init` | `ca init` |
 | `lna hooks` | `ca hooks` |
 | `lna rules check` | `ca rules check` |
-| `lna remind-capture` | `ca remind-capture` |
+| `lna remind-capture` | Removed -- handled by git pre-commit hook via `ca setup` |
 | `lna test-summary` | `ca test-summary` |
 
 ## New Features in v1.0.0

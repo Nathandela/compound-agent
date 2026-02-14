@@ -26,7 +26,7 @@ For detailed project rules and TDD workflow, see `.claude/CLAUDE.md`.
 |-----------|----------|---------|
 | Types/Schemas | `src/memory/types.ts` | Zod schemas for Lesson and LessonRecord |
 | Storage | `src/memory/storage/` | JSONL append-only + SQLite FTS5 index |
-| Embeddings | `src/memory/embeddings/` | node-llama-cpp with nomic model |
+| Embeddings | `src/memory/embeddings/` | node-llama-cpp with EmbeddingGemma-300M |
 | Search | `src/memory/search/` | Vector similarity + ranking with boosts |
 | Capture | `src/memory/capture/` | Trigger detection + quality filters |
 | Retrieval | `src/memory/retrieval/` | Session-start and plan-time retrieval |
@@ -85,7 +85,7 @@ pnpm dev
 node ./dist/cli.js <command>
 
 # Commands
-node ./dist/cli.js download-model   # Download nomic-embed-text model
+node ./dist/cli.js download-model   # Download EmbeddingGemma-300M model
 ```
 
 ---
@@ -168,12 +168,26 @@ db.prepare(`SELECT * FROM lessons WHERE id = '${id}'`);
 
 ## API Contracts
 
-### Zod Schemas (src/types.ts)
+### Zod Schemas (src/memory/types.ts)
 
 ```typescript
-// Record types for JSONL storage
-LessonSchema        // Unified lesson schema (all fields, optional except core)
-LessonRecordSchema  // Union: LessonSchema | legacy minimal tombstone (for reading JSONL)
+// Memory item schemas (current format)
+MemoryItemSchema        // Base memory item (all fields, optional except core)
+MemoryItemRecordSchema  // Union: MemoryItemSchema | legacy formats (for reading JSONL)
+MemoryItemTypeSchema    // "lesson" | "solution" | "pattern" | "preference"
+
+// Specialized item schemas
+LessonItemSchema        // type: "lesson" - mistakes and corrections
+SolutionItemSchema      // type: "solution" - working approaches
+PatternItemSchema       // type: "pattern" - recurring code patterns
+PreferenceItemSchema    // type: "preference" - user preferences
+
+// Legacy schemas (backward compatibility)
+LessonSchema            // Original lesson format
+LessonRecordSchema      // Union: LessonSchema | LegacyTombstoneSchema
+LessonTypeSchema        // "mistake" | "preference" | "procedure"
+LegacyLessonSchema      // Pre-v1 lesson format
+LegacyTombstoneSchema   // Minimal tombstone record for deletions
 ```
 
 ### Public Exports (src/index.ts)
@@ -182,25 +196,39 @@ All public API is exported from `src/index.ts`:
 
 ```typescript
 // Storage
-appendLesson, readLessons, LESSONS_PATH
-rebuildIndex, searchKeyword, closeDb, DB_PATH
+appendLesson, appendMemoryItem, readLessons, readMemoryItems
+rebuildIndex, searchKeyword, closeDb, DB_PATH, LESSONS_PATH
 
 // Embeddings
 embedText, embedTexts, getEmbedding, unloadEmbedding
-ensureModel, getModelPath
+isModelAvailable, isModelUsable, resolveModel
+MODEL_FILENAME, MODEL_URI
 
 // Search
-searchVector, cosineSimilarity, rankLessons, calculateScore
+searchVector, cosineSimilarity, calculateScore
+rankLessons, rankMemoryItems
+severityBoost, recencyBoost, confirmationBoost
 
 // Capture
 shouldPropose, isNovel, isSpecific, isActionable
 detectUserCorrection, detectSelfCorrection, detectTestFailure
 
 // Retrieval
-loadSessionLessons, retrieveForPlan, formatLessonsCheck
+loadSessionLessons, loadSessionMemory
+retrieveForPlan, formatLessonsCheck, formatMemoryCheck
 
-// Types
-generateId, LessonSchema, LessonRecordSchema
+// Context Recovery
+getPrimeContext
+
+// Types & Schemas
+generateId
+LessonSchema, LessonRecordSchema, LessonTypeSchema
+MemoryItemSchema, MemoryItemRecordSchema, MemoryItemTypeSchema
+LessonItemSchema, SolutionItemSchema, PatternItemSchema, PreferenceItemSchema
+LegacyLessonSchema, LegacyTombstoneSchema
+
+// Constants
+VERSION
 ```
 
 ### Function Signatures
@@ -210,12 +238,21 @@ Key functions follow consistent patterns:
 ```typescript
 // Storage: (repoRoot, data) -> Promise<void>
 appendLesson(repoRoot: string, lesson: Lesson): Promise<void>
+appendMemoryItem(repoRoot: string, item: MemoryItem): Promise<void>
 
 // Search: (repoRoot, query, options) -> Promise<Result[]>
-searchVector(repoRoot: string, query: string, options?: SearchOptions): Promise<ScoredLesson[]>
+searchVector(repoRoot: string, query: string, options?: SearchVectorOptions): Promise<ScoredMemoryItem[]>
+
+// Ranking: (items) -> RankedResult[]
+rankMemoryItems(items: ScoredMemoryItem[]): RankedMemoryItem[]
 
 // Detection: (input) -> DetectedResult | null
 detectUserCorrection(message: string): DetectedCorrection | null
+
+// Retrieval: (repoRoot, ...) -> Promise<string>
+loadSessionMemory(repoRoot: string): Promise<string>
+retrieveForPlan(repoRoot: string, planText: string): Promise<PlanRetrievalResult>
+getPrimeContext(repoRoot: string): Promise<string>
 ```
 
 ---

@@ -250,14 +250,13 @@ score = vector_similarity(query, item)
       * severity_boost     (high=1.5, medium=1.0, low=0.8)
       * recency_boost      (last 30d=1.2, older=1.0)
       * confirmation_boost (confirmed=1.3)
-      * retrieval_boost    (frequently retrieved=1.1)
 ```
 
 ### Example
 
 ```json
 {
-  "id": "M-a1b2c3d4",
+  "id": "Sa1b2c3d4",
   "type": "solution",
   "trigger": "API returned 401 despite valid JWT token",
   "insight": "Auth API requires X-Request-ID header in all requests",
@@ -304,7 +303,7 @@ pnpm lint             # Type check + ESLint
 | Build | tsup |
 | Testing | Vitest + fast-check (property tests) |
 | Storage | better-sqlite3 + FTS5 |
-| Embeddings | node-llama-cpp + nomic-embed-text-v1.5 |
+| Embeddings | node-llama-cpp + EmbeddingGemma-300M |
 | CLI | Commander.js |
 | Schema | Zod |
 | MCP | @modelcontextprotocol/sdk |

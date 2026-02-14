@@ -9,7 +9,7 @@ Compound-agent manages two resources that persist in memory:
 | Resource | When Loaded | Memory Usage | Cleanup Function |
 |----------|-------------|--------------|------------------|
 | SQLite Database | First DB operation | ~few KB | `closeDb()` |
-| Embedding Model | First embedding call | ~500MB | `unloadEmbedding()` |
+| Embedding Model | First embedding call | ~278MB | `unloadEmbedding()` |
 
 Both resources use **lazy loading** - they are only acquired when first needed, not on import.
 
@@ -66,7 +66,7 @@ async function main() {
 ```
 Import module          --> No model loaded
   |
-First embedding call   --> Model loaded (~2-5 seconds, ~500MB RAM)
+First embedding call   --> Model loaded (~2-5 seconds, ~278MB RAM)
 (embedText, embedTexts,
  searchVector, etc.)
   |
@@ -86,7 +86,7 @@ Next embedding call    --> Reloads model (~2-5 seconds)
 
 ### Memory Impact
 
-The nomic-embed-text model requires approximately **500MB of RAM** when loaded. This is significant for:
+The EmbeddingGemma-300M model requires approximately **278MB of RAM** when loaded. This is significant for:
 
 - Memory-constrained environments
 - Containers with low memory limits
@@ -115,7 +115,7 @@ async function main() {
 // Process a batch, then free memory
 const vectors = await embedTexts(batch);
 // ... use vectors
-unloadEmbedding(); // Free 500MB before next operation
+unloadEmbedding(); // Free ~278MB before next operation
 ```
 
 ## Complete Cleanup Pattern
@@ -204,7 +204,7 @@ Failing to clean up will **not corrupt data**, but may cause:
 
 | Issue | Impact |
 |-------|--------|
-| Memory leaks | ~500MB not freed in long-running processes |
+| Memory leaks | ~278MB not freed in long-running processes |
 | Unclean exit | Some environments warn about open handles |
 | File locks | SQLite WAL files may persist longer than needed |
 
@@ -237,7 +237,7 @@ The SQLite database is stored at `.claude/.cache/lessons.sqlite`. The directory 
 
 3. **Download model proactively** - Run `download-model` during setup, not on first use
 
-4. **Monitor memory in production** - The 500MB embedding model is significant
+4. **Monitor memory in production** - The ~278MB embedding model is significant
 
 5. **Order matters** - Unload embedding before closing database (though either order works)
 

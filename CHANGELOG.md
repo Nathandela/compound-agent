@@ -1,6 +1,6 @@
 # Changelog
 
-> **Note**: This project was renamed from **learning-agent** (CLI: `lna`) to **compound-agent** (CLI: `ca`) in v1.0.0. Historical entries below use the original name.
+> **Note**: This project was renamed from **learning-agent** (CLI: `lna`) to **compound-agent** (CLI: `ca`) as part of the compound-agent rename. Historical entries below use the original name.
 
 All notable changes to this project will be documented in this file.
 
@@ -8,8 +8,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
-
-## [1.0.0] - 2026-02-14
 
 ### Added
 
@@ -387,8 +385,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/Nathandela/learning_agent/compare/v0.2.9...v1.0.0
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.9...HEAD
 [0.2.9]: https://github.com/Nathandela/learning_agent/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/Nathandela/learning_agent/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/Nathandela/learning_agent/compare/v0.2.6...v0.2.7
