@@ -9,11 +9,13 @@ Every implementation MUST follow the mandatory subagent sequence. Work is NOT co
 | Order | Agent | Purpose | When to Use |
 |-------|-------|---------|-------------|
 | 1 | `/invariant-designer` | Define invariants | Before writing ANY code |
-| 2 | `/test-first-enforcer` | Verify TDD adherence | Before implementing |
-| 3 | `/property-test-generator` | Generate property tests | For edge cases |
-| 4 | `/anti-cargo-cult-reviewer` | Reject fake tests | During test review |
-| 5 | `/module-boundary-reviewer` | Validate module design | After implementation |
-| 6 | `/implementation-reviewer` | **FINAL authority** | Before marking complete |
+| 2 | `/cct-subagent` | Inject mistake-derived test requirements | After invariants, before tests |
+| 3 | `/test-first-enforcer` | Verify TDD adherence | Before implementing |
+| 4 | `/property-test-generator` | Generate property tests | For edge cases |
+| 5 | `/anti-cargo-cult-reviewer` | Reject fake tests | During test review |
+| 6 | `/module-boundary-reviewer` | Validate module design | After implementation |
+| 7 | `/drift-detector` | Check for constraint drift | After boundary review |
+| 8 | `/implementation-reviewer` | **FINAL authority** | Before marking complete |
 
 ## Closed-Loop Process
 
@@ -26,7 +28,14 @@ Every implementation MUST follow the mandatory subagent sequence. Work is NOT co
          |
          v
 +------------------+
-| 2. TESTS FIRST   |  /test-first-enforcer
+| 2. CCT INJECTION |  /cct-subagent
+| Inject test reqs |  - Match past mistakes
+| from past lessons|  - REQUIRED / SUGGESTED tests
++--------+---------+
+         |
+         v
++------------------+
+| 3. TESTS FIRST   |  /test-first-enforcer
 | Write failing    |  /property-test-generator
 | tests that verify|  /anti-cargo-cult-reviewer
 | invariants       |
@@ -34,14 +43,21 @@ Every implementation MUST follow the mandatory subagent sequence. Work is NOT co
          |
          v
 +------------------+
-| 3. IMPLEMENT     |  /module-boundary-reviewer
+| 4. IMPLEMENT     |  /module-boundary-reviewer
 | Minimal code to  |  - One test at a time
 | pass tests       |  - NEVER modify tests to pass
 +--------+---------+
          |
          v
 +------------------+
-| 4. REVIEW        |  /implementation-reviewer
+| 5. DRIFT CHECK   |  /drift-detector
+| Verify alignment |  - Invariants, ADRs
+| with constraints |  - Architecture decisions
++--------+---------+
+         |
+         v
++------------------+
+| 6. REVIEW        |  /implementation-reviewer
 | Independent gate |  - Validates ALL criteria
 | FINAL authority  |  - Cannot be bypassed
 +--------+---------+
@@ -68,19 +84,31 @@ Use `/invariant-designer` to document what must be true:
 - Safety properties (what must never happen)
 - Liveness properties (what must eventually happen)
 
-### Phase 2: Write Tests FIRST
+### Phase 2: CCT Injection
+Use `/cct-subagent` to inject mistake-derived test requirements:
+- Read CCT patterns synthesized from past lessons
+- Match patterns against the current task's domain and files
+- Output REQUIRED or SUGGESTED test requirements for test-first-enforcer
+
+### Phase 3: Write Tests FIRST
 - Use `/test-first-enforcer` to verify TDD adherence
 - Use `/property-test-generator` for edge cases
 - Use `/anti-cargo-cult-reviewer` to reject fake tests
 - Tests MUST fail before implementation exists
 
-### Phase 3: Implement
+### Phase 4: Implement
 - Write minimal code to pass tests
 - One test at a time
 - **NEVER** modify tests to make them pass
 - Use `/module-boundary-reviewer` for design validation
 
-### Phase 4: Review (Closed Loop)
+### Phase 5: Drift Check
+Use `/drift-detector` to verify implementation alignment:
+- Compare implementation against documented invariants and ADRs
+- Check module boundaries and data flows match architecture
+- Flag any deviation, even if tests pass
+
+### Phase 6: Review (Closed Loop)
 - Call `/implementation-reviewer` for final approval
 - If **REJECTED**: Fix ALL issues listed, return to appropriate stage, resubmit
 - If **APPROVED**: Work is complete

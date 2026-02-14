@@ -17,6 +17,8 @@ export { rebuildIndex, searchKeyword } from './sqlite.js';
 // Internal files NOT exported through index.ts
 ```
 
+Code size limits (functions < 50 lines, files < 300 lines) are mechanically enforced via lint rules. See [linting-for-agents.md](linting-for-agents.md) for rule configuration and error message patterns.
+
 ## Documentation Structure
 
 ```

@@ -19,3 +19,7 @@
 - **Long functions**: Prefer < 50 lines
 - **Implicit dependencies**: Pass dependencies explicitly
 - **Emojis in code/comments**: Keep code professional
+
+---
+
+Inviolable and strong-default anti-patterns have corresponding lint rules for mechanical enforcement. See [linting-for-agents.md](linting-for-agents.md) for the tier-to-enforcement mapping.

@@ -156,6 +156,22 @@ export type { PlanRetrievalResult } from './memory/retrieval/index.js';
 // Context recovery API (for MCP server integration)
 export { getPrimeContext } from './commands/index.js';
 
+// Audit API
+export { runAudit, AuditFindingSchema, AuditReportSchema } from './audit/index.js';
+export type { AuditFinding, AuditReport, AuditOptions } from './audit/index.js';
+
+// Compound API (clustering, synthesis, pattern I/O)
+export {
+  buildSimilarityMatrix,
+  CCT_PATTERNS_PATH,
+  CctPatternSchema,
+  clusterBySimilarity,
+  readCctPatterns,
+  synthesizePattern,
+  writeCctPatterns,
+} from './compound/index.js';
+export type { CctPattern, ClusterResult } from './compound/index.js';
+
 // Types and schemas
 export {
   generateId,

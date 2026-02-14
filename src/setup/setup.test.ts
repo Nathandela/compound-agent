@@ -564,14 +564,14 @@ describe('Setup Commands - Generated Content', () => {
    * Tests for agent template installation
    */
   describe('Agent template installation', () => {
-    it('creates .claude/agents/compound/ with 13 .md files', async () => {
+    it('creates .claude/agents/compound/ with 18 .md files', async () => {
       runCli('init');
 
       const agentsDir = join(getTempDir(), '.claude', 'agents', 'compound');
       expect(existsSync(agentsDir)).toBe(true);
 
       const files = readdirSync(agentsDir).filter((f) => f.endsWith('.md'));
-      expect(files.length).toBe(13);
+      expect(files.length).toBe(18);
     });
 
     it('creates all expected agent template files', async () => {
@@ -609,7 +609,7 @@ describe('Setup Commands - Generated Content', () => {
 
       const agentsDir = join(getTempDir(), '.claude', 'agents', 'compound');
       const files = readdirSync(agentsDir).filter((f) => f.endsWith('.md'));
-      expect(files.length).toBe(13);
+      expect(files.length).toBe(18);
     });
 
     it('does not overwrite existing agent files', async () => {
