@@ -131,12 +131,13 @@ pnpm lint      # Zero violations
 ### Inviolable -- Before Saying "Done"
 
 ```bash
-[ ] 1. git status           # Check what changed
-[ ] 2. git add <files>      # Stage code changes
-[ ] 3. bd sync              # Commit beads changes
-[ ] 4. git commit -m "..."  # Commit code
-[ ] 5. bd sync              # Commit any new beads changes
-[ ] 6. git push             # Push to remote
+[ ] 1. ca verify-gates <epic-id>  # Verify review + compound tasks closed (if epic work)
+[ ] 2. git status                  # Check what changed
+[ ] 3. git add <files>             # Stage code changes
+[ ] 4. bd sync                     # Commit beads changes
+[ ] 5. git commit -m "..."         # Commit code
+[ ] 6. bd sync                     # Commit any new beads changes
+[ ] 7. git push                    # Push to remote
 ```
 
 **CRITICAL**: Work is NOT complete until `git push` succeeds.

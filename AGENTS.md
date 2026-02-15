@@ -383,6 +383,7 @@ MCP tools are the preferred interface. Use CLI only as fallback.
 | `npx ca learn --trigger "..." --insight "..."` | Capture a lesson |
 | `npx ca list` | List all lessons |
 | `npx ca stats` | Database health |
+| `npx ca verify-gates <epic-id>` | Verify review + compound tasks exist and are closed |
 
 ### Core Principle
 

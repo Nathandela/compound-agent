@@ -166,6 +166,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca export` | Export items as JSON |
 | `ca import <file>` | Import items from JSONL file |
 | `ca prime` | Load workflow context (used by hooks) |
+| `ca verify-gates <epic-id>` | Verify review + compound tasks exist and are closed |
 | `ca audit` | Run audit checks against the codebase |
 | `ca rules check` | Run repository-defined rule checks |
 | `ca test-summary` | Run tests and output a compact summary |

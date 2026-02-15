@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-02-15
+
+### Added
+
+- **`ca verify-gates <epic-id>` command**: Verifies review and compound beads tasks exist and are closed before epic can be marked complete
+- **Phase enforcement gates in `/compound:lfg`**: Mechanical STOP markers (`PHASE GATE 3`, `PHASE GATE 4`, `FINAL GATE`) between workflow phases prevent Claude from skipping review and compound phases
+- **Per-phase MEMORY CHECK instructions**: Each of the 5 phases in lfg.md now has explicit `MEMORY CHECK` instructions for memory_search/memory_capture
+- **Phase state tracking**: lfg.md tracks phase completion via `bd update --notes` with `Phase: COMPLETE` markers, surviving context compaction
+- **SESSION CLOSE checklist in lfg.md**: Inviolable 8-step checklist at end of lfg workflow ensures bd sync and git push
+
+### Fixed
+
+- **`ca setup --update` now ensures MCP config**: Previously only regenerated templates; now also calls `configureClaudeSettings()` to ensure `.mcp.json` and hooks are current for projects upgrading from older versions
+- **`ca prime` warns when MCP server is missing**: Displays actionable warning with `Run 'npx ca setup'` when `.mcp.json` is not registered
+- **work.md verification gate strengthened**: Replaced soft "Verification Gate" with `MANDATORY VERIFICATION` section requiring `/implementation-reviewer` APPROVED status
+- **compound.md minimum capture requirement**: Added "At minimum, capture 1 lesson per significant decision" to prevent empty compound phases
+- **plan.md post-plan verification**: Added `POST-PLAN VERIFICATION` section with grep checks for review and compound task creation
+
 ## [1.2.0] - 2026-02-15
 
 ### Added
@@ -438,7 +456,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/Nathandela/learning_agent/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Nathandela/learning_agent/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Nathandela/learning_agent/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Nathandela/learning_agent/compare/v0.2.9...v1.0.0

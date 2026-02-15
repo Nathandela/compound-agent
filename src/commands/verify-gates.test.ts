@@ -193,4 +193,24 @@ describe('verify-gates', () => {
     expect(reviewCheck!.status).toBe('fail');
     expect(compoundCheck!.status).toBe('fail');
   });
+
+  // ==========================================================================
+  // Works with any beads prefix, not just learning_agent-
+  // ==========================================================================
+
+  it('parses deps with different beads project prefixes', async () => {
+    const output = [
+      '○ my-project-abc1 · EPIC: Test epic   [P0 · OPEN]',
+      'Owner: Test · Type: epic',
+      '',
+      'DEPENDS ON',
+      '  → ✓ my-project-r1: Review: check implementation ● P0',
+      '  → ✓ my-project-c1: Compound: capture learnings ● P0',
+    ].join('\n');
+
+    mockExecSync.mockReturnValue(output);
+
+    const checks = await runVerifyGates('abc1');
+    expect(checks.every(c => c.status === 'pass')).toBe(true);
+  });
 });

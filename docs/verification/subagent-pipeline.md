@@ -137,6 +137,28 @@ External reviewers:
 - Present findings with severity tags (P1/P2/P3)
 - Never block the pipeline — findings are informational only
 
+## Workflow Enforcement Gates
+
+When using `/compound:lfg` to chain all 5 workflow phases, mechanical gates prevent phase-skipping:
+
+| Gate | Location | Checks |
+|------|----------|--------|
+| PHASE GATE 3 | Between Work and Review | All work tasks closed, `bd ready` shows review task |
+| PHASE GATE 4 | Between Review and Compound | Review task closed, `bd ready` shows compound task |
+| FINAL GATE | After Compound | `ca verify-gates <epic-id>` confirms review + compound tasks closed |
+
+### `ca verify-gates <epic-id>`
+
+Parses the epic's dependency graph and checks that both a `Review:` task and a `Compound:` task exist and are closed. Returns pass/fail for each gate.
+
+```bash
+ca verify-gates beads-abc123
+# Review task .............. PASS (beads-def456 closed)
+# Compound task ............ PASS (beads-ghi789 closed)
+```
+
+Both gates must pass before closing the epic.
+
 ## Subagent Authority
 
 The `/implementation-reviewer` has FINAL authority:

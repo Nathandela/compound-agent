@@ -33,8 +33,9 @@ function parseDeps(output: string): DepTask[] {
     }
     if (inDeps) {
       // Dependency lines start with "  ->" or similar arrow
+      // Match any beads ID prefix (e.g., learning_agent-xxx, my-project-xxx)
       const match = line.match(
-        /^\s+→\s+(✓|○)\s+learning_agent-\S+:\s+(.+?)\s+●/,
+        /^\s+→\s+(✓|○)\s+\S+-\S+:\s+(.+?)\s+●/,
       );
       if (match && match[1] && match[2]) {
         deps.push({ closed: match[1] === '✓', title: match[2] });
