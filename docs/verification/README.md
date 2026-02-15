@@ -7,6 +7,8 @@ This directory contains documentation for the systematic code verification pract
 | Document | Purpose |
 |----------|---------|
 | [closed-loop-review-process.md](closed-loop-review-process.md) | Mandatory review workflow with exit criteria |
+| [subagent-pipeline.md](subagent-pipeline.md) | Full 8-step pipeline + optional external reviewers |
+| [exit-criteria.md](exit-criteria.md) | Exit criteria checklists for all 6 categories |
 
 ## Quick Reference
 
@@ -20,6 +22,7 @@ This directory contains documentation for the systematic code verification pract
 6. `/module-boundary-reviewer` - Check module design
 7. `/drift-detector` - Check constraint drift
 8. `/implementation-reviewer` - Final approval
+9. External reviewers (optional) - Cross-model review via Gemini/Codex CLI
 
 ### Exit Criteria
 

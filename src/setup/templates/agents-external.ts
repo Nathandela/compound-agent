@@ -17,8 +17,8 @@ model: sonnet
 Run a cross-model code review by invoking the Gemini CLI in headless mode. Provides an independent perspective from a different LLM to catch issues Claude may miss.
 
 ## Prerequisites
-- Gemini CLI installed (\`npm i -g @anthropic-ai/gemini-cli\` or \`brew install gemini\`)
-- Authenticated (\`gemini auth\`)
+- Gemini CLI installed (\`npm i -g @google/gemini-cli\`)
+- Authenticated (\`gemini auth login\`)
 
 ## Instructions
 1. **Check availability** — run \`command -v gemini\` via Bash. If not found, report "Gemini CLI not installed — skipping external review" and stop.

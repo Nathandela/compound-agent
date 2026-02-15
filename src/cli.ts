@@ -9,6 +9,7 @@
  *   Retrieval:  search, list, check-plan, load-session
  *   Management: wrong, validate, compact, stats, rebuild, export, import, show, update, delete
  *   Setup:      init, setup claude, hooks, download-model
+ *   Reviewer:   reviewer enable, reviewer disable, reviewer list
  */
 
 import { Command } from 'commander';

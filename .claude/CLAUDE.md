@@ -96,9 +96,12 @@ Every implementation MUST follow this subagent sequence:
 6. /module-boundary-reviewer --> Validate module design
 7. /drift-detector          --> Check constraint drift
 8. /implementation-reviewer  --> FINAL gate (must be APPROVED)
+9. (optional) external reviewers --> Cross-model review (Gemini/Codex)
 ```
 
 **Inviolable rules**: Tests before implementation. Real data, no mocked business logic. ALL subagents in sequence. On rejection, fix ALL issues before resubmitting.
+
+**External reviewers (optional)**: If `.claude/compound-agent.json` has `"externalReviewers"` configured, Gemini/Codex run after step 8 as advisory (non-blocking) reviewers. Enable with `npx ca reviewer enable gemini`.
 
 > **Full pipeline details**: See `docs/verification/subagent-pipeline.md`
 > **Exit criteria checklists**: See `docs/verification/exit-criteria.md`
@@ -166,6 +169,7 @@ pnpm lint      # Zero violations
 ```
 .claude/                        (repository scope)
 ├── CLAUDE.md                   <- Always loaded (permanent rules)
+├── compound-agent.json         <- Config (external reviewers, etc.)
 ├── agents/                     <- Subagent definitions (TDD pipeline)
 ├── commands/                   <- Custom slash commands
 ├── lessons/

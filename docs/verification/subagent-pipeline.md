@@ -16,6 +16,7 @@ Every implementation MUST follow the mandatory subagent sequence. Work is NOT co
 | 6 | `/module-boundary-reviewer` | Validate module design | After implementation |
 | 7 | `/drift-detector` | Check for constraint drift | After boundary review |
 | 8 | `/implementation-reviewer` | **FINAL authority** | Before marking complete |
+| 9 | External reviewers (optional) | Cross-model review (Gemini/Codex) | After approval, if configured |
 
 ## Closed-Loop Process
 
@@ -122,6 +123,19 @@ Use `/drift-detector` to verify implementation alignment:
 - ALL subagents in sequence must be used
 - Work is NOT complete until `/implementation-reviewer` returns APPROVED
 - On rejection, fix ALL issues before resubmitting (not just some)
+
+## Optional: External Reviewers
+
+After `/implementation-reviewer` approves, configured external reviewers run as **advisory (non-blocking)** cross-model checks.
+
+**Setup**: `npx ca reviewer enable gemini` or `npx ca reviewer enable codex`
+**Config**: `.claude/compound-agent.json` — `{ "externalReviewers": ["gemini", "codex"] }`
+
+External reviewers:
+- Check tool availability via `command -v` (graceful skip if not installed)
+- Feed beads issue context + `git diff` to the external tool in headless mode
+- Present findings with severity tags (P1/P2/P3)
+- Never block the pipeline — findings are informational only
 
 ## Subagent Authority
 
