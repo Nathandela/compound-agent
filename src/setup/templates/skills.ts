@@ -17,22 +17,29 @@ Explore the problem space before committing to a solution. This phase produces a
 ## Methodology
 1. Ask "why" before "how" -- understand the real problem
 2. Search memory with \`memory_search\` for similar past features and known constraints
-3. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences
-4. Divergent phase: generate multiple approaches without filtering
-5. Optional: spawn Explore subagents for quick codebase research on relevant areas
+3. Spawn Explore subagents: docs-explorer for \`docs/\` (architecture, specs, research, standards, existing ADRs) and code-explorer for relevant codebase areas
+4. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences
+5. Divergent phase: generate multiple approaches without filtering
 6. Identify constraints and non-functional requirements (performance, security, etc.)
 7. Convergent phase: evaluate approaches against constraints
 8. Document decisions with rationale, list open questions, and create a beads epic
+9. Auto-create ADR files in \`docs/decisions/\` for significant decisions (lightweight: Status, Context, Decision, Consequences)
 
 ## Memory Integration
 - Call \`memory_search\` with relevant keywords before generating approaches
 - Look for past architectural decisions, pitfalls, and preferences
 - If the problem domain matches past work, review those lessons first
 
+## Docs Integration
+- Spawn docs-explorer to scan \`docs/\` for relevant architecture docs, research, and standards
+- Review existing ADRs in \`docs/decisions/\` -- prior decisions may constrain the brainstorm
+- Auto-create ADR for each significant decision made during convergence
+
 ## Common Pitfalls
 - Jumping to the first solution without exploring alternatives
 - Ignoring non-functional requirements (scalability, maintainability)
 - Not searching memory for similar past features
+- Not checking existing docs and ADRs for prior decisions
 - Over-scoping: trying to solve everything at once
 - Skipping the "why" and diving into "how"
 - Not creating a beads epic from conclusions (losing brainstorm output)
@@ -41,8 +48,10 @@ Explore the problem space before committing to a solution. This phase produces a
 - Multiple approaches were considered (at least 2-3)
 - Constraints and requirements are explicitly listed
 - Memory was searched for relevant context
+- Existing docs and ADRs were reviewed for prior decisions
 - User was engaged via \`AskUserQuestion\` for clarification
 - A clear decision was made with documented rationale
+- ADRs created for significant architectural decisions
 - Open questions are captured for the plan phase
 - A beads epic was created from conclusions via \`bd create\`
 `,
@@ -60,8 +69,8 @@ Create a concrete implementation plan by decomposing work into small, testable t
 ## Methodology
 1. Review brainstorm output for decisions and open questions
 2. Search memory with \`memory_search\` for architectural patterns and past mistakes
-3. Spawn research agent team (repo-analyst for codebase, memory-analyst for deep memory search)
-4. Synthesize research findings into a coherent approach
+3. Spawn research agent team: docs-analyst for \`docs/\` (specs, standards, ADRs), repo-analyst for codebase, memory-analyst for deep memory search
+4. Synthesize research findings into a coherent approach. Flag conflicts between ADRs and proposed plan.
 5. Decompose into tasks small enough to verify individually
 6. Define acceptance criteria for each task
 7. Map dependencies between tasks
@@ -72,11 +81,17 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Look for past planning mistakes (missing dependencies, unclear criteria)
 - Check for preferred architectural patterns in this codebase
 
+## Docs Integration
+- Spawn docs-analyst to scan \`docs/\` for relevant specs, standards, and research
+- Check \`docs/decisions/\` for existing ADRs that constrain or inform the plan
+- If the plan contradicts an ADR, flag it for the user before proceeding
+
 ## Common Pitfalls
 - Creating too many fine-grained tasks (aim for 3-7 per feature)
 - Unclear acceptance criteria ("make it work" is not a criterion)
 - Missing dependencies between tasks
 - Not checking memory for past architectural decisions
+- Not reviewing existing ADRs and docs for constraints
 - Planning implementation details too early (stay at task level)
 
 ## Quality Criteria
@@ -84,6 +99,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Dependencies are mapped and no circular dependencies exist
 - Tasks are ordered so each can be verified independently
 - Memory was searched for relevant patterns and past mistakes
+- Existing docs and ADRs were checked for constraints
 - Complexity estimates are realistic (no "should be quick")
 `,
 
@@ -215,13 +231,14 @@ description: Reflect on the cycle and capture high-quality lessons for future se
 # Compound Skill
 
 ## Overview
-Extract and store lessons learned during the cycle. This is what makes the system compound -- each session leaves the next one better equipped.
+Extract and store lessons learned during the cycle, and update project documentation. This is what makes the system compound -- each session leaves the next one better equipped.
 
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
 2. Spawn the compound analysis team in parallel:
    - context-analyzer: gathers cycle context (diffs, test output)
    - lesson-extractor: identifies corrections, surprises, discoveries
+   - docs-reviewer: scans \`docs/\` for outdated content and ADRs that need updating
    - pattern-matcher: checks \`memory_search\` for duplicates and related items
    - solution-writer: drafts final memory items
    - compounding: synthesizes accumulated lessons into CCT patterns
@@ -231,12 +248,19 @@ Extract and store lessons learned during the cycle. This is what makes the syste
 6. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
 7. Store via \`memory_capture\` with supersedes/related links where applicable
 8. Delegate to the \`compounding\` subagent to run synthesis: cluster accumulated lessons by similarity and write CCT patterns to \`.claude/lessons/cct-patterns.jsonl\`
-9. Ask user to confirm high-severity items only; medium/low are auto-stored
+9. Update outdated docs and deprecate superseded ADRs (set status to \`deprecated\`)
+10. Ask user to confirm high-severity items only; medium/low are auto-stored
+
+## Docs Integration
+- Spawn docs-reviewer to check if \`docs/\` content is outdated after the cycle
+- Check \`docs/decisions/\` for ADRs contradicted by the work done
+- Set ADR status to \`deprecated\` if a decision was reversed, referencing the new ADR
 
 ## Common Pitfalls
 - Not spawning the analysis team (analyzing solo misses cross-cutting patterns)
 - Capturing without checking for duplicates via \`memory_search\`
 - Skipping supersedes/related linking when an item updates prior knowledge
+- Not checking if docs or ADRs need updating after the cycle
 - Requiring user confirmation for every item (only high-severity needs it)
 - Not classifying items by type (lesson/solution/pattern/preference)
 - Capturing vague lessons ("be careful with X") -- be specific and concrete
@@ -247,6 +271,7 @@ Extract and store lessons learned during the cycle. This is what makes the syste
 - Duplicates checked via \`memory_search\` before capture
 - Items classified by type (lesson/solution/pattern/preference)
 - Supersedes/related links set where applicable
+- Outdated docs and ADRs were updated or deprecated
 - User confirmed high-severity items
 - Beads checked for related issues (\`bd\`)
 - Each item gives clear, concrete guidance for future sessions

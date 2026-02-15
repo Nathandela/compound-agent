@@ -13,9 +13,11 @@ Explore requirements through collaborative dialogue before committing to a plan.
 ## Workflow
 1. Parse the topic from \`$ARGUMENTS\`. If empty, ask the user what to brainstorm.
 2. Call \`memory_search\` with the topic to surface relevant past lessons. Display retrieved items and incorporate them into exploration.
-3. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences through structured dialogue.
-4. Explore edge cases and failure modes.
-5. Optional: spawn Explore subagents for quick codebase research on specific aspects relevant to the brainstorm.
+3. Spawn Explore subagents to research existing context:
+   - **docs-explorer**: scan \`docs/\` for architecture docs, specs, research, standards, anti-patterns, and existing ADRs in \`docs/decisions/\`
+   - **code-explorer**: quick codebase research on areas relevant to the brainstorm
+4. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences through structured dialogue.
+5. Explore edge cases and failure modes.
 6. Propose 2-3 alternative approaches with tradeoffs.
 7. Run \`bd ready\` to check if related tasks already exist.
 8. Output a clear problem definition, chosen approach, and open questions.
@@ -23,10 +25,32 @@ Explore requirements through collaborative dialogue before committing to a plan.
    \`\`\`bash
    bd create --title="<epic title>" --type=feature --description="<problem definition + approach + scope>"
    \`\`\`
+10. For each significant decision, auto-create an ADR in \`docs/decisions/\`:
+    - Scan \`docs/decisions/\` for the highest existing number, increment by 1
+    - Write \`docs/decisions/NNN-<kebab-title>.md\` using this template:
+      \`\`\`markdown
+      # NNN. <Title>
+      Status: accepted
+      Date: <YYYY-MM-DD>
+
+      ## Context
+      <What prompted this decision>
+
+      ## Decision
+      <What was decided and why>
+
+      ## Consequences
+      <What follows from this decision>
+      \`\`\`
 
 ## Memory Integration
 - Call \`memory_search\` at the start to avoid repeating past mistakes.
 - If the brainstorm surfaces new insights, note them for later capture.
+
+## Docs Integration
+- Spawn a docs-explorer subagent to scan \`docs/\` for relevant architecture docs, research, standards, and existing ADRs.
+- Review existing ADRs in \`docs/decisions/\` for prior decisions that constrain the current brainstorm.
+- Auto-create ADR files for significant architectural decisions made during brainstorm.
 
 ## Beads Integration
 - Run \`bd ready\` to check for existing related work.
@@ -39,16 +63,17 @@ Explore requirements through collaborative dialogue before committing to a plan.
 # Plan
 
 ## Purpose
-Create a structured implementation plan enriched by semantic memory, with concrete tasks and dependencies.
+Create a structured implementation plan enriched by semantic memory and existing documentation, with concrete tasks and dependencies.
 
 ## Workflow
 1. Parse the goal from \`$ARGUMENTS\`. If empty, ask the user what to plan.
 2. Check for brainstorm output: run \`bd list\` to find a related brainstorm epic. If one exists, read its description for decisions and open questions.
 3. Call \`memory_search\` with the goal to retrieve relevant past lessons. Display retrieved memory items and incorporate them into planning context.
 4. Spawn research agent team:
+   - **Docs Analyst** (\`docs-analyst\`): scan \`docs/\` for specs, standards, anti-patterns, and ADRs in \`docs/decisions/\` that constrain the plan
    - **Repo Analyst** (\`repo-analyst\`): explore codebase patterns, conventions, and architecture
    - **Memory Analyst** (\`memory-analyst\`): deep dive into related memory items with multiple search queries
-5. Synthesize research findings from both agents into a coherent plan.
+5. Synthesize research findings from all agents into a coherent plan. Flag any conflicts between ADRs and proposed approach.
 6. Break the goal into concrete, ordered tasks with clear acceptance criteria.
 7. Create beads issues and map dependencies:
    \`\`\`bash
@@ -61,6 +86,11 @@ Create a structured implementation plan enriched by semantic memory, with concre
 - Call \`memory_search\` before planning to learn from past approaches.
 - Search for architectural patterns relevant to the goal.
 - Incorporate retrieved lessons into task descriptions as context.
+
+## Docs Integration
+- Spawn a docs-analyst subagent to scan \`docs/\` for relevant specs, standards, research, and existing ADRs.
+- Check \`docs/decisions/\` for prior ADRs that constrain or inform the plan.
+- If the plan contradicts an existing ADR, flag the conflict for the user.
 
 ## Beads Integration
 - Create one \`bd\` issue per task with \`bd create\`.
@@ -151,7 +181,7 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
 # Compound
 
 ## Purpose
-Multi-agent analysis to capture high-quality lessons from completed work into the memory system.
+Multi-agent analysis to capture high-quality lessons from completed work into the memory system and update project documentation.
 
 ## Workflow
 1. Parse what was done from \`$ARGUMENTS\` or recent git history (\`git diff\`, \`git log\`).
@@ -159,6 +189,7 @@ Multi-agent analysis to capture high-quality lessons from completed work into th
 3. Spawn the compound analysis team in parallel:
    - **context-analyzer**: summarize what happened (git diff, test results, plan context)
    - **lesson-extractor**: identify mistakes, corrections, and discoveries
+   - **docs-reviewer**: scan \`docs/\` for docs that need updating based on what changed, and check if any ADR in \`docs/decisions/\` should be deprecated or superseded
    - **pattern-matcher**: match against existing memory, classify New/Duplicate/Reinforcement/Contradiction
    - **solution-writer**: formulate structured items typed as lesson, solution, pattern, or preference
    - **compounding**: synthesize accumulated lessons into CCT patterns for test reuse
@@ -177,9 +208,15 @@ Multi-agent analysis to capture high-quality lessons from completed work into th
    - Synthesize CCT patterns from clusters of 2+ items
    - Write patterns to \`.claude/lessons/cct-patterns.jsonl\`
    - Skip if fewer than 5 total lessons exist (not enough signal)
-9. Confirm with user for high-severity items only; medium/low items are auto-stored.
-10. Run \`bd ready\` to check for related issues; \`bd close\` any resolved by captured knowledge.
-11. Output a summary of captured and skipped items with reasons.
+9. If the docs-reviewer found outdated docs or ADRs, update them. For superseded ADRs, set status to \`deprecated\` and reference the new ADR.
+10. Confirm with user for high-severity items only; medium/low items are auto-stored.
+11. Run \`bd ready\` to check for related issues; \`bd close\` any resolved by captured knowledge.
+12. Output a summary of captured items, skipped items, and docs updated.
+
+## Docs Integration
+- Spawn a docs-reviewer subagent to check if \`docs/\` content needs updating after the cycle.
+- Check \`docs/decisions/\` for ADRs that may be outdated or contradicted by the work done.
+- Update ADR status to \`deprecated\` if a decision was reversed, with a reference to the new ADR.
 
 ## Beads Integration
 - Check \`bd ready\` for related open issues.
@@ -196,10 +233,13 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
 ## Workflow
 1. **Brainstorm phase**: Explore the goal from \`$ARGUMENTS\`.
    - Call \`memory_search\` with the goal.
+   - Spawn docs-explorer to scan \`docs/\` for relevant context and existing ADRs.
    - Ask clarifying questions, explore alternatives.
+   - Auto-create ADRs for significant decisions in \`docs/decisions/\`.
    - Produce a brainstorm summary.
 
 2. **Plan phase**: Structure the work.
+   - Spawn docs-analyst to check specs, standards, and ADRs that constrain the plan.
    - Break into tasks with dependencies.
    - Create beads issues for tracking.
    - Produce a plan with task IDs.
@@ -219,6 +259,7 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
 5. **Compound phase**: Capture learnings.
    - Store novel insights via \`memory_capture\`.
    - Avoid duplicates by searching first with \`memory_search\`.
+   - Spawn docs-reviewer to check if \`docs/\` or ADRs need updating.
 
 ## Phase Control
 - **Skip phases**: Parse \`$ARGUMENTS\` for "from <phase>" (e.g., "from plan"). Skip all phases before the named one.
