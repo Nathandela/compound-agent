@@ -71,10 +71,11 @@ Create a concrete implementation plan by decomposing work into small, testable t
 2. Search memory with \`memory_search\` for architectural patterns and past mistakes
 3. Spawn research agent team: docs-analyst for \`docs/\` (specs, standards, ADRs), repo-analyst for codebase, memory-analyst for deep memory search
 4. Synthesize research findings into a coherent approach. Flag conflicts between ADRs and proposed plan.
-5. Decompose into tasks small enough to verify individually
-6. Define acceptance criteria for each task
-7. Map dependencies between tasks
-8. Create beads issues: \`bd create --title="..." --type=task\`
+5. Use \`AskUserQuestion\` to resolve ambiguities, conflicting constraints, or priority trade-offs before decomposing
+6. Decompose into tasks small enough to verify individually
+7. Define acceptance criteria for each task
+8. Map dependencies between tasks
+9. Create beads issues: \`bd create --title="..." --type=task\`
 
 ## Memory Integration
 - Call \`memory_search\` for patterns related to the feature area
@@ -100,6 +101,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Tasks are ordered so each can be verified independently
 - Memory was searched for relevant patterns and past mistakes
 - Existing docs and ADRs were checked for constraints
+- Ambiguities resolved via \`AskUserQuestion\` before decomposing
 - Complexity estimates are realistic (no "should be quick")
 `,
 
@@ -142,7 +144,7 @@ The lead coordinates but does not write code:
 - Spawn agents with task context and relevant memory items
 - Review agent outputs for correctness and consistency
 - Resolve conflicts between test expectations and implementation
-- Escalate to user if agents cannot converge
+- Use \`AskUserQuestion\` when blocked by ambiguity or conflicting agent outputs -- get user direction before proceeding
 
 ## Memory Integration
 - Call \`memory_search\` per delegated subtask with the subtask's specific description
@@ -195,10 +197,11 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    - **P1** (critical): Security vulnerabilities, data loss, correctness bugs -- must fix before merge
    - **P2** (important): Architecture issues, performance regressions -- should fix soon
    - **P3** (minor): Style, naming, documentation -- track for later
-7. Create beads issues for P1 findings: \`bd create --title="P1: ..."\`
-8. Fix all P1 findings before proceeding
-9. Run \`/implementation-reviewer\` as mandatory gate -- it has final authority on whether code ships
-10. Capture novel findings with \`memory_capture\` for future sessions
+7. Use \`AskUserQuestion\` when severity classification is ambiguous or fix approach has multiple valid options
+8. Create beads issues for P1 findings: \`bd create --title="P1: ..."\`
+9. Fix all P1 findings before proceeding
+10. Run \`/implementation-reviewer\` as mandatory gate -- it has final authority on whether code ships
+11. Capture novel findings with \`memory_capture\` for future sessions
 
 ## Memory Integration
 - Call \`memory_search\` before review to check for known recurring issues
@@ -249,7 +252,7 @@ Extract and store lessons learned during the cycle, and update project documenta
 7. Store via \`memory_capture\` with supersedes/related links where applicable
 8. Delegate to the \`compounding\` subagent to run synthesis: cluster accumulated lessons by similarity and write CCT patterns to \`.claude/lessons/cct-patterns.jsonl\`
 9. Update outdated docs and deprecate superseded ADRs (set status to \`deprecated\`)
-10. Ask user to confirm high-severity items only; medium/low are auto-stored
+10. Use \`AskUserQuestion\` to confirm high-severity items with the user before storing; medium/low items are auto-stored
 
 ## Docs Integration
 - Spawn docs-reviewer to check if \`docs/\` content is outdated after the cycle

@@ -74,13 +74,14 @@ Create a structured implementation plan enriched by semantic memory and existing
    - **Repo Analyst** (\`repo-analyst\`): explore codebase patterns, conventions, and architecture
    - **Memory Analyst** (\`memory-analyst\`): deep dive into related memory items with multiple search queries
 5. Synthesize research findings from all agents into a coherent plan. Flag any conflicts between ADRs and proposed approach.
-6. Break the goal into concrete, ordered tasks with clear acceptance criteria.
-7. Create beads issues and map dependencies:
+6. Use \`AskUserQuestion\` to resolve ambiguities: unclear requirements, conflicting ADRs, or priority trade-offs that need user input before decomposing.
+7. Break the goal into concrete, ordered tasks with clear acceptance criteria.
+8. Create beads issues and map dependencies:
    \`\`\`bash
    bd create --title="<task>" --type=task --priority=<1-4>
    bd dep add <dependent-task> <blocking-task>
    \`\`\`
-8. Output the plan as a structured list with task IDs and dependency graph.
+9. Output the plan as a structured list with task IDs and dependency graph.
 
 ## Memory Integration
 - Call \`memory_search\` before planning to learn from past approaches.
@@ -117,9 +118,10 @@ Execute implementation by delegating to an agent team. The lead coordinates and 
    - If **complex** (cross-cutting or ambiguous scope): iterative TDD — delegate to **test-writer** and **implementer** in ping-pong cycles until done.
 6. When agents work on overlapping areas, they communicate directly to coordinate and avoid conflicts.
 7. Lead coordinates the cycle: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-8. Commit incrementally as tests pass — do not batch all commits to the end.
-9. Run the full test suite to check for regressions.
-10. Close the task: \`bd close <id>\`.
+8. If blocked by ambiguity or conflicting agent outputs, use \`AskUserQuestion\` to get user direction before proceeding.
+9. Commit incrementally as tests pass — do not batch all commits to the end.
+10. Run the full test suite to check for regressions.
+11. Close the task: \`bd close <id>\`.
 
 ## Verification Gate
 Before marking work complete, run the 8-step TDD verification pipeline:
@@ -158,13 +160,14 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
    - **P2** (important): architectural violations, significant performance issues
    - **P3** (minor): style nits, small improvements, non-urgent suggestions
 6. Synthesize and prioritize findings — deduplicate overlapping reports, consolidate related items, and rank by severity before creating issues.
-7. For P1 findings, create beads issues:
+7. Use \`AskUserQuestion\` when severity classification is ambiguous (e.g., a finding could be P1 or P2) or when the fix approach has multiple valid options.
+8. For P1 findings, create beads issues:
    \`\`\`bash
    bd create --title="P1: <finding>" --type=bug --priority=1
    \`\`\`
-8. Run quality gates: \`pnpm test\` and \`pnpm lint\` to verify no regressions.
-9. Submit to **\`/implementation-reviewer\`** as the mandatory gate — it has final authority on whether the review passes. All P1 findings must be resolved before approval.
-10. Output a review summary with pass/fail per perspective and severity breakdown.
+9. Run quality gates: \`pnpm test\` and \`pnpm lint\` to verify no regressions.
+10. Submit to **\`/implementation-reviewer\`** as the mandatory gate — it has final authority on whether the review passes. All P1 findings must be resolved before approval.
+11. Output a review summary with pass/fail per perspective and severity breakdown.
 
 ## Memory Integration
 - Call \`memory_search\` at the start for known issues in the changed areas.
@@ -209,7 +212,7 @@ Multi-agent analysis to capture high-quality lessons from completed work into th
    - Write patterns to \`.claude/lessons/cct-patterns.jsonl\`
    - Skip if fewer than 5 total lessons exist (not enough signal)
 9. If the docs-reviewer found outdated docs or ADRs, update them. For superseded ADRs, set status to \`deprecated\` and reference the new ADR.
-10. Confirm with user for high-severity items only; medium/low items are auto-stored.
+10. Use \`AskUserQuestion\` to confirm high-severity items with the user before storing; medium/low items are auto-stored.
 11. Run \`bd ready\` to check for related issues; \`bd close\` any resolved by captured knowledge.
 12. Output a summary of captured items, skipped items, and docs updated.
 
