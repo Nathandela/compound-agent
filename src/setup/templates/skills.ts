@@ -119,20 +119,21 @@ Execute implementation through an agent team using adaptive TDD. The lead coordi
 1. Pick a task from \`bd ready\` or \`$ARGUMENTS\`
 2. Search memory with \`memory_search\` per agent/subtask for targeted context
 3. Assess complexity (see below) and choose team strategy
-4. Execute based on complexity:
-   - If trivial: single agent handles directly, no TDD ceremony. Skip to step 7.
-   - If simple: **Red** — delegate to test-writer for full test suite, then **Green** — delegate to implementer to make them pass.
-   - If complex: **Red/Green ping-pong** — test-writer and implementer alternate in cycles until done.
-5. When agents work on overlapping areas, they communicate directly to coordinate
-6. **Refactor**: Review agent output, request cleanup if needed
-7. Commit incrementally as tests pass — do not batch all commits to the end
-8. Capture lessons with \`memory_capture\` after corrections or discoveries
+4. For non-trivial tasks, spawn **test-analyst** first to produce a structured test plan (happy paths, edge cases, failure modes, boundary conditions, invariants) -- no code, just a checklist of what to test
+5. Execute based on complexity:
+   - If trivial: single agent handles directly, no TDD ceremony. Skip to step 8.
+   - If simple: **Analyze** — test-analyst produces test plan, then **Red** — test-writer implements failing tests from the plan, then **Green** — implementer makes them pass.
+   - If complex: **Analyze** — test-analyst produces test plan, then **Red/Green ping-pong** — test-writer and implementer alternate in cycles.
+6. When agents work on overlapping areas, they communicate directly to coordinate
+7. **Refactor**: Review agent output, request cleanup if needed
+8. Commit incrementally as tests pass — do not batch all commits to the end
+9. Capture lessons with \`memory_capture\` after corrections or discoveries
 
 ## Team Structure
 Adaptive TDD model based on task complexity:
 - **Trivial**: Single agent handles the change directly, no TDD ceremony
-- **Simple**: Sequential -- test-writer writes all tests, then implementer makes them pass
-- **Complex**: Iterative ping-pong -- test-writer and implementer alternate in cycles
+- **Simple**: test-analyst → test-writer → implementer (sequential)
+- **Complex**: test-analyst → test-writer/implementer ping-pong (iterative)
 
 ## Complexity Assessment
 - **Trivial**: Config changes, typos, renaming, one-line fixes. No new behavior.
@@ -141,7 +142,8 @@ Adaptive TDD model based on task complexity:
 
 ## Agent Delegation
 The lead coordinates but does not write code:
-- Spawn agents with task context and relevant memory items
+- Spawn **test-analyst** first for non-trivial tasks -- it produces the test plan that test-writer implements
+- Spawn agents with task context, relevant memory items, and the test plan
 - Review agent outputs for correctness and consistency
 - Resolve conflicts between test expectations and implementation
 - Use \`AskUserQuestion\` when blocked by ambiguity or conflicting agent outputs -- get user direction before proceeding
@@ -163,12 +165,14 @@ Before marking work complete, run the 8-step TDD verification pipeline:
 ## Common Pitfalls
 - Lead writing code instead of delegating to agents
 - Skipping complexity assessment and always using full TDD for trivial changes
+- Letting test-writer improvise without a test-analyst plan (vibes-based testing)
 - Not injecting memory context into agent prompts
 - Modifying tests to make them pass instead of fixing implementation
 - Not running the full test suite after agent work completes
 
 ## Quality Criteria
 - Complexity was assessed before choosing team strategy
+- Test-analyst produced a test plan before test-writer started (non-trivial tasks)
 - Tests existed before implementation code
 - Agents received relevant memory context
 - Lead coordinated without writing implementation code

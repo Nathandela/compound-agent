@@ -112,16 +112,21 @@ Execute implementation by delegating to an agent team. The lead coordinates and 
 2. Mark task in progress: \`bd update <id> --status=in_progress\`.
 3. Call \`memory_search\` with the task description to retrieve relevant lessons. Run \`memory_search\` per agent/subtask so each gets targeted context.
 4. Assess complexity to determine team strategy.
-5. Execute based on assessed complexity:
+5. For non-trivial tasks, spawn a **test-analyst** agent before any code is written. The test-analyst:
+   - Analyzes the task requirements and acceptance criteria
+   - Identifies happy paths, edge cases, failure modes, boundary conditions, and invariants
+   - Produces a structured **test plan** (not code) listing concrete test cases to cover
+   - The test-writer then implements this plan as actual test code
+6. Execute based on assessed complexity:
    - If **trivial** (config changes, typos, one-line fixes): handle directly with a single agent. No TDD pair needed. Proceed to verification and close.
-   - If **simple** (well-scoped feature or bug fix): sequential TDD — delegate to **test-writer** agent to write failing tests, then delegate to **implementer** agent to make them pass.
-   - If **complex** (cross-cutting or ambiguous scope): iterative TDD — delegate to **test-writer** and **implementer** in ping-pong cycles until done.
-6. When agents work on overlapping areas, they communicate directly to coordinate and avoid conflicts.
-7. Lead coordinates the cycle: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-8. If blocked by ambiguity or conflicting agent outputs, use \`AskUserQuestion\` to get user direction before proceeding.
-9. Commit incrementally as tests pass — do not batch all commits to the end.
-10. Run the full test suite to check for regressions.
-11. Close the task: \`bd close <id>\`.
+   - If **simple** (well-scoped feature or bug fix): sequential TDD — **test-analyst** produces test plan, then **test-writer** implements failing tests, then **implementer** makes them pass.
+   - If **complex** (cross-cutting or ambiguous scope): iterative TDD — **test-analyst** produces test plan, then **test-writer** and **implementer** alternate in ping-pong cycles until done.
+7. When agents work on overlapping areas, they communicate directly to coordinate and avoid conflicts.
+8. Lead coordinates the cycle: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
+9. If blocked by ambiguity or conflicting agent outputs, use \`AskUserQuestion\` to get user direction before proceeding.
+10. Commit incrementally as tests pass — do not batch all commits to the end.
+11. Run the full test suite to check for regressions.
+12. Close the task: \`bd close <id>\`.
 
 ## Verification Gate
 Before marking work complete, run the 8-step TDD verification pipeline:
