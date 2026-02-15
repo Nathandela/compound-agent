@@ -4,9 +4,8 @@ import { WORKFLOW_COMMANDS } from './commands.js';
 /**
  * LFG phase structural tests.
  *
- * Verifies the lfg.md command template chains all 5 workflow phases
- * (brainstorm, plan, work, review, compound) with proper ordering,
- * memory integration, stop conditions, and review gate.
+ * Verifies the lfg.md command template is a thin orchestrator that chains
+ * all 5 workflow phases via /compound:* slash command delegation.
  */
 
 describe('LFG Phase Integration', () => {
@@ -17,24 +16,17 @@ describe('LFG Phase Integration', () => {
       expect(lfgCommand).toBeDefined();
     });
 
-    it('starts with $ARGUMENTS', () => {
-      expect(lfgCommand.trimStart()).toMatch(/^\$ARGUMENTS/);
+    it('starts with YAML frontmatter followed by $ARGUMENTS', () => {
+      expect(lfgCommand.trimStart()).toMatch(/^---/);
+      expect(lfgCommand).toContain('$ARGUMENTS');
     });
 
     it('has ## Workflow section', () => {
       expect(lfgCommand).toContain('## Workflow');
     });
 
-    it('has ## Stop Conditions section', () => {
-      expect(lfgCommand).toContain('## Stop Conditions');
-    });
-
-    it('has ## Memory Integration section', () => {
-      expect(lfgCommand).toContain('## Memory Integration');
-    });
-
-    it('stays under 7000 characters', () => {
-      expect(lfgCommand.length).toBeLessThanOrEqual(7000);
+    it('stays under 1500 characters', () => {
+      expect(lfgCommand.length).toBeLessThanOrEqual(1500);
     });
   });
 
@@ -47,21 +39,11 @@ describe('LFG Phase Integration', () => {
       }
     });
 
-    it('each phase has a numbered step in the workflow', () => {
-      const workflowMatch = lfgCommand.match(/## Workflow[^]*?(?=## Stop|$)/i);
-      expect(workflowMatch).not.toBeNull();
-      const workflow = workflowMatch![0];
-      for (const phase of phases) {
-        expect(workflow.toLowerCase()).toContain(phase);
-      }
-    });
-
     it('phases appear in correct order: brainstorm < plan < work < review < compound', () => {
-      const workflowMatch = lfgCommand.match(/## Workflow[^]*?(?=## Stop|$)/i);
+      const workflowMatch = lfgCommand.match(/## Workflow[^]*?(?=## Phase Control|$)/i);
       expect(workflowMatch).not.toBeNull();
       const workflow = workflowMatch![0];
 
-      // Find each phase's numbered step (e.g. "1. **Brainstorm phase**")
       let lastPos = -1;
       for (const phase of phases) {
         const phasePattern = new RegExp(`\\d+\\.\\s+\\*\\*${phase}`, 'i');
@@ -74,63 +56,60 @@ describe('LFG Phase Integration', () => {
     });
   });
 
-  describe('memory integration', () => {
-    it('references memory_search', () => {
-      expect(lfgCommand).toContain('memory_search');
-    });
-
-    it('references memory_capture', () => {
-      expect(lfgCommand).toContain('memory_capture');
+  describe('phase delegation', () => {
+    it('each phase delegates to its dedicated slash command', () => {
+      expect(lfgCommand).toMatch(/\/compound:brainstorm/);
+      expect(lfgCommand).toMatch(/\/compound:plan/);
+      expect(lfgCommand).toMatch(/\/compound:work/);
+      expect(lfgCommand).toMatch(/\/compound:review/);
+      expect(lfgCommand).toMatch(/\/compound:compound/);
     });
 
     it('compound phase warns against MEMORY.md', () => {
-      const compoundMatch = lfgCommand.match(/compound.*?phase[^]*?(?=## FINAL|$)/i);
-      expect(compoundMatch).not.toBeNull();
-      expect(compoundMatch![0]).toMatch(/NOT.*MEMORY\.md/i);
+      expect(lfgCommand).toMatch(/NOT.*MEMORY\.md/i);
     });
 
-    it('## Memory Integration section references memory_search in brainstorm, work, compound', () => {
-      const memorySection = lfgCommand.match(/## Memory Integration[^]*$/i);
-      expect(memorySection).not.toBeNull();
-      const section = memorySection![0];
-      expect(section).toContain('memory_search');
-      expect(section).toMatch(/brainstorm/i);
-      expect(section).toMatch(/work/i);
-      expect(section).toMatch(/compound/i);
-    });
-
-    it('## Memory Integration section references memory_capture in work and compound', () => {
-      const memorySection = lfgCommand.match(/## Memory Integration[^]*$/i);
-      expect(memorySection).not.toBeNull();
-      const section = memorySection![0];
-      expect(section).toContain('memory_capture');
-      expect(section).toMatch(/work/i);
-      expect(section).toMatch(/compound/i);
+    it('references memory_capture in compound phase', () => {
+      expect(lfgCommand).toContain('memory_capture');
     });
   });
 
-  describe('stop conditions', () => {
-    it('has explicit stop conditions section', () => {
-      const stopSection = lfgCommand.match(/## Stop Conditions[^]*?(?=## Memory|$)/i);
-      expect(stopSection).not.toBeNull();
+  describe('phase control', () => {
+    it('has ## Phase Control section', () => {
+      expect(lfgCommand).toContain('## Phase Control');
     });
 
-    it('references unclear goal as a stop condition', () => {
-      const stopSection = lfgCommand.match(/## Stop Conditions[^]*?(?=## Memory|$)/i);
-      expect(stopSection).not.toBeNull();
-      expect(stopSection![0]).toMatch(/unclear/i);
+    it('describes skip-phase behavior', () => {
+      expect(lfgCommand).toMatch(/skip|from.*phase/i);
     });
 
-    it('references test failures as a stop condition', () => {
-      const stopSection = lfgCommand.match(/## Stop Conditions[^]*?(?=## Memory|$)/i);
-      expect(stopSection).not.toBeNull();
-      expect(stopSection![0]).toMatch(/test.*fail/i);
+    it('describes progress reporting', () => {
+      expect(lfgCommand).toMatch(/progress|announce|\[Phase/i);
     });
 
-    it('references security issues as a stop condition', () => {
-      const stopSection = lfgCommand.match(/## Stop Conditions[^]*?(?=## Memory|$)/i);
-      expect(stopSection).not.toBeNull();
-      expect(stopSection![0]).toMatch(/security/i);
+    it('describes resume via bd show and notes field', () => {
+      expect(lfgCommand).toMatch(/resume/i);
+      expect(lfgCommand).toContain('notes field');
+    });
+  });
+
+  describe('session close', () => {
+    it('has SESSION CLOSE section', () => {
+      expect(lfgCommand).toContain('SESSION CLOSE');
+    });
+
+    it('references ca verify-gates', () => {
+      expect(lfgCommand).toContain('ca verify-gates');
+    });
+
+    it('requires git push as final step', () => {
+      expect(lfgCommand).toMatch(/git push/);
+    });
+  });
+
+  describe('phase state tracking', () => {
+    it('contains COMPLETE markers for phase transitions', () => {
+      expect(lfgCommand).toMatch(/Phase:.*COMPLETE/);
     });
   });
 
@@ -139,12 +118,24 @@ describe('LFG Phase Integration', () => {
       expect(lfgCommand).toMatch(/\/compound:review/);
     });
 
-    it('review phase mentions /implementation-reviewer as mandatory gate', () => {
-      expect(lfgCommand).toMatch(/\/implementation-reviewer/);
+    it('review gate (PHASE GATE 4) lives in review.md', () => {
+      expect(WORKFLOW_COMMANDS['review.md']).toContain('PHASE GATE 4');
+      expect(WORKFLOW_COMMANDS['review.md']).toMatch(/implementation-reviewer/);
+    });
+  });
+
+  describe('gates relocated to individual phase commands', () => {
+    it('PHASE GATE 3 in work.md', () => {
+      expect(WORKFLOW_COMMANDS['work.md']).toContain('PHASE GATE 3');
     });
 
-    it('P1 findings are referenced in phase gate', () => {
-      expect(lfgCommand).toMatch(/P1.*resolved|P1.*finding/i);
+    it('PHASE GATE 4 in review.md', () => {
+      expect(WORKFLOW_COMMANDS['review.md']).toContain('PHASE GATE 4');
+    });
+
+    it('FINAL GATE in compound.md', () => {
+      expect(WORKFLOW_COMMANDS['compound.md']).toContain('FINAL GATE');
+      expect(WORKFLOW_COMMANDS['compound.md']).toContain('ca verify-gates');
     });
   });
 
@@ -159,108 +150,12 @@ describe('LFG Phase Integration', () => {
       }
     });
 
-    it('lfg.md references memory_search which exists in individual phase commands', () => {
-      expect(lfgCommand).toContain('memory_search');
-      // Verify the phases that use memory_search also reference it in their own commands
+    it('individual phase commands handle their own memory integration', () => {
       expect(WORKFLOW_COMMANDS['brainstorm.md']).toContain('memory_search');
       expect(WORKFLOW_COMMANDS['work.md']).toContain('memory_search');
-      expect(WORKFLOW_COMMANDS['compound.md']).toContain('memory_search');
-    });
-
-    it('lfg.md references memory_capture which exists in individual phase commands', () => {
-      expect(lfgCommand).toContain('memory_capture');
       expect(WORKFLOW_COMMANDS['work.md']).toContain('memory_capture');
+      expect(WORKFLOW_COMMANDS['compound.md']).toContain('memory_search');
       expect(WORKFLOW_COMMANDS['compound.md']).toContain('memory_capture');
-    });
-  });
-
-  describe('phase delegation survives compaction', () => {
-    it('each phase delegates to its dedicated slash command', () => {
-      expect(lfgCommand).toMatch(/\/compound:brainstorm/);
-      expect(lfgCommand).toMatch(/\/compound:plan/);
-      expect(lfgCommand).toMatch(/\/compound:work/);
-      expect(lfgCommand).toMatch(/\/compound:review/);
-      expect(lfgCommand).toMatch(/\/compound:compound/);
-    });
-
-    it('resume section can recover phase state from beads after compaction', () => {
-      const phaseControlMatch = lfgCommand.match(/## Phase Control[^]*?(?=## Stop|$)/i);
-      expect(phaseControlMatch).not.toBeNull();
-      const phaseControl = phaseControlMatch![0];
-      expect(phaseControl).toMatch(/bd list|bd ready|resume/i);
-    });
-  });
-
-  describe('phase control', () => {
-    it('has ## Phase Control section', () => {
-      expect(lfgCommand).toContain('## Phase Control');
-    });
-
-    it('describes skip-phase behavior', () => {
-      expect(lfgCommand).toMatch(/skip.*phase|from.*phase/i);
-    });
-
-    it('describes progress reporting', () => {
-      expect(lfgCommand).toMatch(/progress|announce|current.*phase|\[Phase/i);
-    });
-
-    it('describes retry on failure', () => {
-      expect(lfgCommand).toMatch(/retry.*fail|fail.*retry/i);
-    });
-
-    it('describes resume after interruption', () => {
-      expect(lfgCommand).toMatch(/resume|interrupt/i);
-    });
-  });
-
-  describe('beads integration', () => {
-    it('work phase mentions task tracking', () => {
-      const workMatch = lfgCommand.match(/work.*?phase[^]*?(?=\d+\.\s\*\*Review|$)/i);
-      expect(workMatch).not.toBeNull();
-      expect(workMatch![0]).toMatch(/task/i);
-    });
-
-    it('references closing tasks', () => {
-      expect(lfgCommand).toMatch(/close.*task|task.*complete/i);
-    });
-  });
-
-  describe('workflow enforcement gates', () => {
-    it('lfg.md contains PHASE GATE 3 between work and review', () => {
-      expect(lfgCommand).toContain('PHASE GATE 3');
-    });
-
-    it('lfg.md contains PHASE GATE 4 between review and compound', () => {
-      expect(lfgCommand).toContain('PHASE GATE 4');
-    });
-
-    it('lfg.md contains FINAL GATE for epic closure', () => {
-      expect(lfgCommand).toContain('FINAL GATE');
-    });
-
-    it('lfg.md contains ca verify-gates', () => {
-      expect(lfgCommand).toContain('ca verify-gates');
-    });
-
-    it('lfg.md contains SESSION CLOSE section', () => {
-      expect(lfgCommand).toContain('SESSION CLOSE');
-    });
-
-    it('lfg.md contains phase state tracking with COMPLETE markers', () => {
-      expect(lfgCommand).toMatch(/Phase:.*COMPLETE/);
-    });
-
-    it('lfg.md phase control resume reads notes field for phase state', () => {
-      const phaseControlMatch = lfgCommand.match(/## Phase Control[^]*?(?=## Stop|$)/i);
-      expect(phaseControlMatch).not.toBeNull();
-      expect(phaseControlMatch![0]).toContain('notes field');
-    });
-
-    it('lfg.md delegates memory integration to phase slash commands', () => {
-      // Each phase delegates to its slash command which handles memory_search/memory_capture
-      const memorySection = lfgCommand.match(/## Memory Integration[^]*$/i);
-      expect(memorySection).not.toBeNull();
-      expect(memorySection![0]).toMatch(/slash command/i);
     });
   });
 

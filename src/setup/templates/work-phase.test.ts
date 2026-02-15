@@ -22,8 +22,9 @@ describe('Work Phase Integration', () => {
       expect(workCommand).toBeDefined();
     });
 
-    it('starts with $ARGUMENTS', () => {
-      expect(workCommand.trimStart()).toMatch(/^\$ARGUMENTS/);
+    it('starts with YAML frontmatter followed by $ARGUMENTS', () => {
+      expect(workCommand.trimStart()).toMatch(/^---/);
+      expect(workCommand).toContain('$ARGUMENTS');
     });
 
     it('has ## Workflow section', () => {
@@ -81,6 +82,11 @@ describe('Work Phase Integration', () => {
       expect(workCommand).toContain('## MANDATORY VERIFICATION');
       expect(workCommand).toMatch(/implementation-reviewer/i);
       expect(workCommand).toMatch(/invariant-designer/i);
+    });
+
+    it('contains PHASE GATE 3 at end of template', () => {
+      expect(workCommand).toContain('PHASE GATE 3');
+      expect(workCommand).toMatch(/work tasks.*closed|work tasks remain open/i);
     });
   });
 

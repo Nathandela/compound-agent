@@ -28,8 +28,9 @@ describe('Review Phase Integration', () => {
       expect(reviewCommand).toBeDefined();
     });
 
-    it('starts with $ARGUMENTS', () => {
-      expect(reviewCommand.trimStart()).toMatch(/^\$ARGUMENTS/);
+    it('starts with YAML frontmatter followed by $ARGUMENTS', () => {
+      expect(reviewCommand.trimStart()).toMatch(/^---/);
+      expect(reviewCommand).toContain('$ARGUMENTS');
     });
 
     it('has ## Workflow section', () => {
@@ -107,6 +108,11 @@ describe('Review Phase Integration', () => {
     // --- Slash-form /implementation-reviewer ---
     it('uses /implementation-reviewer slash form', () => {
       expect(reviewCommand).toMatch(/\/implementation-reviewer/);
+    });
+
+    it('contains PHASE GATE 4 at end of template', () => {
+      expect(reviewCommand).toContain('PHASE GATE 4');
+      expect(reviewCommand).toMatch(/implementation-reviewer.*APPROVED|APPROVED.*implementation-reviewer/i);
     });
   });
 

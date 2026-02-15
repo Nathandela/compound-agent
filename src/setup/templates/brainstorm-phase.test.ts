@@ -19,8 +19,9 @@ describe('Brainstorm Phase Integration', () => {
       expect(brainstormCommand).toBeDefined();
     });
 
-    it('starts with $ARGUMENTS', () => {
-      expect(brainstormCommand.trimStart()).toMatch(/^\$ARGUMENTS/);
+    it('starts with YAML frontmatter followed by $ARGUMENTS', () => {
+      expect(brainstormCommand.trimStart()).toMatch(/^---/);
+      expect(brainstormCommand).toContain('$ARGUMENTS');
     });
 
     it('has ## Workflow section', () => {

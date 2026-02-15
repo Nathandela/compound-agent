@@ -22,8 +22,9 @@ describe('Plan Phase Integration', () => {
       expect(planCommand).toBeDefined();
     });
 
-    it('starts with $ARGUMENTS', () => {
-      expect(planCommand.trimStart()).toMatch(/^\$ARGUMENTS/);
+    it('starts with YAML frontmatter followed by $ARGUMENTS', () => {
+      expect(planCommand.trimStart()).toMatch(/^---/);
+      expect(planCommand).toContain('$ARGUMENTS');
     });
 
     it('has ## Workflow section', () => {

@@ -3,7 +3,12 @@
  */
 
 export const WORKFLOW_COMMANDS: Record<string, string> = {
-  'brainstorm.md': `$ARGUMENTS
+  'brainstorm.md': `---
+name: compound:brainstorm
+description: Explore requirements through collaborative dialogue before committing to a plan
+argument-hint: "<goal or topic to brainstorm>"
+---
+$ARGUMENTS
 
 # Brainstorm
 
@@ -62,7 +67,12 @@ Explore requirements through collaborative dialogue before committing to a plan.
 - If the brainstorm identifies sub-tasks, suggest creating them with \`bd create\`.
 `,
 
-  'plan.md': `$ARGUMENTS
+  'plan.md': `---
+name: compound:plan
+description: Create a structured implementation plan with concrete tasks and dependencies
+argument-hint: "<goal or epic to plan>"
+---
+$ARGUMENTS
 
 # Plan
 
@@ -121,7 +131,12 @@ If either is missing, CREATE THEM NOW. The plan is NOT complete without these ga
 - Each task should include acceptance criteria in its description.
 `,
 
-  'work.md': `$ARGUMENTS
+  'work.md': `---
+name: compound:work
+description: Execute implementation by delegating to an agent team
+argument-hint: "<task ID or description>"
+---
+$ARGUMENTS
 
 # Work
 
@@ -178,9 +193,20 @@ for complex changes. For all changes, /implementation-reviewer is the minimum re
 - Start with \`bd ready\` to pick work.
 - Update status with bd update (id) --status=in_progress.
 - Close with bd close (id) when all tests pass.
+
+## PHASE GATE 3 -- MANDATORY
+Before starting Review, verify ALL work tasks are closed:
+- Run bd list with status in_progress -- must return empty
+- Run bd list with status open -- only Review and Compound tasks should remain
+If any work tasks remain open, DO NOT proceed. Complete them first.
 `,
 
-  'review.md': `$ARGUMENTS
+  'review.md': `---
+name: compound:review
+description: Multi-agent code review with severity classification and mandatory gate
+argument-hint: "<scope or git diff range>"
+---
+$ARGUMENTS
 
 # Review
 
@@ -232,9 +258,19 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
 ## Beads Integration
 - Create \`bd\` issues for P1 and P2 findings with \`bd create\`.
 - Close related issues with \`bd close\` when findings are resolved.
+
+## PHASE GATE 4 -- MANDATORY
+Before starting Compound, verify review is complete:
+- /implementation-reviewer must have returned APPROVED
+- All P1 findings must be resolved
 `,
 
-  'compound.md': `$ARGUMENTS
+  'compound.md': `---
+name: compound:compound
+description: Capture high-quality lessons from completed work into the memory system
+argument-hint: "<topic or epic context>"
+---
+$ARGUMENTS
 
 # Compound
 
@@ -292,91 +328,56 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the MCP tool. MEMORY.md is
 ## Beads Integration
 - Check \`bd ready\` for related open issues.
 - Close resolved issues with \`bd close\`.
-`,
-
-  'lfg.md': `$ARGUMENTS
-
-# LFG (Full Cycle)
-
-## Purpose
-Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
-Each phase delegates to its dedicated slash command for fresh, complete instructions.
-
-## Workflow
-1. **Brainstorm phase**: Run \`/compound:brainstorm\` with the goal stated above.
-   - Pass the full goal text as arguments.
-   - Update epic phase state: bd update (epic-id) --notes="Phase: brainstorm COMPLETE, Next: plan"
-
-2. **Plan phase**: Run \`/compound:plan\` with the brainstorm conclusions.
-   - Pass the epic ID and goal as arguments.
-   - Update epic phase state: bd update (epic-id) --notes="Phase: plan COMPLETE, Next: work"
-
-3. **Work phase**: Run \`/compound:work\` to implement all planned tasks.
-   - Pass the epic ID as argument so it can find tasks via \`bd ready\`.
-   - Update epic phase state: bd update (epic-id) --notes="Phase: work COMPLETE, Next: review"
-
-## PHASE GATE 3->4 -- MANDATORY
-Before starting Review, verify ALL work tasks are closed:
-- Run \`bd list --status=in_progress\` -- must return empty
-- Run \`bd list --status=open\` -- only Review and Compound tasks should remain
-If any work tasks remain open, DO NOT proceed. Complete them first.
-
-4. **Review phase**: Run \`/compound:review\` on the changed code.
-   - Pass the epic scope or \`git diff\` range as arguments.
-   - Update epic phase state: bd update (epic-id) --notes="Phase: review COMPLETE, Next: compound"
-
-## PHASE GATE 4->5 -- MANDATORY
-Before starting Compound, verify review is complete:
-- /implementation-reviewer must have returned APPROVED
-- All P1 findings must be resolved
-
-5. **Compound phase**: Run \`/compound:compound\` to capture learnings.
-   - Pass the epic context and summary of work done.
-   - CRITICAL: Lessons are stored via \`memory_capture\` MCP tool, NOT via MEMORY.md.
-   - Update epic phase state: bd update (epic-id) --notes="Phase: compound COMPLETE, Next: close"
 
 ## FINAL GATE -- EPIC CLOSURE
 Before closing the epic:
 - Run ca verify-gates (epic-id) -- must return PASS for both gates
-- Run \`pnpm test\` -- must pass
-- Run \`pnpm lint\` -- must pass
+- Run pnpm test -- must pass
+- Run pnpm lint -- must pass
 If verify-gates fails, the missing phase was SKIPPED. Go back and complete it.
 CRITICAL: 3/5 phases is NOT success. All 5 phases are required.
+`,
+
+  'lfg.md': `---
+name: compound:lfg
+description: Full workflow cycle chaining brainstorm, plan, work, review, and compound phases
+argument-hint: "<goal>"
+disable-model-invocation: true
+---
+$ARGUMENTS
+
+# LFG (Full Cycle)
+
+## Workflow
+1. **Brainstorm**: /compound:brainstorm with the goal. Update: bd update (epic-id) --notes="Phase: brainstorm COMPLETE, Next: plan"
+2. **Plan**: /compound:plan with conclusions. Update: bd update (epic-id) --notes="Phase: plan COMPLETE, Next: work"
+3. **Work**: /compound:work (finds tasks via bd ready). Update: bd update (epic-id) --notes="Phase: work COMPLETE, Next: review"
+4. **Review**: /compound:review on changed code. Update: bd update (epic-id) --notes="Phase: review COMPLETE, Next: compound"
+5. **Compound**: /compound:compound to capture learnings (via memory_capture, NOT MEMORY.md). Update: bd update (epic-id) --notes="Phase: compound COMPLETE, Next: close"
 
 ## Phase Control
-- **Skip phases**: If the arguments above contain "from <phase>" (e.g., "from plan"), skip all phases before the named one.
-- **Progress**: Announce the current phase before starting it (e.g., "[Phase 2/5] Plan").
-- **Retry**: If a phase fails, report the failure and ask the user whether to retry, skip, or abort.
-- **Resume**: After interruption, run bd show (epic-id) and read the notes field for current phase state. Resume from that phase. If no phase state, check \`bd list --status=in_progress\` to infer.
-
-## Stop Conditions
-- Stop if brainstorm reveals the goal is unclear (ask user).
-- Stop if any test phase produces failures that cannot be resolved.
-- Stop if review finds critical security issues.
-
-## Memory Integration
-- Each phase slash command handles its own \`memory_search\` and \`memory_capture\` calls.
-- \`memory_search\` is called in brainstorm, work, and compound phases.
-- \`memory_capture\` is called in work and compound phases.
+- Skip: "from <phase>" in arguments skips earlier phases.
+- Resume: bd show (epic-id), read notes field for phase state.
+- Progress: announce "[Phase N/5] Name" before each phase.
 
 ## SESSION CLOSE -- INVIOLABLE
-Before saying "done" or "complete", ALL of these must pass:
-1. ca verify-gates (epic-id) -- All workflow gates satisfied
-2. pnpm test -- All tests green
-3. pnpm lint -- Zero violations
-4. git status -- Review changes
-5. git add (specific files) -- Stage (never git add .)
-6. bd sync -- Sync beads
-7. git commit -- Commit with descriptive message
-8. git push -- Push to remote
-If ANY step fails, fix it. Work is NOT done until git push succeeds.
+1. ca verify-gates (epic-id)
+2. pnpm test -- all green
+3. pnpm lint -- zero violations
+4. git status, git add (specific files), bd sync, git commit, git push
+Work is NOT done until git push succeeds.
 `,
 
   // =========================================================================
   // Utility commands (CLI wrappers)
   // =========================================================================
 
-  'learn.md': `Capture a lesson from this session.
+  'learn.md': `---
+name: compound:learn
+description: Capture a lesson from this session into the memory system
+argument-hint: "<insight to remember>"
+---
+Capture a lesson from this session.
 
 Usage: /compound learn <insight>
 
@@ -388,7 +389,12 @@ Examples:
 npx ca learn "$ARGUMENTS"
 \`\`\`
 `,
-  'search.md': `Search lessons for relevant context.
+  'search.md': `---
+name: compound:search
+description: Search stored lessons for relevant context
+argument-hint: "<search query>"
+---
+Search lessons for relevant context.
 
 Usage: /compound search <query>
 
@@ -402,19 +408,32 @@ npx ca search "$ARGUMENTS"
 
 Note: You can also use the \`memory_search\` MCP tool directly.
 `,
-  'list.md': `Show all stored lessons.
+  'list.md': `---
+name: compound:list
+description: Show all stored lessons
+---
+Show all stored lessons.
 
 \`\`\`bash
 npx ca list
 \`\`\`
 `,
-  'prime.md': `Load compound-agent workflow context after compaction or context loss.
+  'prime.md': `---
+name: compound:prime
+description: Load compound-agent workflow context after compaction or context loss
+---
+Load compound-agent workflow context after compaction or context loss.
 
 \`\`\`bash
 npx ca prime
 \`\`\`
 `,
-  'show.md': `Show details of a specific lesson.
+  'show.md': `---
+name: compound:show
+description: Show details of a specific lesson
+argument-hint: "<lesson-id>"
+---
+Show details of a specific lesson.
 
 Usage: /compound show <lesson-id>
 
@@ -422,7 +441,12 @@ Usage: /compound show <lesson-id>
 npx ca show "$ARGUMENTS"
 \`\`\`
 `,
-  'wrong.md': `Mark a lesson as incorrect or invalid.
+  'wrong.md': `---
+name: compound:wrong
+description: Mark a lesson as incorrect or invalid
+argument-hint: "<lesson-id>"
+---
+Mark a lesson as incorrect or invalid.
 
 Usage: /compound wrong <lesson-id>
 
@@ -430,7 +454,11 @@ Usage: /compound wrong <lesson-id>
 npx ca wrong "$ARGUMENTS"
 \`\`\`
 `,
-  'stats.md': `Show compound-agent database statistics and health.
+  'stats.md': `---
+name: compound:stats
+description: Show compound-agent database statistics and health
+---
+Show compound-agent database statistics and health.
 
 \`\`\`bash
 npx ca stats

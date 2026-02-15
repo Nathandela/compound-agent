@@ -28,8 +28,9 @@ describe('Compound Phase Integration', () => {
       expect(compoundCommand).toBeDefined();
     });
 
-    it('starts with $ARGUMENTS', () => {
-      expect(compoundCommand.trimStart()).toMatch(/^\$ARGUMENTS/);
+    it('starts with YAML frontmatter followed by $ARGUMENTS', () => {
+      expect(compoundCommand.trimStart()).toMatch(/^---/);
+      expect(compoundCommand).toContain('$ARGUMENTS');
     });
 
     it('has ## Workflow section', () => {
@@ -107,6 +108,11 @@ describe('Compound Phase Integration', () => {
     // --- Beads integration ---
     it('references beads integration', () => {
       expect(compoundCommand).toMatch(/\bbd\b/);
+    });
+
+    it('contains FINAL GATE for epic closure', () => {
+      expect(compoundCommand).toContain('FINAL GATE');
+      expect(compoundCommand).toContain('ca verify-gates');
     });
 
     // --- Type classification ---

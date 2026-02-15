@@ -89,6 +89,22 @@ describe('WORKFLOW_COMMANDS', () => {
     });
   });
 
+  it('every template starts with YAML frontmatter', () => {
+    for (const [key, template] of Object.entries(WORKFLOW_COMMANDS)) {
+      expect(
+        template.trimStart().startsWith('---'),
+        `${key} does not start with YAML frontmatter (---)`,
+      ).toBe(true);
+      // Verify closing --- exists
+      const firstDelim = template.indexOf('---');
+      const secondDelim = template.indexOf('---', firstDelim + 3);
+      expect(
+        secondDelim,
+        `${key} missing closing --- delimiter`,
+      ).toBeGreaterThan(firstDelim);
+    }
+  });
+
   it('no template exceeds 7000 characters', () => {
     for (const [key, template] of Object.entries(WORKFLOW_COMMANDS)) {
       expect(
