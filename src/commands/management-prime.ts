@@ -11,6 +11,7 @@ import { getRepoRoot } from '../cli-utils.js';
 import { loadSessionLessons } from '../memory/retrieval/index.js';
 import { syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem, Source } from '../memory/index.js';
+import { hasMcpServerInMcpJson } from '../setup/index.js';
 
 /**
  * Beads-style trust language template.
@@ -124,6 +125,15 @@ export async function getPrimeContext(repoRoot?: string): Promise<string> {
 
   // Build output: trust language first
   let output = TRUST_LANGUAGE_TEMPLATE;
+
+  // Warn if MCP server is not registered
+  const hasMcp = await hasMcpServerInMcpJson(root);
+  if (!hasMcp) {
+    output += `
+WARNING: MCP server not registered. Run 'npx ca setup' to enable memory_search/memory_capture tools.
+
+`;
+  }
 
   // Add Emergency Recall section if we have high-severity lessons
   if (lessons.length > 0) {

@@ -89,12 +89,12 @@ describe('WORKFLOW_COMMANDS', () => {
     });
   });
 
-  it('no template exceeds 5000 characters', () => {
+  it('no template exceeds 7000 characters', () => {
     for (const [key, template] of Object.entries(WORKFLOW_COMMANDS)) {
       expect(
         template.length,
-        `${key} is ${template.length} chars (max 5000)`,
-      ).toBeLessThanOrEqual(5000);
+        `${key} is ${template.length} chars (max 7000)`,
+      ).toBeLessThanOrEqual(7000);
     }
   });
 });

@@ -372,6 +372,46 @@ describe('Prime Command', () => {
   });
 
   // ============================================================================
+  // MCP Warning: Prime warns when MCP is not configured
+  // ============================================================================
+
+  describe('MCP Missing Warning', () => {
+    it('includes MCP warning when .mcp.json does not exist', async () => {
+      // No .mcp.json in tempDir
+      const output = await getPrimeContext(tempDir);
+      expect(output).toContain('WARNING');
+      expect(output).toMatch(/MCP.*not registered|MCP server not registered/i);
+      expect(output).toContain('npx ca setup');
+    });
+
+    it('includes MCP warning when .mcp.json has no compound-agent entry', async () => {
+      // Create .mcp.json without compound-agent
+      await writeFile(join(tempDir, '.mcp.json'), JSON.stringify({ mcpServers: {} }, null, 2), 'utf-8');
+
+      const output = await getPrimeContext(tempDir);
+      expect(output).toContain('WARNING');
+      expect(output).toMatch(/MCP.*not registered|MCP server not registered/i);
+    });
+
+    it('does NOT include MCP warning when .mcp.json has compound-agent', async () => {
+      // Create .mcp.json with compound-agent entry
+      const mcpConfig = {
+        mcpServers: {
+          'compound-agent': {
+            command: 'npx',
+            args: ['-y', 'compound-agent@latest', 'mcp'],
+          },
+        },
+      };
+      await writeFile(join(tempDir, '.mcp.json'), JSON.stringify(mcpConfig, null, 2), 'utf-8');
+
+      const output = await getPrimeContext(tempDir);
+      expect(output).not.toContain('WARNING');
+      expect(output).not.toMatch(/MCP server not registered/i);
+    });
+  });
+
+  // ============================================================================
   // Auto-Sync: Memory index is fresh before loading lessons
   // ============================================================================
 
