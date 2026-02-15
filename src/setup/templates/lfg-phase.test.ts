@@ -33,8 +33,8 @@ describe('LFG Phase Integration', () => {
       expect(lfgCommand).toContain('## Memory Integration');
     });
 
-    it('stays under 5000 characters', () => {
-      expect(lfgCommand.length).toBeLessThanOrEqual(5000);
+    it('stays under 7000 characters', () => {
+      expect(lfgCommand.length).toBeLessThanOrEqual(7000);
     });
   });
 
@@ -255,6 +255,78 @@ describe('LFG Phase Integration', () => {
 
     it('references closing tasks', () => {
       expect(lfgCommand).toMatch(/close.*task|task.*complete/i);
+    });
+  });
+
+  describe('workflow enforcement gates', () => {
+    it('lfg.md contains PHASE GATE 3 between work and review', () => {
+      expect(lfgCommand).toContain('PHASE GATE 3');
+    });
+
+    it('lfg.md contains PHASE GATE 4 between review and compound', () => {
+      expect(lfgCommand).toContain('PHASE GATE 4');
+    });
+
+    it('lfg.md contains FINAL GATE for epic closure', () => {
+      expect(lfgCommand).toContain('FINAL GATE');
+    });
+
+    it('lfg.md contains ca verify-gates', () => {
+      expect(lfgCommand).toContain('ca verify-gates');
+    });
+
+    it('lfg.md contains SESSION CLOSE section', () => {
+      expect(lfgCommand).toContain('SESSION CLOSE');
+    });
+
+    it('lfg.md contains phase state tracking with COMPLETE markers', () => {
+      expect(lfgCommand).toMatch(/Phase:.*COMPLETE/);
+    });
+
+    it('lfg.md phase control resume reads notes field for phase state', () => {
+      const phaseControlMatch = lfgCommand.match(/## Phase Control[^]*?(?=## Stop|$)/i);
+      expect(phaseControlMatch).not.toBeNull();
+      expect(phaseControlMatch![0]).toContain('notes field');
+    });
+
+    it('lfg.md each phase has MEMORY CHECK instruction', () => {
+      // Each of the 5 phases should have a MEMORY CHECK
+      const phases = ['Brainstorm', 'Plan', 'Work', 'Review', 'Compound'];
+      for (const phase of phases) {
+        const phasePattern = new RegExp(
+          `\\*\\*${phase} phase\\*\\*[^]*?MEMORY CHECK`,
+          'i',
+        );
+        expect(lfgCommand, `${phase} phase missing MEMORY CHECK`).toMatch(phasePattern);
+      }
+    });
+  });
+
+  describe('plan.md enforcement', () => {
+    const planCommand = WORKFLOW_COMMANDS['plan.md'];
+
+    it('plan.md contains POST-PLAN VERIFICATION section', () => {
+      expect(planCommand).toContain('POST-PLAN VERIFICATION');
+    });
+  });
+
+  describe('work.md enforcement', () => {
+    const workCommand = WORKFLOW_COMMANDS['work.md'];
+
+    it('work.md contains MANDATORY VERIFICATION section', () => {
+      expect(workCommand).toContain('MANDATORY VERIFICATION');
+    });
+
+    it('work.md instructs displaying memory_search results', () => {
+      expect(workCommand).toMatch(/display.*memory|memory.*display/i);
+    });
+  });
+
+  describe('compound.md enforcement', () => {
+    const compoundCommand = WORKFLOW_COMMANDS['compound.md'];
+
+    it('compound.md requires minimum 1 lesson per significant decision', () => {
+      expect(compoundCommand).toContain('At minimum, capture 1 lesson');
     });
   });
 });

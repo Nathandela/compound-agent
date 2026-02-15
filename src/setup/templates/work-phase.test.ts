@@ -77,12 +77,10 @@ describe('Work Phase Integration', () => {
       expect(workCommand).toContain('memory_capture');
     });
 
-    it('includes explicit Verification Gate section with 8-step pipeline', () => {
-      expect(workCommand).toContain('## Verification Gate');
-      expect(workCommand).toMatch(/invariant-designer/i);
-      expect(workCommand).toMatch(/cct-subagent/i);
-      expect(workCommand).toMatch(/drift-detector/i);
+    it('includes explicit Mandatory Verification section with pipeline reference', () => {
+      expect(workCommand).toContain('## MANDATORY VERIFICATION');
       expect(workCommand).toMatch(/implementation-reviewer/i);
+      expect(workCommand).toMatch(/invariant-designer/i);
     });
   });
 
