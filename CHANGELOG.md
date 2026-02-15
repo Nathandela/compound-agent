@@ -9,10 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-02-15
+
 ### Added
 
 - **`ca loop` command**: Generate autonomous infinity loop scripts that process beads epics end-to-end via chained Claude Code sessions
 - **HUMAN_REQUIRED marker**: Loop detects human-blocking issues, logs reason to beads, skips epic without stopping the loop
+- **Review+compound blocking tasks**: Plan phase now creates review and compound beads issues with dependencies, ensuring these phases survive context compaction and surface via `bd ready`
 
 ### Fixed
 
@@ -435,7 +438,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Nathandela/learning_agent/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/Nathandela/learning_agent/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Nathandela/learning_agent/compare/v0.2.9...v1.0.0
 [0.2.9]: https://github.com/Nathandela/learning_agent/compare/v0.2.8...v0.2.9
