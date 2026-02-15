@@ -11,7 +11,7 @@ export const WORKFLOW_COMMANDS: Record<string, string> = {
 Explore requirements through collaborative dialogue before committing to a plan.
 
 ## Workflow
-1. Parse the topic from \`$ARGUMENTS\`. If empty, ask the user what to brainstorm.
+1. Parse the topic from the arguments above. If empty, ask the user what to brainstorm.
 2. Call \`memory_search\` with the topic to surface relevant past lessons. Display retrieved items and incorporate them into exploration.
 3. Create a research team and spawn explorers in parallel:
    \`\`\`
@@ -28,12 +28,10 @@ Explore requirements through collaborative dialogue before committing to a plan.
 7. Run \`bd ready\` to check if related tasks already exist.
 8. Output a clear problem definition, chosen approach, and open questions.
 9. Create a beads epic from conclusions:
-   \`\`\`bash
-   bd create --title="<epic title>" --type=feature --description="<problem definition + approach + scope>"
-   \`\`\`
+   bd create --title="(epic title)" --type=feature --description="(problem definition + approach + scope)"
 10. For each significant decision, auto-create an ADR in \`docs/decisions/\`:
     - Scan \`docs/decisions/\` for the highest existing number, increment by 1
-    - Write \`docs/decisions/NNN-<kebab-title>.md\` using this template:
+    - Write docs/decisions/NNN-(kebab-title).md using this template:
       \`\`\`markdown
       # NNN. <Title>
       Status: accepted
@@ -72,7 +70,7 @@ Explore requirements through collaborative dialogue before committing to a plan.
 Create a structured implementation plan enriched by semantic memory and existing documentation, with concrete tasks and dependencies.
 
 ## Workflow
-1. Parse the goal from \`$ARGUMENTS\`. If empty, ask the user what to plan.
+1. Parse the goal from the arguments above. If empty, ask the user what to plan.
 2. Check for brainstorm output: run \`bd list\` to find a related brainstorm epic. If one exists, read its description for decisions and open questions.
 3. Call \`memory_search\` with the goal to retrieve relevant past lessons. Display retrieved memory items and incorporate them into planning context.
 4. Create a research team and spawn analysts in parallel:
@@ -90,26 +88,20 @@ Create a structured implementation plan enriched by semantic memory and existing
 6. Use \`AskUserQuestion\` to resolve ambiguities: unclear requirements, conflicting ADRs, or priority trade-offs that need user input before decomposing.
 7. Break the goal into concrete, ordered tasks with clear acceptance criteria.
 8. **Create review and compound blocking tasks** so they survive compaction:
-   \`\`\`bash
-   bd create --title="Review: /compound:review" --type=task --priority=1
-   bd create --title="Compound: /compound:compound" --type=task --priority=1
-   bd dep add <review-id> <last-work-task>   # review depends on work
-   bd dep add <compound-id> <review-id>       # compound depends on review
-   \`\`\`
+   - bd create --title="Review: /compound:review" --type=task --priority=1
+   - bd create --title="Compound: /compound:compound" --type=task --priority=1
+   - bd dep add (review-id) (last-work-task)   -- review depends on work
+   - bd dep add (compound-id) (review-id)       -- compound depends on review
    These tasks surface via \`bd ready\` after work completes, ensuring review and compound phases are never skipped — even after context compaction.
 9. Create beads issues and map dependencies:
-   \`\`\`bash
-   bd create --title="<task>" --type=task --priority=<1-4>
-   bd dep add <dependent-task> <blocking-task>
-   \`\`\`
+   - bd create --title="(task)" --type=task --priority=(1-4)
+   - bd dep add (dependent-task) (blocking-task)
 10. Output the plan as a structured list with task IDs and dependency graph.
 
 ## POST-PLAN VERIFICATION -- MANDATORY
 After creating all tasks, verify review and compound tasks exist:
-\`\`\`bash
-bd list --status=open | grep 'Review:'    # Must show a result
-bd list --status=open | grep 'Compound:'  # Must show a result
-\`\`\`
+- Run bd list --status=open and check for a "Review:" task
+- Run bd list --status=open and check for a "Compound:" task
 If either is missing, CREATE THEM NOW. The plan is NOT complete without these gates.
 
 ## Memory Integration
@@ -125,7 +117,7 @@ If either is missing, CREATE THEM NOW. The plan is NOT complete without these ga
 ## Beads Integration
 - Create one \`bd\` issue per task with \`bd create\`.
 - Set priority (1=critical, 4=low) based on dependency order.
-- Map dependencies with \`bd dep add <dependent> <blocker>\`.
+- Map dependencies with bd dep add (dependent) (blocker).
 - Each task should include acceptance criteria in its description.
 `,
 
@@ -137,8 +129,8 @@ If either is missing, CREATE THEM NOW. The plan is NOT complete without these ga
 Execute implementation by delegating to an agent team. The lead coordinates and does not code directly.
 
 ## Workflow
-1. Parse task from \`$ARGUMENTS\`. If empty, run \`bd ready\` to find available tasks.
-2. Mark task in progress: \`bd update <id> --status=in_progress\`.
+1. Parse task from the arguments above. If empty, run \`bd ready\` to find available tasks.
+2. Mark task in progress: bd update (id) --status=in_progress.
 3. Call \`memory_search\` with the task description to retrieve relevant lessons. Run \`memory_search\` per agent/subtask so each gets targeted context. Display retrieved lessons in your response. Do not silently discard memory results.
 4. Assess complexity to determine team strategy.
 5. If **trivial** (config changes, typos, one-line fixes): handle directly with a single subagent. No AgentTeam needed. Proceed to step 10.
@@ -164,11 +156,11 @@ Execute implementation by delegating to an agent team. The lead coordinates and 
 12. Shut down the team when done: send \`shutdown_request\` to all teammates.
 13. Commit incrementally as tests pass — do not batch all commits to the end.
 14. Run the full test suite to check for regressions.
-15. Close the task: \`bd close <id>\`.
+15. Close the task: bd close (id).
 
 ## MANDATORY VERIFICATION -- DO NOT CLOSE TASK WITHOUT THIS
 STOP. Before running \`bd close\`, you MUST:
-1. Run \`pnpm test && pnpm lint\` (quality gates)
+1. Run pnpm test, then pnpm lint (quality gates)
 2. Run /implementation-reviewer on the changed code
 3. Wait for APPROVED status
 If /implementation-reviewer returns REJECTED: fix ALL issues, re-run tests, resubmit.
@@ -184,8 +176,8 @@ for complex changes. For all changes, /implementation-reviewer is the minimum re
 
 ## Beads Integration
 - Start with \`bd ready\` to pick work.
-- Update status with \`bd update <id> --status=in_progress\`.
-- Close with \`bd close <id>\` when all tests pass.
+- Update status with bd update (id) --status=in_progress.
+- Close with bd close (id) when all tests pass.
 `,
 
   'review.md': `$ARGUMENTS
@@ -196,8 +188,8 @@ for complex changes. For all changes, /implementation-reviewer is the minimum re
 Multi-agent code review with severity classification and a mandatory \`/implementation-reviewer\` gate.
 
 ## Workflow
-1. Run quality gates first: \`pnpm test && pnpm lint\`.
-2. Identify scope from \`$ARGUMENTS\` or \`git diff\`. Count changed lines.
+1. Run quality gates first: pnpm test, then pnpm lint.
+2. Identify scope from the arguments above or \`git diff\`. Count changed lines.
 3. Call \`memory_search\` with changed areas to surface past lessons.
 4. **Select reviewer tier based on diff size:**
    - **Small** (<100 lines): 4 core reviewers — security, test-coverage, simplicity, cct-reviewer.
@@ -221,7 +213,7 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
 6. Reviewers communicate cross-cutting findings via SendMessage.
 7. Classify findings: **P1** (security, data loss, correctness — blocks completion), **P2** (architecture, performance), **P3** (style, minor).
 8. Deduplicate and prioritize. Use \`AskUserQuestion\` for ambiguous severity.
-9. For P1/P2 findings: \`bd create --title="P1: <finding>" --type=bug --priority=1\`
+9. For P1/P2 findings: bd create --title="P1: (finding)" --type=bug --priority=1
 10. Submit to **\`/implementation-reviewer\`** — mandatory gate, final authority. All P1s must be resolved.
 11. **External reviewers (optional)**: Check \`.claude/compound-agent.json\` for \`"externalReviewers"\`. Spawn configured reviewers. Advisory only, never blocks.
 12. Output review summary with severity breakdown and external findings (if any).
@@ -249,7 +241,7 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
 Multi-agent analysis to capture high-quality lessons from completed work into the memory system and update project documentation.
 
 ## Workflow
-1. Parse what was done from \`$ARGUMENTS\` or recent git history (\`git diff\`, \`git log\`).
+1. Parse what was done from the arguments above or recent git history (\`git diff\`, \`git log\`).
 2. Call \`memory_search\` with the topic to check what is already known (avoid duplicates).
 3. Create a compound team and spawn the 6 analysis agents in parallel:
    \`\`\`
@@ -306,7 +298,7 @@ Multi-agent analysis to capture high-quality lessons from completed work into th
 Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
 
 ## Workflow
-1. **Brainstorm phase**: Explore the goal from \`$ARGUMENTS\`.
+1. **Brainstorm phase**: Explore the goal stated above.
    - MEMORY CHECK: Call \`memory_search\` with the current goal/task. Display results to user. If relevant items found, state which ones apply and why. If none found, state "No relevant lessons found."
    - Call \`memory_search\` with the goal.
    - \`TeamCreate\` team "brainstorm-<slug>", spawn docs-explorer + code-explorer as parallel teammates.
@@ -314,7 +306,7 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
    - Auto-create ADRs for significant decisions in \`docs/decisions/\`.
    - Create a beads epic from conclusions with \`bd create --type=feature\`.
    - Shut down brainstorm team before next phase.
-   - Update epic phase state: \`bd update <epic-id> --notes="Phase: brainstorm COMPLETE | Next: plan"\`
+   - Update epic phase state: bd update (epic-id) --notes="Phase: brainstorm COMPLETE, Next: plan"
 
 2. **Plan phase**: Structure the work.
    - MEMORY CHECK: Call \`memory_search\` with the current goal/task. Display results to user. If relevant items found, state which ones apply and why. If none found, state "No relevant lessons found."
@@ -324,7 +316,7 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
    - Create beads issues with \`bd create\` and map dependencies with \`bd dep add\`.
    - Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) so they survive compaction and surface via \`bd ready\` after work completes.
    - Shut down plan team before next phase.
-   - Update epic phase state: \`bd update <epic-id> --notes="Phase: plan COMPLETE | Next: work"\`
+   - Update epic phase state: bd update (epic-id) --notes="Phase: plan COMPLETE, Next: work"
 
 3. **Work phase**: Implement with adaptive TDD.
    - MEMORY CHECK: Call \`memory_search\` with the current goal/task. Display results to user. If relevant items found, state which ones apply and why. If none found, state "No relevant lessons found."
@@ -334,29 +326,29 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
    - Call \`memory_search\` per subtask; \`memory_capture\` after corrections.
    - Commit incrementally. Close tasks as they complete.
    - Run verification gate before marking complete. Shut down work team.
-   - Update epic phase state: \`bd update <epic-id> --notes="Phase: work COMPLETE | Next: review"\`
+   - Update epic phase state: bd update (epic-id) --notes="Phase: work COMPLETE, Next: review"
 
 ## PHASE GATE 3->4 -- MANDATORY
 Before starting Review, verify ALL work tasks are closed:
 - Run \`bd list --status=in_progress\` — must return empty
 - Run \`bd list --status=open\` — only Review and Compound tasks should remain
 If any work tasks remain open, DO NOT proceed. Complete them first.
-Update epic phase: \`bd update <epic-id> --notes="Phase: work COMPLETE | Next: review"\`
+Update epic phase: bd update (epic-id) --notes="Phase: work COMPLETE, Next: review"
 
 4. **Review phase**: 11-agent review with severity classification.
    - MEMORY CHECK: Call \`memory_search\` with the current goal/task. Display results to user. If relevant items found, state which ones apply and why. If none found, state "No relevant lessons found."
-   - Run quality gates first: \`pnpm test && pnpm lint\`.
+   - Run quality gates first: pnpm test, then pnpm lint.
    - \`TeamCreate\` team "review-<slug>", spawn all 11 reviewers as parallel teammates.
    - Classify findings as P1 (critical/blocking), P2 (important), P3 (minor).
    - P1 findings must be fixed before proceeding — they block completion.
    - Submit to \`/implementation-reviewer\` as the mandatory gate. Shut down review team.
-   - Update epic phase state: \`bd update <epic-id> --notes="Phase: review COMPLETE | Next: compound"\`
+   - Update epic phase state: bd update (epic-id) --notes="Phase: review COMPLETE, Next: compound"
 
 ## PHASE GATE 4->5 -- MANDATORY
 Before starting Compound, verify review is complete:
 - /implementation-reviewer must have returned APPROVED
 - All P1 findings must be resolved
-Update epic phase: \`bd update <epic-id> --notes="Phase: review COMPLETE | Next: compound"\`
+Update epic phase: bd update (epic-id) --notes="Phase: review COMPLETE, Next: compound"
 
 5. **Compound phase**: Capture learnings.
    - MEMORY CHECK: Call \`memory_search\` with the current goal/task. Display results to user. If relevant items found, state which ones apply and why. If none found, state "No relevant lessons found."
@@ -365,11 +357,11 @@ Update epic phase: \`bd update <epic-id> --notes="Phase: review COMPLETE | Next:
    - Store novel insights via \`memory_capture\` with supersedes/related links.
    - Update outdated docs and deprecate superseded ADRs.
    - Use \`AskUserQuestion\` to confirm high-severity items. Shut down compound team.
-   - Update epic phase state: \`bd update <epic-id> --notes="Phase: compound COMPLETE | Next: close"\`
+   - Update epic phase state: bd update (epic-id) --notes="Phase: compound COMPLETE, Next: close"
 
 ## FINAL GATE -- EPIC CLOSURE
 Before closing the epic:
-- Run \`ca verify-gates <epic-id>\` — must return PASS for both gates
+- Run ca verify-gates (epic-id) — must return PASS for both gates
 - Run \`pnpm test\` — must pass
 - Run \`pnpm lint\` — must pass
 If verify-gates fails, the missing phase was SKIPPED. Go back and complete it.
@@ -379,10 +371,10 @@ CRITICAL: 3/5 phases is NOT success. All 5 phases are required.
 Each phase creates its own AgentTeam via \`TeamCreate\`, spawns teammates via \`Task\` tool with \`team_name\`, coordinates via \`SendMessage\`, and shuts down with \`shutdown_request\` before the next phase starts. Use subagents (Task without team_name) only for quick lookups like \`memory_search\` or \`bd\` commands.
 
 ## Phase Control
-- **Skip phases**: Parse \`$ARGUMENTS\` for "from <phase>" (e.g., "from plan"). Skip all phases before the named one.
+- **Skip phases**: If the arguments above contain "from <phase>" (e.g., "from plan"), skip all phases before the named one.
 - **Progress**: Announce the current phase before starting it (e.g., "[Phase 2/5] Plan").
 - **Retry**: If a phase fails, report the failure and ask the user whether to retry, skip, or abort.
-- **Resume**: After interruption, run \`bd show <epic-id>\` and read the notes field for current phase state. Resume from that phase. If no phase state, check \`bd list --status=in_progress\` to infer.
+- **Resume**: After interruption, run bd show (epic-id) and read the notes field for current phase state. Resume from that phase. If no phase state, check \`bd list --status=in_progress\` to infer.
 
 ## Stop Conditions
 - Stop if brainstorm reveals the goal is unclear (ask user).
@@ -395,14 +387,14 @@ Each phase creates its own AgentTeam via \`TeamCreate\`, spawns teammates via \`
 
 ## SESSION CLOSE -- INVIOLABLE
 Before saying "done" or "complete", ALL of these must pass:
-1. \`ca verify-gates <epic-id>\` -- All workflow gates satisfied
-2. \`pnpm test && pnpm lint\` -- Quality gates green
-3. \`git status\` -- Review changes
-4. \`git add <specific-files>\` -- Stage (never git add .)
-5. \`bd sync\` -- Sync beads
-6. \`git commit -m "..."\` -- Commit
-7. \`bd sync\` -- Post-commit sync
-8. \`git push\` -- Push to remote
+1. ca verify-gates (epic-id) -- All workflow gates satisfied
+2. pnpm test -- All tests green
+3. pnpm lint -- Zero violations
+4. git status -- Review changes
+5. git add (specific files) -- Stage (never git add .)
+6. bd sync -- Sync beads
+7. git commit -- Commit with descriptive message
+8. git push -- Push to remote
 If ANY step fails, fix it. Work is NOT done until git push succeeds.
 `,
 

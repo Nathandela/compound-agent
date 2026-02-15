@@ -97,4 +97,64 @@ describe('WORKFLOW_COMMANDS', () => {
       ).toBeLessThanOrEqual(7000);
     }
   });
+
+  /**
+   * Claude Code slash command safety tests.
+   *
+   * Claude Code processes .md templates as slash commands. It substitutes
+   * $ARGUMENTS with user input, then scans backtick-enclosed content for
+   * shell operators. If user input contains ! ( ) | etc., inline backtick
+   * spans that reference $ARGUMENTS trigger permission check failures.
+   *
+   * Phase templates (brainstorm, plan, work, review, compound, lfg) are
+   * instruction-heavy and must avoid shell-unsafe patterns in backticks.
+   * Utility templates (learn, show, etc.) are thin CLI wrappers where
+   * ```bash blocks are intentional and work correctly.
+   */
+  describe('slash command shell safety', () => {
+    // Shell operators that trigger Claude Code permission checks.
+    // Excludes -> (arrow), >= <= (comparison), and = (assignment).
+    const SHELL_OPERATORS = /[|!;]|&&|\|\||[<>](?![-=])/;
+
+    for (const [key, template] of Object.entries(WORKFLOW_COMMANDS)) {
+      describe(key, () => {
+        it('no $ARGUMENTS inside inline backticks', () => {
+          // $ARGUMENTS at the very start (standalone line) is the standard
+          // slash command pattern. But inside inline backtick code spans,
+          // it gets substituted with user text that may contain ! ( ) etc.
+          // Fenced blocks (```) are excluded — utility commands use them
+          // with properly quoted "$ARGUMENTS" which works fine.
+          const inlineBackticks = template.match(/(?<!`)`(?!`)[^`]+`(?!`)/g) ?? [];
+          for (const span of inlineBackticks) {
+            expect(
+              span,
+              `${key}: $ARGUMENTS inside inline backtick span risks shell injection`,
+            ).not.toContain('$ARGUMENTS');
+          }
+        });
+
+        it('no shell operators inside inline backticks', () => {
+          const inlineBackticks = template.match(/(?<!`)`(?!`)[^`]+`(?!`)/g) ?? [];
+          for (const span of inlineBackticks) {
+            expect(
+              span,
+              `${key}: shell operator in inline backtick span ${span}`,
+            ).not.toMatch(SHELL_OPERATORS);
+          }
+        });
+      });
+    }
+
+    // Phase templates must not use ```bash fenced blocks (Claude Code may
+    // try to execute them). Utility templates are allowed — they're thin
+    // CLI wrappers where ```bash is intentional.
+    for (const key of PHASE_FILENAMES) {
+      it(`${key}: no \`\`\`bash fenced code blocks in phase template`, () => {
+        expect(
+          WORKFLOW_COMMANDS[key],
+          `${key}: fenced bash block in phase template risks execution`,
+        ).not.toMatch(/```bash/);
+      });
+    }
+  });
 });
