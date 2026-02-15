@@ -9,8 +9,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { writeFile } from 'node:fs/promises';
+
 import { appendLesson } from '../memory/storage/jsonl.js';
 import { closeDb } from '../memory/storage/sqlite/index.js';
+import { syncIfNeeded } from '../memory/storage/sqlite/sync.js';
 import { createFullLesson, createQuickLesson } from '../test-utils.js';
 import { getPrimeContext } from './management-prime.js';
 
@@ -365,6 +368,28 @@ describe('Prime Command', () => {
       expect(output).toContain('Tagless insight');
       expect(output).not.toContain('()');
       expect(output).not.toContain('( )');
+    });
+  });
+
+  // ============================================================================
+  // Auto-Sync: Memory index is fresh before loading lessons
+  // ============================================================================
+
+  describe('Auto-Sync on Prime (session start freshness)', () => {
+    it('syncs SQLite index so MCP searches have fresh data', async () => {
+      // 1. Add a lesson and force-sync the SQLite index
+      await appendLesson(tempDir, createFullLesson('L001', 'First lesson', 'high'));
+      await syncIfNeeded(tempDir, { force: true });
+
+      // 2. Simulate git pull adding a new JSONL entry
+      await appendLesson(tempDir, createFullLesson('L002', 'Lesson from git pull', 'high'));
+
+      // 3. Prime should call syncIfNeeded so SQLite is fresh
+      await getPrimeContext(tempDir);
+
+      // 4. Verify SQLite was synced — a subsequent syncIfNeeded should be a no-op
+      const synced = await syncIfNeeded(tempDir);
+      expect(synced).toBe(false); // false means already up-to-date
     });
   });
 

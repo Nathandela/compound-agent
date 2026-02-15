@@ -10,6 +10,7 @@
  *   Management: wrong, validate, compact, stats, rebuild, export, import, show, update, delete
  *   Setup:      init, setup claude, hooks, download-model
  *   Reviewer:   reviewer enable, reviewer disable, reviewer list
+ *   Health:     doctor
  */
 
 import { Command } from 'commander';

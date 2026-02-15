@@ -146,9 +146,9 @@ Execute implementation by delegating to an agent team. The lead coordinates and 
 10. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
 11. If blocked by ambiguity or conflicting agent outputs, use \`AskUserQuestion\` to get user direction.
 12. Shut down the team when done: send \`shutdown_request\` to all teammates.
-10. Commit incrementally as tests pass — do not batch all commits to the end.
-11. Run the full test suite to check for regressions.
-12. Close the task: \`bd close <id>\`.
+13. Commit incrementally as tests pass — do not batch all commits to the end.
+14. Run the full test suite to check for regressions.
+15. Close the task: \`bd close <id>\`.
 
 ## Verification Gate
 Before marking work complete, run the 8-step TDD verification pipeline:
@@ -173,60 +173,48 @@ Before marking work complete, run the 8-step TDD verification pipeline:
 Multi-agent code review with severity classification and a mandatory \`/implementation-reviewer\` gate.
 
 ## Workflow
-1. Run quality gates first: \`pnpm test && pnpm lint\` to catch easy failures before the full review.
-2. Identify what to review from \`$ARGUMENTS\` or recent changes (\`git diff\`).
-3. Call \`memory_search\` with the changed areas to surface relevant past lessons.
-4. Create a review team and spawn all 11 reviewers in parallel:
+1. Run quality gates first: \`pnpm test && pnpm lint\`.
+2. Identify scope from \`$ARGUMENTS\` or \`git diff\`. Count changed lines.
+3. Call \`memory_search\` with changed areas to surface past lessons.
+4. **Select reviewer tier based on diff size:**
+   - **Small** (<100 lines): 4 core reviewers — security, test-coverage, simplicity, cct-reviewer.
+   - **Medium** (100-500 lines): add architecture, performance, edge-case (7 total).
+   - **Large** (500+ lines): full team — all 11 reviewers including docs, consistency, error-handling, pattern-matcher.
+5. Create team and spawn selected reviewers in parallel:
    \`\`\`
    TeamCreate: team_name="review-<scope-slug>"
+   Task: name="security-reviewer", prompt: "Review for injection, auth, data exposure"
+   Task: name="test-coverage-reviewer", prompt: "Review for missing edge cases, cargo-cult tests"
+   Task: name="simplicity-reviewer", prompt: "Review for over-engineering, dead code"
+   Task: name="cct-reviewer", prompt: "Check against CCT patterns in .claude/lessons/"
+   (medium+) Task: name="architecture-reviewer", prompt: "Review module boundaries, coupling"
+   (medium+) Task: name="performance-reviewer", prompt: "Review allocations, N+1, blocking calls"
+   (medium+) Task: name="edge-case-reviewer", prompt: "Check boundary conditions, off-by-one"
+   (large)   Task: name="docs-reviewer", prompt: "Check doc alignment, ADR compliance"
+   (large)   Task: name="consistency-reviewer", prompt: "Check naming, patterns, style"
+   (large)   Task: name="error-handling-reviewer", prompt: "Review error messages, resilience"
+   (large)   Task: name="pattern-matcher", prompt: "Match findings to memory, reinforce via memory_capture"
    \`\`\`
-   Spawn all reviewers simultaneously — each as a teammate:
-   \`\`\`
-   Task: name="security-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
-     prompt: "Review for injection risks, auth issues, data exposure in: <diff/files>"
-   Task: name="architecture-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
-     prompt: "Review module boundaries, coupling, cohesion, API design in: <diff/files>"
-   Task: name="performance-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
-     prompt: "Review for unnecessary allocations, N+1 queries, blocking calls in: <diff/files>"
-   Task: name="test-coverage-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
-     prompt: "Review for missing edge cases, cargo-cult tests, mocked business logic in: <diff/files>"
-   Task: name="simplicity-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
-     prompt: "Review for over-engineering, dead code, unnecessary abstractions in: <diff/files>"
-   Task: name="docs-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
-     prompt: "Check documentation alignment, ADR compliance, undocumented public APIs in: <diff/files>"
-   Task: name="consistency-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
-     prompt: "Check naming conventions, code patterns, style consistency in: <diff/files>"
-   Task: name="error-handling-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
-     prompt: "Review error messages quality, resilience, logging, observability in: <diff/files>"
-   Task: name="edge-case-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
-     prompt: "Check boundary conditions, off-by-one, nil/undefined, empty inputs in: <diff/files>"
-   Task: name="pattern-matcher", subagent_type="general-purpose", team_name="review-<scope>"
-     prompt: "Search memory_search for recurring issues. If a finding matches a known pattern, reinforce severity via memory_capture."
-   Task: name="cct-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
-     prompt: "Check code against CCT patterns in .claude/lessons/cct-patterns.jsonl for known Claude mistakes."
-   \`\`\`
-5. Reviewers communicate cross-cutting findings via SendMessage.
-6. Classify findings: **P1** (security, data loss, correctness — blocks completion), **P2** (architecture, performance), **P3** (style, minor).
-7. Deduplicate and prioritize. Use \`AskUserQuestion\` for ambiguous severity.
-8. For P1/P2 findings: \`bd create --title="P1: <finding>" --type=bug --priority=1\`
-9. Submit to **\`/implementation-reviewer\`** — mandatory gate, final authority. All P1s must be resolved.
-10. **External reviewers (optional)**: Check \`.claude/compound-agent.json\` for \`"externalReviewers"\`. Spawn \`external-reviewer-gemini\` / \`external-reviewer-codex\` as configured. Advisory only, never blocks. Skip if tool not installed.
-11. Output review summary with severity breakdown and external findings (if any).
+6. Reviewers communicate cross-cutting findings via SendMessage.
+7. Classify findings: **P1** (security, data loss, correctness — blocks completion), **P2** (architecture, performance), **P3** (style, minor).
+8. Deduplicate and prioritize. Use \`AskUserQuestion\` for ambiguous severity.
+9. For P1/P2 findings: \`bd create --title="P1: <finding>" --type=bug --priority=1\`
+10. Submit to **\`/implementation-reviewer\`** — mandatory gate, final authority. All P1s must be resolved.
+11. **External reviewers (optional)**: Check \`.claude/compound-agent.json\` for \`"externalReviewers"\`. Spawn configured reviewers. Advisory only, never blocks.
+12. Output review summary with severity breakdown and external findings (if any).
 
 ## Memory Integration
-- Call \`memory_search\` at the start for known issues in the changed areas.
-- **pattern-matcher** auto-reinforces: when a review finding matches an existing memory item, call \`memory_capture\` to increase its severity (recurring issues become higher priority).
-- **cct-reviewer** reads \`.claude/lessons/cct-patterns.jsonl\` for known Claude failure patterns.
-- After the review, call \`memory_capture\` with \`type=solution\` to store the review report for future sessions.
+- Call \`memory_search\` at the start for known issues in changed areas.
+- **pattern-matcher** auto-reinforces recurring findings via \`memory_capture\`.
+- **cct-reviewer** reads \`.claude/lessons/cct-patterns.jsonl\` for known Claude mistakes.
+- After review, call \`memory_capture\` with \`type=solution\` to store the review report.
 
 ## Docs Integration
-- **docs-reviewer** checks that code changes align with \`docs/\` content and existing ADRs.
-- Flags if a public API was added without documentation.
-- Flags if code contradicts an existing ADR in \`docs/decisions/\`.
+- **docs-reviewer** checks code changes align with \`docs/\` and existing ADRs.
+- Flags undocumented public APIs and ADR contradictions.
 
 ## Beads Integration
 - Create \`bd\` issues for P1 and P2 findings with \`bd create\`.
-- Reference the reviewed code in issue descriptions.
 - Close related issues with \`bd close\` when findings are resolved.
 `,
 

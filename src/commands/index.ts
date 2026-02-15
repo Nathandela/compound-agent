@@ -15,6 +15,7 @@ import {
 } from '../setup/index.js';
 
 import { registerCrudCommands } from './management-crud.js';
+import { registerDoctorCommand } from './doctor.js';
 import { registerInvalidationCommands } from './management-invalidation.js';
 import { registerIOCommands } from './management-io.js';
 import { registerMaintenanceCommands } from './management-maintenance.js';
@@ -64,6 +65,7 @@ export function registerManagementCommands(program: Command): void {
   registerPrimeCommand(program);
   registerCrudCommands(program);
   registerAuditCommands(program);
+  registerDoctorCommand(program);
   registerReviewerCommand(program);
   registerRulesCommands(program);
   registerTestSummaryCommand(program);

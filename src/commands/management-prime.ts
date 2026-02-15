@@ -9,6 +9,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { loadSessionLessons } from '../memory/retrieval/index.js';
+import { syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem, Source } from '../memory/index.js';
 
 /**
@@ -109,6 +110,14 @@ function formatLessonForPrime(lesson: MemoryItem): string {
  */
 export async function getPrimeContext(repoRoot?: string): Promise<string> {
   const root = repoRoot ?? getRepoRoot();
+
+  // Sync SQLite index before loading — ensures MCP searches have fresh data
+  // after git pull or external JSONL changes.
+  try {
+    await syncIfNeeded(root);
+  } catch {
+    // Non-fatal: prime still works from JSONL even if SQLite sync fails
+  }
 
   // Load high-severity lessons (top 5, sorted by recency)
   const lessons = await loadSessionLessons(root, 5);

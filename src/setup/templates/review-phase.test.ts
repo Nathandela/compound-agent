@@ -293,6 +293,24 @@ describe('Review Phase Integration', () => {
     });
   });
 
+  describe('dynamic reviewer selection', () => {
+    it('review.md describes tiered reviewer selection based on diff size', () => {
+      expect(reviewCommand).toMatch(/small|trivial|< ?100|fewer/i);
+      expect(reviewCommand).toMatch(/large|full|500|all/i);
+    });
+
+    it('review.md lists core reviewers for small diffs', () => {
+      // Small diffs should use a reduced set
+      expect(reviewCommand).toMatch(/security/i);
+      expect(reviewCommand).toMatch(/test/i);
+      expect(reviewCommand).toMatch(/simplicity/i);
+    });
+
+    it('review.md describes scaling up reviewers for larger diffs', () => {
+      expect(reviewCommand).toMatch(/scale|add|additional|full.*team|all.*reviewer/i);
+    });
+  });
+
   describe('branch-contract checks', () => {
     // --- Review-specific architectural contracts ---
 

@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-02-15
+
+### Added
+
+- **External reviewer integration**: Optional Gemini CLI and Codex CLI as headless cross-model reviewers. Enable with `ca reviewer enable gemini`. Advisory only, non-blocking.
+- **`ca reviewer` command**: `ca reviewer enable|disable|list` to manage external reviewers
+- **`ca doctor` command**: Verifies external dependencies (bd, embedding model, hooks, MCP server) with actionable fix hints
+- **Dynamic reviewer selection**: Review workflow scales agent count with diff size — 4 core reviewers for small diffs, 7 for medium, full 11 for large
+- **Auto-sync on session start**: `ca prime` now syncs the SQLite index before loading lessons, ensuring MCP searches have fresh data after `git pull`
+- **Config system**: `.claude/compound-agent.json` for user-editable settings (not overwritten by `setup --update`)
+
+### Changed
+
+- **Workflow commands**: Moved slash commands into `compound/` subfolder with legacy cleanup migration
+- **Review template**: Tiered reviewer selection replaces fixed 11-reviewer spawn
+
+### Fixed
+
+- **Safe legacy migration**: `setup --update` and `--uninstall` now check for `GENERATED_MARKER` before deleting root-level commands — user-authored files preserved
+- **Config robustness**: Malformed `.claude/compound-agent.json` no longer crashes reviewer commands
+- **Consistent error handling**: `reviewer disable` and `list` now wrapped in try/catch matching `enable`
+- **Template numbering**: Fixed duplicate step numbers in work.md workflow
+
+## [1.0.0] - 2026-02-15
+
 ### Added
 
 - **Unified memory types**: lesson, solution, pattern, preference -- all share one store, schema, and search mechanism
@@ -398,7 +423,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v0.2.9...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Nathandela/learning_agent/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/Nathandela/learning_agent/compare/v0.2.9...v1.0.0
 [0.2.9]: https://github.com/Nathandela/learning_agent/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/Nathandela/learning_agent/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/Nathandela/learning_agent/compare/v0.2.6...v0.2.7
