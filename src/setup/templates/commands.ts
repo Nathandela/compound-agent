@@ -223,6 +223,7 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
 - **pattern-matcher** auto-reinforces recurring findings via \`memory_capture\`.
 - **cct-reviewer** reads \`.claude/lessons/cct-patterns.jsonl\` for known Claude mistakes.
 - After review, call \`memory_capture\` with \`type=solution\` to store the review report.
+- **CRITICAL**: Use \`memory_capture\` MCP tool for ALL lesson storage -- NOT MEMORY.md.
 
 ## Docs Integration
 - **docs-reviewer** checks code changes align with \`docs/\` and existing ADRs.
@@ -239,6 +240,9 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
 
 ## Purpose
 Multi-agent analysis to capture high-quality lessons from completed work into the memory system and update project documentation.
+
+**CRITICAL**: Store all lessons via \`memory_capture\` MCP tool -- NOT via MEMORY.md, NOT via markdown files.
+Lessons go to \`.claude/lessons/index.jsonl\` through the MCP tool. MEMORY.md is a different system and MUST NOT be used for compounding.
 
 ## Workflow
 1. Parse what was done from the arguments above or recent git history (\`git diff\`, \`git log\`).
@@ -296,79 +300,48 @@ Multi-agent analysis to capture high-quality lessons from completed work into th
 
 ## Purpose
 Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
+Each phase delegates to its dedicated slash command for fresh, complete instructions.
 
 ## Workflow
-1. **Brainstorm phase**: Explore the goal stated above.
-   - MEMORY CHECK: Call \`memory_search\` with the current goal/task. Display results to user. If relevant items found, state which ones apply and why. If none found, state "No relevant lessons found."
-   - Call \`memory_search\` with the goal.
-   - \`TeamCreate\` team "brainstorm-<slug>", spawn docs-explorer + code-explorer as parallel teammates.
-   - Ask clarifying questions via \`AskUserQuestion\`, explore alternatives.
-   - Auto-create ADRs for significant decisions in \`docs/decisions/\`.
-   - Create a beads epic from conclusions with \`bd create --type=feature\`.
-   - Shut down brainstorm team before next phase.
+1. **Brainstorm phase**: Run \`/compound:brainstorm\` with the goal stated above.
+   - Pass the full goal text as arguments.
    - Update epic phase state: bd update (epic-id) --notes="Phase: brainstorm COMPLETE, Next: plan"
 
-2. **Plan phase**: Structure the work.
-   - MEMORY CHECK: Call \`memory_search\` with the current goal/task. Display results to user. If relevant items found, state which ones apply and why. If none found, state "No relevant lessons found."
-   - Check for brainstorm epic via \`bd list\`.
-   - \`TeamCreate\` team "plan-<slug>", spawn docs-analyst + repo-analyst + memory-analyst as parallel teammates.
-   - Break into tasks with dependencies and acceptance criteria.
-   - Create beads issues with \`bd create\` and map dependencies with \`bd dep add\`.
-   - Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) so they survive compaction and surface via \`bd ready\` after work completes.
-   - Shut down plan team before next phase.
+2. **Plan phase**: Run \`/compound:plan\` with the brainstorm conclusions.
+   - Pass the epic ID and goal as arguments.
    - Update epic phase state: bd update (epic-id) --notes="Phase: plan COMPLETE, Next: work"
 
-3. **Work phase**: Implement with adaptive TDD.
-   - MEMORY CHECK: Call \`memory_search\` with the current goal/task. Display results to user. If relevant items found, state which ones apply and why. If none found, state "No relevant lessons found."
-   - Assess complexity (trivial/simple/complex) to choose strategy.
-   - Trivial: single subagent, no team. Simple/complex: \`TeamCreate\` team "work-<task-id>".
-   - Spawn test-analyst first, then test-writer + implementer as teammates.
-   - Call \`memory_search\` per subtask; \`memory_capture\` after corrections.
-   - Commit incrementally. Close tasks as they complete.
-   - Run verification gate before marking complete. Shut down work team.
+3. **Work phase**: Run \`/compound:work\` to implement all planned tasks.
+   - Pass the epic ID as argument so it can find tasks via \`bd ready\`.
    - Update epic phase state: bd update (epic-id) --notes="Phase: work COMPLETE, Next: review"
 
 ## PHASE GATE 3->4 -- MANDATORY
 Before starting Review, verify ALL work tasks are closed:
-- Run \`bd list --status=in_progress\` — must return empty
-- Run \`bd list --status=open\` — only Review and Compound tasks should remain
+- Run \`bd list --status=in_progress\` -- must return empty
+- Run \`bd list --status=open\` -- only Review and Compound tasks should remain
 If any work tasks remain open, DO NOT proceed. Complete them first.
-Update epic phase: bd update (epic-id) --notes="Phase: work COMPLETE, Next: review"
 
-4. **Review phase**: 11-agent review with severity classification.
-   - MEMORY CHECK: Call \`memory_search\` with the current goal/task. Display results to user. If relevant items found, state which ones apply and why. If none found, state "No relevant lessons found."
-   - Run quality gates first: pnpm test, then pnpm lint.
-   - \`TeamCreate\` team "review-<slug>", spawn all 11 reviewers as parallel teammates.
-   - Classify findings as P1 (critical/blocking), P2 (important), P3 (minor).
-   - P1 findings must be fixed before proceeding — they block completion.
-   - Submit to \`/implementation-reviewer\` as the mandatory gate. Shut down review team.
+4. **Review phase**: Run \`/compound:review\` on the changed code.
+   - Pass the epic scope or \`git diff\` range as arguments.
    - Update epic phase state: bd update (epic-id) --notes="Phase: review COMPLETE, Next: compound"
 
 ## PHASE GATE 4->5 -- MANDATORY
 Before starting Compound, verify review is complete:
 - /implementation-reviewer must have returned APPROVED
 - All P1 findings must be resolved
-Update epic phase: bd update (epic-id) --notes="Phase: review COMPLETE, Next: compound"
 
-5. **Compound phase**: Capture learnings.
-   - MEMORY CHECK: Call \`memory_search\` with the current goal/task. Display results to user. If relevant items found, state which ones apply and why. If none found, state "No relevant lessons found."
-   - \`TeamCreate\` team "compound-<slug>", spawn 6 analysis agents as parallel teammates.
-   - Search first with \`memory_search\` to avoid duplicates. Apply quality filters (novelty + specificity).
-   - Store novel insights via \`memory_capture\` with supersedes/related links.
-   - Update outdated docs and deprecate superseded ADRs.
-   - Use \`AskUserQuestion\` to confirm high-severity items. Shut down compound team.
+5. **Compound phase**: Run \`/compound:compound\` to capture learnings.
+   - Pass the epic context and summary of work done.
+   - CRITICAL: Lessons are stored via \`memory_capture\` MCP tool, NOT via MEMORY.md.
    - Update epic phase state: bd update (epic-id) --notes="Phase: compound COMPLETE, Next: close"
 
 ## FINAL GATE -- EPIC CLOSURE
 Before closing the epic:
-- Run ca verify-gates (epic-id) — must return PASS for both gates
-- Run \`pnpm test\` — must pass
-- Run \`pnpm lint\` — must pass
+- Run ca verify-gates (epic-id) -- must return PASS for both gates
+- Run \`pnpm test\` -- must pass
+- Run \`pnpm lint\` -- must pass
 If verify-gates fails, the missing phase was SKIPPED. Go back and complete it.
 CRITICAL: 3/5 phases is NOT success. All 5 phases are required.
-
-## Agent Team Pattern
-Each phase creates its own AgentTeam via \`TeamCreate\`, spawns teammates via \`Task\` tool with \`team_name\`, coordinates via \`SendMessage\`, and shuts down with \`shutdown_request\` before the next phase starts. Use subagents (Task without team_name) only for quick lookups like \`memory_search\` or \`bd\` commands.
 
 ## Phase Control
 - **Skip phases**: If the arguments above contain "from <phase>" (e.g., "from plan"), skip all phases before the named one.
@@ -382,6 +355,7 @@ Each phase creates its own AgentTeam via \`TeamCreate\`, spawns teammates via \`
 - Stop if review finds critical security issues.
 
 ## Memory Integration
+- Each phase slash command handles its own \`memory_search\` and \`memory_capture\` calls.
 - \`memory_search\` is called in brainstorm, work, and compound phases.
 - \`memory_capture\` is called in work and compound phases.
 

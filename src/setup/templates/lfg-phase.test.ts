@@ -83,34 +83,10 @@ describe('LFG Phase Integration', () => {
       expect(lfgCommand).toContain('memory_capture');
     });
 
-    it('memory_search is mentioned in brainstorm phase section', () => {
-      const brainstormMatch = lfgCommand.match(/brainstorm.*?phase[^]*?(?=\d+\.\s\*\*Plan|$)/i);
-      expect(brainstormMatch).not.toBeNull();
-      expect(brainstormMatch![0]).toContain('memory_search');
-    });
-
-    it('memory_search is mentioned in work phase section', () => {
-      const workMatch = lfgCommand.match(/work.*?phase[^]*?(?=\d+\.\s\*\*Review|$)/i);
-      expect(workMatch).not.toBeNull();
-      expect(workMatch![0]).toContain('memory_search');
-    });
-
-    it('memory_capture is mentioned in work phase section', () => {
-      const workMatch = lfgCommand.match(/work.*?phase[^]*?(?=\d+\.\s\*\*Review|$)/i);
-      expect(workMatch).not.toBeNull();
-      expect(workMatch![0]).toContain('memory_capture');
-    });
-
-    it('memory_search is mentioned in compound phase section', () => {
-      const compoundMatch = lfgCommand.match(/compound.*?phase[^]*?(?=## Stop|$)/i);
+    it('compound phase warns against MEMORY.md', () => {
+      const compoundMatch = lfgCommand.match(/compound.*?phase[^]*?(?=## FINAL|$)/i);
       expect(compoundMatch).not.toBeNull();
-      expect(compoundMatch![0]).toContain('memory_search');
-    });
-
-    it('memory_capture is mentioned in compound phase section', () => {
-      const compoundMatch = lfgCommand.match(/compound.*?phase[^]*?(?=## Stop|$)/i);
-      expect(compoundMatch).not.toBeNull();
-      expect(compoundMatch![0]).toContain('memory_capture');
+      expect(compoundMatch![0]).toMatch(/NOT.*MEMORY\.md/i);
     });
 
     it('## Memory Integration section references memory_search in brainstorm, work, compound', () => {
@@ -159,19 +135,16 @@ describe('LFG Phase Integration', () => {
   });
 
   describe('review gate', () => {
-    it('review phase mentions severity classification (P1/P2/P3)', () => {
-      expect(lfgCommand).toMatch(/P1/);
-      expect(lfgCommand).toMatch(/P2/);
-      expect(lfgCommand).toMatch(/P3/);
+    it('review phase delegates to /compound:review', () => {
+      expect(lfgCommand).toMatch(/\/compound:review/);
     });
 
     it('review phase mentions /implementation-reviewer as mandatory gate', () => {
       expect(lfgCommand).toMatch(/\/implementation-reviewer/);
-      expect(lfgCommand).toMatch(/mandatory.*gate|gate/i);
     });
 
-    it('P1 findings are described as blocking', () => {
-      expect(lfgCommand).toMatch(/P1.*block|block.*P1|critical.*block/i);
+    it('P1 findings are referenced in phase gate', () => {
+      expect(lfgCommand).toMatch(/P1.*resolved|P1.*finding/i);
     });
   });
 
@@ -201,25 +174,19 @@ describe('LFG Phase Integration', () => {
     });
   });
 
-  describe('review and compound blocking tasks survive compaction', () => {
-    it('plan phase instructs creating review and compound beads issues', () => {
-      const planMatch = lfgCommand.match(/plan.*?phase[^]*?(?=\d+\.\s\*\*Work|$)/i);
-      expect(planMatch).not.toBeNull();
-      const planSection = planMatch![0];
-      expect(planSection).toMatch(/review.*compound|compound.*review/is);
-      expect(planSection).toMatch(/bd create|beads/i);
+  describe('phase delegation survives compaction', () => {
+    it('each phase delegates to its dedicated slash command', () => {
+      expect(lfgCommand).toMatch(/\/compound:brainstorm/);
+      expect(lfgCommand).toMatch(/\/compound:plan/);
+      expect(lfgCommand).toMatch(/\/compound:work/);
+      expect(lfgCommand).toMatch(/\/compound:review/);
+      expect(lfgCommand).toMatch(/\/compound:compound/);
     });
 
-    it('review and compound tasks have dependencies so they surface via bd ready', () => {
-      // compound depends on review, review depends on work
-      expect(lfgCommand).toMatch(/depend|block|bd dep/i);
-    });
-
-    it('resume section can recover review/compound from beads after compaction', () => {
+    it('resume section can recover phase state from beads after compaction', () => {
       const phaseControlMatch = lfgCommand.match(/## Phase Control[^]*?(?=## Stop|$)/i);
       expect(phaseControlMatch).not.toBeNull();
       const phaseControl = phaseControlMatch![0];
-      // Resume uses bd list, which will surface pending review/compound tasks
       expect(phaseControl).toMatch(/bd list|bd ready|resume/i);
     });
   });
@@ -289,16 +256,11 @@ describe('LFG Phase Integration', () => {
       expect(phaseControlMatch![0]).toContain('notes field');
     });
 
-    it('lfg.md each phase has MEMORY CHECK instruction', () => {
-      // Each of the 5 phases should have a MEMORY CHECK
-      const phases = ['Brainstorm', 'Plan', 'Work', 'Review', 'Compound'];
-      for (const phase of phases) {
-        const phasePattern = new RegExp(
-          `\\*\\*${phase} phase\\*\\*[^]*?MEMORY CHECK`,
-          'i',
-        );
-        expect(lfgCommand, `${phase} phase missing MEMORY CHECK`).toMatch(phasePattern);
-      }
+    it('lfg.md delegates memory integration to phase slash commands', () => {
+      // Each phase delegates to its slash command which handles memory_search/memory_capture
+      const memorySection = lfgCommand.match(/## Memory Integration[^]*$/i);
+      expect(memorySection).not.toBeNull();
+      expect(memorySection![0]).toMatch(/slash command/i);
     });
   });
 
@@ -327,6 +289,19 @@ describe('LFG Phase Integration', () => {
 
     it('compound.md requires minimum 1 lesson per significant decision', () => {
       expect(compoundCommand).toContain('At minimum, capture 1 lesson');
+    });
+
+    it('compound.md contains anti-MEMORY.md guardrail', () => {
+      expect(compoundCommand).toMatch(/NOT.*MEMORY\.md/i);
+      expect(compoundCommand).toMatch(/\.claude\/lessons\/index\.jsonl/);
+    });
+  });
+
+  describe('review.md enforcement', () => {
+    const reviewCommand = WORKFLOW_COMMANDS['review.md'];
+
+    it('review.md Memory Integration warns against MEMORY.md', () => {
+      expect(reviewCommand).toMatch(/NOT.*MEMORY\.md/i);
     });
   });
 });
