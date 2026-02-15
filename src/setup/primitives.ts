@@ -13,7 +13,6 @@ import {
   CLAUDE_REF_START_MARKER,
   COMPOUND_AGENT_SECTION_HEADER,
   PLUGIN_MANIFEST,
-  SLASH_COMMANDS,
 } from './templates.js';
 import { AGENT_TEMPLATES, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
 
@@ -107,28 +106,6 @@ export async function createPluginManifest(repoRoot: string): Promise<boolean> {
   return true;
 }
 
-/**
- * Create slash commands in .claude/commands/ directory.
- * Idempotent: does not overwrite existing files.
- *
- * @returns true if any commands were created
- */
-export async function createSlashCommands(repoRoot: string): Promise<boolean> {
-  const commandsDir = join(repoRoot, '.claude', 'commands');
-  await mkdir(commandsDir, { recursive: true });
-
-  let created = false;
-
-  for (const [filename, content] of Object.entries(SLASH_COMMANDS)) {
-    const filePath = join(commandsDir, filename);
-    if (!existsSync(filePath)) {
-      await writeFile(filePath, content, 'utf-8');
-      created = true;
-    }
-  }
-
-  return created;
-}
 
 /**
  * Install agent templates to .claude/agents/compound/.

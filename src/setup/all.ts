@@ -28,7 +28,6 @@ import {
 } from './claude-helpers.js';
 import {
   createPluginManifest,
-  createSlashCommands,
   ensureClaudeMdReference,
   GENERATED_MARKER,
   installAgentTemplates,
@@ -36,7 +35,7 @@ import {
   installWorkflowCommands,
   updateAgentsMd,
 } from './primitives.js';
-import { SLASH_COMMANDS } from './templates.js';
+import { LEGACY_ROOT_SLASH_COMMANDS } from './templates.js';
 import { AGENT_TEMPLATES, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
 
 /** Result of one-shot setup */
@@ -109,16 +108,13 @@ export async function runSetup(options: { skipModel?: boolean }): Promise<SetupR
   // 4. Create plugin manifest
   await createPluginManifest(repoRoot);
 
-  // 5. Create slash commands
-  await createSlashCommands(repoRoot);
-
-  // 5b. Install agent templates
+  // 5. Install agent templates
   await installAgentTemplates(repoRoot);
 
-  // 5c. Install workflow commands
+  // 6. Install workflow commands (includes utility commands)
   await installWorkflowCommands(repoRoot);
 
-  // 5d. Install phase skills
+  // 7. Install phase skills
   await installPhaseSkills(repoRoot);
 
   // 6. Configure Claude settings (hooks in settings.json, MCP in .mcp.json)
@@ -169,8 +165,8 @@ export async function runUninstall(repoRoot: string, dryRun: boolean): Promise<s
     }
   }
 
-  // Remove base slash commands
-  for (const filename of Object.keys(SLASH_COMMANDS)) {
+  // Remove legacy root-level slash commands (v1.0 migration)
+  for (const filename of LEGACY_ROOT_SLASH_COMMANDS) {
     const filePath = join(repoRoot, '.claude', 'commands', filename);
     if (existsSync(filePath)) {
       if (!dryRun) await rm(filePath);
@@ -275,6 +271,14 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{ up
   }
   for (const [phase, content] of Object.entries(PHASE_SKILLS)) {
     await processFile(join(repoRoot, '.claude', 'skills', 'compound', phase, 'SKILL.md'), content);
+  }
+
+  // Migration: clean up legacy root-level slash commands from v1.0
+  for (const filename of LEGACY_ROOT_SLASH_COMMANDS) {
+    const filePath = join(repoRoot, '.claude', 'commands', filename);
+    if (existsSync(filePath)) {
+      if (!dryRun) await rm(filePath);
+    }
   }
 
   return { updated, added, skipped };

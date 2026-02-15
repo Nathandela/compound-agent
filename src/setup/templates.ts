@@ -213,72 +213,14 @@ ${AGENTS_SECTION_END_MARKER}
 `;
 
 // ============================================================================
-// Slash Commands (8lp, 6nw)
+// Legacy Slash Commands (removed in v1.1 — now in WORKFLOW_COMMANDS)
 // ============================================================================
 
-/** Slash command templates for .claude/commands/ */
-export const SLASH_COMMANDS: Record<string, string> = {
-  'learn.md': `Capture a lesson from this session.
-
-Usage: /learn <insight>
-
-Examples:
-- /learn "Always use Polars for large CSV files"
-- /learn "API requires X-Request-ID header"
-
-\`\`\`bash
-npx ca learn "$ARGUMENTS"
-\`\`\`
-`,
-  'search.md': `Search lessons for relevant context.
-
-Usage: /search <query>
-
-Examples:
-- /search "API authentication"
-- /search "data processing patterns"
-
-\`\`\`bash
-npx ca search "$ARGUMENTS"
-\`\`\`
-
-Note: You can also use the \`memory_search\` MCP tool directly.
-`,
-  'list.md': `Show all stored lessons.
-
-\`\`\`bash
-npx ca list
-\`\`\`
-`,
-  'prime.md': `Load compound-agent workflow context after compaction or context loss.
-
-\`\`\`bash
-npx ca prime
-\`\`\`
-`,
-  'show.md': `Show details of a specific lesson.
-
-Usage: /show <lesson-id>
-
-\`\`\`bash
-npx ca show "$ARGUMENTS"
-\`\`\`
-`,
-  'wrong.md': `Mark a lesson as incorrect or invalid.
-
-Usage: /wrong <lesson-id>
-
-\`\`\`bash
-npx ca wrong "$ARGUMENTS"
-\`\`\`
-`,
-  'stats.md': `Show compound-agent database statistics and health.
-
-\`\`\`bash
-npx ca stats
-\`\`\`
-`,
-};
+/** File names of slash commands that used to live at .claude/commands/ root level.
+ * Used by --update to clean up stale files from v1.0 deployments. */
+export const LEGACY_ROOT_SLASH_COMMANDS = [
+  'learn.md', 'search.md', 'list.md', 'prime.md', 'show.md', 'wrong.md', 'stats.md',
+];
 
 // ============================================================================
 // Plugin Configuration (ctv)

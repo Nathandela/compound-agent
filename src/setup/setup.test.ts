@@ -16,7 +16,6 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { setupCliTestContext } from '../test-utils.js';
-import { SLASH_COMMANDS } from './templates.js';
 import { AGENT_TEMPLATES, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
 
 describe('Setup Commands - Generated Content', () => {
@@ -78,21 +77,34 @@ describe('Setup Commands - Generated Content', () => {
       expect(commands.some((c) => c.includes('prime'))).toBe(true);
     });
 
-    it('creates additional slash commands (show, wrong, stats)', async () => {
+    it('creates utility slash commands in compound/ folder', async () => {
       runCli('init');
 
-      const commandsDir = join(getTempDir(), '.claude', 'commands');
+      const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
 
-      // Check for additional commands
       expect(existsSync(join(commandsDir, 'show.md'))).toBe(true);
       expect(existsSync(join(commandsDir, 'wrong.md'))).toBe(true);
       expect(existsSync(join(commandsDir, 'stats.md'))).toBe(true);
+      expect(existsSync(join(commandsDir, 'learn.md'))).toBe(true);
+      expect(existsSync(join(commandsDir, 'search.md'))).toBe(true);
     });
 
-    it('slash commands reference correct CLI commands', async () => {
+    it('does NOT create slash commands at root .claude/commands/ level', async () => {
       runCli('init');
 
       const commandsDir = join(getTempDir(), '.claude', 'commands');
+
+      // Utility commands should NOT exist at root level
+      expect(existsSync(join(commandsDir, 'learn.md'))).toBe(false);
+      expect(existsSync(join(commandsDir, 'show.md'))).toBe(false);
+      expect(existsSync(join(commandsDir, 'wrong.md'))).toBe(false);
+      expect(existsSync(join(commandsDir, 'stats.md'))).toBe(false);
+    });
+
+    it('utility commands reference correct CLI commands', async () => {
+      runCli('init');
+
+      const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
 
       const showContent = await readFile(join(commandsDir, 'show.md'), 'utf-8');
       expect(showContent).toContain('ca show');
@@ -412,17 +424,15 @@ describe('Setup Commands - Generated Content', () => {
       expect(existsSync(join(getTempDir(), '.claude', 'plugin.json'))).toBe(false);
     });
 
-    it('removes base slash commands (.claude/commands/*.md)', async () => {
+    it('removes all commands in compound/ folder', async () => {
       runCli('init');
 
-      const commandsDir = join(getTempDir(), '.claude', 'commands');
+      const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
       expect(existsSync(join(commandsDir, 'learn.md'))).toBe(true);
 
       runCli('setup --uninstall');
 
-      for (const filename of Object.keys(SLASH_COMMANDS)) {
-        expect(existsSync(join(commandsDir, filename))).toBe(false);
-      }
+      expect(existsSync(commandsDir)).toBe(false);
     });
 
     it('does NOT remove .claude/lessons/ (user data)', async () => {
@@ -505,6 +515,30 @@ describe('Setup Commands - Generated Content', () => {
 
       const result = runCli('setup --update');
       expect(result.combined).toMatch(/updated|up to date/i);
+    });
+
+    it('cleans up old root-level slash commands during update', async () => {
+      runCli('init');
+
+      // Simulate v1.0 state: slash commands at root level
+      const commandsDir = join(getTempDir(), '.claude', 'commands');
+      const oldFiles = ['learn.md', 'search.md', 'list.md', 'prime.md', 'show.md', 'wrong.md', 'stats.md'];
+      for (const f of oldFiles) {
+        await writeFile(join(commandsDir, f), 'old root-level command', 'utf-8');
+      }
+
+      runCli('setup --update');
+
+      // Old root-level files should be removed
+      for (const f of oldFiles) {
+        expect(existsSync(join(commandsDir, f))).toBe(false);
+      }
+
+      // But compound/ folder should have them
+      const compoundDir = join(commandsDir, 'compound');
+      for (const f of oldFiles) {
+        expect(existsSync(join(compoundDir, f))).toBe(true);
+      }
     });
   });
 
@@ -637,14 +671,14 @@ describe('Setup Commands - Generated Content', () => {
    * Tests for workflow command template installation
    */
   describe('Workflow command template installation', () => {
-    it('creates .claude/commands/compound/ with 6 .md files', async () => {
+    it('creates .claude/commands/compound/ with 13 .md files', async () => {
       runCli('init');
 
       const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
       expect(existsSync(commandsDir)).toBe(true);
 
       const files = readdirSync(commandsDir).filter((f) => f.endsWith('.md'));
-      expect(files.length).toBe(6);
+      expect(files.length).toBe(13);
     });
 
     it('creates all expected workflow command files', async () => {
@@ -682,7 +716,7 @@ describe('Setup Commands - Generated Content', () => {
 
       const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
       const files = readdirSync(commandsDir).filter((f) => f.endsWith('.md'));
-      expect(files.length).toBe(6);
+      expect(files.length).toBe(13);
     });
 
     it('--skip-agents skips workflow command installation', async () => {

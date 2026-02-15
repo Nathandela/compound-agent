@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { WORKFLOW_COMMANDS } from './commands.js';
 
-const EXPECTED_FILENAMES = [
+const PHASE_FILENAMES = [
   'brainstorm.md',
   'plan.md',
   'work.md',
@@ -10,15 +10,24 @@ const EXPECTED_FILENAMES = [
   'lfg.md',
 ];
 
+const UTILITY_FILENAMES = [
+  'learn.md',
+  'search.md',
+  'list.md',
+  'prime.md',
+  'show.md',
+  'wrong.md',
+  'stats.md',
+];
+
 describe('WORKFLOW_COMMANDS', () => {
-  it('has exactly 6 entries', () => {
-    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(6);
+  it('has exactly 13 entries (6 phase + 7 utility)', () => {
+    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(13);
   });
 
   it('has all expected filenames', () => {
-    expect(Object.keys(WORKFLOW_COMMANDS).sort()).toEqual(
-      EXPECTED_FILENAMES.sort(),
-    );
+    const expected = [...PHASE_FILENAMES, ...UTILITY_FILENAMES];
+    expect(Object.keys(WORKFLOW_COMMANDS).sort()).toEqual(expected.sort());
   });
 
   it('every key ends with .md', () => {
@@ -27,32 +36,57 @@ describe('WORKFLOW_COMMANDS', () => {
     }
   });
 
-  it('every template contains $ARGUMENTS', () => {
-    for (const [key, template] of Object.entries(WORKFLOW_COMMANDS)) {
-      expect(template, `${key} missing $ARGUMENTS`).toContain('$ARGUMENTS');
-    }
+  describe('phase commands', () => {
+    it('every phase template contains $ARGUMENTS', () => {
+      for (const key of PHASE_FILENAMES) {
+        expect(WORKFLOW_COMMANDS[key], `${key} missing $ARGUMENTS`).toContain('$ARGUMENTS');
+      }
+    });
+
+    it('every phase template has a ## Workflow section', () => {
+      for (const key of PHASE_FILENAMES) {
+        expect(WORKFLOW_COMMANDS[key], `${key} missing ## Workflow`).toContain('## Workflow');
+      }
+    });
+
+    it('every phase template references memory_search or memory_capture', () => {
+      for (const key of PHASE_FILENAMES) {
+        const template = WORKFLOW_COMMANDS[key];
+        const hasMemory =
+          template.includes('memory_search') ||
+          template.includes('memory_capture');
+        expect(hasMemory, `${key} missing memory integration`).toBe(true);
+      }
+    });
+
+    it('every phase template except lfg references bd (beads integration)', () => {
+      for (const key of PHASE_FILENAMES) {
+        if (key === 'lfg.md') continue;
+        expect(WORKFLOW_COMMANDS[key], `${key} missing bd reference`).toMatch(/\bbd\b/);
+      }
+    });
+
+    it('lfg.md references all other phases', () => {
+      const lfg = WORKFLOW_COMMANDS['lfg.md'];
+      const phases = ['brainstorm', 'plan', 'work', 'review', 'compound'];
+      for (const phase of phases) {
+        expect(lfg, `lfg.md missing reference to ${phase}`).toContain(phase);
+      }
+    });
   });
 
-  it('every template has a ## Workflow section', () => {
-    for (const [key, template] of Object.entries(WORKFLOW_COMMANDS)) {
-      expect(template, `${key} missing ## Workflow`).toContain('## Workflow');
-    }
-  });
+  describe('utility commands', () => {
+    it('learn.md references ca learn', () => {
+      expect(WORKFLOW_COMMANDS['learn.md']).toContain('ca learn');
+    });
 
-  it('every template references memory_search or memory_capture', () => {
-    for (const [key, template] of Object.entries(WORKFLOW_COMMANDS)) {
-      const hasMemory =
-        template.includes('memory_search') ||
-        template.includes('memory_capture');
-      expect(hasMemory, `${key} missing memory integration`).toBe(true);
-    }
-  });
+    it('search.md references ca search', () => {
+      expect(WORKFLOW_COMMANDS['search.md']).toContain('ca search');
+    });
 
-  it('every template except lfg references bd (beads integration)', () => {
-    for (const [key, template] of Object.entries(WORKFLOW_COMMANDS)) {
-      if (key === 'lfg.md') continue;
-      expect(template, `${key} missing bd reference`).toMatch(/\bbd\b/);
-    }
+    it('stats.md references ca stats', () => {
+      expect(WORKFLOW_COMMANDS['stats.md']).toContain('ca stats');
+    });
   });
 
   it('no template exceeds 5000 characters', () => {
@@ -61,14 +95,6 @@ describe('WORKFLOW_COMMANDS', () => {
         template.length,
         `${key} is ${template.length} chars (max 5000)`,
       ).toBeLessThanOrEqual(5000);
-    }
-  });
-
-  it('lfg.md references all other phases', () => {
-    const lfg = WORKFLOW_COMMANDS['lfg.md'];
-    const phases = ['brainstorm', 'plan', 'work', 'review', 'compound'];
-    for (const phase of phases) {
-      expect(lfg, `lfg.md missing reference to ${phase}`).toContain(phase);
     }
   });
 });

@@ -14,7 +14,6 @@ import { installClaudeHooksForInit } from './claude-helpers.js';
 import { installPreCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
-  createSlashCommands,
   ensureClaudeMdReference,
   installAgentTemplates,
   installPhaseSkills,
@@ -65,11 +64,6 @@ async function initAction(
     await ensureClaudeMdReference(repoRoot);
   }
 
-  let slashCommandsCreated = false;
-  if (!options.skipAgents) {
-    slashCommandsCreated = await createSlashCommands(repoRoot);
-  }
-
   if (!options.skipAgents) {
     await createPluginManifest(repoRoot);
     await installAgentTemplates(repoRoot);
@@ -94,7 +88,6 @@ async function initAction(
       initialized: true,
       lessonsDir,
       agentsMd: agentsMdUpdated,
-      slashCommands: slashCommandsCreated || !options.skipAgents,
       hooks: hooksChanged,
       hookStatus: hookResult?.status ?? 'skipped',
       claudeHooks: claudeHooksInstalled,
@@ -107,7 +100,6 @@ async function initAction(
   out.success('Compound agent initialized');
   console.log(`  Lessons directory: ${lessonsDir}`);
   printAgentsMdStatus(agentsMdUpdated, options.skipAgents);
-  printSlashCommandsStatus(slashCommandsCreated, options.skipAgents);
   printHookStatus(hookResult, options.skipHooks);
   printClaudeHooksStatus(claudeHooksResult, options.skipClaude);
 }
@@ -119,16 +111,6 @@ function printAgentsMdStatus(updated: boolean, skipped?: boolean): void {
     console.log('  AGENTS.md: Skipped (--skip-agents)');
   } else {
     console.log('  AGENTS.md: Already has Compound Agent section');
-  }
-}
-
-function printSlashCommandsStatus(created: boolean, skipped?: boolean): void {
-  if (created) {
-    console.log('  Slash commands: Created (/learn, /show, /wrong, /stats)');
-  } else if (skipped) {
-    console.log('  Slash commands: Skipped (--skip-agents)');
-  } else {
-    console.log('  Slash commands: Already exist');
   }
 }
 
