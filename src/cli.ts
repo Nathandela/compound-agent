@@ -10,6 +10,7 @@
  *   Management: wrong, validate, compact, stats, rebuild, export, import, show, update, delete
  *   Setup:      init, setup claude, hooks, download-model
  *   Reviewer:   reviewer enable, reviewer disable, reviewer list
+ *   Loop:       loop
  *   Health:     doctor
  */
 
@@ -18,6 +19,7 @@ import { Command } from 'commander';
 import { registerCompoundCommands } from './commands/compound.js';
 import {
   registerCaptureCommands,
+  registerLoopCommands,
   registerManagementCommands,
   registerRetrievalCommands,
   registerSetupCommands,
@@ -81,6 +83,7 @@ registerRetrievalCommands(program);
 registerManagementCommands(program);
 registerSetupCommands(program);
 registerCompoundCommands(program);
+registerLoopCommands(program);
 
 // ============================================================================
 // Parse and Execute

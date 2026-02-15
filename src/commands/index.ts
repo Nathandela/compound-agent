@@ -26,6 +26,7 @@ import { registerRulesCommands } from './rules.js';
 import { registerTestSummaryCommand } from './test-summary.js';
 
 export { registerCaptureCommands } from './capture.js';
+export { registerLoopCommands } from './loop.js';
 export { registerRetrievalCommands } from './retrieval.js';
 
 // Re-export types and helpers from management modules
