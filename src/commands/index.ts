@@ -20,6 +20,7 @@ import { registerIOCommands } from './management-io.js';
 import { registerMaintenanceCommands } from './management-maintenance.js';
 import { registerPrimeCommand } from './management-prime.js';
 import { registerAuditCommands } from './audit.js';
+import { registerReviewerCommand } from './reviewer.js';
 import { registerRulesCommands } from './rules.js';
 import { registerTestSummaryCommand } from './test-summary.js';
 
@@ -63,6 +64,7 @@ export function registerManagementCommands(program: Command): void {
   registerPrimeCommand(program);
   registerCrudCommands(program);
   registerAuditCommands(program);
+  registerReviewerCommand(program);
   registerRulesCommands(program);
   registerTestSummaryCommand(program);
 }

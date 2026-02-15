@@ -205,19 +205,13 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
    Task: name="cct-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
      prompt: "Check code against CCT patterns in .claude/lessons/cct-patterns.jsonl for known Claude mistakes."
    \`\`\`
-5. Reviewers communicate findings with each other via SendMessage so cross-cutting issues (e.g., a security fix that impacts performance) are identified early.
-6. Collect all findings and classify by severity:
-   - **P1** (critical): security vulnerabilities, data loss, correctness bugs — P1 findings block completion
-   - **P2** (important): architectural violations, significant performance issues
-   - **P3** (minor): style nits, small improvements, non-urgent suggestions
-7. Synthesize and prioritize findings — deduplicate overlapping reports, consolidate related items, and rank by severity before creating issues.
-8. Use \`AskUserQuestion\` when severity classification is ambiguous (e.g., a finding could be P1 or P2) or when the fix approach has multiple valid options.
-9. For P1 and P2 findings, create beads issues:
-   \`\`\`bash
-   bd create --title="P1: <finding>" --type=bug --priority=1
-   \`\`\`
-10. Submit to **\`/implementation-reviewer\`** as the mandatory gate — it has final authority on whether the review passes. All P1 findings must be resolved before approval.
-11. Output a review summary with pass/fail per perspective and severity breakdown.
+5. Reviewers communicate cross-cutting findings via SendMessage.
+6. Classify findings: **P1** (security, data loss, correctness — blocks completion), **P2** (architecture, performance), **P3** (style, minor).
+7. Deduplicate and prioritize. Use \`AskUserQuestion\` for ambiguous severity.
+8. For P1/P2 findings: \`bd create --title="P1: <finding>" --type=bug --priority=1\`
+9. Submit to **\`/implementation-reviewer\`** — mandatory gate, final authority. All P1s must be resolved.
+10. **External reviewers (optional)**: Check \`.claude/compound-agent.json\` for \`"externalReviewers"\`. Spawn \`external-reviewer-gemini\` / \`external-reviewer-codex\` as configured. Advisory only, never blocks. Skip if tool not installed.
+11. Output review summary with severity breakdown and external findings (if any).
 
 ## Memory Integration
 - Call \`memory_search\` at the start for known issues in the changed areas.

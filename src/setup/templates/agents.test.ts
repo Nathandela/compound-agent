@@ -20,11 +20,13 @@ const EXPECTED_FILENAMES = [
   'doc-gardener.md',
   'cct-subagent.md',
   'drift-detector.md',
+  'external-reviewer-gemini.md',
+  'external-reviewer-codex.md',
 ];
 
 describe('AGENT_TEMPLATES', () => {
-  it('has exactly 18 entries', () => {
-    expect(Object.keys(AGENT_TEMPLATES)).toHaveLength(18);
+  it('has exactly 20 entries', () => {
+    expect(Object.keys(AGENT_TEMPLATES)).toHaveLength(20);
   });
 
   it('every key ends with .md', () => {
@@ -61,7 +63,7 @@ describe('AGENT_TEMPLATES', () => {
     }
   });
 
-  it('contains all 18 expected filenames', () => {
+  it('contains all 20 expected filenames', () => {
     const keys = Object.keys(AGENT_TEMPLATES);
     for (const filename of EXPECTED_FILENAMES) {
       expect(keys, `missing ${filename}`).toContain(filename);
