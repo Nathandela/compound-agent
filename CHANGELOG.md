@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.4] - 2026-02-15
+
+### Changed
+
+- **lfg.md delegates phases to slash commands**: Instead of inlining all 5 phase workflows (~80 lines), lfg.md now invokes `/compound:{brainstorm,plan,work,review,compound}`. This prevents phase instructions from being compacted away by late phases.
+- **Anti-MEMORY.md guardrails**: compound.md and review.md now explicitly warn against using MEMORY.md for lesson storage, directing Claude to use `memory_capture` MCP tool instead.
+
+### Fixed
+
+- **Phase 5 context drift**: Claude no longer falls back to MEMORY.md during compound phase because each phase loads fresh instructions from its dedicated slash command.
+
 ## [1.2.1] - 2026-02-15
 
 ### Added
