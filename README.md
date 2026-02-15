@@ -170,6 +170,18 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca rules check` | Run repository-defined rule checks |
 | `ca test-summary` | Run tests and output a compact summary |
 
+### Automation
+
+| Command | Description |
+|---------|-------------|
+| `ca loop` | Generate infinity loop script for autonomous epic processing |
+| `ca loop --epics <ids...>` | Target specific epic IDs |
+| `ca loop -o <path>` | Custom output path (default: `./infinity-loop.sh`) |
+| `ca loop --max-retries <n>` | Max retries per epic on failure (default: 1) |
+| `ca loop --force` | Overwrite existing script |
+
+Generated scripts detect three markers: `EPIC_COMPLETE` (success), `EPIC_FAILED` (retry then stop), `HUMAN_REQUIRED: <reason>` (skip and continue). Run with `LOOP_DRY_RUN=1` to preview.
+
 ### Setup
 
 | Command | Description |

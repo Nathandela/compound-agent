@@ -14,6 +14,13 @@ import type { Command } from 'commander';
 import { out } from './shared.js';
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** Safe pattern for epic IDs: alphanumeric, hyphens, underscores, dots */
+const EPIC_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+
+// ============================================================================
 // Types
 // ============================================================================
 
@@ -70,8 +77,9 @@ function buildEpicSelector(): string {
   return `
 get_next_epic() {
   if [ -n "$EPIC_IDS" ]; then
-    # From explicit list, find first still-open epic
+    # From explicit list, find first still-open epic not yet processed
     for epic_id in $EPIC_IDS; do
+      case " $PROCESSED " in *" $epic_id "*) continue ;; esac
       local status
       status=$(bd show "$epic_id" --json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',''))" 2>/dev/null || echo "")
       if [ "$status" = "open" ]; then
@@ -81,9 +89,16 @@ get_next_epic() {
     done
     return 1
   else
-    # Dynamic: get next ready epic from dependency graph
+    # Dynamic: get next ready epic from dependency graph, filtering processed
     local epic_id
-    epic_id=$(bd list --type=epic --ready --json --limit=1 2>/dev/null | python3 -c "import sys,json; items=json.load(sys.stdin); print(items[0]['id'] if items else '')" 2>/dev/null || echo "")
+    epic_id=$(bd list --type=epic --ready --json --limit=10 2>/dev/null | python3 -c "
+import sys,json
+processed = set('$PROCESSED'.split())
+items = json.load(sys.stdin)
+for item in items:
+    if item['id'] not in processed:
+        print(item['id'])
+        break" 2>/dev/null || echo "")
     if [ -z "$epic_id" ]; then
       return 1
     fi
@@ -162,6 +177,7 @@ function buildMainLoop(): string {
 COMPLETED=0
 FAILED=0
 SKIPPED=0
+PROCESSED=""
 
 log "Infinity loop starting"
 log "Config: max_retries=$MAX_RETRIES model=$MODEL"
@@ -181,7 +197,7 @@ while true; do
 
     log "Attempt $ATTEMPT/$((MAX_RETRIES + 1)) for $EPIC_ID (log: $LOGFILE)"
 
-    if [ -n "$LOOP_DRY_RUN" ]; then
+    if [ -n "\${LOOP_DRY_RUN:-}" ]; then
       log "[DRY RUN] Would run claude session for $EPIC_ID"
       SUCCESS=true
       break
@@ -225,8 +241,11 @@ while true; do
   else
     FAILED=$((FAILED + 1))
     log "Epic $EPIC_ID failed after $((MAX_RETRIES + 1)) attempts. Stopping loop."
+    PROCESSED="$PROCESSED $EPIC_ID"
     break
   fi
+
+  PROCESSED="$PROCESSED $EPIC_ID"
 done
 
 log "Loop finished. Completed: $COMPLETED, Failed: $FAILED, Skipped: $SKIPPED"
@@ -234,9 +253,27 @@ log "Loop finished. Completed: $COMPLETED, Failed: $FAILED, Skipped: $SKIPPED"
 }
 
 /**
+ * Validate loop script options before generation.
+ */
+function validateOptions(options: LoopScriptOptions): void {
+  if (!Number.isInteger(options.maxRetries) || options.maxRetries < 0) {
+    throw new Error(`Invalid maxRetries: must be a non-negative integer, got ${options.maxRetries}`);
+  }
+  if (options.epics) {
+    for (const id of options.epics) {
+      if (!EPIC_ID_PATTERN.test(id)) {
+        throw new Error(`Invalid epic ID "${id}": must match ${EPIC_ID_PATTERN}`);
+      }
+    }
+  }
+}
+
+/**
  * Generate a bash script that autonomously processes beads epics.
  */
 export function generateLoopScript(options: LoopScriptOptions): string {
+  validateOptions(options);
+
   const epicIds = options.epics?.join(' ') ?? '';
   const timestamp = new Date().toISOString();
 
@@ -257,14 +294,29 @@ async function handleLoop(cmd: Command, options: LoopOptions): Promise<void> {
   if (existsSync(outputPath) && !options.force) {
     out.error(`File already exists: ${outputPath}`);
     out.info('Use --force to overwrite');
+    process.exitCode = 1;
     return;
   }
 
-  const script = generateLoopScript({
-    epics: options.epics,
-    maxRetries: Number(options.maxRetries ?? 1),
-    model: options.model ?? 'claude-opus-4-6',
-  });
+  const maxRetries = Number(options.maxRetries ?? 1);
+  if (!Number.isInteger(maxRetries) || maxRetries < 0) {
+    out.error(`Invalid --max-retries: must be a non-negative integer, got "${options.maxRetries}"`);
+    process.exitCode = 1;
+    return;
+  }
+
+  let script: string;
+  try {
+    script = generateLoopScript({
+      epics: options.epics,
+      maxRetries,
+      model: options.model ?? 'claude-opus-4-6',
+    });
+  } catch (err) {
+    out.error((err as Error).message);
+    process.exitCode = 1;
+    return;
+  }
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, script, 'utf-8');

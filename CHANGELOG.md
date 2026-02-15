@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`ca loop` command**: Generate autonomous infinity loop scripts that process beads epics end-to-end via chained Claude Code sessions
+- **HUMAN_REQUIRED marker**: Loop detects human-blocking issues, logs reason to beads, skips epic without stopping the loop
+
+### Fixed
+
+- **Loop script `set -u` crash**: `LOOP_DRY_RUN` now uses safe expansion (`${VAR:-}`) for `set -u` compatibility
+- **Infinite reprocessing**: Loop tracks processed epics to prevent re-selecting the same epic in dry-run or human-required paths
+- **Input validation**: `--max-retries` rejects non-integer values; epic IDs validated against safe pattern to prevent shell injection
+- **Exit codes**: `ca loop` now returns non-zero on errors (overwrite refusal, invalid options)
+
 ## [1.1.0] - 2026-02-15
 
 ### Added

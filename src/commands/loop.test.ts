@@ -110,6 +110,63 @@ describe('generateLoopScript', () => {
     const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
     expect(script).toContain('SKIPPED');
   });
+
+  // P0: LOOP_DRY_RUN safe expansion under set -u
+  it('uses safe expansion for LOOP_DRY_RUN', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Must use ${VAR:-} syntax, not bare $VAR, for set -u compatibility
+    expect(script).toContain('${LOOP_DRY_RUN:-}');
+    // Should NOT have bare $LOOP_DRY_RUN in conditionals
+    expect(script).not.toMatch(/\[ -n "\$LOOP_DRY_RUN" \]/);
+  });
+
+  // P0: Prevent reprocessing same epic forever
+  it('tracks processed epics to prevent reprocessing', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('PROCESSED');
+  });
+
+  it('skips processed epics in explicit mode', () => {
+    const script = generateLoopScript({
+      epics: ['epic-1'],
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+    });
+    // get_next_epic should check PROCESSED before returning epic
+    expect(script).toMatch(/PROCESSED.*epic_id|epic_id.*PROCESSED/s);
+  });
+
+  it('appends epic to PROCESSED after processing', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toMatch(/PROCESSED=.*EPIC_ID/);
+  });
+
+  // P1: Input validation
+  it('rejects NaN maxRetries', () => {
+    expect(() => generateLoopScript({ maxRetries: NaN, model: 'claude-opus-4-6' }))
+      .toThrow(/maxRetries/i);
+  });
+
+  it('rejects negative maxRetries', () => {
+    expect(() => generateLoopScript({ maxRetries: -1, model: 'claude-opus-4-6' }))
+      .toThrow(/maxRetries/i);
+  });
+
+  it('rejects epic IDs with shell metacharacters', () => {
+    expect(() => generateLoopScript({
+      epics: ['$(rm -rf /)'],
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+    })).toThrow(/epic.*id/i);
+  });
+
+  it('accepts valid epic IDs with alphanumeric, hyphens, underscores', () => {
+    expect(() => generateLoopScript({
+      epics: ['learning_agent-jlrh', 'beads-123', 'my.epic'],
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+    })).not.toThrow();
+  });
 });
 
 describe('ca loop CLI', () => {
@@ -159,5 +216,27 @@ describe('ca loop CLI', () => {
     const content = readFileSync(outputPath, 'utf-8');
     expect(content).toContain('abc');
     expect(content).toContain('def');
+  });
+
+  // P2: Overwrite refusal should not silently succeed
+  it('does not overwrite file on refusal', () => {
+    const outputPath = join(getTempDir(), 'infinity-loop.sh');
+    writeFileSync(outputPath, 'existing content');
+
+    runCli('loop');
+    const content = readFileSync(outputPath, 'utf-8');
+    expect(content).toBe('existing content');
+  });
+
+  // P1: Invalid max-retries rejected at CLI level
+  it('rejects invalid max-retries', () => {
+    const { combined } = runCli('loop --max-retries abc');
+    expect(combined).toMatch(/invalid|retries|integer/i);
+  });
+
+  // P1: Invalid epic IDs rejected at CLI level
+  it('rejects invalid epic IDs', () => {
+    const { combined } = runCli('loop --epics "$(bad)"');
+    expect(combined).toMatch(/invalid|epic.*id/i);
   });
 });
