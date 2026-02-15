@@ -151,9 +151,10 @@ Before marking work complete, run the 8-step TDD verification pipeline:
 Multi-agent code review with severity classification and a mandatory \`/implementation-reviewer\` gate.
 
 ## Workflow
-1. Identify what to review from \`$ARGUMENTS\` or recent changes (\`git diff\`).
-2. Call \`memory_search\` with the changed areas to surface relevant past lessons.
-3. Spawn the reviewer agent team in parallel — one agent per perspective:
+1. Run quality gates first: \`pnpm test && pnpm lint\` to catch easy failures before the full review.
+2. Identify what to review from \`$ARGUMENTS\` or recent changes (\`git diff\`).
+3. Call \`memory_search\` with the changed areas to surface relevant past lessons.
+4. Spawn the reviewer agent team in parallel — one agent per perspective:
    - **security-reviewer**: injection risks, auth issues, data exposure
    - **architecture-reviewer**: module boundaries, coupling, cohesion, API design
    - **performance-reviewer**: unnecessary allocations, N+1 queries, blocking calls
@@ -165,18 +166,17 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
    - **edge-case-reviewer**: boundary conditions, off-by-one, nil/undefined, empty inputs, type coercion traps
    - **pattern-matcher**: search \`memory_search\` for recurring issues — if a finding matches a known pattern, auto-reinforce its severity via \`memory_capture\`
    - **cct-reviewer**: check code against CCT patterns in \`.claude/lessons/cct-patterns.jsonl\` for known Claude mistakes from past sessions
-4. Reviewers communicate findings with each other via direct messages so cross-cutting issues (e.g., a security fix that impacts performance) are identified early.
-5. Collect all findings and classify by severity:
+5. Reviewers communicate findings with each other via direct messages so cross-cutting issues (e.g., a security fix that impacts performance) are identified early.
+6. Collect all findings and classify by severity:
    - **P1** (critical): security vulnerabilities, data loss, correctness bugs — P1 findings block completion
    - **P2** (important): architectural violations, significant performance issues
    - **P3** (minor): style nits, small improvements, non-urgent suggestions
-6. Synthesize and prioritize findings — deduplicate overlapping reports, consolidate related items, and rank by severity before creating issues.
-7. Use \`AskUserQuestion\` when severity classification is ambiguous (e.g., a finding could be P1 or P2) or when the fix approach has multiple valid options.
-8. For P1 findings, create beads issues:
+7. Synthesize and prioritize findings — deduplicate overlapping reports, consolidate related items, and rank by severity before creating issues.
+8. Use \`AskUserQuestion\` when severity classification is ambiguous (e.g., a finding could be P1 or P2) or when the fix approach has multiple valid options.
+9. For P1 and P2 findings, create beads issues:
    \`\`\`bash
    bd create --title="P1: <finding>" --type=bug --priority=1
    \`\`\`
-9. Run quality gates: \`pnpm test\` and \`pnpm lint\` to verify no regressions.
 10. Submit to **\`/implementation-reviewer\`** as the mandatory gate — it has final authority on whether the review passes. All P1 findings must be resolved before approval.
 11. Output a review summary with pass/fail per perspective and severity breakdown.
 
@@ -255,23 +255,25 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
 1. **Brainstorm phase**: Explore the goal from \`$ARGUMENTS\`.
    - Call \`memory_search\` with the goal.
    - Spawn docs-explorer to scan \`docs/\` for relevant context and existing ADRs.
-   - Ask clarifying questions, explore alternatives.
+   - Ask clarifying questions via \`AskUserQuestion\`, explore alternatives.
    - Auto-create ADRs for significant decisions in \`docs/decisions/\`.
-   - Produce a brainstorm summary.
+   - Create a beads epic from conclusions with \`bd create --type=feature\`.
 
 2. **Plan phase**: Structure the work.
+   - Check for brainstorm epic via \`bd list\`.
    - Spawn docs-analyst to check specs, standards, and ADRs that constrain the plan.
-   - Break into tasks with dependencies.
-   - Create beads issues for tracking.
-   - Produce a plan with task IDs.
+   - Break into tasks with dependencies and acceptance criteria.
+   - Create beads issues with \`bd create\` and map dependencies with \`bd dep add\`.
 
-3. **Work phase**: Implement with TDD.
-   - For each task: tests first, then implementation.
-   - Call \`memory_search\` before architectural decisions.
-   - Call \`memory_capture\` after corrections.
-   - Close tasks as they complete.
+3. **Work phase**: Implement with adaptive TDD.
+   - Assess complexity (trivial/simple/complex) to choose team strategy.
+   - For non-trivial tasks: test-analyst produces test plan, then test-writer and implementer execute.
+   - Call \`memory_search\` per subtask; \`memory_capture\` after corrections.
+   - Commit incrementally. Close tasks as they complete.
+   - Run verification gate before marking complete.
 
 4. **Review phase**: 11-agent review with severity classification.
+   - Run quality gates first: \`pnpm test && pnpm lint\`.
    - Core (security, architecture, performance, test-coverage, simplicity), quality (docs, consistency, error-handling), intelligence (edge-case, pattern-matcher, cct-reviewer).
    - Classify findings as P1 (critical/blocking), P2 (important), P3 (minor).
    - P1 findings must be fixed before proceeding — they block completion.
@@ -279,9 +281,11 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
    - Create beads issues for P1/P2 findings.
 
 5. **Compound phase**: Capture learnings.
-   - Store novel insights via \`memory_capture\`.
-   - Avoid duplicates by searching first with \`memory_search\`.
-   - Spawn docs-reviewer to check if \`docs/\` or ADRs need updating.
+   - Spawn 6-agent analysis team: context-analyzer, lesson-extractor, docs-reviewer, pattern-matcher, solution-writer, compounding.
+   - Search first with \`memory_search\` to avoid duplicates. Apply quality filters (novelty + specificity).
+   - Store novel insights via \`memory_capture\` with supersedes/related links.
+   - Update outdated docs and deprecate superseded ADRs.
+   - Use \`AskUserQuestion\` to confirm high-severity items before storing.
 
 ## Phase Control
 - **Skip phases**: Parse \`$ARGUMENTS\` for "from <phase>" (e.g., "from plan"). Skip all phases before the named one.
