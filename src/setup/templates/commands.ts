@@ -13,9 +13,15 @@ Explore requirements through collaborative dialogue before committing to a plan.
 ## Workflow
 1. Parse the topic from \`$ARGUMENTS\`. If empty, ask the user what to brainstorm.
 2. Call \`memory_search\` with the topic to surface relevant past lessons. Display retrieved items and incorporate them into exploration.
-3. Spawn Explore subagents to research existing context:
-   - **docs-explorer**: scan \`docs/\` for architecture docs, specs, research, standards, anti-patterns, and existing ADRs in \`docs/decisions/\`
-   - **code-explorer**: quick codebase research on areas relevant to the brainstorm
+3. Create a research team and spawn explorers in parallel:
+   \`\`\`
+   TeamCreate: team_name="brainstorm-<topic-slug>"
+   Task: name="docs-explorer", subagent_type="Explore", team_name="brainstorm-<topic-slug>"
+     prompt: "Scan docs/ for architecture docs, specs, research, standards, anti-patterns, and existing ADRs in docs/decisions/"
+   Task: name="code-explorer", subagent_type="Explore", team_name="brainstorm-<topic-slug>"
+     prompt: "Research codebase areas relevant to: <topic>"
+   \`\`\`
+   Wait for both teammates to report findings, then synthesize.
 4. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences through structured dialogue.
 5. Explore edge cases and failure modes.
 6. Propose 2-3 alternative approaches with tradeoffs.
@@ -69,10 +75,17 @@ Create a structured implementation plan enriched by semantic memory and existing
 1. Parse the goal from \`$ARGUMENTS\`. If empty, ask the user what to plan.
 2. Check for brainstorm output: run \`bd list\` to find a related brainstorm epic. If one exists, read its description for decisions and open questions.
 3. Call \`memory_search\` with the goal to retrieve relevant past lessons. Display retrieved memory items and incorporate them into planning context.
-4. Spawn research agent team:
-   - **Docs Analyst** (\`docs-analyst\`): scan \`docs/\` for specs, standards, anti-patterns, and ADRs in \`docs/decisions/\` that constrain the plan
-   - **Repo Analyst** (\`repo-analyst\`): explore codebase patterns, conventions, and architecture
-   - **Memory Analyst** (\`memory-analyst\`): deep dive into related memory items with multiple search queries
+4. Create a research team and spawn analysts in parallel:
+   \`\`\`
+   TeamCreate: team_name="plan-<goal-slug>"
+   Task: name="docs-analyst", subagent_type="Explore", team_name="plan-<goal-slug>"
+     prompt: "Scan docs/ for specs, standards, anti-patterns, and ADRs in docs/decisions/ that constrain the plan for: <goal>"
+   Task: name="repo-analyst", subagent_type="Explore", team_name="plan-<goal-slug>"
+     prompt: "Explore codebase patterns, conventions, and architecture relevant to: <goal>"
+   Task: name="memory-analyst", subagent_type="general-purpose", team_name="plan-<goal-slug>"
+     prompt: "Deep dive into related memory items with multiple memory_search queries for: <goal>"
+   \`\`\`
+   Wait for all teammates to report findings, then synthesize.
 5. Synthesize research findings from all agents into a coherent plan. Flag any conflicts between ADRs and proposed approach.
 6. Use \`AskUserQuestion\` to resolve ambiguities: unclear requirements, conflicting ADRs, or priority trade-offs that need user input before decomposing.
 7. Break the goal into concrete, ordered tasks with clear acceptance criteria.
@@ -112,18 +125,27 @@ Execute implementation by delegating to an agent team. The lead coordinates and 
 2. Mark task in progress: \`bd update <id> --status=in_progress\`.
 3. Call \`memory_search\` with the task description to retrieve relevant lessons. Run \`memory_search\` per agent/subtask so each gets targeted context.
 4. Assess complexity to determine team strategy.
-5. For non-trivial tasks, spawn a **test-analyst** agent before any code is written. The test-analyst:
-   - Analyzes the task requirements and acceptance criteria
-   - Identifies happy paths, edge cases, failure modes, boundary conditions, and invariants
-   - Produces a structured **test plan** (not code) listing concrete test cases to cover
-   - The test-writer then implements this plan as actual test code
-6. Execute based on assessed complexity:
-   - If **trivial** (config changes, typos, one-line fixes): handle directly with a single agent. No TDD pair needed. Proceed to verification and close.
-   - If **simple** (well-scoped feature or bug fix): sequential TDD — **test-analyst** produces test plan, then **test-writer** implements failing tests, then **implementer** makes them pass.
-   - If **complex** (cross-cutting or ambiguous scope): iterative TDD — **test-analyst** produces test plan, then **test-writer** and **implementer** alternate in ping-pong cycles until done.
-7. When agents work on overlapping areas, they communicate directly to coordinate and avoid conflicts.
-8. Lead coordinates the cycle: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-9. If blocked by ambiguity or conflicting agent outputs, use \`AskUserQuestion\` to get user direction before proceeding.
+5. If **trivial** (config changes, typos, one-line fixes): handle directly with a single subagent. No AgentTeam needed. Proceed to step 10.
+6. If **simple** or **complex**, create an AgentTeam:
+   \`\`\`
+   TeamCreate: team_name="work-<task-id>"
+   \`\`\`
+7. Spawn **test-analyst** as the first teammate (produces a test plan, not code):
+   \`\`\`
+   Task: name="test-analyst", subagent_type="general-purpose", team_name="work-<task-id>"
+     prompt: "Analyze requirements for <task>. Identify happy paths, edge cases, failure modes, boundary conditions, invariants. Output a structured test plan."
+   \`\`\`
+   Wait for test-analyst to report the test plan via SendMessage.
+8. If **simple**: spawn test-writer, wait for tests, then spawn implementer:
+   \`\`\`
+   Task: name="test-writer", subagent_type="general-purpose", team_name="work-<task-id>"
+   Task: name="implementer", subagent_type="general-purpose", team_name="work-<task-id>"
+   \`\`\`
+   If **complex**: spawn both as teammates, coordinate via SendMessage for ping-pong cycles.
+9. When agents work on overlapping areas, they communicate directly via SendMessage to coordinate and avoid conflicts.
+10. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
+11. If blocked by ambiguity or conflicting agent outputs, use \`AskUserQuestion\` to get user direction.
+12. Shut down the team when done: send \`shutdown_request\` to all teammates.
 10. Commit incrementally as tests pass — do not batch all commits to the end.
 11. Run the full test suite to check for regressions.
 12. Close the task: \`bd close <id>\`.
@@ -154,19 +176,36 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
 1. Run quality gates first: \`pnpm test && pnpm lint\` to catch easy failures before the full review.
 2. Identify what to review from \`$ARGUMENTS\` or recent changes (\`git diff\`).
 3. Call \`memory_search\` with the changed areas to surface relevant past lessons.
-4. Spawn the reviewer agent team in parallel — one agent per perspective:
-   - **security-reviewer**: injection risks, auth issues, data exposure
-   - **architecture-reviewer**: module boundaries, coupling, cohesion, API design
-   - **performance-reviewer**: unnecessary allocations, N+1 queries, blocking calls
-   - **test-coverage-reviewer**: missing edge cases, cargo-cult tests, mocked business logic
-   - **simplicity-reviewer**: over-engineering, dead code, unnecessary abstractions
-   - **docs-reviewer**: documentation alignment, ADR compliance, undocumented public APIs
-   - **consistency-reviewer**: naming conventions, code patterns, style consistency with existing codebase
-   - **error-handling-reviewer**: error messages quality, resilience, logging, observability
-   - **edge-case-reviewer**: boundary conditions, off-by-one, nil/undefined, empty inputs, type coercion traps
-   - **pattern-matcher**: search \`memory_search\` for recurring issues — if a finding matches a known pattern, auto-reinforce its severity via \`memory_capture\`
-   - **cct-reviewer**: check code against CCT patterns in \`.claude/lessons/cct-patterns.jsonl\` for known Claude mistakes from past sessions
-5. Reviewers communicate findings with each other via direct messages so cross-cutting issues (e.g., a security fix that impacts performance) are identified early.
+4. Create a review team and spawn all 11 reviewers in parallel:
+   \`\`\`
+   TeamCreate: team_name="review-<scope-slug>"
+   \`\`\`
+   Spawn all reviewers simultaneously — each as a teammate:
+   \`\`\`
+   Task: name="security-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
+     prompt: "Review for injection risks, auth issues, data exposure in: <diff/files>"
+   Task: name="architecture-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
+     prompt: "Review module boundaries, coupling, cohesion, API design in: <diff/files>"
+   Task: name="performance-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
+     prompt: "Review for unnecessary allocations, N+1 queries, blocking calls in: <diff/files>"
+   Task: name="test-coverage-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
+     prompt: "Review for missing edge cases, cargo-cult tests, mocked business logic in: <diff/files>"
+   Task: name="simplicity-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
+     prompt: "Review for over-engineering, dead code, unnecessary abstractions in: <diff/files>"
+   Task: name="docs-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
+     prompt: "Check documentation alignment, ADR compliance, undocumented public APIs in: <diff/files>"
+   Task: name="consistency-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
+     prompt: "Check naming conventions, code patterns, style consistency in: <diff/files>"
+   Task: name="error-handling-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
+     prompt: "Review error messages quality, resilience, logging, observability in: <diff/files>"
+   Task: name="edge-case-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
+     prompt: "Check boundary conditions, off-by-one, nil/undefined, empty inputs in: <diff/files>"
+   Task: name="pattern-matcher", subagent_type="general-purpose", team_name="review-<scope>"
+     prompt: "Search memory_search for recurring issues. If a finding matches a known pattern, reinforce severity via memory_capture."
+   Task: name="cct-reviewer", subagent_type="general-purpose", team_name="review-<scope>"
+     prompt: "Check code against CCT patterns in .claude/lessons/cct-patterns.jsonl for known Claude mistakes."
+   \`\`\`
+5. Reviewers communicate findings with each other via SendMessage so cross-cutting issues (e.g., a security fix that impacts performance) are identified early.
 6. Collect all findings and classify by severity:
    - **P1** (critical): security vulnerabilities, data loss, correctness bugs — P1 findings block completion
    - **P2** (important): architectural violations, significant performance issues
@@ -207,14 +246,23 @@ Multi-agent analysis to capture high-quality lessons from completed work into th
 ## Workflow
 1. Parse what was done from \`$ARGUMENTS\` or recent git history (\`git diff\`, \`git log\`).
 2. Call \`memory_search\` with the topic to check what is already known (avoid duplicates).
-3. Spawn the compound analysis team in parallel:
-   - **context-analyzer**: summarize what happened (git diff, test results, plan context)
-   - **lesson-extractor**: identify mistakes, corrections, and discoveries
-   - **docs-reviewer**: scan \`docs/\` for docs that need updating based on what changed, and check if any ADR in \`docs/decisions/\` should be deprecated or superseded
-   - **pattern-matcher**: match against existing memory, classify New/Duplicate/Reinforcement/Contradiction
-   - **solution-writer**: formulate structured items typed as lesson, solution, pattern, or preference
-   - **compounding**: synthesize accumulated lessons into CCT patterns for test reuse
-4. Agents pass results to each other via direct messages so downstream agents build on upstream findings.
+3. Create a compound team and spawn the 6 analysis agents in parallel:
+   \`\`\`
+   TeamCreate: team_name="compound-<topic-slug>"
+   Task: name="context-analyzer", subagent_type="general-purpose", team_name="compound-<topic>"
+     prompt: "Summarize what happened: git diff, test results, plan context for: <topic>"
+   Task: name="lesson-extractor", subagent_type="general-purpose", team_name="compound-<topic>"
+     prompt: "Identify mistakes, corrections, and discoveries from: <topic>"
+   Task: name="docs-reviewer", subagent_type="Explore", team_name="compound-<topic>"
+     prompt: "Scan docs/ for content that needs updating. Check if any ADR in docs/decisions/ should be deprecated."
+   Task: name="pattern-matcher", subagent_type="general-purpose", team_name="compound-<topic>"
+     prompt: "Match findings against existing memory via memory_search. Classify: New/Duplicate/Reinforcement/Contradiction."
+   Task: name="solution-writer", subagent_type="general-purpose", team_name="compound-<topic>"
+     prompt: "Formulate structured memory items typed as lesson, solution, pattern, or preference."
+   Task: name="compounding", subagent_type="general-purpose", team_name="compound-<topic>"
+     prompt: "Synthesize accumulated lessons into CCT patterns for test reuse."
+   \`\`\`
+4. Agents pass results to each other via SendMessage so downstream agents build on upstream findings. The lead coordinates the pipeline: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
 5. Apply quality filter on each candidate item:
    - **Novel**: skip if >0.85 similarity to existing memory
    - **Specific**: reject vague or generic advice
@@ -254,38 +302,43 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
 ## Workflow
 1. **Brainstorm phase**: Explore the goal from \`$ARGUMENTS\`.
    - Call \`memory_search\` with the goal.
-   - Spawn docs-explorer to scan \`docs/\` for relevant context and existing ADRs.
+   - \`TeamCreate\` team "brainstorm-<slug>", spawn docs-explorer + code-explorer as parallel teammates.
    - Ask clarifying questions via \`AskUserQuestion\`, explore alternatives.
    - Auto-create ADRs for significant decisions in \`docs/decisions/\`.
    - Create a beads epic from conclusions with \`bd create --type=feature\`.
+   - Shut down brainstorm team before next phase.
 
 2. **Plan phase**: Structure the work.
    - Check for brainstorm epic via \`bd list\`.
-   - Spawn docs-analyst to check specs, standards, and ADRs that constrain the plan.
+   - \`TeamCreate\` team "plan-<slug>", spawn docs-analyst + repo-analyst + memory-analyst as parallel teammates.
    - Break into tasks with dependencies and acceptance criteria.
    - Create beads issues with \`bd create\` and map dependencies with \`bd dep add\`.
+   - Shut down plan team before next phase.
 
 3. **Work phase**: Implement with adaptive TDD.
-   - Assess complexity (trivial/simple/complex) to choose team strategy.
-   - For non-trivial tasks: test-analyst produces test plan, then test-writer and implementer execute.
+   - Assess complexity (trivial/simple/complex) to choose strategy.
+   - Trivial: single subagent, no team. Simple/complex: \`TeamCreate\` team "work-<task-id>".
+   - Spawn test-analyst first, then test-writer + implementer as teammates.
    - Call \`memory_search\` per subtask; \`memory_capture\` after corrections.
    - Commit incrementally. Close tasks as they complete.
-   - Run verification gate before marking complete.
+   - Run verification gate before marking complete. Shut down work team.
 
 4. **Review phase**: 11-agent review with severity classification.
    - Run quality gates first: \`pnpm test && pnpm lint\`.
-   - Core (security, architecture, performance, test-coverage, simplicity), quality (docs, consistency, error-handling), intelligence (edge-case, pattern-matcher, cct-reviewer).
+   - \`TeamCreate\` team "review-<slug>", spawn all 11 reviewers as parallel teammates.
    - Classify findings as P1 (critical/blocking), P2 (important), P3 (minor).
    - P1 findings must be fixed before proceeding — they block completion.
-   - Submit to \`/implementation-reviewer\` as the mandatory gate before moving on.
-   - Create beads issues for P1/P2 findings.
+   - Submit to \`/implementation-reviewer\` as the mandatory gate. Shut down review team.
 
 5. **Compound phase**: Capture learnings.
-   - Spawn 6-agent analysis team: context-analyzer, lesson-extractor, docs-reviewer, pattern-matcher, solution-writer, compounding.
+   - \`TeamCreate\` team "compound-<slug>", spawn 6 analysis agents as parallel teammates.
    - Search first with \`memory_search\` to avoid duplicates. Apply quality filters (novelty + specificity).
    - Store novel insights via \`memory_capture\` with supersedes/related links.
    - Update outdated docs and deprecate superseded ADRs.
-   - Use \`AskUserQuestion\` to confirm high-severity items before storing.
+   - Use \`AskUserQuestion\` to confirm high-severity items. Shut down compound team.
+
+## Agent Team Pattern
+Each phase creates its own AgentTeam via \`TeamCreate\`, spawns teammates via \`Task\` tool with \`team_name\`, coordinates via \`SendMessage\`, and shuts down with \`shutdown_request\` before the next phase starts. Use subagents (Task without team_name) only for quick lookups like \`memory_search\` or \`bd\` commands.
 
 ## Phase Control
 - **Skip phases**: Parse \`$ARGUMENTS\` for "from <phase>" (e.g., "from plan"). Skip all phases before the named one.

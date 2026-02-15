@@ -17,7 +17,7 @@ Explore the problem space before committing to a solution. This phase produces a
 ## Methodology
 1. Ask "why" before "how" -- understand the real problem
 2. Search memory with \`memory_search\` for similar past features and known constraints
-3. Spawn Explore subagents: docs-explorer for \`docs/\` (architecture, specs, research, standards, existing ADRs) and code-explorer for relevant codebase areas
+3. Create an AgentTeam (\`TeamCreate\`) and spawn docs-explorer + code-explorer as parallel teammates via \`Task\` tool with \`team_name\`. Use subagents only for quick single lookups.
 4. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences
 5. Divergent phase: generate multiple approaches without filtering
 6. Identify constraints and non-functional requirements (performance, security, etc.)
@@ -31,7 +31,7 @@ Explore the problem space before committing to a solution. This phase produces a
 - If the problem domain matches past work, review those lessons first
 
 ## Docs Integration
-- Spawn docs-explorer to scan \`docs/\` for relevant architecture docs, research, and standards
+- Spawn docs-explorer as an AgentTeam teammate (not a subagent) to scan \`docs/\` for relevant architecture docs, research, and standards
 - Review existing ADRs in \`docs/decisions/\` -- prior decisions may constrain the brainstorm
 - Auto-create ADR for each significant decision made during convergence
 
@@ -69,7 +69,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 ## Methodology
 1. Review brainstorm output for decisions and open questions
 2. Search memory with \`memory_search\` for architectural patterns and past mistakes
-3. Spawn research agent team: docs-analyst for \`docs/\` (specs, standards, ADRs), repo-analyst for codebase, memory-analyst for deep memory search
+3. Create an AgentTeam (\`TeamCreate\`) and spawn docs-analyst, repo-analyst, and memory-analyst as parallel teammates via \`Task\` tool with \`team_name\`
 4. Synthesize research findings into a coherent approach. Flag conflicts between ADRs and proposed plan.
 5. Use \`AskUserQuestion\` to resolve ambiguities, conflicting constraints, or priority trade-offs before decomposing
 6. Decompose into tasks small enough to verify individually
@@ -83,7 +83,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Check for preferred architectural patterns in this codebase
 
 ## Docs Integration
-- Spawn docs-analyst to scan \`docs/\` for relevant specs, standards, and research
+- Spawn docs-analyst as an AgentTeam teammate to scan \`docs/\` for relevant specs, standards, and research
 - Check \`docs/decisions/\` for existing ADRs that constrain or inform the plan
 - If the plan contradicts an ADR, flag it for the user before proceeding
 
@@ -129,24 +129,12 @@ Execute implementation through an agent team using adaptive TDD. The lead coordi
 8. Commit incrementally as tests pass — do not batch all commits to the end
 9. Capture lessons with \`memory_capture\` after corrections or discoveries
 
-## Team Structure
-Adaptive TDD model based on task complexity:
-- **Trivial**: Single agent handles the change directly, no TDD ceremony
-- **Simple**: test-analyst → test-writer → implementer (sequential)
-- **Complex**: test-analyst → test-writer/implementer ping-pong (iterative)
-
-## Complexity Assessment
-- **Trivial**: Config changes, typos, renaming, one-line fixes. No new behavior.
-- **Simple**: Well-scoped feature or bug fix. Clear inputs/outputs. One module affected.
-- **Complex**: Cross-module changes, architectural decisions, ambiguous requirements.
-
-## Agent Delegation
-The lead coordinates but does not write code:
-- Spawn **test-analyst** first for non-trivial tasks -- it produces the test plan that test-writer implements
-- Spawn agents with task context, relevant memory items, and the test plan
-- Review agent outputs for correctness and consistency
-- Resolve conflicts between test expectations and implementation
-- Use \`AskUserQuestion\` when blocked by ambiguity or conflicting agent outputs -- get user direction before proceeding
+## Team Structure & Delegation
+The lead coordinates but does not write code. Use AgentTeam (\`TeamCreate\`) for non-trivial work, plain subagent for trivial fixes:
+- **Trivial**: Single subagent, no team. Config changes, typos, one-line fixes.
+- **Simple**: \`TeamCreate\` → test-analyst → test-writer → implementer (sequential teammates)
+- **Complex**: \`TeamCreate\` → test-analyst → test-writer/implementer ping-pong (iterative teammates)
+Spawn teammates via \`Task\` with \`team_name\`, coordinate via \`SendMessage\`, shut down with \`shutdown_request\` when done.
 
 ## Memory Integration
 - Call \`memory_search\` per delegated subtask with the subtask's specific description
@@ -194,11 +182,11 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 ## Methodology
 1. Run quality gates first: \`pnpm test && pnpm lint\`
 2. Search memory with \`memory_search\` for known patterns and recurring issues
-3. Spawn 11 specialized reviewer agents in parallel:
+3. Create an AgentTeam (\`TeamCreate\`) and spawn all 11 reviewers as parallel teammates via \`Task\` tool with \`team_name\`:
    - **Core**: security, architecture, performance, test-coverage, simplicity
    - **Quality**: docs-reviewer, consistency-reviewer, error-handling-reviewer
    - **Intelligence**: edge-case-reviewer, pattern-matcher (memory-backed), cct-reviewer (CCT patterns)
-4. Reviewers communicate findings to each other via direct messages
+4. Reviewers communicate findings to each other via \`SendMessage\`
 5. Collect, consolidate, and deduplicate all findings
 6. Classify by severity: P1 (critical/blocking), P2 (important), P3 (minor)
 7. Use \`AskUserQuestion\` when severity is ambiguous or fix has multiple valid options
@@ -249,14 +237,14 @@ Extract and store lessons learned during the cycle, and update project documenta
 
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
-2. Spawn the compound analysis team in parallel:
+2. Create an AgentTeam (\`TeamCreate\`) and spawn the 6 analysis agents as parallel teammates via \`Task\` tool with \`team_name\`:
    - context-analyzer: gathers cycle context (diffs, test output)
    - lesson-extractor: identifies corrections, surprises, discoveries
    - docs-reviewer: scans \`docs/\` for outdated content and ADRs that need updating
    - pattern-matcher: checks \`memory_search\` for duplicates and related items
    - solution-writer: drafts final memory items
    - compounding: synthesizes accumulated lessons into CCT patterns
-3. Agents pass results through the pipeline and share findings with each other
+3. Agents pass results through the pipeline via \`SendMessage\`. The lead coordinates: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
 4. Apply quality filters: novelty check (>0.85 similarity = skip), specificity check
 5. Classify each item by type: lesson, solution, pattern, or preference
 6. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
@@ -266,7 +254,7 @@ Extract and store lessons learned during the cycle, and update project documenta
 10. Use \`AskUserQuestion\` to confirm high-severity items with the user before storing; medium/low items are auto-stored
 
 ## Docs Integration
-- Spawn docs-reviewer to check if \`docs/\` content is outdated after the cycle
+- docs-reviewer runs as an AgentTeam teammate to check if \`docs/\` content is outdated after the cycle
 - Check \`docs/decisions/\` for ADRs contradicted by the work done
 - Set ADR status to \`deprecated\` if a decision was reversed, referencing the new ADR
 
