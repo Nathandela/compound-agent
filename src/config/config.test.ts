@@ -59,6 +59,14 @@ describe('readConfig', () => {
     const config = await readConfig(tempDir);
     expect(config).toEqual({});
   });
+
+  it('returns empty config when file contains a non-object', async () => {
+    const configPath = join(tempDir, '.claude', CONFIG_FILENAME);
+    await writeFile(configPath, '"just a string"', 'utf-8');
+
+    const config = await readConfig(tempDir);
+    expect(config).toEqual({});
+  });
 });
 
 describe('writeConfig', () => {
@@ -112,9 +120,42 @@ describe('getExternalReviewers', () => {
     const reviewers = await getExternalReviewers(tempDir);
     expect(reviewers).toEqual(['gemini', 'codex']);
   });
+
+  it('returns empty array when externalReviewers is a string (malformed)', async () => {
+    const configPath = join(tempDir, '.claude', CONFIG_FILENAME);
+    await writeFile(configPath, JSON.stringify({ externalReviewers: 'gemini' }), 'utf-8');
+
+    const reviewers = await getExternalReviewers(tempDir);
+    expect(reviewers).toEqual([]);
+  });
+
+  it('returns empty array when externalReviewers is a number (malformed)', async () => {
+    const configPath = join(tempDir, '.claude', CONFIG_FILENAME);
+    await writeFile(configPath, JSON.stringify({ externalReviewers: 42 }), 'utf-8');
+
+    const reviewers = await getExternalReviewers(tempDir);
+    expect(reviewers).toEqual([]);
+  });
+
+  it('returns empty array when externalReviewers is null', async () => {
+    const configPath = join(tempDir, '.claude', CONFIG_FILENAME);
+    await writeFile(configPath, JSON.stringify({ externalReviewers: null }), 'utf-8');
+
+    const reviewers = await getExternalReviewers(tempDir);
+    expect(reviewers).toEqual([]);
+  });
 });
 
 describe('enableReviewer', () => {
+  it('handles malformed externalReviewers (string) without corrupting', async () => {
+    const configPath = join(tempDir, '.claude', CONFIG_FILENAME);
+    await writeFile(configPath, JSON.stringify({ externalReviewers: 'gemini' }), 'utf-8');
+
+    await enableReviewer(tempDir, 'codex');
+    const reviewers = await getExternalReviewers(tempDir);
+    expect(reviewers).toEqual(['codex']);
+  });
+
   it('adds reviewer to empty config', async () => {
     const result = await enableReviewer(tempDir, 'gemini');
     expect(result).toBe(true);

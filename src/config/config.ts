@@ -31,7 +31,9 @@ export async function readConfig(repoRoot: string): Promise<CompoundAgentConfig>
   const path = configPath(repoRoot);
   if (!existsSync(path)) return {};
   try {
-    return JSON.parse(await readFile(path, 'utf-8'));
+    const parsed = JSON.parse(await readFile(path, 'utf-8'));
+    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return {};
+    return parsed;
   } catch {
     return {};
   }
@@ -48,10 +50,18 @@ export async function writeConfig(repoRoot: string, config: CompoundAgentConfig)
 /**
  * Get the list of enabled external reviewers, filtering out invalid names.
  */
+/**
+ * Safely extract the externalReviewers array from config, handling malformed values.
+ */
+function safeReviewerArray(config: CompoundAgentConfig): string[] {
+  const raw = config.externalReviewers;
+  if (!Array.isArray(raw)) return [];
+  return raw;
+}
+
 export async function getExternalReviewers(repoRoot: string): Promise<ReviewerName[]> {
   const config = await readConfig(repoRoot);
-  const raw = config.externalReviewers ?? [];
-  return raw.filter((r): r is ReviewerName => (VALID_REVIEWERS as readonly string[]).includes(r));
+  return safeReviewerArray(config).filter((r): r is ReviewerName => (VALID_REVIEWERS as readonly string[]).includes(r));
 }
 
 /**
@@ -62,7 +72,7 @@ export async function enableReviewer(repoRoot: string, name: string): Promise<bo
     throw new Error(`Invalid reviewer: ${name}. Valid options: ${VALID_REVIEWERS.join(', ')}`);
   }
   const config = await readConfig(repoRoot);
-  const reviewers = config.externalReviewers ?? [];
+  const reviewers = safeReviewerArray(config);
   if (reviewers.includes(name)) return false;
   config.externalReviewers = [...reviewers, name];
   await writeConfig(repoRoot, config);
@@ -74,7 +84,7 @@ export async function enableReviewer(repoRoot: string, name: string): Promise<bo
  */
 export async function disableReviewer(repoRoot: string, name: string): Promise<boolean> {
   const config = await readConfig(repoRoot);
-  const reviewers = config.externalReviewers ?? [];
+  const reviewers = safeReviewerArray(config);
   if (!reviewers.includes(name)) return false;
   config.externalReviewers = reviewers.filter(r => r !== name);
   await writeConfig(repoRoot, config);

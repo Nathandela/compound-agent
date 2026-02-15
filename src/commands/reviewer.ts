@@ -44,12 +44,17 @@ export function registerReviewerCommand(program: Command): void {
     .command('disable <name>')
     .description('Disable an external reviewer')
     .action(async (name: string) => {
-      const repoRoot = getRepoRoot();
-      const removed = await disableReviewer(repoRoot, name);
-      if (removed) {
-        console.log(`Disabled external reviewer: ${name}`);
-      } else {
-        console.log(`${name} is not enabled`);
+      try {
+        const repoRoot = getRepoRoot();
+        const removed = await disableReviewer(repoRoot, name);
+        if (removed) {
+          console.log(`Disabled external reviewer: ${name}`);
+        } else {
+          console.log(`${name} is not enabled`);
+        }
+      } catch (err) {
+        console.error((err as Error).message);
+        process.exitCode = 1;
       }
     });
 
@@ -57,17 +62,22 @@ export function registerReviewerCommand(program: Command): void {
     .command('list')
     .description('List enabled external reviewers')
     .action(async () => {
-      const repoRoot = getRepoRoot();
-      const reviewers = await getExternalReviewers(repoRoot);
-      if (reviewers.length === 0) {
-        console.log('No external reviewers enabled');
-        console.log(`Available: ${VALID_REVIEWERS.join(', ')}`);
-        console.log('Enable with: ca reviewer enable <name>');
-      } else {
-        console.log('Enabled external reviewers:');
-        for (const r of reviewers) {
-          console.log(`  - ${r}`);
+      try {
+        const repoRoot = getRepoRoot();
+        const reviewers = await getExternalReviewers(repoRoot);
+        if (reviewers.length === 0) {
+          console.log('No external reviewers enabled');
+          console.log(`Available: ${VALID_REVIEWERS.join(', ')}`);
+          console.log('Enable with: ca reviewer enable <name>');
+        } else {
+          console.log('Enabled external reviewers:');
+          for (const r of reviewers) {
+            console.log(`  - ${r}`);
+          }
         }
+      } catch (err) {
+        console.error((err as Error).message);
+        process.exitCode = 1;
       }
     });
 }
