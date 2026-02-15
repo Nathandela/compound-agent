@@ -554,6 +554,52 @@ describe('Setup Commands - Generated Content', () => {
       const content = await readFile(join(commandsDir, 'learn.md'), 'utf-8');
       expect(content).toBe('My custom learn command');
     });
+
+    it('ensures hooks and MCP config are current after update', async () => {
+      runCli('setup --skip-model');
+
+      // Remove .mcp.json to simulate missing config
+      const mcpPath = join(getTempDir(), '.mcp.json');
+      await rm(mcpPath, { force: true });
+      expect(existsSync(mcpPath)).toBe(false);
+
+      runCli('setup --update');
+
+      // .mcp.json should be recreated by --update
+      expect(existsSync(mcpPath)).toBe(true);
+      const mcpConfig = JSON.parse(await readFile(mcpPath, 'utf-8'));
+      expect(mcpConfig.mcpServers?.['compound-agent']).toBeDefined();
+    });
+
+    it('does not duplicate MCP config if already present during update', async () => {
+      runCli('setup --skip-model');
+
+      // MCP should already exist
+      const mcpPath = join(getTempDir(), '.mcp.json');
+      const before = JSON.parse(await readFile(mcpPath, 'utf-8'));
+      expect(before.mcpServers?.['compound-agent']).toBeDefined();
+
+      runCli('setup --update');
+
+      // Should still have exactly one entry
+      const after = JSON.parse(await readFile(mcpPath, 'utf-8'));
+      expect(after.mcpServers?.['compound-agent']).toBeDefined();
+      const serverKeys = Object.keys(after.mcpServers);
+      const caCount = serverKeys.filter((k: string) => k === 'compound-agent').length;
+      expect(caCount).toBe(1);
+    });
+
+    it('reports config status in --update output', async () => {
+      runCli('setup --skip-model');
+
+      // Remove .mcp.json to trigger config update
+      const mcpPath = join(getTempDir(), '.mcp.json');
+      await rm(mcpPath, { force: true });
+
+      const result = runCli('setup --update');
+      // Should mention config was updated
+      expect(result.combined).toMatch(/config|hooks|MCP/i);
+    });
   });
 
   /**

@@ -241,7 +241,7 @@ export async function runUninstall(repoRoot: string, dryRun: boolean): Promise<s
  * Update generated files with latest templates.
  * Files with GENERATED_MARKER are overwritten, user-customized files are skipped.
  */
-export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{ updated: number; added: number; skipped: number }> {
+export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{ updated: number; added: number; skipped: number; configUpdated: boolean }> {
   let updated = 0;
   let added = 0;
   let skipped = 0;
@@ -290,7 +290,14 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{ up
     }
   }
 
-  return { updated, added, skipped };
+  // Ensure hooks and MCP config are current
+  let configUpdated = false;
+  if (!dryRun) {
+    const { hooks, mcpServer } = await configureClaudeSettings(repoRoot);
+    configUpdated = hooks || mcpServer;
+  }
+
+  return { updated, added, skipped, configUpdated };
 }
 
 /**
@@ -373,6 +380,7 @@ export function registerSetupAllCommand(setupCommand: Command): void {
           if (result.added > 0) console.log(`  ${prefix}Added: ${result.added} file(s)`);
         }
         if (result.skipped > 0) console.log(`  Skipped: ${result.skipped} user-customized file(s)`);
+        if (result.configUpdated) console.log(`  ${prefix}Config: hooks/MCP updated`);
         return;
       }
 
