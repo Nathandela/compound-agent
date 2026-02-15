@@ -338,10 +338,8 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
 
 ## PHASE GATE 3->4 -- MANDATORY
 Before starting Review, verify ALL work tasks are closed:
-\`\`\`bash
-bd list --status=in_progress  # Must return empty
-bd list --status=open | grep -v 'Review:\\|Compound:'  # Must return empty (only review+compound should be open)
-\`\`\`
+- Run \`bd list --status=in_progress\` — must return empty
+- Run \`bd list --status=open\` — only Review and Compound tasks should remain
 If any work tasks remain open, DO NOT proceed. Complete them first.
 Update epic phase: \`bd update <epic-id> --notes="Phase: work COMPLETE | Next: review"\`
 
@@ -370,11 +368,10 @@ Update epic phase: \`bd update <epic-id> --notes="Phase: review COMPLETE | Next:
    - Update epic phase state: \`bd update <epic-id> --notes="Phase: compound COMPLETE | Next: close"\`
 
 ## FINAL GATE -- EPIC CLOSURE
-Before closing the epic, run:
-\`\`\`bash
-ca verify-gates <epic-id>    # Must return PASS
-pnpm test && pnpm lint       # Must pass
-\`\`\`
+Before closing the epic:
+- Run \`ca verify-gates <epic-id>\` — must return PASS for both gates
+- Run \`pnpm test\` — must pass
+- Run \`pnpm lint\` — must pass
 If verify-gates fails, the missing phase was SKIPPED. Go back and complete it.
 CRITICAL: 3/5 phases is NOT success. All 5 phases are required.
 
