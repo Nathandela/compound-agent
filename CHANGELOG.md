@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **lfg.md delegates phases to slash commands**: Instead of inlining all 5 phase workflows (~80 lines), lfg.md now invokes `/compound:{brainstorm,plan,work,review,compound}`. This prevents phase instructions from being compacted away by late phases.
+- **lfg.md slimmed to thin orchestrator**: Reduced from ~2200 to ~1324 characters. Removed inlined Purpose, Stop Conditions, and Memory Integration sections.
+- **Phase gates relocated to individual commands**: PHASE GATE 3 moved to work.md, PHASE GATE 4 to review.md, FINAL GATE to compound.md — gates now survive compaction.
+- **YAML frontmatter on all 13 command templates**: Each template now has name, description, and argument-hint metadata. lfg.md additionally uses `disable-model-invocation: true`.
 - **Anti-MEMORY.md guardrails**: compound.md and review.md now explicitly warn against using MEMORY.md for lesson storage, directing Claude to use `memory_capture` MCP tool instead.
 
 ### Fixed
