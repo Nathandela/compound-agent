@@ -83,6 +83,33 @@ describe('generateLoopScript', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
     expect(script).toContain('MAX_RETRIES=1');
   });
+
+  it('includes HUMAN_REQUIRED marker in prompt', () => {
+    const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
+    expect(script).toContain('HUMAN_REQUIRED');
+  });
+
+  it('prompt instructs to log reason with HUMAN_REQUIRED', () => {
+    const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
+    expect(script).toContain('HUMAN_REQUIRED:');
+  });
+
+  it('main loop detects HUMAN_REQUIRED and skips epic', () => {
+    const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
+    // Should grep for HUMAN_REQUIRED in log and not retry
+    expect(script).toMatch(/grep.*HUMAN_REQUIRED/);
+  });
+
+  it('main loop logs human-required reason to beads', () => {
+    const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
+    expect(script).toContain('bd update');
+    expect(script).toMatch(/HUMAN_REQUIRED.*bd update|bd update.*HUMAN_REQUIRED/s);
+  });
+
+  it('tracks SKIPPED count in summary', () => {
+    const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
+    expect(script).toContain('SKIPPED');
+  });
 });
 
 describe('ca loop CLI', () => {

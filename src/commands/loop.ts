@@ -136,10 +136,21 @@ If you cannot complete the epic after reasonable effort:
 
 EPIC_FAILED
 
+## Step 5: On human required
+If you hit a blocker that REQUIRES human action (account creation, API keys,
+external service setup, design decisions you cannot make, etc.):
+1. Add a note: \`bd update $epic_id --notes "Human required: <reason>"\`
+2. Output this exact marker followed by a short reason on the SAME line:
+
+HUMAN_REQUIRED: <reason>
+
+Example: HUMAN_REQUIRED: Need AWS credentials configured in .env
+
 ## Rules
 - Do NOT ask questions -- there is no human. Make reasonable decisions.
 - Do NOT stop early -- complete the full workflow.
 - If tests fail, fix them. Retry up to 3 times before declaring failure.
+- Use HUMAN_REQUIRED only for true blockers that no amount of retrying can solve.
 - Commit incrementally as you make progress.
 PROMPT_BODY
 }`;
@@ -150,6 +161,7 @@ function buildMainLoop(): string {
 # Main loop
 COMPLETED=0
 FAILED=0
+SKIPPED=0
 
 log "Infinity loop starting"
 log "Config: max_retries=$MAX_RETRIES model=$MODEL"
@@ -186,6 +198,13 @@ while true; do
       log "Epic $EPIC_ID completed successfully"
       SUCCESS=true
       break
+    elif grep -q "HUMAN_REQUIRED" "$LOGFILE"; then
+      REASON=$(grep "HUMAN_REQUIRED:" "$LOGFILE" | head -1 | sed 's/.*HUMAN_REQUIRED: *//')
+      log "Epic $EPIC_ID needs human action: $REASON"
+      bd update "$EPIC_ID" --notes "Human required: $REASON" 2>/dev/null || true
+      SKIPPED=$((SKIPPED + 1))
+      SUCCESS=skip
+      break
     elif grep -q "EPIC_FAILED" "$LOGFILE"; then
       log "Epic $EPIC_ID reported failure (attempt $ATTEMPT)"
     else
@@ -201,6 +220,8 @@ while true; do
   if [ "$SUCCESS" = true ]; then
     COMPLETED=$((COMPLETED + 1))
     log "Epic $EPIC_ID done. Completed so far: $COMPLETED"
+  elif [ "$SUCCESS" = skip ]; then
+    log "Epic $EPIC_ID skipped (human required). Continuing."
   else
     FAILED=$((FAILED + 1))
     log "Epic $EPIC_ID failed after $((MAX_RETRIES + 1)) attempts. Stopping loop."
@@ -208,7 +229,7 @@ while true; do
   fi
 done
 
-log "Loop finished. Completed: $COMPLETED, Failed: $FAILED"
+log "Loop finished. Completed: $COMPLETED, Failed: $FAILED, Skipped: $SKIPPED"
 [ $FAILED -eq 0 ] && exit 0 || exit 1`;
 }
 

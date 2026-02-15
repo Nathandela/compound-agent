@@ -94,7 +94,15 @@ Create a structured implementation plan enriched by semantic memory and existing
    bd create --title="<task>" --type=task --priority=<1-4>
    bd dep add <dependent-task> <blocking-task>
    \`\`\`
-9. Output the plan as a structured list with task IDs and dependency graph.
+9. **Create review and compound blocking tasks** so they survive compaction:
+   \`\`\`bash
+   bd create --title="Review: /compound:review" --type=task --priority=1
+   bd create --title="Compound: /compound:compound" --type=task --priority=1
+   bd dep add <review-id> <last-work-task>   # review depends on work
+   bd dep add <compound-id> <review-id>       # compound depends on review
+   \`\`\`
+   These tasks surface via \`bd ready\` after work completes, ensuring review and compound phases are never skipped — even after context compaction.
+10. Output the plan as a structured list with task IDs and dependency graph.
 
 ## Memory Integration
 - Call \`memory_search\` before planning to learn from past approaches.
@@ -295,6 +303,7 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
    - \`TeamCreate\` team "plan-<slug>", spawn docs-analyst + repo-analyst + memory-analyst as parallel teammates.
    - Break into tasks with dependencies and acceptance criteria.
    - Create beads issues with \`bd create\` and map dependencies with \`bd dep add\`.
+   - Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) so they survive compaction and surface via \`bd ready\` after work completes.
    - Shut down plan team before next phase.
 
 3. **Work phase**: Implement with adaptive TDD.

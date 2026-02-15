@@ -76,6 +76,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 7. Define acceptance criteria for each task
 8. Map dependencies between tasks
 9. Create beads issues: \`bd create --title="..." --type=task\`
+10. Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) that depend on work tasks — these survive compaction and surface via \`bd ready\` after work completes
 
 ## Memory Integration
 - Call \`memory_search\` for patterns related to the feature area

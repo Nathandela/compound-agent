@@ -201,6 +201,29 @@ describe('LFG Phase Integration', () => {
     });
   });
 
+  describe('review and compound blocking tasks survive compaction', () => {
+    it('plan phase instructs creating review and compound beads issues', () => {
+      const planMatch = lfgCommand.match(/plan.*?phase[^]*?(?=\d+\.\s\*\*Work|$)/i);
+      expect(planMatch).not.toBeNull();
+      const planSection = planMatch![0];
+      expect(planSection).toMatch(/review.*compound|compound.*review/is);
+      expect(planSection).toMatch(/bd create|beads/i);
+    });
+
+    it('review and compound tasks have dependencies so they surface via bd ready', () => {
+      // compound depends on review, review depends on work
+      expect(lfgCommand).toMatch(/depend|block|bd dep/i);
+    });
+
+    it('resume section can recover review/compound from beads after compaction', () => {
+      const phaseControlMatch = lfgCommand.match(/## Phase Control[^]*?(?=## Stop|$)/i);
+      expect(phaseControlMatch).not.toBeNull();
+      const phaseControl = phaseControlMatch![0];
+      // Resume uses bd list, which will surface pending review/compound tasks
+      expect(phaseControl).toMatch(/bd list|bd ready|resume/i);
+    });
+  });
+
   describe('phase control', () => {
     it('has ## Phase Control section', () => {
       expect(lfgCommand).toContain('## Phase Control');

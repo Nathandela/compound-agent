@@ -155,6 +155,33 @@ describe('Plan Phase Integration', () => {
     });
   });
 
+  describe('review and compound blocking tasks', () => {
+    it('plan.md instructs creating a review blocking task', () => {
+      expect(planCommand).toMatch(/review/i);
+      expect(planCommand).toMatch(/bd create.*review|review.*bd create/is);
+    });
+
+    it('plan.md instructs creating a compound blocking task', () => {
+      expect(planCommand).toMatch(/compound/i);
+      expect(planCommand).toMatch(/bd create.*compound|compound.*bd create/is);
+    });
+
+    it('plan.md sets compound to depend on review', () => {
+      // compound blocked by review (review must finish before compound starts)
+      expect(planCommand).toMatch(/bd dep add.*compound.*review|compound.*depend.*review|review.*block.*compound/is);
+    });
+
+    it('plan.md sets review to depend on work tasks', () => {
+      // review blocked by work tasks
+      expect(planCommand).toMatch(/bd dep add.*review.*work|review.*depend.*work|work.*block.*review/is);
+    });
+
+    it('plan skill mentions review and compound as blocking tasks', () => {
+      expect(planSkill).toMatch(/review.*compound|compound.*review/is);
+      expect(planSkill).toMatch(/block|depend/i);
+    });
+  });
+
   describe('cross-template consistency', () => {
     it('plan command references the same agents defined in AGENT_TEMPLATES', () => {
       // If plan.md mentions repo-analyst, the agent template must exist
