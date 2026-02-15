@@ -155,10 +155,16 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
 2. Call \`memory_search\` with the changed areas to surface relevant past lessons.
 3. Spawn the reviewer agent team in parallel — one agent per perspective:
    - **security-reviewer**: injection risks, auth issues, data exposure
-   - **architecture-reviewer**: module boundaries, coupling, cohesion
+   - **architecture-reviewer**: module boundaries, coupling, cohesion, API design
    - **performance-reviewer**: unnecessary allocations, N+1 queries, blocking calls
    - **test-coverage-reviewer**: missing edge cases, cargo-cult tests, mocked business logic
    - **simplicity-reviewer**: over-engineering, dead code, unnecessary abstractions
+   - **docs-reviewer**: documentation alignment, ADR compliance, undocumented public APIs
+   - **consistency-reviewer**: naming conventions, code patterns, style consistency with existing codebase
+   - **error-handling-reviewer**: error messages quality, resilience, logging, observability
+   - **edge-case-reviewer**: boundary conditions, off-by-one, nil/undefined, empty inputs, type coercion traps
+   - **pattern-matcher**: search \`memory_search\` for recurring issues — if a finding matches a known pattern, auto-reinforce its severity via \`memory_capture\`
+   - **cct-reviewer**: check code against CCT patterns in \`.claude/lessons/cct-patterns.jsonl\` for known Claude mistakes from past sessions
 4. Reviewers communicate findings with each other via direct messages so cross-cutting issues (e.g., a security fix that impacts performance) are identified early.
 5. Collect all findings and classify by severity:
    - **P1** (critical): security vulnerabilities, data loss, correctness bugs — P1 findings block completion
@@ -176,7 +182,14 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
 
 ## Memory Integration
 - Call \`memory_search\` at the start for known issues in the changed areas.
+- **pattern-matcher** auto-reinforces: when a review finding matches an existing memory item, call \`memory_capture\` to increase its severity (recurring issues become higher priority).
+- **cct-reviewer** reads \`.claude/lessons/cct-patterns.jsonl\` for known Claude failure patterns.
 - After the review, call \`memory_capture\` with \`type=solution\` to store the review report for future sessions.
+
+## Docs Integration
+- **docs-reviewer** checks that code changes align with \`docs/\` content and existing ADRs.
+- Flags if a public API was added without documentation.
+- Flags if code contradicts an existing ADR in \`docs/decisions/\`.
 
 ## Beads Integration
 - Create \`bd\` issues for P1 and P2 findings with \`bd create\`.
@@ -258,7 +271,8 @@ Chain all phases: brainstorm, plan, work, review, compound. End-to-end delivery.
    - Call \`memory_capture\` after corrections.
    - Close tasks as they complete.
 
-4. **Review phase**: Multi-perspective review with severity classification.
+4. **Review phase**: 11-agent review with severity classification.
+   - Core (security, architecture, performance, test-coverage, simplicity), quality (docs, consistency, error-handling), intelligence (edge-case, pattern-matcher, cct-reviewer).
    - Classify findings as P1 (critical/blocking), P2 (important), P3 (minor).
    - P1 findings must be fixed before proceeding — they block completion.
    - Submit to \`/implementation-reviewer\` as the mandatory gate before moving on.

@@ -194,40 +194,47 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 ## Methodology
 1. Run quality gates first: \`pnpm test && pnpm lint\`
 2. Search memory with \`memory_search\` for known patterns and recurring issues
-3. Spawn specialized reviewer agents in parallel (security, architecture, performance, test-coverage, simplicity)
-4. Reviewers communicate findings to each other via direct messages so later analysis benefits from earlier discoveries
-5. Collect and consolidate all findings, deduplicating overlaps across reviewers
-6. Classify each finding by severity:
-   - **P1** (critical): Security vulnerabilities, data loss, correctness bugs -- must fix before merge
-   - **P2** (important): Architecture issues, performance regressions -- should fix soon
-   - **P3** (minor): Style, naming, documentation -- track for later
-7. Use \`AskUserQuestion\` when severity classification is ambiguous or fix approach has multiple valid options
+3. Spawn 11 specialized reviewer agents in parallel:
+   - **Core**: security, architecture, performance, test-coverage, simplicity
+   - **Quality**: docs-reviewer, consistency-reviewer, error-handling-reviewer
+   - **Intelligence**: edge-case-reviewer, pattern-matcher (memory-backed), cct-reviewer (CCT patterns)
+4. Reviewers communicate findings to each other via direct messages
+5. Collect, consolidate, and deduplicate all findings
+6. Classify by severity: P1 (critical/blocking), P2 (important), P3 (minor)
+7. Use \`AskUserQuestion\` when severity is ambiguous or fix has multiple valid options
 8. Create beads issues for P1 findings: \`bd create --title="P1: ..."\`
 9. Fix all P1 findings before proceeding
-10. Run \`/implementation-reviewer\` as mandatory gate -- it has final authority on whether code ships
-11. Capture novel findings with \`memory_capture\` for future sessions
+10. Run \`/implementation-reviewer\` as mandatory gate
+11. Capture novel findings with \`memory_capture\`; pattern-matcher auto-reinforces recurring issues
 
 ## Memory Integration
-- Call \`memory_search\` before review to check for known recurring issues
-- Past reviews may highlight patterns worth re-checking
-- Use \`memory_capture\` for novel review findings that future sessions should know
+- Call \`memory_search\` before review for known recurring issues
+- **pattern-matcher** auto-reinforces: recurring findings get severity increased via \`memory_capture\`
+- **cct-reviewer** reads CCT patterns for known Claude failure patterns
 - Capture the review report via \`memory_capture\` with \`type=solution\`
+
+## Docs Integration
+- **docs-reviewer** checks code/docs alignment and ADR compliance
+- Flags undocumented public APIs and ADR violations
 
 ## Common Pitfalls
 - Ignoring reviewer feedback because "it works"
-- Not running all specialized reviewers (skipping perspectives)
+- Not running all 11 reviewer perspectives (skipping dimensions)
 - Treating all findings as equal priority (classify P1/P2/P3 first)
 - Not creating beads issues for deferred fixes
 - Skipping quality gates before review
 - Bypassing the implementation-reviewer gate
+- Not checking CCT patterns for known Claude mistakes
 
 ## Quality Criteria
 - All quality gates pass (\`pnpm test\`, lint)
-- All 5 reviewer perspectives were applied in parallel
+- All 11 reviewer perspectives were applied in parallel
 - Findings are classified P1/P2/P3 and deduplicated
-- All P1 findings are fixed before \`/implementation-reviewer\` approval
+- pattern-matcher checked memory and reinforced recurring issues
+- cct-reviewer checked against known Claude failure patterns
+- docs-reviewer confirmed docs/ADR alignment
+- All P1 findings fixed before \`/implementation-reviewer\` approval
 - \`/implementation-reviewer\` approved as mandatory gate
-- Memory was searched and novel findings captured
 `,
 
   compound: `---
