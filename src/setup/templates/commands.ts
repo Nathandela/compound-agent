@@ -46,7 +46,7 @@ Explore requirements through collaborative dialogue before committing to a plan.
 
 ## Memory Integration
 - Run \`npx ca search\` at the start to avoid repeating past mistakes.
-- If the brainstorm surfaces new insights, note them for later capture.
+- If the brainstorm surfaces new insights, run \`npx ca learn\` to capture them for later.
 
 ## Docs Integration
 - Spawn a docs-explorer subagent to scan \`docs/\` for relevant architecture docs, research, standards, and existing ADRs.
@@ -126,17 +126,18 @@ $ARGUMENTS
 Execute implementation by delegating to an agent team. The lead coordinates and does not code directly.
 
 ## Workflow
-1. Parse task from the arguments above. If empty, run \`bd ready\` to find available tasks.
-2. Mark task in progress: bd update (id) --status=in_progress.
+1. Parse tasks from the arguments above. If empty, run \`bd ready\` to find available tasks.
+2. Mark tasks in progress: bd update (id) --status=in_progress.
 3. Run \`npx ca search\` with the task description to retrieve relevant lessons. Run \`npx ca search\` per agent/subtask so each gets targeted context. Display retrieved lessons in your response. Do not silently discard memory results.
-4. Spawn test-writer and implementer as a team. Test-writer writes failing tests first, implementer makes them pass.
-5. Agents communicate via SendMessage when working on overlapping areas.
-6. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-7. If blocked by ambiguity or conflicting agent outputs, use \`AskUserQuestion\` to get user direction.
-8. Shut down the team when done: send shutdown_request to all teammates.
-9. Commit incrementally as tests pass — do not batch all commits to the end.
-10. Run the full test suite to check for regressions.
-11. Close the task: bd close (id).
+4. Define what can be parallelized in reaching the end of all concerned tasks. We are aiming for clean implementation with parallelized team work.
+5. Make a task list and deploy an AgentTeam to tackle that. In the agent team, we want test-writers and implementers. Test-writer writes failing tests first, implementer makes them pass.
+6. Agents communicate via SendMessage when working on overlapping areas.
+7. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
+8. If blocked by ambiguity or conflicting agent outputs, use \`AskUserQuestion\` to get user direction.
+9. Shut down the team when done: send shutdown_request to all teammates.
+10. Commit incrementally as tests pass — do not batch all commits to the end.
+11. Run the full test suite to check for regressions.
+12. Close the tasks: bd close (id).
 
 ## MANDATORY VERIFICATION -- DO NOT CLOSE TASK WITHOUT THIS
 STOP. Before running \`bd close\`, you MUST:
@@ -146,13 +147,13 @@ STOP. Before running \`bd close\`, you MUST:
 If /implementation-reviewer returns REJECTED: fix ALL issues, re-run tests, resubmit.
 DO NOT close the task until approved. This is INVIOLABLE per CLAUDE.md.
 
-The full 8-step pipeline (invariant-designer through implementation-reviewer) is recommended
+The full 8-step pipeline (invariant-designer through implementation-reviewer) is strictly needed
 for complex changes. For all changes, /implementation-reviewer is the minimum required gate.
 
 ## Memory Integration
 - Run \`npx ca search\` per delegated subtask with the subtask's specific description, not one shared query.
 - Each agent receives memory items tailored to their assigned task.
-- After corrections or discoveries, run \`npx ca learn\` to record them.
+- After corrections or discoveries, you have to run \`npx ca learn\` to record them.
 
 ## Beads Integration
 - Start with \`bd ready\` to pick work.
@@ -186,7 +187,7 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
    - **Small** (<100 lines): 4 core reviewers — security, test-coverage, simplicity, cct-reviewer.
    - **Medium** (100-500 lines): add architecture, performance, edge-case (7 total).
    - **Large** (500+ lines): full team — all 11 reviewers including docs, consistency, error-handling, pattern-matcher.
-5. Spawn selected reviewers in parallel. Reviewers communicate cross-cutting findings via SendMessage.
+5. Spawn selected reviewers in an AgentTeam to work in parallel. Reviewers communicate cross-cutting findings via SendMessage.
 6. Classify findings: **P1** (security, data loss, correctness — blocks completion), **P2** (architecture, performance), **P3** (style, minor).
 7. Deduplicate and prioritize. Use \`AskUserQuestion\` for ambiguous severity.
 8. For P1/P2 findings: bd create --title="P1: (finding)" --type=bug --priority=1
@@ -233,7 +234,7 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
 ## Workflow
 1. Parse what was done from the arguments above or recent git history (\`git diff\`, \`git log\`).
 2. Run \`npx ca search\` with the topic to check what is already known (avoid duplicates).
-3. Spawn the analysis pipeline in parallel: context-analyzer, lesson-extractor, docs-reviewer, pattern-matcher, solution-writer, compounding.
+3. Spawn the analysis pipeline in an AgentTeam to parallelize work with communication: context-analyzer, lesson-extractor, docs-reviewer, pattern-matcher, solution-writer, compounding.
 4. Agents pass results to each other via SendMessage so downstream agents build on upstream findings. The lead coordinates the pipeline: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
 5. Apply quality filter on each candidate item:
    - **Novel**: skip if >0.85 similarity to existing memory
