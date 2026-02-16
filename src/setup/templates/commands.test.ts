@@ -49,13 +49,13 @@ describe('WORKFLOW_COMMANDS', () => {
       }
     });
 
-    it('every phase template references memory_search or memory_capture', () => {
+    it('every phase template references npx ca search or npx ca learn', () => {
       for (const key of PHASE_FILENAMES) {
         const template = WORKFLOW_COMMANDS[key];
         const hasMemory =
-          template.includes('memory_search') ||
-          template.includes('memory_capture');
-        expect(hasMemory, `${key} missing memory integration`).toBe(true);
+          template.includes('npx ca search') ||
+          template.includes('npx ca learn');
+        expect(hasMemory, `${key} missing memory CLI command integration`).toBe(true);
       }
     });
 

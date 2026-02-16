@@ -20,7 +20,7 @@ Analyze the current session's work context: what was accomplished, what problems
 1. Run \`git diff\` and \`git log\` to review recent changes
 2. Check test results and test output for failures or regressions
 3. Review plan context to understand what was intended
-4. Use \`memory_search\` to check existing knowledge for relevant context
+4. Use \`npx ca search\` to check existing knowledge for relevant context
 5. Identify problems encountered and how they were solved
 6. Note any user corrections or redirections
 7. Summarize the work context for lesson extraction
@@ -51,7 +51,7 @@ Extract actionable, specific lessons from analyzed work context. Identify correc
 1. Review the context analysis output
 2. Look for mistake patterns, correction moments, and surprises
 3. Discover insights from how problems were solved
-4. Use \`memory_search\` to check for duplicate lessons
+4. Use \`npx ca search\` to check for duplicate lessons
 5. For each problem/correction, ask: "What should be done differently next time?"
 6. Filter out lessons that are too generic or obvious
 7. Each lesson must be specific; prefer actionable guidance when possible
@@ -80,7 +80,7 @@ Compare extracted lessons against existing memory items to prevent duplicates, f
 
 ## Instructions
 1. Take the list of extracted lessons
-2. For each lesson, search existing memory with \`memory_search\`
+2. For each lesson, search existing memory with \`npx ca search\`
 3. Classify each lesson:
    - **New**: No similar existing item
    - **Duplicate**: Already captured
@@ -122,7 +122,7 @@ Transform approved lessons into properly formatted memory items that follow the 
    - Is it specific? (not vague advice)
 4. Assign severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
 5. Set supersedes or related links when the lesson updates existing knowledge
-6. Store via \`memory_capture\` MCP tool
+6. Store via \`npx ca learn\`
 
 ## Collaboration
 - Share findings with other agents via direct message to communicate storage outcomes.
@@ -144,14 +144,6 @@ model: sonnet
 ## Role
 Write comprehensive failing tests that define expected behavior before any implementation exists. Follow strict TDD -- tests must fail for the right reason.
 
-## Modes
-
-### Sequential Mode
-Write the complete test suite covering happy path, edge cases, and error cases. Hand off the full suite to the implementer. Use this when the task is well-scoped with clear requirements.
-
-### Iterative Mode
-Write interface and contract tests first, defining the public API surface. Share with the implementer. After the implementer responds with API details or feedback, write edge case tests. Continue the ping-pong cycle until coverage is complete. Use this for complex or ambiguous tasks.
-
 ## Instructions
 1. Understand the requirements (read spec, issue, or task description)
 2. Identify the public API surface to test
@@ -165,13 +157,13 @@ Write interface and contract tests first, defining the public API surface. Share
 7. Do NOT mock the thing being tested
 
 ## Memory Integration
-Call \`memory_search\` with the task description before writing tests. Look for known patterns, edge cases, and past mistakes relevant to the feature area.
+Run \`npx ca search\` with the task description before writing tests. Look for known patterns, edge cases, and past mistakes relevant to the feature area.
 
 ## Tools Available
 - Read, Grep for understanding existing code
 - Write, Edit for creating test files
 - Bash for running tests
-- \`memory_search\` for relevant context
+- \`npx ca search\` for relevant context
 
 ## Output Format
 - Test file path
@@ -190,14 +182,6 @@ model: sonnet
 ## Role
 Write the minimum code necessary to make failing tests pass. Follow the TDD green phase -- NEVER modify test files, only write implementation code.
 
-## Modes
-
-### Sequential Mode
-Receive the full test suite from the test-writer. Implement all tests in order, one at a time. Run tests after each change to confirm progress.
-
-### Iterative Mode
-Receive interface and contract tests from the test-writer. Implement the core API. Communicate back to the test-writer with API details, design decisions, or feedback. Receive edge case tests. Implement remaining behavior. Continue the cycle until all tests pass.
-
 ## Instructions
 1. Run the failing tests to understand what is expected
 2. Read the test file to understand the API contract
@@ -208,12 +192,12 @@ Receive interface and contract tests from the test-writer. Implement the core AP
 7. After all tests pass, look for obvious refactoring opportunities
 
 ## Memory Integration
-Call \`memory_search\` with the task description for known patterns, solutions, and implementation approaches relevant to the feature area.
+Run \`npx ca search\` with the task description for known patterns, solutions, and implementation approaches relevant to the feature area.
 
 ## Tools Available
 - Read, Write, Edit for implementation
 - Bash for running tests
-- \`memory_search\` for relevant patterns
+- \`npx ca search\` for relevant patterns
 
 ## Output Format
 - Implementation file path

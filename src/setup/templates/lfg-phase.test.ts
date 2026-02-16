@@ -69,8 +69,8 @@ describe('LFG Phase Integration', () => {
       expect(lfgCommand).toMatch(/NOT.*MEMORY\.md/i);
     });
 
-    it('references memory_capture in compound phase', () => {
-      expect(lfgCommand).toContain('memory_capture');
+    it('references npx ca learn in compound phase', () => {
+      expect(lfgCommand).toContain('npx ca learn');
     });
   });
 
@@ -151,11 +151,11 @@ describe('LFG Phase Integration', () => {
     });
 
     it('individual phase commands handle their own memory integration', () => {
-      expect(WORKFLOW_COMMANDS['brainstorm.md']).toContain('memory_search');
-      expect(WORKFLOW_COMMANDS['work.md']).toContain('memory_search');
-      expect(WORKFLOW_COMMANDS['work.md']).toContain('memory_capture');
-      expect(WORKFLOW_COMMANDS['compound.md']).toContain('memory_search');
-      expect(WORKFLOW_COMMANDS['compound.md']).toContain('memory_capture');
+      expect(WORKFLOW_COMMANDS['brainstorm.md']).toContain('npx ca search');
+      expect(WORKFLOW_COMMANDS['work.md']).toContain('npx ca search');
+      expect(WORKFLOW_COMMANDS['work.md']).toContain('npx ca learn');
+      expect(WORKFLOW_COMMANDS['compound.md']).toContain('npx ca search');
+      expect(WORKFLOW_COMMANDS['compound.md']).toContain('npx ca learn');
     });
   });
 
@@ -174,8 +174,8 @@ describe('LFG Phase Integration', () => {
       expect(workCommand).toContain('MANDATORY VERIFICATION');
     });
 
-    it('work.md instructs displaying memory_search results', () => {
-      expect(workCommand).toMatch(/display.*memory|memory.*display/i);
+    it('work.md instructs displaying search results', () => {
+      expect(workCommand).toMatch(/display.*search|display.*memory|memory.*display|search.*display/i);
     });
   });
 

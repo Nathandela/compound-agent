@@ -42,12 +42,12 @@ describe('Compound Phase Integration', () => {
     });
 
     // --- Memory enrichment ---
-    it('references memory_search for semantic retrieval', () => {
-      expect(compoundCommand).toContain('memory_search');
+    it('references npx ca search for semantic retrieval', () => {
+      expect(compoundCommand).toContain('npx ca search');
     });
 
-    it('references memory_capture for storing items', () => {
-      expect(compoundCommand).toContain('memory_capture');
+    it('references npx ca learn for storing items', () => {
+      expect(compoundCommand).toContain('npx ca learn');
     });
 
     // --- Agent team spawning ---
@@ -90,8 +90,8 @@ describe('Compound Phase Integration', () => {
     });
 
     // --- Storage ---
-    it('references memory_capture for storing approved items', () => {
-      expect(compoundCommand).toMatch(/memory_capture/);
+    it('references npx ca learn for storing approved items', () => {
+      expect(compoundCommand).toContain('npx ca learn');
     });
 
     // --- Supersedes/related links ---
@@ -152,12 +152,12 @@ describe('Compound Phase Integration', () => {
       expect(compoundSkill).toContain('## Quality Criteria');
     });
 
-    it('references memory_search', () => {
-      expect(compoundSkill).toContain('memory_search');
+    it('references npx ca search', () => {
+      expect(compoundSkill).toContain('npx ca search');
     });
 
-    it('references memory_capture', () => {
-      expect(compoundSkill).toContain('memory_capture');
+    it('references npx ca learn', () => {
+      expect(compoundSkill).toContain('npx ca learn');
     });
 
     it('stays under 4000 characters', () => {
@@ -293,8 +293,8 @@ describe('Compound Phase Integration', () => {
     });
 
     describe('pattern-matcher.md specifics', () => {
-      it('references memory_search', () => {
-        expect(patternMatcher).toContain('memory_search');
+      it('references npx ca search', () => {
+        expect(patternMatcher).toContain('npx ca search');
       });
 
       it('classifies as New/Duplicate/Reinforcement/Contradiction', () => {
@@ -306,8 +306,8 @@ describe('Compound Phase Integration', () => {
     });
 
     describe('solution-writer.md specifics', () => {
-      it('references memory_capture', () => {
-        expect(solutionWriter).toContain('memory_capture');
+      it('references npx ca learn', () => {
+        expect(solutionWriter).toContain('npx ca learn');
       });
 
       it('references quality filters', () => {
@@ -340,14 +340,14 @@ describe('Compound Phase Integration', () => {
       expect(AGENT_TEMPLATES['solution-writer.md']).toBeDefined();
     });
 
-    it('skill and command both reference memory_search', () => {
-      expect(compoundCommand).toContain('memory_search');
-      expect(compoundSkill).toContain('memory_search');
+    it('skill and command both reference npx ca search', () => {
+      expect(compoundCommand).toContain('npx ca search');
+      expect(compoundSkill).toContain('npx ca search');
     });
 
-    it('skill and command both reference memory_capture', () => {
-      expect(compoundCommand).toContain('memory_capture');
-      expect(compoundSkill).toContain('memory_capture');
+    it('skill and command both reference npx ca learn', () => {
+      expect(compoundCommand).toContain('npx ca learn');
+      expect(compoundSkill).toContain('npx ca learn');
     });
 
     it('skill and command both reference beads (bd)', () => {
@@ -385,9 +385,9 @@ describe('Compound Phase Integration', () => {
       const workflowMatch = compoundCommand.match(/## Workflow[^]*?(?=##|$)/i);
       expect(workflowMatch).not.toBeNull();
       const workflow = workflowMatch![0];
-      // Quality filter (novelty/specificity) should appear before memory_capture
+      // Quality filter (novelty/specificity) should appear before npx ca learn
       const filterPos = workflow.search(/novel|specific|quality.*filter|filter/i);
-      const capturePos = workflow.search(/memory_capture|store|captur/i);
+      const capturePos = workflow.search(/npx ca learn|store|captur/i);
       expect(filterPos).toBeGreaterThan(-1);
       expect(capturePos).toBeGreaterThan(-1);
       expect(filterPos).toBeLessThan(capturePos);

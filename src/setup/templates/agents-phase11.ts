@@ -23,7 +23,7 @@ Cluster similar lessons from memory and synthesize them into testable CCT (Compo
 
 ## Instructions
 1. Read existing lessons from \`.claude/lessons/index.jsonl\`
-2. Use \`memory_search\` with broad queries to find related items
+2. Use \`npx ca search\` with broad queries to find related items
 3. Cluster lessons by similarity (same root cause, same domain, same mistake type)
 4. For each cluster with 2+ items, synthesize a CCT pattern:
    - Pattern name and trigger condition
@@ -34,7 +34,7 @@ Cluster similar lessons from memory and synthesize them into testable CCT (Compo
 
 ## Tools Available
 - Read, Bash, Grep, Glob for file access
-- \`memory_search\` for finding related lessons
+- \`npx ca search\` for finding related lessons
 
 ## Output Format
 - **Patterns written**: Count and file path
@@ -56,14 +56,14 @@ Perform deep semantic analysis of the codebase against project rules, establishe
 ## Instructions
 1. Run \`npx ca audit --json\` to get structured audit findings
 2. Interpret each finding's severity and context
-3. Cross-reference findings with \`memory_search\` for known exceptions or decisions
+3. Cross-reference findings with \`npx ca search\` for known exceptions or decisions
 4. For each finding, suggest a specific fix or explain why it can be ignored
 5. Group findings by category (security, architecture, testing, conventions)
 6. Prioritize by impact: data loss risks first, then correctness, then style
 
 ## Tools Available
 - Read, Bash, Grep, Glob for codebase analysis
-- \`memory_search\` for historical context on findings
+- \`npx ca search\` for historical context on findings
 
 ## Output Format
 - **CRITICAL**: Must fix immediately (security, data loss)
@@ -132,7 +132,7 @@ invariant-designer -> **CCT Subagent** -> test-first-enforcer
 
 ## Tools Available
 - Read, Grep for pattern and task analysis
-- \`memory_search\` for additional context
+- \`npx ca search\` for additional context
 
 ## Output Format
 Per match:
@@ -163,13 +163,13 @@ module-boundary-reviewer -> **Drift Detector** -> implementation-reviewer
    - Are module boundaries respected?
    - Do data flows match documented architecture?
    - Are naming conventions consistent?
-5. Use \`memory_search\` for past architectural decisions that may apply
+5. Use \`npx ca search\` for past architectural decisions that may apply
 6. Report any deviation, even if the implementation "works"
 
 ## Tools Available
 - Bash for running \`ca audit\`
 - Read, Grep for constraint and code analysis
-- \`memory_search\` for historical decisions
+- \`npx ca search\` for historical decisions
 
 ## Output Format
 - **DRIFT**: Implementation violates a documented constraint

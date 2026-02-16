@@ -39,12 +39,12 @@ describe('PHASE_SKILLS', () => {
     }
   });
 
-  it('every template references memory tools', () => {
+  it('every template references memory CLI commands', () => {
     for (const [key, content] of Object.entries(PHASE_SKILLS)) {
       const hasMemory =
-        content.includes('memory_search') ||
-        content.includes('memory_capture');
-      expect(hasMemory, `${key} missing memory tool reference`).toBe(true);
+        content.includes('npx ca search') ||
+        content.includes('npx ca learn');
+      expect(hasMemory, `${key} missing memory CLI command reference`).toBe(true);
     }
   });
 

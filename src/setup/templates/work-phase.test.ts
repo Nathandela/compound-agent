@@ -36,8 +36,8 @@ describe('Work Phase Integration', () => {
     });
 
     // --- Memory enrichment ---
-    it('references memory_search for semantic retrieval', () => {
-      expect(workCommand).toContain('memory_search');
+    it('references npx ca search for semantic retrieval', () => {
+      expect(workCommand).toContain('npx ca search');
     });
 
     // --- Agent team delegation ---
@@ -46,15 +46,8 @@ describe('Work Phase Integration', () => {
       expect(workCommand).toMatch(/implementer/i);
     });
 
-    it('describes spawning agent team', () => {
+    it('describes spawning or delegating to agent team', () => {
       expect(workCommand).toMatch(/spawn|launch|start|delegate/i);
-    });
-
-    // --- Complexity assessment ---
-    it('describes complexity assessment (trivial/simple/complex)', () => {
-      expect(workCommand).toMatch(/trivial/i);
-      expect(workCommand).toMatch(/simple/i);
-      expect(workCommand).toMatch(/complex/i);
     });
 
     // --- Delegate mode ---
@@ -74,8 +67,8 @@ describe('Work Phase Integration', () => {
       expect(workCommand).toMatch(/memory.*agent|agent.*memory|inject.*memory|memory.*inject|context.*agent/i);
     });
 
-    it('describes memory_capture for corrections or discoveries', () => {
-      expect(workCommand).toContain('memory_capture');
+    it('describes npx ca learn for corrections or discoveries', () => {
+      expect(workCommand).toContain('npx ca learn');
     });
 
     it('includes explicit Mandatory Verification section with pipeline reference', () => {
@@ -117,8 +110,8 @@ describe('Work Phase Integration', () => {
       expect(workSkill).toContain('## Quality Criteria');
     });
 
-    it('references memory_search', () => {
-      expect(workSkill).toContain('memory_search');
+    it('references npx ca search', () => {
+      expect(workSkill).toContain('npx ca search');
     });
 
     it('stays under 4000 characters', () => {
@@ -126,12 +119,8 @@ describe('Work Phase Integration', () => {
     });
 
     // --- Work-specific skill content ---
-    it('describes team structure / adaptive TDD model', () => {
-      expect(workSkill).toMatch(/team structure|adaptive|team/i);
-    });
-
-    it('describes complexity assessment', () => {
-      expect(workSkill).toMatch(/complexity|trivial|simple|complex/i);
+    it('describes team structure / agent delegation', () => {
+      expect(workSkill).toMatch(/team|delegat|agent/i);
     });
 
     it('describes agent delegation', () => {
@@ -142,8 +131,8 @@ describe('Work Phase Integration', () => {
       expect(workSkill).toMatch(/inject.*memory.*agent|memory.*inject.*agent|memory.*items.*agent|agent.*memory.*context/i);
     });
 
-    it('describes memory_capture for corrections or discoveries', () => {
-      expect(workSkill).toContain('memory_capture');
+    it('describes npx ca learn for corrections or discoveries', () => {
+      expect(workSkill).toContain('npx ca learn');
     });
 
     it('includes MANDATORY VERIFICATION gate with implementation-reviewer', () => {
@@ -166,26 +155,8 @@ describe('Work Phase Integration', () => {
       expect(frontmatter).toMatch(/model:/);
     });
 
-    it('references sequential mode (write full test suite, hand off)', () => {
-      expect(testWriter).toMatch(/sequential/i);
-      // Should describe writing the full suite then handing off
-      expect(testWriter).toMatch(/hand.off|hand off|complete.*suite|full.*suite/i);
-    });
-
-    it('references iterative mode (interface tests first, ping-pong)', () => {
-      expect(testWriter).toMatch(/iterative/i);
-      // Should describe interface/contract tests first
-      expect(testWriter).toMatch(/interface|contract/i);
-    });
-
-    it('references memory_search for task context', () => {
-      expect(testWriter).toContain('memory_search');
-    });
-
-    it('describes when to use each mode', () => {
-      // Both modes should be described with guidance on when to use
-      expect(testWriter).toMatch(/sequential/i);
-      expect(testWriter).toMatch(/iterative/i);
+    it('references npx ca search for task context', () => {
+      expect(testWriter).toContain('npx ca search');
     });
 
     it('stays under 4000 characters', () => {
@@ -206,22 +177,12 @@ describe('Work Phase Integration', () => {
       expect(frontmatter).toMatch(/model:/);
     });
 
-    it('references sequential mode (receive test suite, implement)', () => {
-      expect(implementer).toMatch(/sequential/i);
-    });
-
-    it('references iterative mode (receive interface tests, communicate back)', () => {
-      expect(implementer).toMatch(/iterative/i);
-      // Should describe communicating back to test-writer
-      expect(implementer).toMatch(/communicat|respond|feedback|report/i);
-    });
-
     it('explicitly states NEVER modify test files', () => {
       expect(implementer).toMatch(/never.*modify.*test|never.*change.*test|never.*edit.*test/i);
     });
 
-    it('references memory_search for implementation patterns', () => {
-      expect(implementer).toContain('memory_search');
+    it('references npx ca search for implementation patterns', () => {
+      expect(implementer).toContain('npx ca search');
     });
 
     it('stays under 4000 characters', () => {
@@ -239,9 +200,9 @@ describe('Work Phase Integration', () => {
       }
     });
 
-    it('work skill and command both reference memory_search', () => {
-      expect(workCommand).toContain('memory_search');
-      expect(workSkill).toContain('memory_search');
+    it('work skill and command both reference npx ca search', () => {
+      expect(workCommand).toContain('npx ca search');
+      expect(workSkill).toContain('npx ca search');
     });
 
     it('work skill and command both reference beads (bd)', () => {
@@ -249,35 +210,14 @@ describe('Work Phase Integration', () => {
       expect(workSkill).toMatch(/\bbd\b|beads/i);
     });
 
-    it('both agents reference the same modes described in work.md command', () => {
-      // work.md describes sequential and iterative modes
-      // Both agents should reference both modes
-      expect(testWriter).toMatch(/sequential/i);
-      expect(testWriter).toMatch(/iterative/i);
-      expect(implementer).toMatch(/sequential/i);
-      expect(implementer).toMatch(/iterative/i);
-    });
-
-    it('both agents mention memory_search', () => {
-      expect(testWriter).toContain('memory_search');
-      expect(implementer).toContain('memory_search');
-    });
-
-    it('work command and skill both describe all three complexity levels', () => {
-      for (const level of ['trivial', 'simple', 'complex']) {
-        expect(workCommand.toLowerCase()).toContain(level);
-        expect(workSkill.toLowerCase()).toContain(level);
-      }
-    });
-
     it('work command and skill both describe delegate mode (lead does not code)', () => {
       expect(workCommand).toMatch(/does not (code|implement)|do not (code|implement)|coordinat/i);
       expect(workSkill).toMatch(/does not (code|implement|write)|do not (code|implement|write)|coordinat.*delegat|delegat.*coordinat/i);
     });
 
-    it('work command and skill both reference memory_capture', () => {
-      expect(workCommand).toContain('memory_capture');
-      expect(workSkill).toContain('memory_capture');
+    it('work command and skill both reference npx ca learn', () => {
+      expect(workCommand).toContain('npx ca learn');
+      expect(workSkill).toContain('npx ca learn');
     });
 
     it('work skill references full beads lifecycle (bd ready, bd update, bd close)', () => {
@@ -289,49 +229,18 @@ describe('Work Phase Integration', () => {
     it('implementer explicitly prohibits modifying test files', () => {
       expect(implementer).toMatch(/never.*modify.*test/i);
     });
+
+    it('both agents mention npx ca search', () => {
+      expect(testWriter).toContain('npx ca search');
+      expect(implementer).toContain('npx ca search');
+    });
   });
 
   describe('branch-contract checks', () => {
-    // --- F1: Workflow must have explicit conditional branching ---
-    it('work.md workflow uses explicit conditional branching for complexity paths', () => {
-      // The workflow section must contain explicit if/conditional structure
-      // that separates trivial from simple/complex paths
-      const workflowMatch = workCommand.match(/## Workflow[^]*?(?=##|$)/i);
-      expect(workflowMatch).not.toBeNull();
-      const workflow = workflowMatch![0];
-      // Must have genuine conditional language — "If trivial" / "If simple" / "If complex"
-      // not just "**Trivial**:" label definitions
-      expect(workflow).toMatch(/\bif\b.*\btrivial\b/i);
-      expect(workflow).toMatch(/\bif\b.*\bsimple\b/i);
-      expect(workflow).toMatch(/\bif\b.*\bcomplex\b/i);
-    });
-
-    it('work.md trivial workflow path excludes test-writer/implementer spawning', () => {
-      // After explicit branching, the trivial path should NOT mention spawning pair agents
-      // Look for a trivial-specific instruction block in the workflow
-      const workflowMatch = workCommand.match(/## Workflow[^]*?(?=##|$)/i);
-      expect(workflowMatch).not.toBeNull();
-      const workflow = workflowMatch![0];
-      // Find the trivial branch content (between trivial conditional and simple conditional)
-      const trivialBranch = workflow.match(/(?:if|when).*trivial[^]*?(?=(?:if|when).*(?:simple|complex)|$)/i);
-      expect(trivialBranch).not.toBeNull();
-      const trivialText = trivialBranch![0].toLowerCase();
-      expect(trivialText).not.toMatch(/spawn.*test.writer|delegate.*test.writer|test.writer.*agent/);
-      expect(trivialText).not.toMatch(/spawn.*implementer|delegate.*implementer/);
-    });
-
-    it('work SKILL.md methodology uses conditional branching for complexity', () => {
-      const methodologyMatch = workSkill.match(/## Methodology[^]*?(?=##|$)/i);
-      expect(methodologyMatch).not.toBeNull();
-      const methodology = methodologyMatch![0];
-      // Must have genuine conditional language, not just label definitions
-      expect(methodology).toMatch(/\bif\b.*\btrivial\b/i);
-    });
-
     // --- F2: Per-agent memory must be per-subtask ---
     it('work.md describes per-subtask memory search, not single broadcast', () => {
       expect(workCommand).toMatch(
-        /memory_search.*(per (agent|subtask|delegated)|each (agent|subtask|delegated).*task|for each.*memory_search)/i
+        /npx ca search.*(per (agent|subtask|delegated)|each (agent|subtask|delegated).*task|for each.*npx ca search)/i
       );
     });
 

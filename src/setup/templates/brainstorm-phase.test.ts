@@ -33,13 +33,13 @@ describe('Brainstorm Phase Integration', () => {
     });
 
     // --- Memory enrichment ---
-    it('references memory_search for semantic retrieval', () => {
-      expect(brainstormCommand).toContain('memory_search');
+    it('references npx ca search for semantic retrieval', () => {
+      expect(brainstormCommand).toContain('npx ca search');
     });
 
-    it('calls memory_search before asking questions', () => {
-      // memory_search should appear in workflow before AskUserQuestion
-      const memIdx = brainstormCommand.indexOf('memory_search');
+    it('calls npx ca search before asking questions', () => {
+      // npx ca search should appear in workflow before AskUserQuestion
+      const memIdx = brainstormCommand.indexOf('npx ca search');
       const askIdx = brainstormCommand.indexOf('AskUserQuestion');
       expect(memIdx).toBeGreaterThan(-1);
       expect(askIdx).toBeGreaterThan(-1);
@@ -107,8 +107,8 @@ describe('Brainstorm Phase Integration', () => {
       expect(brainstormSkill).toContain('## Quality Criteria');
     });
 
-    it('references memory_search', () => {
-      expect(brainstormSkill).toContain('memory_search');
+    it('references npx ca search', () => {
+      expect(brainstormSkill).toContain('npx ca search');
     });
 
     it('stays under 4000 characters', () => {
@@ -130,9 +130,9 @@ describe('Brainstorm Phase Integration', () => {
   });
 
   describe('cross-template consistency', () => {
-    it('both command and skill reference memory_search', () => {
-      expect(brainstormCommand).toContain('memory_search');
-      expect(brainstormSkill).toContain('memory_search');
+    it('both command and skill reference npx ca search', () => {
+      expect(brainstormCommand).toContain('npx ca search');
+      expect(brainstormSkill).toContain('npx ca search');
     });
 
     it('both command and skill reference AskUserQuestion', () => {

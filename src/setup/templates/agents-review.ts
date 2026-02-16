@@ -61,14 +61,13 @@ Search compound-agent memory to find relevant lessons, patterns, and decisions f
 
 ## Instructions
 1. Identify the key topics from the current task
-2. Use \`memory_search\` MCP tool with relevant queries
+2. Use \`npx ca search\` with relevant queries
 3. Search with multiple query variations for coverage
 4. Filter results by relevance and recency
 5. Summarize applicable lessons concisely
 
 ## Tools Available
-- \`memory_search\` MCP tool (primary)
-- \`npx ca search\` CLI (fallback)
+- \`npx ca search\` CLI
 
 ## Output Format
 Return a list of relevant memory items:
@@ -146,7 +145,7 @@ Review code for architectural consistency, pattern compliance, module boundary i
 
 ## Tools Available
 - Read, Grep, Glob for codebase analysis
-- \`memory_search\` for past architectural decisions
+- \`npx ca search\` for past architectural decisions
 
 ## Output Format
 - **VIOLATION**: Breaks established architecture

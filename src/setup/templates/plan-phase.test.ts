@@ -36,8 +36,8 @@ describe('Plan Phase Integration', () => {
     });
 
     // --- Semantic enrichment (6pwy) ---
-    it('references memory_search for semantic retrieval', () => {
-      expect(planCommand).toContain('memory_search');
+    it('references npx ca search for semantic retrieval', () => {
+      expect(planCommand).toContain('npx ca search');
     });
 
     it('instructs reading brainstorm output if available', () => {
@@ -116,8 +116,8 @@ describe('Plan Phase Integration', () => {
       expect(planSkill).toContain('## Quality Criteria');
     });
 
-    it('references memory_search', () => {
-      expect(planSkill).toContain('memory_search');
+    it('references npx ca search', () => {
+      expect(planSkill).toContain('npx ca search');
     });
 
     it('stays under 4000 characters', () => {
@@ -151,8 +151,8 @@ describe('Plan Phase Integration', () => {
       expect(repoAnalyst).toMatch(/codebase|repository|structure/i);
     });
 
-    it('memory-analyst references memory_search', () => {
-      expect(memoryAnalyst).toContain('memory_search');
+    it('memory-analyst references npx ca search', () => {
+      expect(memoryAnalyst).toContain('npx ca search');
     });
   });
 
@@ -194,9 +194,9 @@ describe('Plan Phase Integration', () => {
       }
     });
 
-    it('plan skill and plan command both reference memory_search', () => {
-      expect(planCommand).toContain('memory_search');
-      expect(planSkill).toContain('memory_search');
+    it('plan skill and plan command both reference npx ca search', () => {
+      expect(planCommand).toContain('npx ca search');
+      expect(planSkill).toContain('npx ca search');
     });
 
     it('plan skill and plan command both reference beads', () => {

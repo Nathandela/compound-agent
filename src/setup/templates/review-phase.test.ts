@@ -42,12 +42,12 @@ describe('Review Phase Integration', () => {
     });
 
     // --- Memory enrichment ---
-    it('references memory_search for semantic retrieval', () => {
-      expect(reviewCommand).toContain('memory_search');
+    it('references npx ca search for semantic retrieval', () => {
+      expect(reviewCommand).toContain('npx ca search');
     });
 
-    it('references memory_capture for novel findings', () => {
-      expect(reviewCommand).toContain('memory_capture');
+    it('references npx ca learn for novel findings', () => {
+      expect(reviewCommand).toContain('npx ca learn');
     });
 
     // --- Agent team spawning ---
@@ -143,12 +143,12 @@ describe('Review Phase Integration', () => {
       expect(reviewSkill).toContain('## Quality Criteria');
     });
 
-    it('references memory_search', () => {
-      expect(reviewSkill).toContain('memory_search');
+    it('references npx ca search', () => {
+      expect(reviewSkill).toContain('npx ca search');
     });
 
-    it('references memory_capture for novel findings', () => {
-      expect(reviewSkill).toContain('memory_capture');
+    it('references npx ca learn for novel findings', () => {
+      expect(reviewSkill).toContain('npx ca learn');
     });
 
     it('stays under 4000 characters', () => {
@@ -256,14 +256,14 @@ describe('Review Phase Integration', () => {
       expect(AGENT_TEMPLATES['simplicity-reviewer.md']).toBeDefined();
     });
 
-    it('review skill and command both reference memory_search', () => {
-      expect(reviewCommand).toContain('memory_search');
-      expect(reviewSkill).toContain('memory_search');
+    it('review skill and command both reference npx ca search', () => {
+      expect(reviewCommand).toContain('npx ca search');
+      expect(reviewSkill).toContain('npx ca search');
     });
 
-    it('review skill and command both reference memory_capture', () => {
-      expect(reviewCommand).toContain('memory_capture');
-      expect(reviewSkill).toContain('memory_capture');
+    it('review skill and command both reference npx ca learn', () => {
+      expect(reviewCommand).toContain('npx ca learn');
+      expect(reviewSkill).toContain('npx ca learn');
     });
 
     it('review skill and command both reference beads (bd)', () => {

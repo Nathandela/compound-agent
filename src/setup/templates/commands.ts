@@ -17,16 +17,8 @@ Explore requirements through collaborative dialogue before committing to a plan.
 
 ## Workflow
 1. Parse the topic from the arguments above. If empty, ask the user what to brainstorm.
-2. Call \`memory_search\` with the topic to surface relevant past lessons. Display retrieved items and incorporate them into exploration.
-3. Create a research team and spawn explorers in parallel:
-   \`\`\`
-   TeamCreate: team_name="brainstorm-<topic-slug>"
-   Task: name="docs-explorer", subagent_type="Explore", team_name="brainstorm-<topic-slug>"
-     prompt: "Scan docs/ for architecture docs, specs, research, standards, anti-patterns, and existing ADRs in docs/decisions/"
-   Task: name="code-explorer", subagent_type="Explore", team_name="brainstorm-<topic-slug>"
-     prompt: "Research codebase areas relevant to: <topic>"
-   \`\`\`
-   Wait for both teammates to report findings, then synthesize.
+2. Run \`npx ca search\` with the topic to surface relevant past lessons. Display retrieved items and incorporate them into exploration.
+3. Spawn docs-explorer and code-explorer in parallel to research the topic. Synthesize their findings.
 4. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences through structured dialogue.
 5. Explore edge cases and failure modes.
 6. Propose 2-3 alternative approaches with tradeoffs.
@@ -53,7 +45,7 @@ Explore requirements through collaborative dialogue before committing to a plan.
       \`\`\`
 
 ## Memory Integration
-- Call \`memory_search\` at the start to avoid repeating past mistakes.
+- Run \`npx ca search\` at the start to avoid repeating past mistakes.
 - If the brainstorm surfaces new insights, note them for later capture.
 
 ## Docs Integration
@@ -82,18 +74,8 @@ Create a structured implementation plan enriched by semantic memory and existing
 ## Workflow
 1. Parse the goal from the arguments above. If empty, ask the user what to plan.
 2. Check for brainstorm output: run \`bd list\` to find a related brainstorm epic. If one exists, read its description for decisions and open questions.
-3. Call \`memory_search\` with the goal to retrieve relevant past lessons. Display retrieved memory items and incorporate them into planning context.
-4. Create a research team and spawn analysts in parallel:
-   \`\`\`
-   TeamCreate: team_name="plan-<goal-slug>"
-   Task: name="docs-analyst", subagent_type="Explore", team_name="plan-<goal-slug>"
-     prompt: "Scan docs/ for specs, standards, anti-patterns, and ADRs in docs/decisions/ that constrain the plan for: <goal>"
-   Task: name="repo-analyst", subagent_type="Explore", team_name="plan-<goal-slug>"
-     prompt: "Explore codebase patterns, conventions, and architecture relevant to: <goal>"
-   Task: name="memory-analyst", subagent_type="general-purpose", team_name="plan-<goal-slug>"
-     prompt: "Deep dive into related memory items with multiple memory_search queries for: <goal>"
-   \`\`\`
-   Wait for all teammates to report findings, then synthesize.
+3. Run \`npx ca search\` with the goal to retrieve relevant past lessons. Display retrieved memory items and incorporate them into planning context.
+4. Spawn docs-analyst, repo-analyst, and memory-analyst in parallel to research constraints and patterns. Synthesize their findings.
 5. Synthesize research findings from all agents into a coherent plan. Flag any conflicts between ADRs and proposed approach.
 6. Use \`AskUserQuestion\` to resolve ambiguities: unclear requirements, conflicting ADRs, or priority trade-offs that need user input before decomposing.
 7. Break the goal into concrete, ordered tasks with clear acceptance criteria.
@@ -115,7 +97,7 @@ After creating all tasks, verify review and compound tasks exist:
 If either is missing, CREATE THEM NOW. The plan is NOT complete without these gates.
 
 ## Memory Integration
-- Call \`memory_search\` before planning to learn from past approaches.
+- Run \`npx ca search\` before planning to learn from past approaches.
 - Search for architectural patterns relevant to the goal.
 - Incorporate retrieved lessons into task descriptions as context.
 
@@ -146,32 +128,15 @@ Execute implementation by delegating to an agent team. The lead coordinates and 
 ## Workflow
 1. Parse task from the arguments above. If empty, run \`bd ready\` to find available tasks.
 2. Mark task in progress: bd update (id) --status=in_progress.
-3. Call \`memory_search\` with the task description to retrieve relevant lessons. Run \`memory_search\` per agent/subtask so each gets targeted context. Display retrieved lessons in your response. Do not silently discard memory results.
-4. Assess complexity to determine team strategy.
-5. If **trivial** (config changes, typos, one-line fixes): handle directly with a single subagent. No AgentTeam needed. Proceed to step 10.
-6. If **simple** or **complex**, create an AgentTeam:
-   \`\`\`
-   TeamCreate: team_name="work-<task-id>"
-   \`\`\`
-7. Spawn **test-analyst** as the first teammate (produces a test plan, not code):
-   \`\`\`
-   Task: name="test-analyst", subagent_type="general-purpose", team_name="work-<task-id>"
-     prompt: "Analyze requirements for <task>. Identify happy paths, edge cases, failure modes, boundary conditions, invariants. Output a structured test plan."
-   \`\`\`
-   Wait for test-analyst to report the test plan via SendMessage.
-8. If **simple**: spawn test-writer, wait for tests, then spawn implementer:
-   \`\`\`
-   Task: name="test-writer", subagent_type="general-purpose", team_name="work-<task-id>"
-   Task: name="implementer", subagent_type="general-purpose", team_name="work-<task-id>"
-   \`\`\`
-   If **complex**: spawn both as teammates, coordinate via SendMessage for ping-pong cycles.
-9. When agents work on overlapping areas, they communicate directly via SendMessage to coordinate and avoid conflicts.
-10. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-11. If blocked by ambiguity or conflicting agent outputs, use \`AskUserQuestion\` to get user direction.
-12. Shut down the team when done: send \`shutdown_request\` to all teammates.
-13. Commit incrementally as tests pass — do not batch all commits to the end.
-14. Run the full test suite to check for regressions.
-15. Close the task: bd close (id).
+3. Run \`npx ca search\` with the task description to retrieve relevant lessons. Run \`npx ca search\` per agent/subtask so each gets targeted context. Display retrieved lessons in your response. Do not silently discard memory results.
+4. Spawn test-writer and implementer as a team. Test-writer writes failing tests first, implementer makes them pass.
+5. Agents communicate via SendMessage when working on overlapping areas.
+6. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
+7. If blocked by ambiguity or conflicting agent outputs, use \`AskUserQuestion\` to get user direction.
+8. Shut down the team when done: send shutdown_request to all teammates.
+9. Commit incrementally as tests pass — do not batch all commits to the end.
+10. Run the full test suite to check for regressions.
+11. Close the task: bd close (id).
 
 ## MANDATORY VERIFICATION -- DO NOT CLOSE TASK WITHOUT THIS
 STOP. Before running \`bd close\`, you MUST:
@@ -185,9 +150,9 @@ The full 8-step pipeline (invariant-designer through implementation-reviewer) is
 for complex changes. For all changes, /implementation-reviewer is the minimum required gate.
 
 ## Memory Integration
-- Call \`memory_search\` per delegated subtask with the subtask's specific description, not one shared query.
+- Run \`npx ca search\` per delegated subtask with the subtask's specific description, not one shared query.
 - Each agent receives memory items tailored to their assigned task.
-- After corrections or discoveries, call \`memory_capture\` to record them.
+- After corrections or discoveries, run \`npx ca learn\` to record them.
 
 ## Beads Integration
 - Start with \`bd ready\` to pick work.
@@ -216,40 +181,25 @@ Multi-agent code review with severity classification and a mandatory \`/implemen
 ## Workflow
 1. Run quality gates first: pnpm test, then pnpm lint.
 2. Identify scope from the arguments above or \`git diff\`. Count changed lines.
-3. Call \`memory_search\` with changed areas to surface past lessons.
+3. Run \`npx ca search\` with changed areas to surface past lessons.
 4. **Select reviewer tier based on diff size:**
    - **Small** (<100 lines): 4 core reviewers — security, test-coverage, simplicity, cct-reviewer.
    - **Medium** (100-500 lines): add architecture, performance, edge-case (7 total).
    - **Large** (500+ lines): full team — all 11 reviewers including docs, consistency, error-handling, pattern-matcher.
-5. Create team and spawn selected reviewers in parallel:
-   \`\`\`
-   TeamCreate: team_name="review-<scope-slug>"
-   Task: name="security-reviewer", prompt: "Review for injection, auth, data exposure"
-   Task: name="test-coverage-reviewer", prompt: "Review for missing edge cases, cargo-cult tests"
-   Task: name="simplicity-reviewer", prompt: "Review for over-engineering, dead code"
-   Task: name="cct-reviewer", prompt: "Check against CCT patterns in .claude/lessons/"
-   (medium+) Task: name="architecture-reviewer", prompt: "Review module boundaries, coupling"
-   (medium+) Task: name="performance-reviewer", prompt: "Review allocations, N+1, blocking calls"
-   (medium+) Task: name="edge-case-reviewer", prompt: "Check boundary conditions, off-by-one"
-   (large)   Task: name="docs-reviewer", prompt: "Check doc alignment, ADR compliance"
-   (large)   Task: name="consistency-reviewer", prompt: "Check naming, patterns, style"
-   (large)   Task: name="error-handling-reviewer", prompt: "Review error messages, resilience"
-   (large)   Task: name="pattern-matcher", prompt: "Match findings to memory, reinforce via memory_capture"
-   \`\`\`
-6. Reviewers communicate cross-cutting findings via SendMessage.
-7. Classify findings: **P1** (security, data loss, correctness — blocks completion), **P2** (architecture, performance), **P3** (style, minor).
-8. Deduplicate and prioritize. Use \`AskUserQuestion\` for ambiguous severity.
-9. For P1/P2 findings: bd create --title="P1: (finding)" --type=bug --priority=1
-10. Submit to **\`/implementation-reviewer\`** — mandatory gate, final authority. All P1s must be resolved.
-11. **External reviewers (optional)**: Check \`.claude/compound-agent.json\` for \`"externalReviewers"\`. Spawn configured reviewers. Advisory only, never blocks.
-12. Output review summary with severity breakdown and external findings (if any).
+5. Spawn selected reviewers in parallel. Reviewers communicate cross-cutting findings via SendMessage.
+6. Classify findings: **P1** (security, data loss, correctness — blocks completion), **P2** (architecture, performance), **P3** (style, minor).
+7. Deduplicate and prioritize. Use \`AskUserQuestion\` for ambiguous severity.
+8. For P1/P2 findings: bd create --title="P1: (finding)" --type=bug --priority=1
+9. Submit to **\`/implementation-reviewer\`** — mandatory gate, final authority. All P1s must be resolved.
+10. **External reviewers (optional)**: Check \`.claude/compound-agent.json\` for \`"externalReviewers"\`. Spawn configured reviewers. Advisory only, never blocks.
+11. Output review summary with severity breakdown and external findings (if any).
 
 ## Memory Integration
-- Call \`memory_search\` at the start for known issues in changed areas.
-- **pattern-matcher** auto-reinforces recurring findings via \`memory_capture\`.
+- Run \`npx ca search\` at the start for known issues in changed areas.
+- **pattern-matcher** auto-reinforces recurring findings via \`npx ca learn\`.
 - **cct-reviewer** reads \`.claude/lessons/cct-patterns.jsonl\` for known Claude mistakes.
-- After review, call \`memory_capture\` with \`type=solution\` to store the review report.
-- **CRITICAL**: Use \`memory_capture\` MCP tool for ALL lesson storage -- NOT MEMORY.md.
+- After review, run \`npx ca learn\` with \`type=solution\` to store the review report.
+- **CRITICAL**: Use \`npx ca learn\` for ALL lesson storage -- NOT MEMORY.md.
 
 ## Docs Integration
 - **docs-reviewer** checks code changes align with \`docs/\` and existing ADRs.
@@ -277,28 +227,13 @@ $ARGUMENTS
 ## Purpose
 Multi-agent analysis to capture high-quality lessons from completed work into the memory system and update project documentation.
 
-**CRITICAL**: Store all lessons via \`memory_capture\` MCP tool -- NOT via MEMORY.md, NOT via markdown files.
-Lessons go to \`.claude/lessons/index.jsonl\` through the MCP tool. MEMORY.md is a different system and MUST NOT be used for compounding.
+**CRITICAL**: Store all lessons via \`npx ca learn\` -- NOT via MEMORY.md, NOT via markdown files.
+Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a different system and MUST NOT be used for compounding.
 
 ## Workflow
 1. Parse what was done from the arguments above or recent git history (\`git diff\`, \`git log\`).
-2. Call \`memory_search\` with the topic to check what is already known (avoid duplicates).
-3. Create a compound team and spawn the 6 analysis agents in parallel:
-   \`\`\`
-   TeamCreate: team_name="compound-<topic-slug>"
-   Task: name="context-analyzer", subagent_type="general-purpose", team_name="compound-<topic>"
-     prompt: "Summarize what happened: git diff, test results, plan context for: <topic>"
-   Task: name="lesson-extractor", subagent_type="general-purpose", team_name="compound-<topic>"
-     prompt: "Identify mistakes, corrections, and discoveries from: <topic>"
-   Task: name="docs-reviewer", subagent_type="Explore", team_name="compound-<topic>"
-     prompt: "Scan docs/ for content that needs updating. Check if any ADR in docs/decisions/ should be deprecated."
-   Task: name="pattern-matcher", subagent_type="general-purpose", team_name="compound-<topic>"
-     prompt: "Match findings against existing memory via memory_search. Classify: New/Duplicate/Reinforcement/Contradiction."
-   Task: name="solution-writer", subagent_type="general-purpose", team_name="compound-<topic>"
-     prompt: "Formulate structured memory items typed as lesson, solution, pattern, or preference."
-   Task: name="compounding", subagent_type="general-purpose", team_name="compound-<topic>"
-     prompt: "Synthesize accumulated lessons into CCT patterns for test reuse."
-   \`\`\`
+2. Run \`npx ca search\` with the topic to check what is already known (avoid duplicates).
+3. Spawn the analysis pipeline in parallel: context-analyzer, lesson-extractor, docs-reviewer, pattern-matcher, solution-writer, compounding.
 4. Agents pass results to each other via SendMessage so downstream agents build on upstream findings. The lead coordinates the pipeline: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
 5. Apply quality filter on each candidate item:
    - **Novel**: skip if >0.85 similarity to existing memory
@@ -307,7 +242,7 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the MCP tool. MEMORY.md is
    - **High**: data loss risk, security implications, contradicts established patterns
    - **Medium**: workflow changes, pattern corrections, tooling preferences
    - **Low**: style preferences, minor optimizations, reinforcements
-7. For approved items, store via \`memory_capture\` with supersedes/related linking to connect with existing memory.
+7. For approved items, store via \`npx ca learn\` with supersedes/related linking to connect with existing memory.
    At minimum, capture 1 lesson per significant decision made during this cycle.
 8. After storing new items, delegate to the **compounding** subagent to run compounding synthesis:
    - Read all lessons from \`.claude/lessons/index.jsonl\`
@@ -353,7 +288,7 @@ $ARGUMENTS
 2. **Plan**: /compound:plan with conclusions. Update: bd update (epic-id) --notes="Phase: plan COMPLETE, Next: work"
 3. **Work**: /compound:work (finds tasks via bd ready). Update: bd update (epic-id) --notes="Phase: work COMPLETE, Next: review"
 4. **Review**: /compound:review on changed code. Update: bd update (epic-id) --notes="Phase: review COMPLETE, Next: compound"
-5. **Compound**: /compound:compound to capture learnings (via memory_capture, NOT MEMORY.md). Update: bd update (epic-id) --notes="Phase: compound COMPLETE, Next: close"
+5. **Compound**: /compound:compound to capture learnings (via npx ca learn, NOT MEMORY.md). Update: bd update (epic-id) --notes="Phase: compound COMPLETE, Next: close"
 
 ## Phase Control
 - Skip: "from <phase>" in arguments skips earlier phases.
@@ -406,7 +341,6 @@ Examples:
 npx ca search "$ARGUMENTS"
 \`\`\`
 
-Note: You can also use the \`memory_search\` MCP tool directly.
 `,
   'list.md': `---
 name: compound:list
