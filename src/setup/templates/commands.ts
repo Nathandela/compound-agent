@@ -12,51 +12,13 @@ $ARGUMENTS
 
 # Brainstorm
 
-## Purpose
-Explore requirements through collaborative dialogue before committing to a plan.
+Run the **brainstorm** phase. Follow the brainstorm skill for full instructions.
 
-## Workflow
-1. Parse the topic from the arguments above. If empty, ask the user what to brainstorm.
-2. Run \`npx ca search\` with the topic to surface relevant past lessons. Display retrieved items and incorporate them into exploration.
-3. Spawn docs-explorer and code-explorer in parallel to research the topic. Synthesize their findings.
-4. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences through structured dialogue.
-5. Explore edge cases and failure modes.
-6. Propose 2-3 alternative approaches with tradeoffs.
-7. Run \`bd ready\` to check if related tasks already exist.
-8. Output a clear problem definition, chosen approach, and open questions.
-9. Create a beads epic from conclusions:
-   bd create --title="(epic title)" --type=feature --description="(problem definition + approach + scope)"
-10. For each significant decision, auto-create an ADR in \`docs/decisions/\`:
-    - Scan \`docs/decisions/\` for the highest existing number, increment by 1
-    - Write docs/decisions/NNN-(kebab-title).md using this template:
-      \`\`\`markdown
-      # NNN. <Title>
-      Status: accepted
-      Date: <YYYY-MM-DD>
-
-      ## Context
-      <What prompted this decision>
-
-      ## Decision
-      <What was decided and why>
-
-      ## Consequences
-      <What follows from this decision>
-      \`\`\`
-
-## Memory Integration
-- Run \`npx ca search\` at the start to avoid repeating past mistakes.
-- If the brainstorm surfaces new insights, run \`npx ca learn\` to capture them for later.
-
-## Docs Integration
-- Spawn a docs-explorer subagent to scan \`docs/\` for relevant architecture docs, research, standards, and existing ADRs.
-- Review existing ADRs in \`docs/decisions/\` for prior decisions that constrain the current brainstorm.
-- Auto-create ADR files for significant architectural decisions made during brainstorm.
-
-## Beads Integration
-- Run \`bd ready\` to check for existing related work.
-- Create a beads epic from brainstorm conclusions with \`bd create --type=feature\`.
-- If the brainstorm identifies sub-tasks, suggest creating them with \`bd create\`.
+Key steps:
+- Search memory and explore docs for prior context
+- Clarify scope and constraints via AskUserQuestion
+- Propose 2-3 approaches with tradeoffs
+- Create a beads epic from conclusions
 `,
 
   'plan.md': `---
@@ -68,49 +30,13 @@ $ARGUMENTS
 
 # Plan
 
-## Purpose
-Create a structured implementation plan enriched by semantic memory and existing documentation, with concrete tasks and dependencies.
+Run the **plan** phase. Follow the plan skill for full instructions.
 
-## Workflow
-1. Parse the goal from the arguments above. If empty, ask the user what to plan.
-2. Check for brainstorm output: run \`bd list\` to find a related brainstorm epic. If one exists, read its description for decisions and open questions.
-3. Run \`npx ca search\` with the goal to retrieve relevant past lessons. Display retrieved memory items and incorporate them into planning context.
-4. Spawn docs-analyst, repo-analyst, and memory-analyst in parallel to research constraints and patterns. Synthesize their findings.
-5. Synthesize research findings from all agents into a coherent plan. Flag any conflicts between ADRs and proposed approach.
-6. Use \`AskUserQuestion\` to resolve ambiguities: unclear requirements, conflicting ADRs, or priority trade-offs that need user input before decomposing.
-7. Break the goal into concrete, ordered tasks with clear acceptance criteria.
-8. **Create review and compound blocking tasks** so they survive compaction:
-   - bd create --title="Review: /compound:review" --type=task --priority=1
-   - bd create --title="Compound: /compound:compound" --type=task --priority=1
-   - bd dep add (review-id) (last-work-task)   -- review depends on work
-   - bd dep add (compound-id) (review-id)       -- compound depends on review
-   These tasks surface via \`bd ready\` after work completes, ensuring review and compound phases are never skipped — even after context compaction.
-9. Create beads issues and map dependencies:
-   - bd create --title="(task)" --type=task --priority=(1-4)
-   - bd dep add (dependent-task) (blocking-task)
-10. Output the plan as a structured list with task IDs and dependency graph.
-
-## POST-PLAN VERIFICATION -- MANDATORY
-After creating all tasks, verify review and compound tasks exist:
-- Run bd list --status=open and check for a "Review:" task
-- Run bd list --status=open and check for a "Compound:" task
-If either is missing, CREATE THEM NOW. The plan is NOT complete without these gates.
-
-## Memory Integration
-- Run \`npx ca search\` before planning to learn from past approaches.
-- Search for architectural patterns relevant to the goal.
-- Incorporate retrieved lessons into task descriptions as context.
-
-## Docs Integration
-- Spawn a docs-analyst subagent to scan \`docs/\` for relevant specs, standards, research, and existing ADRs.
-- Check \`docs/decisions/\` for prior ADRs that constrain or inform the plan.
-- If the plan contradicts an existing ADR, flag the conflict for the user.
-
-## Beads Integration
-- Create one \`bd\` issue per task with \`bd create\`.
-- Set priority (1=critical, 4=low) based on dependency order.
-- Map dependencies with bd dep add (dependent) (blocker).
-- Each task should include acceptance criteria in its description.
+Key steps:
+- Spawn subagents to research constraints and patterns
+- Decompose into tasks with acceptance criteria
+- Create review and compound blocking tasks
+- Verify POST-PLAN gates
 `,
 
   'work.md': `---
@@ -122,49 +48,13 @@ $ARGUMENTS
 
 # Work
 
-## Purpose
-Execute implementation by delegating to an agent team. The lead coordinates and does not code directly.
+Run the **work** phase. Follow the work skill for full instructions.
 
-## Workflow
-1. Parse tasks from the arguments above. If empty, run \`bd ready\` to find available tasks.
-2. Mark tasks in progress: bd update (id) --status=in_progress.
-3. Run \`npx ca search\` with the task description to retrieve relevant lessons. Run \`npx ca search\` per agent/subtask so each gets targeted context. Display retrieved lessons in your response. Do not silently discard memory results.
-4. Define what can be parallelized in reaching the end of all concerned tasks. We are aiming for clean implementation with parallelized team work.
-5. Make a task list and deploy an AgentTeam to tackle that. In the agent team, we want test-writers and implementers. Test-writer writes failing tests first, implementer makes them pass.
-6. Agents communicate via SendMessage when working on overlapping areas.
-7. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-8. If blocked by ambiguity or conflicting agent outputs, use \`AskUserQuestion\` to get user direction.
-9. Shut down the team when done: send shutdown_request to all teammates.
-10. Commit incrementally as tests pass — do not batch all commits to the end.
-11. Run the full test suite to check for regressions.
-12. Close the tasks: bd close (id).
-
-## MANDATORY VERIFICATION -- DO NOT CLOSE TASK WITHOUT THIS
-STOP. Before running \`bd close\`, you MUST:
-1. Run pnpm test, then pnpm lint (quality gates)
-2. Run /implementation-reviewer on the changed code
-3. Wait for APPROVED status
-If /implementation-reviewer returns REJECTED: fix ALL issues, re-run tests, resubmit.
-DO NOT close the task until approved. This is INVIOLABLE per CLAUDE.md.
-
-The full 8-step pipeline (invariant-designer through implementation-reviewer) is strictly needed
-for complex changes. For all changes, /implementation-reviewer is the minimum required gate.
-
-## Memory Integration
-- Run \`npx ca search\` per delegated subtask with the subtask's specific description, not one shared query.
-- Each agent receives memory items tailored to their assigned task.
-- After corrections or discoveries, you have to run \`npx ca learn\` to record them.
-
-## Beads Integration
-- Start with \`bd ready\` to pick work.
-- Update status with bd update (id) --status=in_progress.
-- Close with bd close (id) when all tests pass.
-
-## PHASE GATE 3 -- MANDATORY
-Before starting Review, verify ALL work tasks are closed:
-- Run bd list with status in_progress -- must return empty
-- Run bd list with status open -- only Review and Compound tasks should remain
-If any work tasks remain open, DO NOT proceed. Complete them first.
+Key steps:
+- Deploy AgentTeam with test-writers and implementers
+- Lead coordinates, delegates, does not code directly
+- Commit incrementally as tests pass
+- Run verification gates before closing tasks
 `,
 
   'review.md': `---
@@ -176,44 +66,13 @@ $ARGUMENTS
 
 # Review
 
-## Purpose
-Multi-agent code review with severity classification and a mandatory \`/implementation-reviewer\` gate.
+Run the **review** phase. Follow the review skill for full instructions.
 
-## Workflow
-1. Run quality gates first: pnpm test, then pnpm lint.
-2. Identify scope from the arguments above or \`git diff\`. Count changed lines.
-3. Run \`npx ca search\` with changed areas to surface past lessons.
-4. **Select reviewer tier based on diff size:**
-   - **Small** (<100 lines): 4 core reviewers — security, test-coverage, simplicity, cct-reviewer.
-   - **Medium** (100-500 lines): add architecture, performance, edge-case (7 total).
-   - **Large** (500+ lines): full team — all 11 reviewers including docs, consistency, error-handling, pattern-matcher.
-5. Spawn selected reviewers in an AgentTeam to work in parallel. Reviewers communicate cross-cutting findings via SendMessage.
-6. Classify findings: **P1** (security, data loss, correctness — blocks completion), **P2** (architecture, performance), **P3** (style, minor).
-7. Deduplicate and prioritize. Use \`AskUserQuestion\` for ambiguous severity.
-8. For P1/P2 findings: bd create --title="P1: (finding)" --type=bug --priority=1
-9. Submit to **\`/implementation-reviewer\`** — mandatory gate, final authority. All P1s must be resolved.
-10. **External reviewers (optional)**: Check \`.claude/compound-agent.json\` for \`"externalReviewers"\`. Spawn configured reviewers. Advisory only, never blocks.
-11. Output review summary with severity breakdown and external findings (if any).
-
-## Memory Integration
-- Run \`npx ca search\` at the start for known issues in changed areas.
-- **pattern-matcher** auto-reinforces recurring findings via \`npx ca learn\`.
-- **cct-reviewer** reads \`.claude/lessons/cct-patterns.jsonl\` for known Claude mistakes.
-- After review, run \`npx ca learn\` with \`type=solution\` to store the review report.
-- **CRITICAL**: Use \`npx ca learn\` for ALL lesson storage -- NOT MEMORY.md.
-
-## Docs Integration
-- **docs-reviewer** checks code changes align with \`docs/\` and existing ADRs.
-- Flags undocumented public APIs and ADR contradictions.
-
-## Beads Integration
-- Create \`bd\` issues for P1 and P2 findings with \`bd create\`.
-- Close related issues with \`bd close\` when findings are resolved.
-
-## PHASE GATE 4 -- MANDATORY
-Before starting Compound, verify review is complete:
-- /implementation-reviewer must have returned APPROVED
-- All P1 findings must be resolved
+Key steps:
+- Run quality gates, then spawn reviewers in parallel
+- Classify findings as P1/P2/P3
+- Fix all P1 findings before proceeding
+- Submit to /implementation-reviewer as mandatory gate
 `,
 
   'compound.md': `---
@@ -225,83 +84,32 @@ $ARGUMENTS
 
 # Compound
 
-## Purpose
-Multi-agent analysis to capture high-quality lessons from completed work into the memory system and update project documentation.
+Run the **compound** phase. Follow the compound skill for full instructions.
 
-**CRITICAL**: Store all lessons via \`npx ca learn\` -- NOT via MEMORY.md, NOT via markdown files.
-Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a different system and MUST NOT be used for compounding.
-
-## Workflow
-1. Parse what was done from the arguments above or recent git history (\`git diff\`, \`git log\`).
-2. Run \`npx ca search\` with the topic to check what is already known (avoid duplicates).
-3. Spawn the analysis pipeline in an AgentTeam to parallelize work with communication: context-analyzer, lesson-extractor, docs-reviewer, pattern-matcher, solution-writer, compounding.
-4. Agents pass results to each other via SendMessage so downstream agents build on upstream findings. The lead coordinates the pipeline: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
-5. Apply quality filter on each candidate item:
-   - **Novel**: skip if >0.85 similarity to existing memory
-   - **Specific**: reject vague or generic advice
-6. Classify severity for each approved item:
-   - **High**: data loss risk, security implications, contradicts established patterns
-   - **Medium**: workflow changes, pattern corrections, tooling preferences
-   - **Low**: style preferences, minor optimizations, reinforcements
-7. For approved items, store via \`npx ca learn\` with supersedes/related linking to connect with existing memory.
-   At minimum, capture 1 lesson per significant decision made during this cycle.
-8. After storing new items, delegate to the **compounding** subagent to run compounding synthesis:
-   - Read all lessons from \`.claude/lessons/index.jsonl\`
-   - Cluster by embedding similarity (threshold 0.75)
-   - Synthesize CCT patterns from clusters of 2+ items
-   - Write patterns to \`.claude/lessons/cct-patterns.jsonl\`
-   - Skip if fewer than 5 total lessons exist (not enough signal)
-9. If the docs-reviewer found outdated docs or ADRs, update them. For superseded ADRs, set status to \`deprecated\` and reference the new ADR.
-10. Use \`AskUserQuestion\` to confirm high-severity items with the user before storing; medium/low items are auto-stored.
-11. Run \`bd ready\` to check for related issues; \`bd close\` any resolved by captured knowledge.
-12. Output a summary of captured items, skipped items, and docs updated.
-
-## Docs Integration
-- Spawn a docs-reviewer subagent to check if \`docs/\` content needs updating after the cycle.
-- Check \`docs/decisions/\` for ADRs that may be outdated or contradicted by the work done.
-- Update ADR status to \`deprecated\` if a decision was reversed, with a reference to the new ADR.
-
-## Beads Integration
-- Check \`bd ready\` for related open issues.
-- Close resolved issues with \`bd close\`.
-
-## FINAL GATE -- EPIC CLOSURE
-Before closing the epic:
-- Run ca verify-gates (epic-id) -- must return PASS for both gates
-- Run pnpm test -- must pass
-- Run pnpm lint -- must pass
-If verify-gates fails, the missing phase was SKIPPED. Go back and complete it.
-CRITICAL: 3/5 phases is NOT success. All 5 phases are required.
+Key steps:
+- Spawn analysis agents in an AgentTeam
+- Apply quality filters, then store via npx ca learn
+- Delegate CCT synthesis to compounding agent
+- Verify FINAL GATE before closing epic
 `,
 
   'lfg.md': `---
 name: compound:lfg
-description: Full workflow cycle chaining brainstorm, plan, work, review, and compound phases
+description: Full workflow cycle chaining all five phases
 argument-hint: "<goal>"
 disable-model-invocation: true
 ---
 $ARGUMENTS
 
-# LFG (Full Cycle)
+# LFG
 
-## Workflow
-1. **Brainstorm**: /compound:brainstorm with the goal. Update: bd update (epic-id) --notes="Phase: brainstorm COMPLETE, Next: plan"
-2. **Plan**: /compound:plan with conclusions. Update: bd update (epic-id) --notes="Phase: plan COMPLETE, Next: work"
-3. **Work**: /compound:work (finds tasks via bd ready). Update: bd update (epic-id) --notes="Phase: work COMPLETE, Next: review"
-4. **Review**: /compound:review on changed code. Update: bd update (epic-id) --notes="Phase: review COMPLETE, Next: compound"
-5. **Compound**: /compound:compound to capture learnings (via npx ca learn, NOT MEMORY.md). Update: bd update (epic-id) --notes="Phase: compound COMPLETE, Next: close"
+Run all 5 phases. Follow each phase skill for full instructions.
 
-## Phase Control
-- Skip: "from <phase>" in arguments skips earlier phases.
-- Resume: bd show (epic-id), read notes field for phase state.
-- Progress: announce "[Phase N/5] Name" before each phase.
-
-## SESSION CLOSE -- INVIOLABLE
-1. ca verify-gates (epic-id)
-2. pnpm test -- all green
-3. pnpm lint -- zero violations
-4. git status, git add (specific files), bd sync, git commit, git push
-Work is NOT done until git push succeeds.
+- Brainstorm: explore and define the problem
+- Plan: decompose into tasks with dependencies
+- Work: delegate to AgentTeam for TDD
+- Review: multi-agent review with severity classification
+- Compound: capture lessons via npx ca learn
 `,
 
   // =========================================================================

@@ -2,22 +2,23 @@ import { describe, it, expect } from 'vitest';
 import { WORKFLOW_COMMANDS } from './commands.js';
 import { PHASE_SKILLS } from './skills.js';
 import { AGENT_TEMPLATES } from './agents.js';
+import { AGENT_ROLE_SKILLS } from './agent-role-skills.js';
 
 /**
  * Plan phase integration tests.
  *
- * Verifies the plan.md command, plan SKILL.md, and supporting agents
- * form a complete, well-integrated plan phase per ARCHITECTURE-V2.md.
+ * After v1.2.6 refactor:
+ * - plan.md command is a thin wrapper (< 500 chars) referencing the skill
+ * - plan SKILL.md has the detailed workflow: subagent spawning for
+ *   repo-analyst and memory-analyst, beads task creation, dependency mapping
+ * - repo-analyst and memory-analyst are subagents (thin agent wrappers + role skills)
  */
 
 describe('Plan Phase Integration', () => {
   const planCommand = WORKFLOW_COMMANDS['plan.md'];
   const planSkill = PHASE_SKILLS['plan'];
-  const repoAnalyst = AGENT_TEMPLATES['repo-analyst.md'];
-  const memoryAnalyst = AGENT_TEMPLATES['memory-analyst.md'];
 
-  describe('plan.md command template', () => {
-    // --- Structural requirements ---
+  describe('plan.md command (thin wrapper)', () => {
     it('exists in WORKFLOW_COMMANDS', () => {
       expect(planCommand).toBeDefined();
     });
@@ -27,69 +28,20 @@ describe('Plan Phase Integration', () => {
       expect(planCommand).toContain('$ARGUMENTS');
     });
 
-    it('has ## Workflow section', () => {
-      expect(planCommand).toContain('## Workflow');
+    it('references the skill', () => {
+      expect(planCommand).toMatch(/skill/i);
     });
 
-    it('stays under 5000 characters', () => {
-      expect(planCommand.length).toBeLessThanOrEqual(5000);
+    it('is under 500 characters (thin wrapper)', () => {
+      expect(planCommand.length).toBeLessThanOrEqual(500);
     });
 
-    // --- Semantic enrichment (6pwy) ---
-    it('references npx ca search for semantic retrieval', () => {
-      expect(planCommand).toContain('npx ca search');
-    });
-
-    it('instructs reading brainstorm output if available', () => {
-      expect(planCommand).toMatch(/brainstorm/i);
-    });
-
-    it('describes injecting memory items into plan context', () => {
-      // The template should mention using/incorporating retrieved lessons
-      expect(planCommand).toMatch(/lesson|memory item|retrieved|relevant/i);
-    });
-
-    // --- Agent team spawning (ju7p) ---
-    it('references repo-analyst agent', () => {
-      expect(planCommand).toMatch(/repo.analyst/i);
-    });
-
-    it('references memory-analyst agent', () => {
-      expect(planCommand).toMatch(/memory.analyst/i);
-    });
-
-    it('describes spawning research agent team', () => {
-      // Should mention spawning/launching agents as a team
-      expect(planCommand).toMatch(/spawn|launch|start/i);
-    });
-
-    it('describes lead synthesis of research findings', () => {
-      expect(planCommand).toMatch(/synthe|consolidat|combin/i);
-    });
-
-    // --- Beads task creation (mgii) ---
-    it('references bd create for task creation', () => {
-      expect(planCommand).toContain('bd create');
-    });
-
-    it('references bd dep add for dependency mapping', () => {
-      expect(planCommand).toContain('bd dep add');
-    });
-
-    it('describes priority assignment', () => {
-      expect(planCommand).toMatch(/priority/i);
-    });
-
-    it('describes acceptance criteria for tasks', () => {
-      expect(planCommand).toMatch(/acceptance criteria|exit criteria|definition of done/i);
-    });
-
-    it('references dependency mapping between tasks', () => {
-      expect(planCommand).toMatch(/depend/i);
+    it('does NOT have ## Workflow section (content moved to skill)', () => {
+      expect(planCommand).not.toContain('## Workflow');
     });
   });
 
-  describe('plan SKILL.md template', () => {
+  describe('plan SKILL.md template (has detailed workflow)', () => {
     it('exists in PHASE_SKILLS', () => {
       expect(planSkill).toBeDefined();
     });
@@ -116,92 +68,91 @@ describe('Plan Phase Integration', () => {
       expect(planSkill).toContain('## Quality Criteria');
     });
 
+    it('stays under 6000 characters', () => {
+      expect(planSkill.length).toBeLessThanOrEqual(6000);
+    });
+
+    // --- Content that skill must have ---
     it('references npx ca search', () => {
       expect(planSkill).toContain('npx ca search');
     });
 
-    it('stays under 4000 characters', () => {
-      expect(planSkill.length).toBeLessThanOrEqual(4000);
+    it('references repo-analyst subagent', () => {
+      expect(planSkill).toMatch(/repo.analyst/i);
     });
 
-    // --- Plan-specific skill content ---
-    it('mentions research agents in methodology', () => {
-      expect(planSkill).toMatch(/repo.analyst|memory.analyst|research agent/i);
+    it('references memory-analyst subagent', () => {
+      expect(planSkill).toMatch(/memory.analyst/i);
     });
 
-    it('mentions beads task creation', () => {
-      expect(planSkill).toMatch(/bd create|beads/i);
+    it('describes spawning research subagents', () => {
+      expect(planSkill).toMatch(/spawn|launch|start/i);
     });
 
-    it('mentions dependency mapping', () => {
+    it('describes lead synthesis of research findings', () => {
+      expect(planSkill).toMatch(/synthe|consolidat|combin/i);
+    });
+
+    it('references bd create for task creation', () => {
+      expect(planSkill).toContain('bd create');
+    });
+
+    it('references dependency mapping', () => {
       expect(planSkill).toMatch(/depend/i);
     });
-  });
 
-  describe('supporting agent templates', () => {
-    it('repo-analyst exists', () => {
-      expect(repoAnalyst).toBeDefined();
+    it('describes acceptance criteria for tasks', () => {
+      expect(planSkill).toMatch(/acceptance criteria|exit criteria|definition of done/i);
     });
 
-    it('memory-analyst exists', () => {
-      expect(memoryAnalyst).toBeDefined();
+    it('contains POST-PLAN VERIFICATION', () => {
+      expect(planSkill).toContain('POST-PLAN VERIFICATION');
     });
 
-    it('repo-analyst has codebase exploration instructions', () => {
-      expect(repoAnalyst).toMatch(/codebase|repository|structure/i);
-    });
-
-    it('memory-analyst references npx ca search', () => {
-      expect(memoryAnalyst).toContain('npx ca search');
-    });
-  });
-
-  describe('review and compound blocking tasks', () => {
-    it('plan.md instructs creating a review blocking task', () => {
-      expect(planCommand).toMatch(/review/i);
-      expect(planCommand).toMatch(/bd create.*review|review.*bd create/is);
-    });
-
-    it('plan.md instructs creating a compound blocking task', () => {
-      expect(planCommand).toMatch(/compound/i);
-      expect(planCommand).toMatch(/bd create.*compound|compound.*bd create/is);
-    });
-
-    it('plan.md sets compound to depend on review', () => {
-      // compound blocked by review (review must finish before compound starts)
-      expect(planCommand).toMatch(/bd dep add.*compound.*review|compound.*depend.*review|review.*block.*compound/is);
-    });
-
-    it('plan.md sets review to depend on work tasks', () => {
-      // review blocked by work tasks
-      expect(planCommand).toMatch(/bd dep add.*review.*work|review.*depend.*work|work.*block.*review/is);
-    });
-
-    it('plan skill mentions review and compound as blocking tasks', () => {
+    it('mentions review and compound as blocking tasks', () => {
       expect(planSkill).toMatch(/review.*compound|compound.*review/is);
       expect(planSkill).toMatch(/block|depend/i);
     });
   });
 
-  describe('cross-template consistency', () => {
-    it('plan command references the same agents defined in AGENT_TEMPLATES', () => {
-      // If plan.md mentions repo-analyst, the agent template must exist
-      if (planCommand.match(/repo.analyst/i)) {
-        expect(AGENT_TEMPLATES['repo-analyst.md']).toBeDefined();
-      }
-      if (planCommand.match(/memory.analyst/i)) {
-        expect(AGENT_TEMPLATES['memory-analyst.md']).toBeDefined();
-      }
+  describe('supporting subagents', () => {
+    it('repo-analyst exists as thin agent wrapper', () => {
+      expect(AGENT_TEMPLATES['repo-analyst.md']).toBeDefined();
     });
 
-    it('plan skill and plan command both reference npx ca search', () => {
-      expect(planCommand).toContain('npx ca search');
+    it('memory-analyst exists as thin agent wrapper', () => {
+      expect(AGENT_TEMPLATES['memory-analyst.md']).toBeDefined();
+    });
+
+    it('repo-analyst exists as role skill', () => {
+      expect(AGENT_ROLE_SKILLS['repo-analyst']).toBeDefined();
+    });
+
+    it('memory-analyst exists as role skill', () => {
+      expect(AGENT_ROLE_SKILLS['memory-analyst']).toBeDefined();
+    });
+
+    it('repo-analyst role skill has codebase exploration instructions', () => {
+      expect(AGENT_ROLE_SKILLS['repo-analyst']).toMatch(/codebase|repository|structure/i);
+    });
+
+    it('memory-analyst role skill references npx ca search', () => {
+      expect(AGENT_ROLE_SKILLS['memory-analyst']).toContain('npx ca search');
+    });
+  });
+
+  describe('cross-template consistency', () => {
+    it('plan skill references npx ca search', () => {
       expect(planSkill).toContain('npx ca search');
     });
 
-    it('plan skill and plan command both reference beads', () => {
-      expect(planCommand).toMatch(/\bbd\b/);
+    it('plan skill references beads (bd)', () => {
       expect(planSkill).toMatch(/\bbd\b|beads/i);
+    });
+
+    it('plan skill and agents reference same subagents', () => {
+      expect(AGENT_TEMPLATES['repo-analyst.md']).toBeDefined();
+      expect(AGENT_TEMPLATES['memory-analyst.md']).toBeDefined();
     });
   });
 });

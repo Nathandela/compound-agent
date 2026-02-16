@@ -1,29 +1,24 @@
 import { describe, it, expect } from 'vitest';
 import { WORKFLOW_COMMANDS } from './commands.js';
 import { PHASE_SKILLS } from './skills.js';
-import { AGENT_TEMPLATES } from './agents.js';
+import { AGENT_ROLE_SKILLS } from './agent-role-skills.js';
 
 /**
  * Compound phase integration tests.
  *
- * Verifies the compound.md command, compound SKILL.md, and compound agents
- * (context-analyzer, lesson-extractor, pattern-matcher, solution-writer)
- * form a complete, well-integrated compound phase with multi-agent analysis,
- * team coordination, quality filters, and memory capture.
+ * After v1.2.6 refactor:
+ * - compound.md command is a thin wrapper (< 500 chars) referencing the skill
+ * - compound SKILL.md absorbs the detailed workflow: AgentTeam spawning,
+ *   team coordination via SendMessage, quality filters, severity rubric,
+ *   type classification, supersedes/related linking, FINAL GATE
+ * - 4 compound agents + compounding are now AgentTeam role skills (not agent templates)
  */
 
 describe('Compound Phase Integration', () => {
   const compoundCommand = WORKFLOW_COMMANDS['compound.md'];
   const compoundSkill = PHASE_SKILLS['compound'];
 
-  // All 4 compound agents
-  const contextAnalyzer = AGENT_TEMPLATES['context-analyzer.md'];
-  const lessonExtractor = AGENT_TEMPLATES['lesson-extractor.md'];
-  const patternMatcher = AGENT_TEMPLATES['pattern-matcher.md'];
-  const solutionWriter = AGENT_TEMPLATES['solution-writer.md'];
-
-  describe('compound.md command template', () => {
-    // --- Structural requirements ---
+  describe('compound.md command (thin wrapper)', () => {
     it('exists in WORKFLOW_COMMANDS', () => {
       expect(compoundCommand).toBeDefined();
     });
@@ -33,99 +28,20 @@ describe('Compound Phase Integration', () => {
       expect(compoundCommand).toContain('$ARGUMENTS');
     });
 
-    it('has ## Workflow section', () => {
-      expect(compoundCommand).toContain('## Workflow');
+    it('references the skill', () => {
+      expect(compoundCommand).toMatch(/skill/i);
     });
 
-    it('stays under 5000 characters', () => {
-      expect(compoundCommand.length).toBeLessThanOrEqual(5000);
+    it('is under 500 characters (thin wrapper)', () => {
+      expect(compoundCommand.length).toBeLessThanOrEqual(500);
     });
 
-    // --- Memory enrichment ---
-    it('references npx ca search for semantic retrieval', () => {
-      expect(compoundCommand).toContain('npx ca search');
-    });
-
-    it('references npx ca learn for storing items', () => {
-      expect(compoundCommand).toContain('npx ca learn');
-    });
-
-    // --- Agent team spawning ---
-    it('describes spawning analysis agent team', () => {
-      expect(compoundCommand).toMatch(/spawn|launch|start/i);
-      expect(compoundCommand).toMatch(/agent|team|analyst|analyzer/i);
-    });
-
-    it('references all 4 compound agent roles', () => {
-      expect(compoundCommand).toMatch(/context.analyzer/i);
-      expect(compoundCommand).toMatch(/lesson.extractor/i);
-      expect(compoundCommand).toMatch(/pattern.matcher/i);
-      expect(compoundCommand).toMatch(/solution.writer/i);
-    });
-
-    it('references compounding subagent for CCT synthesis delegation', () => {
-      expect(compoundCommand).toMatch(/compounding/i);
-      expect(compoundCommand).toMatch(/cct-patterns\.jsonl|synthesis|synthesize/i);
-    });
-
-    // --- Team coordination ---
-    it('describes agents communicating and sharing findings', () => {
-      expect(compoundCommand).toMatch(
-        /communicat.*agent|agent.*communicat|share.*finding|finding.*share|direct.*message|message.*direct|pass.*result|result.*pass/i
-      );
-    });
-
-    // --- Quality filter ---
-    it('describes novelty check', () => {
-      expect(compoundCommand).toMatch(/novel/i);
-    });
-
-    it('describes specificity check', () => {
-      expect(compoundCommand).toMatch(/specific/i);
-    });
-
-    it('does NOT reference actionability gate', () => {
-      // Compound phase uses novelty + specificity, NOT actionability
-      expect(compoundCommand).not.toMatch(/actionab/i);
-    });
-
-    // --- Storage ---
-    it('references npx ca learn for storing approved items', () => {
-      expect(compoundCommand).toContain('npx ca learn');
-    });
-
-    // --- Supersedes/related links ---
-    it('describes setting supersedes and/or related links', () => {
-      expect(compoundCommand).toMatch(/supersede|related/i);
-    });
-
-    // --- User confirmation ---
-    it('describes user confirmation only for high-severity items', () => {
-      expect(compoundCommand).toMatch(/confirm.*user|user.*confirm|user.*approv|approv.*user|ask.*user/i);
-      expect(compoundCommand).toMatch(/high.severity|critical|important|significant/i);
-    });
-
-    // --- Beads integration ---
-    it('references beads integration', () => {
-      expect(compoundCommand).toMatch(/\bbd\b/);
-    });
-
-    it('contains FINAL GATE for epic closure', () => {
-      expect(compoundCommand).toContain('FINAL GATE');
-      expect(compoundCommand).toContain('ca verify-gates');
-    });
-
-    // --- Type classification ---
-    it('references type classification', () => {
-      expect(compoundCommand).toMatch(/type.*classif|classif.*type|classify/i);
-      expect(compoundCommand).toMatch(/lesson/i);
-      expect(compoundCommand).toMatch(/solution/i);
-      expect(compoundCommand).toMatch(/pattern/i);
-      expect(compoundCommand).toMatch(/preference/i);
+    it('does NOT have ## Workflow section (content moved to skill)', () => {
+      expect(compoundCommand).not.toContain('## Workflow');
     });
   });
 
-  describe('compound SKILL.md template', () => {
+  describe('compound SKILL.md template (absorbs detailed workflow)', () => {
     it('exists in PHASE_SKILLS', () => {
       expect(compoundSkill).toBeDefined();
     });
@@ -152,40 +68,46 @@ describe('Compound Phase Integration', () => {
       expect(compoundSkill).toContain('## Quality Criteria');
     });
 
-    it('references npx ca search', () => {
-      expect(compoundSkill).toContain('npx ca search');
+    it('stays under 6000 characters', () => {
+      expect(compoundSkill.length).toBeLessThanOrEqual(6000);
     });
 
-    it('references npx ca learn', () => {
-      expect(compoundSkill).toContain('npx ca learn');
+    // --- Absorbed from command: AgentTeam deployment ---
+    it('describes AgentTeam deployment', () => {
+      expect(compoundSkill).toMatch(/AgentTeam/);
     });
 
-    it('stays under 4000 characters', () => {
-      expect(compoundSkill.length).toBeLessThanOrEqual(4000);
+    it('describes SendMessage for team coordination', () => {
+      expect(compoundSkill).toMatch(/SendMessage/);
     });
 
-    // --- Compound-specific skill content ---
-    it('describes spawning analysis team', () => {
-      expect(compoundSkill).toMatch(/spawn|launch|parallel/i);
-      expect(compoundSkill).toMatch(/agent|team|analyst|analyzer/i);
+    it('references all 4 compound agent roles', () => {
+      expect(compoundSkill).toMatch(/context.analyzer/i);
+      expect(compoundSkill).toMatch(/lesson.extractor/i);
+      expect(compoundSkill).toMatch(/pattern.matcher/i);
+      expect(compoundSkill).toMatch(/solution.writer/i);
     });
 
-    it('references compounding subagent for CCT synthesis delegation', () => {
+    it('references compounding for CCT synthesis delegation', () => {
       expect(compoundSkill).toMatch(/compounding/i);
       expect(compoundSkill).toMatch(/cct-patterns\.jsonl|synthesis|synthesize/i);
     });
 
-    it('describes agent communication pattern', () => {
-      expect(compoundSkill).toMatch(
-        /communicat.*agent|agent.*communicat|share.*finding|pass.*result|pipeline|chain/i
-      );
+    // --- Absorbed from command: Memory ---
+    it('references npx ca search for semantic retrieval', () => {
+      expect(compoundSkill).toContain('npx ca search');
     });
 
-    it('describes novelty quality filter', () => {
+    it('references npx ca learn for storing items', () => {
+      expect(compoundSkill).toContain('npx ca learn');
+    });
+
+    // --- Absorbed from command: Quality filter ---
+    it('describes novelty check', () => {
       expect(compoundSkill).toMatch(/novel/i);
     });
 
-    it('describes specificity quality filter', () => {
+    it('describes specificity check', () => {
       expect(compoundSkill).toMatch(/specific/i);
     });
 
@@ -193,218 +115,177 @@ describe('Compound Phase Integration', () => {
       expect(compoundSkill).not.toMatch(/actionab/i);
     });
 
-    it('describes supersedes/related linking', () => {
+    // --- Absorbed from command: Supersedes/related links ---
+    it('describes setting supersedes and/or related links', () => {
       expect(compoundSkill).toMatch(/supersede|related/i);
     });
 
-    it('describes user confirmation for high-severity only', () => {
-      expect(compoundSkill).toMatch(/confirm.*user|user.*confirm|user.*approv|ask.*user/i);
+    // --- Absorbed from command: User confirmation ---
+    it('describes user confirmation only for high-severity items', () => {
+      expect(compoundSkill).toMatch(/confirm.*user|user.*confirm|user.*approv|approv.*user|ask.*user/i);
       expect(compoundSkill).toMatch(/high.severity|critical|important|significant/i);
     });
 
+    // --- Absorbed from command: Beads integration ---
+    it('references beads integration', () => {
+      expect(compoundSkill).toMatch(/\bbd\b/);
+    });
+
+    // --- Absorbed from command: FINAL GATE ---
+    it('contains FINAL GATE for epic closure', () => {
+      expect(compoundSkill).toContain('FINAL GATE');
+      expect(compoundSkill).toContain('ca verify-gates');
+    });
+
+    // --- Absorbed from command: Type classification ---
     it('references type classification', () => {
-      expect(compoundSkill).toMatch(/type.*classif|classif.*type|lesson|solution|pattern|preference/i);
-    });
-  });
-
-  describe('compound agent templates', () => {
-    const compoundAgents = [
-      { key: 'context-analyzer.md', ref: contextAnalyzer, name: 'context-analyzer' },
-      { key: 'lesson-extractor.md', ref: lessonExtractor, name: 'lesson-extractor' },
-      { key: 'pattern-matcher.md', ref: patternMatcher, name: 'pattern-matcher' },
-      { key: 'solution-writer.md', ref: solutionWriter, name: 'solution-writer' },
-    ];
-
-    for (const { key, ref, name } of compoundAgents) {
-      describe(`${key}`, () => {
-        it('exists in AGENT_TEMPLATES', () => {
-          expect(ref).toBeDefined();
-        });
-
-        it('has proper YAML frontmatter with name, description, model', () => {
-          expect(ref.trimStart()).toMatch(/^---/);
-          const frontmatter = ref.split('---')[1];
-          expect(frontmatter).toMatch(/name:/);
-          expect(frontmatter).toMatch(/description:/);
-          expect(frontmatter).toMatch(/model:/);
-        });
-
-        it('has a ## Role section', () => {
-          expect(ref).toContain('## Role');
-        });
-
-        it('has an ## Output Format section', () => {
-          expect(ref).toContain('## Output Format');
-        });
-
-        it('stays under 4000 characters', () => {
-          expect(ref.length).toBeLessThanOrEqual(4000);
-        });
-      });
-    }
-
-    it('each compound agent contains collaboration/communication instructions', () => {
-      const compoundAgentsList = [
-        contextAnalyzer,
-        lessonExtractor,
-        patternMatcher,
-        solutionWriter,
-      ];
-      for (const agent of compoundAgentsList) {
-        expect(agent).toMatch(
-          /share.*finding|communicat|direct.*message|message.*other.*agent|collaborate|findings.*agent|pass.*result|result.*to|pipeline/i
-        );
-      }
+      expect(compoundSkill).toMatch(/type.*classif|classif.*type|classify/i);
+      expect(compoundSkill).toMatch(/lesson/i);
+      expect(compoundSkill).toMatch(/solution/i);
+      expect(compoundSkill).toMatch(/pattern/i);
+      expect(compoundSkill).toMatch(/preference/i);
     });
 
-    // --- Agent-specific content checks ---
-    describe('context-analyzer.md specifics', () => {
-      it('references git diff or git log', () => {
-        expect(contextAnalyzer).toMatch(/git diff|git log/i);
-      });
-
-      it('references test output or test results', () => {
-        expect(contextAnalyzer).toMatch(/test.*output|test.*result/i);
-      });
+    // --- Absorbed from command: Severity rubric ---
+    it('contains severity rubric', () => {
+      expect(compoundSkill).toMatch(/high/i);
+      expect(compoundSkill).toMatch(/medium/i);
+      expect(compoundSkill).toMatch(/low/i);
     });
 
-    describe('lesson-extractor.md specifics', () => {
-      it('references corrections', () => {
-        expect(lessonExtractor).toMatch(/correction/i);
-      });
-
-      it('references mistakes', () => {
-        expect(lessonExtractor).toMatch(/mistake/i);
-      });
-
-      it('references discoveries', () => {
-        expect(lessonExtractor).toMatch(/discover/i);
-      });
-
-      it('does NOT require actionable as hard gate', () => {
-        // Should not mandate "specific and actionable" as joint requirement
-        expect(lessonExtractor).not.toMatch(/specific and actionable/i);
-      });
-
-      it('uses soft language for actionability preference', () => {
-        // Should say "prefer actionable" rather than mandating it
-        expect(lessonExtractor).toMatch(/prefer.*actionable/i);
-      });
+    // --- Anti-MEMORY.md ---
+    it('warns against MEMORY.md', () => {
+      expect(compoundSkill).toMatch(/NOT.*MEMORY\.md/);
     });
 
-    describe('pattern-matcher.md specifics', () => {
-      it('references npx ca search', () => {
-        expect(patternMatcher).toContain('npx ca search');
-      });
-
-      it('classifies as New/Duplicate/Reinforcement/Contradiction', () => {
-        expect(patternMatcher).toMatch(/New/);
-        expect(patternMatcher).toMatch(/Duplicate/);
-        expect(patternMatcher).toMatch(/Reinforcement/);
-        expect(patternMatcher).toMatch(/Contradiction/);
-      });
-    });
-
-    describe('solution-writer.md specifics', () => {
-      it('references npx ca learn', () => {
-        expect(solutionWriter).toContain('npx ca learn');
-      });
-
-      it('references quality filters', () => {
-        expect(solutionWriter).toMatch(/quality.*filter|filter|novel|specific/i);
-      });
-
-      it('references severity assignment', () => {
-        expect(solutionWriter).toMatch(/severity/i);
-      });
-    });
-  });
-
-  describe('severity rubric', () => {
-    it('compound command contains severity rubric', () => {
-      expect(compoundCommand).toMatch(/high/i);
-      expect(compoundCommand).toMatch(/medium/i);
-      expect(compoundCommand).toMatch(/low/i);
-    });
-
-    it('compound skill references severity classification', () => {
-      expect(compoundSkill).toMatch(/severity|high.*medium.*low|classify/i);
-    });
-  });
-
-  describe('cross-template consistency', () => {
-    it('command references agents that exist in AGENT_TEMPLATES (all 4 compound agents)', () => {
-      expect(AGENT_TEMPLATES['context-analyzer.md']).toBeDefined();
-      expect(AGENT_TEMPLATES['lesson-extractor.md']).toBeDefined();
-      expect(AGENT_TEMPLATES['pattern-matcher.md']).toBeDefined();
-      expect(AGENT_TEMPLATES['solution-writer.md']).toBeDefined();
-    });
-
-    it('skill and command both reference npx ca search', () => {
-      expect(compoundCommand).toContain('npx ca search');
-      expect(compoundSkill).toContain('npx ca search');
-    });
-
-    it('skill and command both reference npx ca learn', () => {
-      expect(compoundCommand).toContain('npx ca learn');
-      expect(compoundSkill).toContain('npx ca learn');
-    });
-
-    it('skill and command both reference beads (bd)', () => {
-      expect(compoundCommand).toMatch(/\bbd\b/);
-      expect(compoundSkill).toMatch(/\bbd\b|beads/i);
-    });
-
-    it('skill and command both describe team spawning', () => {
-      expect(compoundCommand).toMatch(/spawn|launch|start/i);
-      expect(compoundSkill).toMatch(/spawn|launch|parallel/i);
-    });
-
-    it('skill and command both describe quality filter', () => {
-      expect(compoundCommand).toMatch(/novel/i);
-      expect(compoundSkill).toMatch(/novel/i);
-      expect(compoundCommand).toMatch(/specific/i);
-      expect(compoundSkill).toMatch(/specific/i);
-    });
-
-    it('skill and command both describe supersedes/related linking', () => {
-      expect(compoundCommand).toMatch(/supersede|related/i);
-      expect(compoundSkill).toMatch(/supersede|related/i);
-    });
-  });
-
-  describe('branch-contract checks', () => {
-    it('compound command workflow describes parallel agent spawning', () => {
-      const workflowMatch = compoundCommand.match(/## Workflow[^]*?(?=##|$)/i);
-      expect(workflowMatch).not.toBeNull();
-      const workflow = workflowMatch![0];
-      expect(workflow).toMatch(/spawn|launch|parallel/i);
-    });
-
-    it('compound command workflow describes quality filter BEFORE storage', () => {
-      const workflowMatch = compoundCommand.match(/## Workflow[^]*?(?=##|$)/i);
-      expect(workflowMatch).not.toBeNull();
-      const workflow = workflowMatch![0];
-      // Quality filter (novelty/specificity) should appear before npx ca learn
-      const filterPos = workflow.search(/novel|specific|quality.*filter|filter/i);
-      const capturePos = workflow.search(/npx ca learn|store|captur/i);
-      expect(filterPos).toBeGreaterThan(-1);
-      expect(capturePos).toBeGreaterThan(-1);
-      expect(filterPos).toBeLessThan(capturePos);
-    });
-
-    it('compound skill methodology describes team spawning', () => {
+    // --- Methodology: parallel agent spawning ---
+    it('methodology describes parallel agent spawning', () => {
       const methodologyMatch = compoundSkill.match(/## Methodology[^]*?(?=##|$)/i);
       expect(methodologyMatch).not.toBeNull();
       const methodology = methodologyMatch![0];
       expect(methodology).toMatch(/spawn|launch|parallel/i);
     });
 
-    it('compound skill methodology describes quality filter', () => {
+    // --- Methodology: quality filter before storage ---
+    it('methodology describes quality filter BEFORE storage', () => {
       const methodologyMatch = compoundSkill.match(/## Methodology[^]*?(?=##|$)/i);
       expect(methodologyMatch).not.toBeNull();
       const methodology = methodologyMatch![0];
-      expect(methodology).toMatch(/novel|specific|quality.*filter|filter/i);
+      const filterPos = methodology.search(/novel|specific|quality.*filter|filter/i);
+      const capturePos = methodology.search(/npx ca learn|store|captur/i);
+      expect(filterPos).toBeGreaterThan(-1);
+      expect(capturePos).toBeGreaterThan(-1);
+      expect(filterPos).toBeLessThan(capturePos);
+    });
+  });
+
+  describe('compound agent role skills', () => {
+    const compoundAgentKeys = [
+      'context-analyzer',
+      'lesson-extractor',
+      'pattern-matcher',
+      'solution-writer',
+      'compounding',
+    ];
+
+    for (const key of compoundAgentKeys) {
+      describe(`${key} role skill`, () => {
+        it('exists in AGENT_ROLE_SKILLS', () => {
+          expect(AGENT_ROLE_SKILLS[key]).toBeDefined();
+        });
+
+        it('has YAML frontmatter with name and description (no model)', () => {
+          const content = AGENT_ROLE_SKILLS[key];
+          expect(content.trimStart()).toMatch(/^---/);
+          const frontmatter = content.split('---')[1];
+          expect(frontmatter).toMatch(/name:/);
+          expect(frontmatter).toMatch(/description:/);
+          expect(frontmatter).not.toMatch(/model:/);
+        });
+
+        it('has ## Role section', () => {
+          expect(AGENT_ROLE_SKILLS[key]).toContain('## Role');
+        });
+
+        it('has ## Output Format section', () => {
+          expect(AGENT_ROLE_SKILLS[key]).toContain('## Output Format');
+        });
+
+        it('mentions AgentTeam deployment', () => {
+          expect(AGENT_ROLE_SKILLS[key]).toMatch(/AgentTeam/);
+        });
+      });
+    }
+
+    // --- Agent-specific content checks ---
+    describe('context-analyzer specifics', () => {
+      it('references git diff or git log', () => {
+        expect(AGENT_ROLE_SKILLS['context-analyzer']).toMatch(/git diff|git log/i);
+      });
+
+      it('references test output or test results', () => {
+        expect(AGENT_ROLE_SKILLS['context-analyzer']).toMatch(/test.*output|test.*result/i);
+      });
+    });
+
+    describe('lesson-extractor specifics', () => {
+      it('references corrections', () => {
+        expect(AGENT_ROLE_SKILLS['lesson-extractor']).toMatch(/correction/i);
+      });
+
+      it('references mistakes', () => {
+        expect(AGENT_ROLE_SKILLS['lesson-extractor']).toMatch(/mistake/i);
+      });
+
+      it('references discoveries', () => {
+        expect(AGENT_ROLE_SKILLS['lesson-extractor']).toMatch(/discover/i);
+      });
+    });
+
+    describe('pattern-matcher specifics', () => {
+      it('references npx ca search', () => {
+        expect(AGENT_ROLE_SKILLS['pattern-matcher']).toContain('npx ca search');
+      });
+
+      it('classifies as New/Duplicate/Reinforcement/Contradiction', () => {
+        const pm = AGENT_ROLE_SKILLS['pattern-matcher'];
+        expect(pm).toMatch(/New/);
+        expect(pm).toMatch(/Duplicate/);
+        expect(pm).toMatch(/Reinforcement/);
+        expect(pm).toMatch(/Contradiction/);
+      });
+    });
+
+    describe('solution-writer specifics', () => {
+      it('references npx ca learn', () => {
+        expect(AGENT_ROLE_SKILLS['solution-writer']).toContain('npx ca learn');
+      });
+
+      it('references quality filters', () => {
+        expect(AGENT_ROLE_SKILLS['solution-writer']).toMatch(/quality.*filter|filter|novel|specific/i);
+      });
+
+      it('references severity assignment', () => {
+        expect(AGENT_ROLE_SKILLS['solution-writer']).toMatch(/severity/i);
+      });
+    });
+  });
+
+  describe('cross-template consistency', () => {
+    it('compound skill references role skills that exist', () => {
+      expect(AGENT_ROLE_SKILLS['context-analyzer']).toBeDefined();
+      expect(AGENT_ROLE_SKILLS['lesson-extractor']).toBeDefined();
+      expect(AGENT_ROLE_SKILLS['pattern-matcher']).toBeDefined();
+      expect(AGENT_ROLE_SKILLS['solution-writer']).toBeDefined();
+    });
+
+    it('compound skill references npx ca search and npx ca learn', () => {
+      expect(compoundSkill).toContain('npx ca search');
+      expect(compoundSkill).toContain('npx ca learn');
+    });
+
+    it('compound skill references beads (bd)', () => {
+      expect(compoundSkill).toMatch(/\bbd\b/);
     });
   });
 });

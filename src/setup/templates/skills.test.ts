@@ -48,12 +48,12 @@ describe('PHASE_SKILLS', () => {
     }
   });
 
-  it('no template exceeds 4000 characters', () => {
+  it('no template exceeds 6000 characters', () => {
     for (const [key, content] of Object.entries(PHASE_SKILLS)) {
       expect(
         content.length,
-        `${key} is ${content.length} chars (max 4000)`,
-      ).toBeLessThanOrEqual(4000);
+        `${key} is ${content.length} chars (max 6000)`,
+      ).toBeLessThanOrEqual(6000);
     }
   });
 
@@ -62,6 +62,8 @@ describe('PHASE_SKILLS', () => {
       expect(content, `${key} missing ## Quality Criteria`).toContain('## Quality Criteria');
     }
   });
+
+  // --- Phase gate assertions (preserved from v1.2.5) ---
 
   it('plan skill contains POST-PLAN VERIFICATION gate', () => {
     expect(PHASE_SKILLS.plan).toContain('POST-PLAN VERIFICATION');
@@ -84,5 +86,40 @@ describe('PHASE_SKILLS', () => {
     expect(PHASE_SKILLS.compound).toContain('FINAL GATE');
     expect(PHASE_SKILLS.compound).toMatch(/NOT.*MEMORY\.md/);
     expect(PHASE_SKILLS.compound).toContain('ca verify-gates');
+  });
+
+  // --- New v1.2.6 assertions: skills absorb detailed workflow ---
+
+  it('work skill contains AgentTeam deployment language', () => {
+    expect(PHASE_SKILLS.work).toMatch(/AgentTeam/);
+  });
+
+  it('work skill contains parallelization instructions', () => {
+    expect(PHASE_SKILLS.work).toMatch(/paralleliz/i);
+  });
+
+  it('work skill references bd ready and bd close for beads lifecycle', () => {
+    expect(PHASE_SKILLS.work).toContain('bd ready');
+    expect(PHASE_SKILLS.work).toContain('bd close');
+  });
+
+  it('work skill references implementation-reviewer', () => {
+    expect(PHASE_SKILLS.work).toContain('implementation-reviewer');
+  });
+
+  it('review skill contains AgentTeam deployment language', () => {
+    expect(PHASE_SKILLS.review).toMatch(/AgentTeam/);
+  });
+
+  it('review skill contains adaptive tier references', () => {
+    expect(PHASE_SKILLS.review).toMatch(/<100 lines/);
+  });
+
+  it('compound skill contains AgentTeam deployment language', () => {
+    expect(PHASE_SKILLS.compound).toMatch(/AgentTeam/);
+  });
+
+  it('compound skill contains SendMessage for team coordination', () => {
+    expect(PHASE_SKILLS.compound).toMatch(/SendMessage/);
   });
 });

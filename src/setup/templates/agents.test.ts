@@ -1,37 +1,38 @@
 import { describe, it, expect } from 'vitest';
 import { AGENT_TEMPLATES } from './agents.js';
 
-const EXPECTED_FILENAMES = [
+/** 6 thin subagent wrappers + 2 external reviewers = 8 total. */
+const THIN_WRAPPER_FILENAMES = [
   'repo-analyst.md',
   'memory-analyst.md',
-  'security-reviewer.md',
-  'architecture-reviewer.md',
-  'performance-reviewer.md',
-  'test-coverage-reviewer.md',
-  'simplicity-reviewer.md',
-  'context-analyzer.md',
-  'lesson-extractor.md',
-  'pattern-matcher.md',
-  'solution-writer.md',
-  'test-writer.md',
-  'implementer.md',
-  'compounding.md',
   'audit.md',
   'doc-gardener.md',
   'cct-subagent.md',
   'drift-detector.md',
+];
+
+const EXTERNAL_REVIEWER_FILENAMES = [
   'external-reviewer-gemini.md',
   'external-reviewer-codex.md',
 ];
 
+const ALL_FILENAMES = [...THIN_WRAPPER_FILENAMES, ...EXTERNAL_REVIEWER_FILENAMES];
+
 describe('AGENT_TEMPLATES', () => {
-  it('has exactly 20 entries', () => {
-    expect(Object.keys(AGENT_TEMPLATES)).toHaveLength(20);
+  it('has exactly 8 entries (6 thin wrappers + 2 external reviewers)', () => {
+    expect(Object.keys(AGENT_TEMPLATES)).toHaveLength(8);
   });
 
   it('every key ends with .md', () => {
     for (const key of Object.keys(AGENT_TEMPLATES)) {
       expect(key).toMatch(/\.md$/);
+    }
+  });
+
+  it('contains all 8 expected filenames', () => {
+    const keys = Object.keys(AGENT_TEMPLATES);
+    for (const filename of ALL_FILENAMES) {
+      expect(keys, `missing ${filename}`).toContain(filename);
     }
   });
 
@@ -51,28 +52,47 @@ describe('AGENT_TEMPLATES', () => {
     }
   });
 
-  it('every template has a ## Role section', () => {
-    for (const [key, content] of Object.entries(AGENT_TEMPLATES)) {
-      expect(content, `${key} missing ## Role`).toMatch(/## Role/);
+  describe('thin subagent wrappers', () => {
+    for (const filename of THIN_WRAPPER_FILENAMES) {
+      describe(filename, () => {
+        it('references "role skill"', () => {
+          expect(AGENT_TEMPLATES[filename]).toMatch(/role skill/i);
+        });
+
+        it('does NOT have a ## Instructions section (thin wrapper)', () => {
+          expect(AGENT_TEMPLATES[filename]).not.toMatch(/## Instructions/);
+        });
+
+        it('stays under 500 characters', () => {
+          expect(
+            AGENT_TEMPLATES[filename].length,
+            `${filename} is ${AGENT_TEMPLATES[filename].length} chars`,
+          ).toBeLessThanOrEqual(500);
+        });
+      });
     }
   });
 
-  it('every template has a ## Instructions section', () => {
-    for (const [key, content] of Object.entries(AGENT_TEMPLATES)) {
-      expect(content, `${key} missing ## Instructions`).toMatch(/## Instructions/);
-    }
-  });
+  describe('external reviewer agents', () => {
+    for (const filename of EXTERNAL_REVIEWER_FILENAMES) {
+      describe(filename, () => {
+        it('has a ## Role section', () => {
+          expect(AGENT_TEMPLATES[filename], `${filename} missing ## Role`).toContain('## Role');
+        });
 
-  it('contains all 20 expected filenames', () => {
-    const keys = Object.keys(AGENT_TEMPLATES);
-    for (const filename of EXPECTED_FILENAMES) {
-      expect(keys, `missing ${filename}`).toContain(filename);
-    }
-  });
+        it('has a ## Instructions section', () => {
+          expect(AGENT_TEMPLATES[filename], `${filename} missing ## Instructions`).toContain(
+            '## Instructions',
+          );
+        });
 
-  it('no template exceeds 4000 characters', () => {
-    for (const [key, content] of Object.entries(AGENT_TEMPLATES)) {
-      expect(content.length, `${key} is ${content.length} chars`).toBeLessThanOrEqual(4000);
+        it('stays under 4000 characters', () => {
+          expect(
+            AGENT_TEMPLATES[filename].length,
+            `${filename} is ${AGENT_TEMPLATES[filename].length} chars`,
+          ).toBeLessThanOrEqual(4000);
+        });
+      });
     }
   });
 });

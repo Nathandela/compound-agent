@@ -30,13 +30,14 @@ import {
   createPluginManifest,
   ensureClaudeMdReference,
   GENERATED_MARKER,
+  installAgentRoleSkills,
   installAgentTemplates,
   installPhaseSkills,
   installWorkflowCommands,
   updateAgentsMd,
 } from './primitives.js';
 import { LEGACY_ROOT_SLASH_COMMANDS } from './templates.js';
-import { AGENT_TEMPLATES, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
+import { AGENT_TEMPLATES, AGENT_ROLE_SKILLS, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
 
 /** Result of one-shot setup */
 interface SetupResult {
@@ -117,7 +118,10 @@ export async function runSetup(options: { skipModel?: boolean }): Promise<SetupR
   // 7. Install phase skills
   await installPhaseSkills(repoRoot);
 
-  // 6. Configure Claude settings (hooks in settings.json, MCP in .mcp.json)
+  // 8. Install agent role skills
+  await installAgentRoleSkills(repoRoot);
+
+  // 9. Configure Claude settings (hooks in settings.json, MCP in .mcp.json)
   const { hooks, mcpServer } = await configureClaudeSettings(repoRoot);
 
   // 7. Download model (unless skipped)
@@ -275,6 +279,9 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{ up
   }
   for (const [phase, content] of Object.entries(PHASE_SKILLS)) {
     await processFile(join(repoRoot, '.claude', 'skills', 'compound', phase, 'SKILL.md'), content);
+  }
+  for (const [name, content] of Object.entries(AGENT_ROLE_SKILLS)) {
+    await processFile(join(repoRoot, '.claude', 'skills', 'compound', 'agents', name, 'SKILL.md'), content);
   }
 
   // Migration: clean up legacy root-level slash commands from v1.0

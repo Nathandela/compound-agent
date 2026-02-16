@@ -15,6 +15,7 @@ import { installPreCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
   ensureClaudeMdReference,
+  installAgentRoleSkills,
   installAgentTemplates,
   installPhaseSkills,
   installWorkflowCommands,
@@ -69,6 +70,7 @@ async function initAction(
     await installAgentTemplates(repoRoot);
     await installWorkflowCommands(repoRoot);
     await installPhaseSkills(repoRoot);
+    await installAgentRoleSkills(repoRoot);
   }
 
   let hookResult: HookInstallResult | null = null;

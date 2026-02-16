@@ -1,29 +1,23 @@
 import { describe, it, expect } from 'vitest';
 import { WORKFLOW_COMMANDS } from './commands.js';
 import { PHASE_SKILLS } from './skills.js';
-import { AGENT_TEMPLATES } from './agents.js';
+import { AGENT_ROLE_SKILLS } from './agent-role-skills.js';
 
 /**
  * Review phase integration tests.
  *
- * Verifies the review.md command, review SKILL.md, and reviewer agents
- * form a complete, well-integrated review phase with multi-agent review,
- * inter-communication, severity classification, and mandatory gate.
+ * After v1.2.6 refactor:
+ * - review.md command is a thin wrapper (< 500 chars) referencing the skill
+ * - review SKILL.md absorbs the detailed workflow: AgentTeam spawning,
+ *   inter-communication, severity classification, adaptive tiers, gates
+ * - 5 reviewer agents are now AgentTeam role skills (not agent templates)
  */
 
 describe('Review Phase Integration', () => {
   const reviewCommand = WORKFLOW_COMMANDS['review.md'];
   const reviewSkill = PHASE_SKILLS['review'];
 
-  // All 5 reviewer agents
-  const securityReviewer = AGENT_TEMPLATES['security-reviewer.md'];
-  const architectureReviewer = AGENT_TEMPLATES['architecture-reviewer.md'];
-  const performanceReviewer = AGENT_TEMPLATES['performance-reviewer.md'];
-  const testCoverageReviewer = AGENT_TEMPLATES['test-coverage-reviewer.md'];
-  const simplicityReviewer = AGENT_TEMPLATES['simplicity-reviewer.md'];
-
-  describe('review.md command template', () => {
-    // --- Structural requirements ---
+  describe('review.md command (thin wrapper)', () => {
     it('exists in WORKFLOW_COMMANDS', () => {
       expect(reviewCommand).toBeDefined();
     });
@@ -33,90 +27,20 @@ describe('Review Phase Integration', () => {
       expect(reviewCommand).toContain('$ARGUMENTS');
     });
 
-    it('has ## Workflow section', () => {
-      expect(reviewCommand).toContain('## Workflow');
+    it('references the skill', () => {
+      expect(reviewCommand).toMatch(/skill/i);
     });
 
-    it('stays under 5000 characters', () => {
-      expect(reviewCommand.length).toBeLessThanOrEqual(5000);
+    it('is under 500 characters (thin wrapper)', () => {
+      expect(reviewCommand.length).toBeLessThanOrEqual(500);
     });
 
-    // --- Memory enrichment ---
-    it('references npx ca search for semantic retrieval', () => {
-      expect(reviewCommand).toContain('npx ca search');
-    });
-
-    it('references npx ca learn for novel findings', () => {
-      expect(reviewCommand).toContain('npx ca learn');
-    });
-
-    // --- Agent team spawning ---
-    it('describes spawning reviewer agent team', () => {
-      expect(reviewCommand).toMatch(/spawn|launch|start/i);
-      expect(reviewCommand).toMatch(/reviewer|review.*agent|agent.*review/i);
-    });
-
-    it('references all 5 reviewer perspectives', () => {
-      expect(reviewCommand).toMatch(/security/i);
-      expect(reviewCommand).toMatch(/architecture/i);
-      expect(reviewCommand).toMatch(/performance/i);
-      expect(reviewCommand).toMatch(/test.*coverage/i);
-      expect(reviewCommand).toMatch(/simplicity/i);
-    });
-
-    // --- Inter-communication ---
-    it('describes reviewer inter-communication', () => {
-      expect(reviewCommand).toMatch(
-        /communicat.*reviewer|reviewer.*communicat|share.*finding|finding.*share|direct.*message|message.*direct/i
-      );
-    });
-
-    // --- Severity classification ---
-    it('describes P1/P2/P3 severity classification', () => {
-      expect(reviewCommand).toMatch(/P1/);
-      expect(reviewCommand).toMatch(/P2/);
-      expect(reviewCommand).toMatch(/P3/);
-    });
-
-    // --- Mandatory gate ---
-    it('describes implementation-reviewer as mandatory gate', () => {
-      expect(reviewCommand).toMatch(/implementation.reviewer/i);
-      expect(reviewCommand).toMatch(/mandatory|final.*authority|gate|block/i);
-    });
-
-    // --- P1 findings -> beads ---
-    it('describes creating beads issues for P1 findings', () => {
-      expect(reviewCommand).toMatch(/bd create/);
-      expect(reviewCommand).toMatch(/P1.*bd|P1.*bead|P1.*issue|finding.*bd|finding.*bead/i);
-    });
-
-    // --- Quality gates ---
-    it('references running quality gates (tests + lint)', () => {
-      expect(reviewCommand).toMatch(/pnpm test|test.*suite|quality.*gate/i);
-    });
-
-    // --- Beads lifecycle ---
-    it('references beads integration', () => {
-      expect(reviewCommand).toMatch(/\bbd\b/);
-    });
-
-    // --- Memory: type=solution for review report ---
-    it('references type=solution for storing review report', () => {
-      expect(reviewCommand).toMatch(/type.*solution|type=solution/i);
-    });
-
-    // --- Slash-form /implementation-reviewer ---
-    it('uses /implementation-reviewer slash form', () => {
-      expect(reviewCommand).toMatch(/\/implementation-reviewer/);
-    });
-
-    it('contains PHASE GATE 4 at end of template', () => {
-      expect(reviewCommand).toContain('PHASE GATE 4');
-      expect(reviewCommand).toMatch(/implementation-reviewer.*APPROVED|APPROVED.*implementation-reviewer/i);
+    it('does NOT have ## Workflow section (content moved to skill)', () => {
+      expect(reviewCommand).not.toContain('## Workflow');
     });
   });
 
-  describe('review SKILL.md template', () => {
+  describe('review SKILL.md template (absorbs detailed workflow)', () => {
     it('exists in PHASE_SKILLS', () => {
       expect(reviewSkill).toBeDefined();
     });
@@ -143,7 +67,25 @@ describe('Review Phase Integration', () => {
       expect(reviewSkill).toContain('## Quality Criteria');
     });
 
-    it('references npx ca search', () => {
+    it('stays under 6000 characters', () => {
+      expect(reviewSkill.length).toBeLessThanOrEqual(6000);
+    });
+
+    // --- Absorbed from command: AgentTeam deployment ---
+    it('describes AgentTeam deployment for reviewers', () => {
+      expect(reviewSkill).toMatch(/AgentTeam/);
+    });
+
+    it('references all 5 reviewer perspectives', () => {
+      expect(reviewSkill).toMatch(/security/i);
+      expect(reviewSkill).toMatch(/architecture/i);
+      expect(reviewSkill).toMatch(/performance/i);
+      expect(reviewSkill).toMatch(/test.*coverage/i);
+      expect(reviewSkill).toMatch(/simplicity/i);
+    });
+
+    // --- Absorbed from command: Memory ---
+    it('references npx ca search for semantic retrieval', () => {
       expect(reviewSkill).toContain('npx ca search');
     });
 
@@ -151,206 +93,142 @@ describe('Review Phase Integration', () => {
       expect(reviewSkill).toContain('npx ca learn');
     });
 
-    it('stays under 4000 characters', () => {
-      expect(reviewSkill.length).toBeLessThanOrEqual(4000);
-    });
-
-    // --- Review-specific skill content ---
-    it('describes spawning specialized reviewers in parallel', () => {
-      expect(reviewSkill).toMatch(/spawn|launch|parallel/i);
-      expect(reviewSkill).toMatch(/reviewer|specialized/i);
-    });
-
-    it('describes reviewer inter-communication pattern', () => {
-      expect(reviewSkill).toMatch(
-        /communicat.*reviewer|reviewer.*communicat|share.*finding|inter.communicat/i
-      );
-    });
-
+    // --- Absorbed from command: Severity classification ---
     it('describes P1/P2/P3 finding classification', () => {
       expect(reviewSkill).toMatch(/P1/);
       expect(reviewSkill).toMatch(/P2/);
       expect(reviewSkill).toMatch(/P3/);
     });
 
+    // --- Absorbed from command: Implementation-reviewer gate ---
     it('describes implementation-reviewer as mandatory gate', () => {
       expect(reviewSkill).toMatch(/implementation.reviewer/i);
       expect(reviewSkill).toMatch(/mandatory|final.*authority|gate/i);
     });
 
-    it('describes P1 findings creating beads issues', () => {
+    it('uses /implementation-reviewer slash form', () => {
+      expect(reviewSkill).toMatch(/\/implementation-reviewer/);
+    });
+
+    // --- Absorbed from command: P1 -> beads ---
+    it('describes creating beads issues for P1 findings', () => {
       expect(reviewSkill).toMatch(/P1.*bd|P1.*bead|P1.*issue|finding.*bd create/i);
     });
 
-    // --- Memory: type=solution for review report ---
+    // --- Absorbed from command: Quality gates ---
+    it('references running quality gates (tests + lint)', () => {
+      expect(reviewSkill).toMatch(/pnpm test|test.*suite|quality.*gate/i);
+    });
+
+    // --- Absorbed from command: Inter-communication ---
+    it('describes reviewer inter-communication', () => {
+      expect(reviewSkill).toMatch(
+        /communicat.*reviewer|reviewer.*communicat|share.*finding|inter.communicat/i,
+      );
+    });
+
+    // --- Absorbed from command: type=solution for review report ---
     it('references type=solution for storing review report', () => {
       expect(reviewSkill).toMatch(/type.*solution|type=solution/i);
     });
 
-    // --- Slash-form /implementation-reviewer ---
-    it('uses /implementation-reviewer slash form', () => {
-      expect(reviewSkill).toMatch(/\/implementation-reviewer/);
-    });
-  });
-
-  describe('reviewer agent templates', () => {
-    const reviewerAgents = [
-      { key: 'security-reviewer.md', ref: securityReviewer, name: 'security' },
-      { key: 'architecture-reviewer.md', ref: architectureReviewer, name: 'architecture' },
-      { key: 'performance-reviewer.md', ref: performanceReviewer, name: 'performance' },
-      { key: 'test-coverage-reviewer.md', ref: testCoverageReviewer, name: 'test-coverage' },
-      { key: 'simplicity-reviewer.md', ref: simplicityReviewer, name: 'simplicity' },
-    ];
-
-    for (const { key, ref, name } of reviewerAgents) {
-      describe(`${key}`, () => {
-        it('exists in AGENT_TEMPLATES', () => {
-          expect(ref).toBeDefined();
-        });
-
-        it('has proper YAML frontmatter with name, description, model', () => {
-          expect(ref.trimStart()).toMatch(/^---/);
-          const frontmatter = ref.split('---')[1];
-          expect(frontmatter).toMatch(/name:/);
-          expect(frontmatter).toMatch(/description:/);
-          expect(frontmatter).toMatch(/model:/);
-        });
-
-        it('has a ## Role section', () => {
-          expect(ref).toContain('## Role');
-        });
-
-        it('has an ## Output Format section with severity levels', () => {
-          expect(ref).toContain('## Output Format');
-        });
-
-        it('stays under 4000 characters', () => {
-          expect(ref.length).toBeLessThanOrEqual(4000);
-        });
-      });
-    }
-
-    it('each reviewer agent contains collaboration/communication instructions', () => {
-      const reviewerAgentsList = [
-        securityReviewer,
-        architectureReviewer,
-        performanceReviewer,
-        testCoverageReviewer,
-        simplicityReviewer,
-      ];
-      for (const agent of reviewerAgentsList) {
-        expect(agent).toMatch(
-          /share.*finding|communicat|direct.*message|message.*other.*reviewer|collaborate|findings.*reviewer/i
-        );
-      }
-    });
-  });
-
-  describe('cross-template consistency', () => {
-    it('review command references reviewer agents that exist in AGENT_TEMPLATES', () => {
-      // All 5 reviewers should exist
-      expect(AGENT_TEMPLATES['security-reviewer.md']).toBeDefined();
-      expect(AGENT_TEMPLATES['architecture-reviewer.md']).toBeDefined();
-      expect(AGENT_TEMPLATES['performance-reviewer.md']).toBeDefined();
-      expect(AGENT_TEMPLATES['test-coverage-reviewer.md']).toBeDefined();
-      expect(AGENT_TEMPLATES['simplicity-reviewer.md']).toBeDefined();
+    // --- Absorbed from command: Adaptive tiers ---
+    it('describes tiered reviewer selection based on diff size', () => {
+      expect(reviewSkill).toMatch(/<100 lines/);
     });
 
-    it('review skill and command both reference npx ca search', () => {
-      expect(reviewCommand).toContain('npx ca search');
-      expect(reviewSkill).toContain('npx ca search');
+    // --- Absorbed from command: PHASE GATE 4 ---
+    it('contains PHASE GATE 4', () => {
+      expect(reviewSkill).toContain('PHASE GATE 4');
+      expect(reviewSkill).toMatch(/implementation-reviewer.*APPROVED|APPROVED.*implementation-reviewer/i);
     });
 
-    it('review skill and command both reference npx ca learn', () => {
-      expect(reviewCommand).toContain('npx ca learn');
-      expect(reviewSkill).toContain('npx ca learn');
+    // --- Anti-MEMORY.md ---
+    it('warns against MEMORY.md', () => {
+      expect(reviewSkill).toMatch(/NOT.*MEMORY\.md/);
     });
 
-    it('review skill and command both reference beads (bd)', () => {
-      expect(reviewCommand).toMatch(/\bbd\b/);
-      expect(reviewSkill).toMatch(/\bbd\b|beads/i);
+    // --- Beads integration ---
+    it('references beads integration', () => {
+      expect(reviewSkill).toMatch(/\bbd\b/);
     });
 
-    it('review skill and command both describe P1/P2/P3 classification', () => {
-      expect(reviewCommand).toMatch(/P1/);
-      expect(reviewSkill).toMatch(/P1/);
-      expect(reviewCommand).toMatch(/P2/);
-      expect(reviewSkill).toMatch(/P2/);
-    });
-
-    it('review skill and command both describe implementation-reviewer gate', () => {
-      expect(reviewCommand).toMatch(/implementation.reviewer/i);
-      expect(reviewSkill).toMatch(/implementation.reviewer/i);
-    });
-
-    it('review skill and command both use /implementation-reviewer slash form', () => {
-      expect(reviewCommand).toMatch(/\/implementation-reviewer/);
-      expect(reviewSkill).toMatch(/\/implementation-reviewer/);
-    });
-
-    it('review skill and command both describe inter-communication', () => {
-      expect(reviewCommand).toMatch(/communicat/i);
-      expect(reviewSkill).toMatch(/communicat/i);
-    });
-
-    it('review skill and command both reference quality gates', () => {
-      expect(reviewCommand).toMatch(/pnpm test|test.*suite|quality.*gate/i);
-      expect(reviewSkill).toMatch(/pnpm test|test.*suite|quality.*gate/i);
-    });
-  });
-
-  describe('dynamic reviewer selection', () => {
-    it('review.md describes tiered reviewer selection based on diff size', () => {
-      expect(reviewCommand).toMatch(/small|trivial|< ?100|fewer/i);
-      expect(reviewCommand).toMatch(/large|full|500|all/i);
-    });
-
-    it('review.md lists core reviewers for small diffs', () => {
-      // Small diffs should use a reduced set
-      expect(reviewCommand).toMatch(/security/i);
-      expect(reviewCommand).toMatch(/test/i);
-      expect(reviewCommand).toMatch(/simplicity/i);
-    });
-
-    it('review.md describes scaling up reviewers for larger diffs', () => {
-      expect(reviewCommand).toMatch(/scale|add|additional|full.*team|all.*reviewer/i);
-    });
-  });
-
-  describe('branch-contract checks', () => {
-    // --- Review-specific architectural contracts ---
-
-    it('review.md workflow describes parallel reviewer spawning', () => {
-      const workflowMatch = reviewCommand.match(/## Workflow[^]*?(?=##|$)/i);
-      expect(workflowMatch).not.toBeNull();
-      const workflow = workflowMatch![0];
-      expect(workflow).toMatch(/spawn|launch|parallel/i);
-    });
-
-    it('review.md workflow describes finding synthesis before beads creation', () => {
-      const workflowMatch = reviewCommand.match(/## Workflow[^]*?(?=##|$)/i);
-      expect(workflowMatch).not.toBeNull();
-      const workflow = workflowMatch![0];
-      // Synthesis/consolidation should appear in the workflow
-      expect(workflow).toMatch(/synthesize|consolidat|prioritize|triage|classify/i);
-    });
-
-    it('review.md describes that P1 findings block completion', () => {
-      expect(reviewCommand).toMatch(/P1.*block|block.*P1|P1.*must.*fix|critical.*block/i);
-    });
-
-    it('review SKILL.md methodology describes reviewer team spawning', () => {
+    // --- Methodology: parallel spawning ---
+    it('methodology describes reviewer team spawning', () => {
       const methodologyMatch = reviewSkill.match(/## Methodology[^]*?(?=##|$)/i);
       expect(methodologyMatch).not.toBeNull();
       const methodology = methodologyMatch![0];
       expect(methodology).toMatch(/spawn|launch|parallel/i);
     });
 
-    it('review SKILL.md methodology describes finding consolidation', () => {
+    // --- Methodology: finding consolidation ---
+    it('methodology describes finding consolidation', () => {
       const methodologyMatch = reviewSkill.match(/## Methodology[^]*?(?=##|$)/i);
       expect(methodologyMatch).not.toBeNull();
       const methodology = methodologyMatch![0];
       expect(methodology).toMatch(/synthesize|consolidat|collect|gather|deduplic/i);
+    });
+  });
+
+  describe('reviewer role skills', () => {
+    const reviewerKeys = [
+      'security-reviewer',
+      'architecture-reviewer',
+      'performance-reviewer',
+      'test-coverage-reviewer',
+      'simplicity-reviewer',
+    ];
+
+    for (const key of reviewerKeys) {
+      describe(`${key} role skill`, () => {
+        it('exists in AGENT_ROLE_SKILLS', () => {
+          expect(AGENT_ROLE_SKILLS[key]).toBeDefined();
+        });
+
+        it('has YAML frontmatter with name and description (no model)', () => {
+          const content = AGENT_ROLE_SKILLS[key];
+          expect(content.trimStart()).toMatch(/^---/);
+          const frontmatter = content.split('---')[1];
+          expect(frontmatter).toMatch(/name:/);
+          expect(frontmatter).toMatch(/description:/);
+          expect(frontmatter).not.toMatch(/model:/);
+        });
+
+        it('has ## Role section', () => {
+          expect(AGENT_ROLE_SKILLS[key]).toContain('## Role');
+        });
+
+        it('has ## Output Format section', () => {
+          expect(AGENT_ROLE_SKILLS[key]).toContain('## Output Format');
+        });
+
+        it('mentions AgentTeam deployment', () => {
+          expect(AGENT_ROLE_SKILLS[key]).toMatch(/AgentTeam/);
+        });
+
+        it('mentions SendMessage for collaboration', () => {
+          expect(AGENT_ROLE_SKILLS[key]).toMatch(/SendMessage/);
+        });
+      });
+    }
+  });
+
+  describe('cross-template consistency', () => {
+    it('review skill references reviewer role skills that exist', () => {
+      expect(AGENT_ROLE_SKILLS['security-reviewer']).toBeDefined();
+      expect(AGENT_ROLE_SKILLS['architecture-reviewer']).toBeDefined();
+      expect(AGENT_ROLE_SKILLS['performance-reviewer']).toBeDefined();
+      expect(AGENT_ROLE_SKILLS['test-coverage-reviewer']).toBeDefined();
+      expect(AGENT_ROLE_SKILLS['simplicity-reviewer']).toBeDefined();
+    });
+
+    it('review skill references npx ca search and npx ca learn', () => {
+      expect(reviewSkill).toContain('npx ca search');
+      expect(reviewSkill).toContain('npx ca learn');
+    });
+
+    it('review skill references beads (bd)', () => {
+      expect(reviewSkill).toMatch(/\bbd\b/);
     });
   });
 });

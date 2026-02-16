@@ -119,19 +119,21 @@ description: Team-based TDD execution with adaptive complexity and agent delegat
 # Work Skill
 
 ## Overview
-Execute implementation through an agent team using adaptive TDD. The lead coordinates and delegates -- agents write code.
+Execute implementation through an AgentTeam using adaptive TDD. The lead coordinates and delegates -- agents write code.
 
 ## Methodology
-1. Pick a task from \`bd ready\` or \`$ARGUMENTS\`
-2. Search memory with \`npx ca search\` per agent/subtask for targeted context
-3. Spawn test-writer and implementer as a team. Test-writer writes failing tests first, implementer makes them pass.
-4. Agents communicate via SendMessage when working on overlapping areas.
-5. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-6. Commit incrementally as tests pass — do not batch all commits to the end
-7. Capture lessons with \`npx ca learn\` after corrections or discoveries
-
-## Team Structure & Delegation
-The lead coordinates but does not write code. Spawn test-writer and implementer as a team. Test-writer writes failing tests first, implementer makes them pass. Agents communicate when tasks overlap.
+1. Pick tasks from \`bd ready\` or \`$ARGUMENTS\`
+2. Mark tasks in progress: \`bd update <id> --status=in_progress\`
+3. Run \`npx ca search\` per agent/subtask for targeted context. Display results.
+4. Define what can be parallelized. Aim for clean implementation with parallelized team work.
+5. Deploy an AgentTeam with test-writer and implementer. Test-writer writes failing tests first, implementer makes them pass.
+6. Agents communicate via SendMessage when working on overlapping areas.
+7. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
+8. If blocked, use AskUserQuestion to get user direction.
+9. Shut down the team when done: send shutdown_request to all teammates.
+10. Commit incrementally as tests pass.
+11. Run full test suite for regressions.
+12. Close tasks: \`bd close <id>\`
 
 ## Memory Integration
 - Run \`npx ca search\` per delegated subtask with the subtask's specific description
@@ -190,7 +192,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
    - **Medium** (100-500): add architecture, performance, edge-case (7 total)
    - **Large** (500+): all 11 reviewers including docs, consistency, error-handling, pattern-matcher
-4. Spawn selected reviewers in parallel.
+4. Spawn selected reviewers in an AgentTeam to work in parallel.
 5. Reviewers communicate findings to each other via \`SendMessage\`
 6. Collect, consolidate, and deduplicate all findings
 7. Classify by severity: P1 (critical/blocking), P2 (important), P3 (minor)
@@ -252,7 +254,7 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
 
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
-2. Spawn the 6 analysis agents in parallel:
+2. Spawn the analysis pipeline in an AgentTeam to parallelize work with communication:
    - context-analyzer: gathers cycle context (diffs, test output)
    - lesson-extractor: identifies corrections, surprises, discoveries
    - docs-reviewer: scans \`docs/\` for outdated content and ADRs that need updating
@@ -263,7 +265,8 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
 4. Apply quality filters: novelty check (>0.85 similarity = skip), specificity check
 5. Classify each item by type: lesson, solution, pattern, or preference
 6. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
-7. Store via \`npx ca learn\` with supersedes/related links where applicable
+7. Store via \`npx ca learn\` with supersedes/related links where applicable.
+   At minimum, capture 1 lesson per significant decision made during this cycle
 8. Delegate to the \`compounding\` subagent to run synthesis: cluster accumulated lessons by similarity and write CCT patterns to \`.claude/lessons/cct-patterns.jsonl\`
 9. Update outdated docs and deprecate superseded ADRs (set status to \`deprecated\`)
 10. Use \`AskUserQuestion\` to confirm high-severity items with the user before storing; medium/low items are auto-stored

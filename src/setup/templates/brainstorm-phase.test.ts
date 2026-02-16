@@ -5,16 +5,17 @@ import { PHASE_SKILLS } from './skills.js';
 /**
  * Brainstorm phase integration tests.
  *
- * Verifies the brainstorm.md command and brainstorm SKILL.md
- * form a complete, well-integrated brainstorm phase per ARCHITECTURE-V2.md.
+ * After v1.2.6 refactor:
+ * - brainstorm.md command is a thin wrapper (< 500 chars) referencing the skill
+ * - brainstorm SKILL.md has the detailed workflow: memory search,
+ *   AskUserQuestion dialogue, optional Explore subagent, beads epic output
  */
 
 describe('Brainstorm Phase Integration', () => {
   const brainstormCommand = WORKFLOW_COMMANDS['brainstorm.md'];
   const brainstormSkill = PHASE_SKILLS['brainstorm'];
 
-  describe('brainstorm.md command template', () => {
-    // --- Structural requirements ---
+  describe('brainstorm.md command (thin wrapper)', () => {
     it('exists in WORKFLOW_COMMANDS', () => {
       expect(brainstormCommand).toBeDefined();
     });
@@ -24,63 +25,20 @@ describe('Brainstorm Phase Integration', () => {
       expect(brainstormCommand).toContain('$ARGUMENTS');
     });
 
-    it('has ## Workflow section', () => {
-      expect(brainstormCommand).toContain('## Workflow');
+    it('references the skill', () => {
+      expect(brainstormCommand).toMatch(/skill/i);
     });
 
-    it('stays under 5000 characters', () => {
-      expect(brainstormCommand.length).toBeLessThanOrEqual(5000);
+    it('is under 500 characters (thin wrapper)', () => {
+      expect(brainstormCommand.length).toBeLessThanOrEqual(500);
     });
 
-    // --- Memory enrichment ---
-    it('references npx ca search for semantic retrieval', () => {
-      expect(brainstormCommand).toContain('npx ca search');
-    });
-
-    it('calls npx ca search before asking questions', () => {
-      // npx ca search should appear in workflow before AskUserQuestion
-      const memIdx = brainstormCommand.indexOf('npx ca search');
-      const askIdx = brainstormCommand.indexOf('AskUserQuestion');
-      expect(memIdx).toBeGreaterThan(-1);
-      expect(askIdx).toBeGreaterThan(-1);
-      expect(memIdx).toBeLessThan(askIdx);
-    });
-
-    // --- AskUserQuestion dialogue (ARCHITECTURE-V2 step 3) ---
-    it('explicitly references AskUserQuestion for user dialogue', () => {
-      expect(brainstormCommand).toContain('AskUserQuestion');
-    });
-
-    it('describes scope and constraint clarification', () => {
-      expect(brainstormCommand).toMatch(/scope|constraint|preference/i);
-    });
-
-    // --- Optional subagent exploration (ARCHITECTURE-V2 step 4) ---
-    it('mentions optional Explore subagent for codebase research', () => {
-      expect(brainstormCommand).toMatch(/explore.*subagent|subagent.*explore|spawn.*explore/i);
-    });
-
-    // --- Beads epic output (ARCHITECTURE-V2 step 5) ---
-    it('instructs creating a beads epic from conclusions', () => {
-      expect(brainstormCommand).toMatch(/bd create.*--type=feature|beads epic/i);
-    });
-
-    it('describes output as problem definition + approach + epic', () => {
-      expect(brainstormCommand).toMatch(/problem definition|clear definition/i);
-      expect(brainstormCommand).toMatch(/approach/i);
-    });
-
-    it('references bd create for epic creation', () => {
-      expect(brainstormCommand).toContain('bd create');
-    });
-
-    // --- Alternative exploration ---
-    it('describes proposing multiple approaches', () => {
-      expect(brainstormCommand).toMatch(/alternative|approach|tradeoff/i);
+    it('does NOT have ## Workflow section (content moved to skill)', () => {
+      expect(brainstormCommand).not.toContain('## Workflow');
     });
   });
 
-  describe('brainstorm SKILL.md template', () => {
+  describe('brainstorm SKILL.md template (has detailed workflow)', () => {
     it('exists in PHASE_SKILLS', () => {
       expect(brainstormSkill).toBeDefined();
     });
@@ -107,15 +65,15 @@ describe('Brainstorm Phase Integration', () => {
       expect(brainstormSkill).toContain('## Quality Criteria');
     });
 
-    it('references npx ca search', () => {
+    it('stays under 6000 characters', () => {
+      expect(brainstormSkill.length).toBeLessThanOrEqual(6000);
+    });
+
+    // --- Content that skill must have ---
+    it('references npx ca search for semantic retrieval', () => {
       expect(brainstormSkill).toContain('npx ca search');
     });
 
-    it('stays under 4000 characters', () => {
-      expect(brainstormSkill.length).toBeLessThanOrEqual(4000);
-    });
-
-    // --- Brainstorm-specific skill content ---
     it('mentions AskUserQuestion for dialogue', () => {
       expect(brainstormSkill).toMatch(/AskUserQuestion/);
     });
@@ -127,21 +85,27 @@ describe('Brainstorm Phase Integration', () => {
     it('mentions beads epic as expected output', () => {
       expect(brainstormSkill).toMatch(/beads epic|bd create|epic/i);
     });
+
+    it('describes scope and constraint clarification', () => {
+      expect(brainstormSkill).toMatch(/scope|constraint|preference/i);
+    });
+
+    it('describes proposing multiple approaches', () => {
+      expect(brainstormSkill).toMatch(/alternative|approach|tradeoff/i);
+    });
   });
 
   describe('cross-template consistency', () => {
     it('both command and skill reference npx ca search', () => {
-      expect(brainstormCommand).toContain('npx ca search');
+      // Command is thin but the skill has the detail
       expect(brainstormSkill).toContain('npx ca search');
     });
 
-    it('both command and skill reference AskUserQuestion', () => {
-      expect(brainstormCommand).toContain('AskUserQuestion');
+    it('skill references AskUserQuestion', () => {
       expect(brainstormSkill).toContain('AskUserQuestion');
     });
 
-    it('both command and skill reference beads', () => {
-      expect(brainstormCommand).toMatch(/\bbd\b/);
+    it('skill references beads', () => {
       expect(brainstormSkill).toMatch(/\bbd\b|beads|epic/i);
     });
   });

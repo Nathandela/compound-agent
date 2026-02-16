@@ -36,46 +36,47 @@ describe('WORKFLOW_COMMANDS', () => {
     }
   });
 
-  describe('phase commands', () => {
-    it('every phase template contains $ARGUMENTS', () => {
+  describe('phase commands (thin wrappers)', () => {
+    it('every phase command contains $ARGUMENTS', () => {
       for (const key of PHASE_FILENAMES) {
         expect(WORKFLOW_COMMANDS[key], `${key} missing $ARGUMENTS`).toContain('$ARGUMENTS');
       }
     });
 
-    it('every phase template has a ## Workflow section', () => {
+    it('every phase command starts with YAML frontmatter', () => {
       for (const key of PHASE_FILENAMES) {
-        expect(WORKFLOW_COMMANDS[key], `${key} missing ## Workflow`).toContain('## Workflow');
+        expect(
+          WORKFLOW_COMMANDS[key].trimStart().startsWith('---'),
+          `${key} missing frontmatter`,
+        ).toBe(true);
       }
     });
 
-    it('every phase template references npx ca search or npx ca learn', () => {
+    it('every phase command references its skill', () => {
       for (const key of PHASE_FILENAMES) {
-        const template = WORKFLOW_COMMANDS[key];
-        const hasMemory =
-          template.includes('npx ca search') ||
-          template.includes('npx ca learn');
-        expect(hasMemory, `${key} missing memory CLI command integration`).toBe(true);
+        expect(WORKFLOW_COMMANDS[key], `${key} missing skill reference`).toMatch(/skill/i);
       }
     });
 
-    it('every phase template except lfg references bd (beads integration)', () => {
+    it('every phase command is under 500 characters', () => {
       for (const key of PHASE_FILENAMES) {
-        if (key === 'lfg.md') continue;
-        expect(WORKFLOW_COMMANDS[key], `${key} missing bd reference`).toMatch(/\bbd\b/);
+        expect(
+          WORKFLOW_COMMANDS[key].length,
+          `${key} is ${WORKFLOW_COMMANDS[key].length} chars (max 500)`,
+        ).toBeLessThanOrEqual(500);
       }
     });
 
-    it('lfg.md references all other phases', () => {
-      const lfg = WORKFLOW_COMMANDS['lfg.md'];
-      const phases = ['brainstorm', 'plan', 'work', 'review', 'compound'];
-      for (const phase of phases) {
-        expect(lfg, `lfg.md missing reference to ${phase}`).toContain(phase);
+    it('phase commands do NOT have ## Workflow sections (content moved to skills)', () => {
+      for (const key of PHASE_FILENAMES) {
+        expect(WORKFLOW_COMMANDS[key], `${key} should not have ## Workflow`).not.toContain(
+          '## Workflow',
+        );
       }
     });
   });
 
-  describe('utility commands', () => {
+  describe('utility commands (unchanged)', () => {
     it('learn.md references ca learn', () => {
       expect(WORKFLOW_COMMANDS['learn.md']).toContain('ca learn');
     });
@@ -98,10 +99,7 @@ describe('WORKFLOW_COMMANDS', () => {
       // Verify closing --- exists
       const firstDelim = template.indexOf('---');
       const secondDelim = template.indexOf('---', firstDelim + 3);
-      expect(
-        secondDelim,
-        `${key} missing closing --- delimiter`,
-      ).toBeGreaterThan(firstDelim);
+      expect(secondDelim, `${key} missing closing --- delimiter`).toBeGreaterThan(firstDelim);
     }
   });
 
@@ -135,11 +133,6 @@ describe('WORKFLOW_COMMANDS', () => {
     for (const [key, template] of Object.entries(WORKFLOW_COMMANDS)) {
       describe(key, () => {
         it('no $ARGUMENTS inside inline backticks', () => {
-          // $ARGUMENTS at the very start (standalone line) is the standard
-          // slash command pattern. But inside inline backtick code spans,
-          // it gets substituted with user text that may contain ! ( ) etc.
-          // Fenced blocks (```) are excluded — utility commands use them
-          // with properly quoted "$ARGUMENTS" which works fine.
           const inlineBackticks = template.match(/(?<!`)`(?!`)[^`]+`(?!`)/g) ?? [];
           for (const span of inlineBackticks) {
             expect(
@@ -162,7 +155,7 @@ describe('WORKFLOW_COMMANDS', () => {
     }
 
     // Phase templates must not use ```bash fenced blocks (Claude Code may
-    // try to execute them). Utility templates are allowed — they're thin
+    // try to execute them). Utility templates are allowed -- they're thin
     // CLI wrappers where ```bash is intentional.
     for (const key of PHASE_FILENAMES) {
       it(`${key}: no \`\`\`bash fenced code blocks in phase template`, () => {
