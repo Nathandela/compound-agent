@@ -62,4 +62,27 @@ describe('PHASE_SKILLS', () => {
       expect(content, `${key} missing ## Quality Criteria`).toContain('## Quality Criteria');
     }
   });
+
+  it('plan skill contains POST-PLAN VERIFICATION gate', () => {
+    expect(PHASE_SKILLS.plan).toContain('POST-PLAN VERIFICATION');
+    expect(PHASE_SKILLS.plan).toMatch(/Review.*Compound.*tasks/i);
+  });
+
+  it('work skill contains MANDATORY VERIFICATION and PHASE GATE 3', () => {
+    expect(PHASE_SKILLS.work).toContain('MANDATORY VERIFICATION');
+    expect(PHASE_SKILLS.work).toContain('/implementation-reviewer');
+    expect(PHASE_SKILLS.work).toContain('PHASE GATE 3');
+  });
+
+  it('review skill contains adaptive tiers, PHASE GATE 4, and anti-MEMORY.md', () => {
+    expect(PHASE_SKILLS.review).toContain('PHASE GATE 4');
+    expect(PHASE_SKILLS.review).toMatch(/NOT.*MEMORY\.md/);
+    expect(PHASE_SKILLS.review).toMatch(/<100 lines/);
+  });
+
+  it('compound skill contains anti-MEMORY.md warning and FINAL GATE', () => {
+    expect(PHASE_SKILLS.compound).toContain('FINAL GATE');
+    expect(PHASE_SKILLS.compound).toMatch(/NOT.*MEMORY\.md/);
+    expect(PHASE_SKILLS.compound).toContain('ca verify-gates');
+  });
 });

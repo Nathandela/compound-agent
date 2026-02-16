@@ -104,6 +104,11 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Existing docs and ADRs were checked for constraints
 - Ambiguities resolved via \`AskUserQuestion\` before decomposing
 - Complexity estimates are realistic (no "should be quick")
+
+## POST-PLAN VERIFICATION -- MANDATORY
+After creating all tasks, verify review and compound tasks exist:
+- Run \`bd list --status=open\` and check for a "Review:" task and a "Compound:" task
+- If either is missing, CREATE THEM NOW. The plan is NOT complete without these gates.
 `,
 
   work: `---
@@ -142,9 +147,14 @@ Spawn teammates via \`Task\` with \`team_name\`, coordinate via \`SendMessage\`,
 - Each agent receives memory items tailored to their assigned task, not a shared blob
 - Call \`memory_capture\` after corrections or novel discoveries
 
-## Verification Gate
-Before marking work complete, run the 8-step TDD verification pipeline:
-1. /invariant-designer → 2. /cct-subagent → 3. /test-first-enforcer → 4. /property-test-generator → 5. /anti-cargo-cult-reviewer → 6. /module-boundary-reviewer → 7. /drift-detector → 8. /implementation-reviewer
+## MANDATORY VERIFICATION -- DO NOT CLOSE TASK WITHOUT THIS
+Before \`bd close\`, you MUST:
+1. Run \`pnpm test\` then \`pnpm lint\` (quality gates)
+2. Run \`/implementation-reviewer\` on changed code -- wait for APPROVED
+If REJECTED: fix ALL issues, re-run tests, resubmit. INVIOLABLE per CLAUDE.md.
+
+The full 8-step pipeline (invariant-designer through implementation-reviewer) is recommended
+for complex changes. For all changes, \`/implementation-reviewer\` is the minimum required gate.
 
 ## Beads Lifecycle
 - \`bd ready\` to find available tasks
@@ -168,6 +178,12 @@ Before marking work complete, run the 8-step TDD verification pipeline:
 - Incremental commits made as tests pass
 - All tests pass after refactoring
 - Task lifecycle tracked via beads (\`bd\`)
+
+## PHASE GATE 3 -- MANDATORY
+Before starting Review, verify ALL work tasks are closed:
+- \`bd list --status=in_progress\` must return empty
+- \`bd list --status=open\` should only have Review and Compound tasks remaining
+If any work tasks remain open, DO NOT proceed. Complete them first.
 `,
 
   review: `---
@@ -183,18 +199,19 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 ## Methodology
 1. Run quality gates first: \`pnpm test && pnpm lint\`
 2. Search memory with \`memory_search\` for known patterns and recurring issues
-3. Create an AgentTeam (\`TeamCreate\`) and spawn all 11 reviewers as parallel teammates via \`Task\` tool with \`team_name\`:
-   - **Core**: security, architecture, performance, test-coverage, simplicity
-   - **Quality**: docs-reviewer, consistency-reviewer, error-handling-reviewer
-   - **Intelligence**: edge-case-reviewer, pattern-matcher (memory-backed), cct-reviewer (CCT patterns)
-4. Reviewers communicate findings to each other via \`SendMessage\`
-5. Collect, consolidate, and deduplicate all findings
-6. Classify by severity: P1 (critical/blocking), P2 (important), P3 (minor)
-7. Use \`AskUserQuestion\` when severity is ambiguous or fix has multiple valid options
-8. Create beads issues for P1 findings: \`bd create --title="P1: ..."\`
-9. Fix all P1 findings before proceeding
-10. Run \`/implementation-reviewer\` as mandatory gate
-11. Capture novel findings with \`memory_capture\`; pattern-matcher auto-reinforces recurring issues
+3. Select reviewer tier based on diff size:
+   - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
+   - **Medium** (100-500): add architecture, performance, edge-case (7 total)
+   - **Large** (500+): all 11 reviewers including docs, consistency, error-handling, pattern-matcher
+4. Create an AgentTeam (\`TeamCreate\`) and spawn selected reviewers as parallel teammates via \`Task\` tool with \`team_name\`
+5. Reviewers communicate findings to each other via \`SendMessage\`
+6. Collect, consolidate, and deduplicate all findings
+7. Classify by severity: P1 (critical/blocking), P2 (important), P3 (minor)
+8. Use \`AskUserQuestion\` when severity is ambiguous or fix has multiple valid options
+9. Create beads issues for P1 findings: \`bd create --title="P1: ..."\`
+10. Fix all P1 findings before proceeding
+11. Run \`/implementation-reviewer\` as mandatory gate
+12. Capture novel findings with \`memory_capture\`; pattern-matcher auto-reinforces recurring issues
 
 ## Memory Integration
 - Call \`memory_search\` before review for known recurring issues
@@ -224,6 +241,13 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 - docs-reviewer confirmed docs/ADR alignment
 - All P1 findings fixed before \`/implementation-reviewer\` approval
 - \`/implementation-reviewer\` approved as mandatory gate
+
+## PHASE GATE 4 -- MANDATORY
+Before starting Compound, verify review is complete:
+- \`/implementation-reviewer\` must have returned APPROVED
+- All P1 findings must be resolved
+
+**CRITICAL**: Use \`memory_capture\` MCP tool for ALL lesson storage -- NOT MEMORY.md.
 `,
 
   compound: `---
@@ -235,6 +259,9 @@ description: Reflect on the cycle and capture high-quality lessons for future se
 
 ## Overview
 Extract and store lessons learned during the cycle, and update project documentation. This is what makes the system compound -- each session leaves the next one better equipped.
+
+**CRITICAL**: Store all lessons via \`memory_capture\` MCP tool -- NOT via MEMORY.md, NOT via markdown files.
+Lessons go to \`.claude/lessons/index.jsonl\` through the MCP tool. MEMORY.md is a different system and MUST NOT be used for compounding.
 
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
@@ -278,5 +305,12 @@ Extract and store lessons learned during the cycle, and update project documenta
 - User confirmed high-severity items
 - Beads checked for related issues (\`bd\`)
 - Each item gives clear, concrete guidance for future sessions
+
+## FINAL GATE -- EPIC CLOSURE
+Before closing the epic:
+- Run \`ca verify-gates <epic-id>\` -- must return PASS for both gates
+- Run \`pnpm test\` and \`pnpm lint\` -- must pass
+If verify-gates fails, the missing phase was SKIPPED. Go back and complete it.
+CRITICAL: 3/5 phases is NOT success. All 5 phases are required.
 `,
 };

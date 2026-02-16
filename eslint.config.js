@@ -6,7 +6,7 @@ import vitest from 'eslint-plugin-vitest'
 import compoundAgent from './tools/eslint-rules/index.js'
 
 export default tseslint.config(
-  { ignores: ['dist/**', 'node_modules/**', '.claude/**'] },
+  { ignores: ['dist/**', 'node_modules/**', '.claude/**', 'examples/**'] },
 
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
