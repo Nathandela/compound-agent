@@ -420,7 +420,7 @@ export function registerSetupAllCommand(setupCommand: Command): void {
       }
       console.log('');
       console.log('Next steps:');
-      console.log('  1. Restart Claude Code to load MCP tools');
-      console.log('  2. Use `memory_search` and `memory_capture` tools');
+      console.log('  1. Restart Claude Code to load hooks');
+      console.log('  2. Use `npx ca search` and `npx ca learn` commands');
     });
 }

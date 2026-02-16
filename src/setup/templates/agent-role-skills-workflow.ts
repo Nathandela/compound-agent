@@ -24,6 +24,7 @@ Analyze the current session's work context: what was accomplished, what problems
 5. Identify problems encountered and how they were solved
 6. Note any user corrections or redirections
 7. Summarize the work context for lesson extraction
+8. For large diffs spanning multiple modules, spawn opus subagents to analyze each module in parallel. Merge findings before sharing.
 
 ## Collaboration
 Share findings with lesson-extractor via direct message so it can extract actionable lessons from the context. Pass results to other compound agents as needed.
@@ -56,6 +57,7 @@ Extract actionable, specific lessons from analyzed work context. Identify correc
 5. For each problem/correction, ask: "What should be done differently next time?"
 6. Filter out lessons that are too generic or obvious
 7. Each lesson must be specific; prefer actionable guidance when possible
+8. For many corrections/discoveries, spawn opus subagents to extract lessons from different domain areas in parallel.
 
 ## Collaboration
 Share findings with pattern-matcher and solution-writer via direct message so they can classify and store the lessons. Collaborate with context-analyzer to clarify ambiguous findings.
@@ -159,6 +161,7 @@ Write comprehensive failing tests that define expected behavior before any imple
 5. Use clear test names describing expected behavior
 6. Run tests to verify they fail for the RIGHT reason (missing implementation, not syntax errors)
 7. Do NOT mock the thing being tested
+8. For multiple test files, spawn opus subagents to write tests in parallel (1 subagent per test file or module). Coordinate to avoid duplicate test setup.
 
 ## Memory Integration
 Run \`npx ca search\` with the task description before writing tests. Look for known patterns, edge cases, and past mistakes relevant to the feature area.
@@ -193,6 +196,7 @@ Write the minimum code necessary to make failing tests pass. Follow the TDD gree
 5. NEVER modify the test files to make them pass
 6. If a test seems wrong, stop and report it -- do not change it
 7. After all tests pass, look for obvious refactoring opportunities
+8. For multiple implementation files, spawn opus subagents to implement in parallel (1 subagent per module). Coordinate on shared interfaces via SendMessage.
 
 ## Memory Integration
 Run \`npx ca search\` with the task description for known patterns, solutions, and implementation approaches relevant to the feature area.

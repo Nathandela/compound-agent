@@ -46,9 +46,9 @@ describe('CLI', { tags: ['integration'] }, () => {
       const agentsPath = join(tempDir, 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
       expect(content).toContain('Compound Agent Integration');
-      // v0.2.4: uses MCP tools instead of CLI commands
-      expect(content).toContain('memory_search');
-      expect(content).toContain('memory_capture');
+      // CLI-first: uses CLI commands
+      expect(content).toContain('npx ca search');
+      expect(content).toContain('npx ca learn');
     });
 
     it('AGENTS.md template includes explicit plan-time instructions', async () => {
@@ -57,9 +57,9 @@ describe('CLI', { tags: ['integration'] }, () => {
       const agentsPath = join(tempDir, 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // v0.2.4: uses Mandatory Recall section and MCP tools
+      // CLI-first: uses Mandatory Recall section and CLI commands
       expect(content).toContain('Mandatory Recall');
-      expect(content).toContain('memory_search');
+      expect(content).toContain('npx ca search');
       expect(content).toMatch(/MUST\s+use/i);
     });
 

@@ -6,27 +6,44 @@
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 
-// Mock execSync before importing the module under test
+// Mock execFileSync before importing the module under test
 vi.mock('node:child_process', () => ({
-  execSync: vi.fn(),
+  execFileSync: vi.fn(),
 }));
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { runVerifyGates, type GateCheck } from './verify-gates.js';
 
-const mockExecSync = vi.mocked(execSync);
+const mockExecFileSync = vi.mocked(execFileSync);
 
-// Helper to build bd show output for an epic
-function bdShowOutput(opts: {
+// Helper to build bd show --json output
+function bdShowJson(opts: {
+  epicId?: string;
+  title?: string;
+  deps?: Array<{ closed: boolean; title: string; id: string }>;
+}): string {
+  return JSON.stringify({
+    id: `learning_agent-${opts.epicId ?? 'test1'}`,
+    title: opts.title ?? 'EPIC: Test epic',
+    status: 'open',
+    depends_on: (opts.deps ?? []).map(dep => ({
+      id: `learning_agent-${dep.id}`,
+      title: dep.title,
+      status: dep.closed ? 'closed' : 'open',
+    })),
+  });
+}
+
+// Helper to build bd show text output (fallback path)
+function bdShowText(opts: {
   epicId?: string;
   title?: string;
   deps?: Array<{ closed: boolean; title: string; id: string }>;
 }): string {
   const id = opts.epicId ?? 'test1';
   const title = opts.title ?? 'EPIC: Test epic';
-  const marker = '○';
   const lines = [
-    `${marker} learning_agent-${id} · ${title}   [P0 · OPEN]`,
+    `○ learning_agent-${id} · ${title}   [P0 · OPEN]`,
     `Owner: Test · Type: epic`,
     `Created: 2026-01-01 · Updated: 2026-01-01`,
     '',
@@ -48,7 +65,56 @@ function bdShowOutput(opts: {
 
 describe('verify-gates', () => {
   beforeEach(() => {
-    mockExecSync.mockReset();
+    mockExecFileSync.mockReset();
+  });
+
+  // ==========================================================================
+  // Shell injection prevention
+  // ==========================================================================
+
+  it('rejects epic IDs with shell metacharacters', async () => {
+    await expect(runVerifyGates('test; rm -rf /')).rejects.toThrow(/invalid epic id/i);
+    await expect(runVerifyGates('$(whoami)')).rejects.toThrow(/invalid epic id/i);
+    await expect(runVerifyGates('test`cmd`')).rejects.toThrow(/invalid epic id/i);
+    await expect(runVerifyGates('id && echo pwned')).rejects.toThrow(/invalid epic id/i);
+  });
+
+  // ==========================================================================
+  // JSON parsing path (primary)
+  // ==========================================================================
+
+  it('parses JSON output from bd show --json', async () => {
+    mockExecFileSync.mockReturnValue(bdShowJson({
+      deps: [
+        { closed: true, title: 'Review: check', id: 'r1' },
+        { closed: true, title: 'Compound: capture', id: 'c1' },
+      ],
+    }));
+
+    const checks = await runVerifyGates('test1');
+    expect(checks.every(c => c.status === 'pass')).toBe(true);
+    // Should call with --json flag
+    expect(mockExecFileSync).toHaveBeenCalledWith('bd', ['show', 'test1', '--json'], { encoding: 'utf-8' });
+  });
+
+  // ==========================================================================
+  // Text fallback path
+  // ==========================================================================
+
+  it('falls back to text parsing when JSON parse fails', async () => {
+    // First call (--json) returns invalid JSON, second call (text) returns text
+    mockExecFileSync
+      .mockReturnValueOnce('not valid json')
+      .mockReturnValueOnce(bdShowText({
+        deps: [
+          { closed: true, title: 'Review: check', id: 'r1' },
+          { closed: true, title: 'Compound: capture', id: 'c1' },
+        ],
+      }));
+
+    const checks = await runVerifyGates('test1');
+    expect(checks.every(c => c.status === 'pass')).toBe(true);
+    expect(mockExecFileSync).toHaveBeenCalledTimes(2);
   });
 
   // ==========================================================================
@@ -56,7 +122,7 @@ describe('verify-gates', () => {
   // ==========================================================================
 
   it('returns an array of GateCheck objects', async () => {
-    mockExecSync.mockReturnValue(bdShowOutput({
+    mockExecFileSync.mockReturnValue(bdShowJson({
       deps: [
         { closed: true, title: 'Review: something', id: 'r1' },
         { closed: true, title: 'Compound: something', id: 'c1' },
@@ -77,7 +143,7 @@ describe('verify-gates', () => {
   // ==========================================================================
 
   it('fails when no review task exists', async () => {
-    mockExecSync.mockReturnValue(bdShowOutput({
+    mockExecFileSync.mockReturnValue(bdShowJson({
       deps: [
         { closed: true, title: 'Compound: some task', id: 'c1' },
       ],
@@ -95,7 +161,7 @@ describe('verify-gates', () => {
   // ==========================================================================
 
   it('fails when review task exists but is open', async () => {
-    mockExecSync.mockReturnValue(bdShowOutput({
+    mockExecFileSync.mockReturnValue(bdShowJson({
       deps: [
         { closed: false, title: 'Review: check implementation', id: 'r1' },
         { closed: true, title: 'Compound: capture learnings', id: 'c1' },
@@ -114,7 +180,7 @@ describe('verify-gates', () => {
   // ==========================================================================
 
   it('fails when review is closed but compound task is missing', async () => {
-    mockExecSync.mockReturnValue(bdShowOutput({
+    mockExecFileSync.mockReturnValue(bdShowJson({
       deps: [
         { closed: true, title: 'Review: check implementation', id: 'r1' },
       ],
@@ -134,7 +200,7 @@ describe('verify-gates', () => {
   // ==========================================================================
 
   it('passes when both review and compound tasks are closed', async () => {
-    mockExecSync.mockReturnValue(bdShowOutput({
+    mockExecFileSync.mockReturnValue(bdShowJson({
       deps: [
         { closed: true, title: 'Review: check implementation', id: 'r1' },
         { closed: true, title: 'Compound: capture learnings', id: 'c1' },
@@ -142,10 +208,6 @@ describe('verify-gates', () => {
     }));
 
     const checks = await runVerifyGates('test1');
-    const reviewCheck = checks.find(c => c.name === 'Review task');
-    const compoundCheck = checks.find(c => c.name === 'Compound task');
-    expect(reviewCheck!.status).toBe('pass');
-    expect(compoundCheck!.status).toBe('pass');
     expect(checks.every(c => c.status === 'pass')).toBe(true);
   });
 
@@ -154,7 +216,7 @@ describe('verify-gates', () => {
   // ==========================================================================
 
   it('fails when compound task exists but is open', async () => {
-    mockExecSync.mockReturnValue(bdShowOutput({
+    mockExecFileSync.mockReturnValue(bdShowJson({
       deps: [
         { closed: true, title: 'Review: check implementation', id: 'r1' },
         { closed: false, title: 'Compound: capture learnings', id: 'c1' },
@@ -173,42 +235,35 @@ describe('verify-gates', () => {
   // ==========================================================================
 
   it('throws a descriptive error for invalid epic ID', async () => {
-    mockExecSync.mockImplementation(() => {
-      throw new Error('Issue not found: learning_agent-invalid');
-    });
-
-    await expect(runVerifyGates('invalid')).rejects.toThrow(/invalid/i);
+    // No mock needed — validation rejects before execFileSync is called
+    await expect(runVerifyGates('test; rm -rf')).rejects.toThrow(/invalid epic id/i);
   });
 
   // ==========================================================================
-  // No DEPENDS ON section at all -> both gates fail
+  // No dependencies -> both gates fail
   // ==========================================================================
 
-  it('fails both gates when epic has no DEPENDS ON section', async () => {
-    mockExecSync.mockReturnValue(bdShowOutput({ deps: [] }));
+  it('fails both gates when epic has no dependencies', async () => {
+    mockExecFileSync.mockReturnValue(bdShowJson({ deps: [] }));
 
     const checks = await runVerifyGates('test1');
-    const reviewCheck = checks.find(c => c.name === 'Review task');
-    const compoundCheck = checks.find(c => c.name === 'Compound task');
-    expect(reviewCheck!.status).toBe('fail');
-    expect(compoundCheck!.status).toBe('fail');
+    expect(checks.every(c => c.status === 'fail')).toBe(true);
   });
 
   // ==========================================================================
-  // Works with any beads prefix, not just learning_agent-
+  // Works with any beads prefix
   // ==========================================================================
 
   it('parses deps with different beads project prefixes', async () => {
-    const output = [
-      '○ my-project-abc1 · EPIC: Test epic   [P0 · OPEN]',
-      'Owner: Test · Type: epic',
-      '',
-      'DEPENDS ON',
-      '  → ✓ my-project-r1: Review: check implementation ● P0',
-      '  → ✓ my-project-c1: Compound: capture learnings ● P0',
-    ].join('\n');
-
-    mockExecSync.mockReturnValue(output);
+    mockExecFileSync.mockReturnValue(JSON.stringify({
+      id: 'my-project-abc1',
+      title: 'EPIC: Test epic',
+      status: 'open',
+      depends_on: [
+        { id: 'my-project-r1', title: 'Review: check', status: 'closed' },
+        { id: 'my-project-c1', title: 'Compound: capture', status: 'closed' },
+      ],
+    }));
 
     const checks = await runVerifyGates('abc1');
     expect(checks.every(c => c.status === 'pass')).toBe(true);

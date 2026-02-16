@@ -1042,24 +1042,13 @@ describe('Management Commands', () => {
       expect(stdout).toMatch(/test fail/i);
     });
 
-    it('includes MCP tools prominently', () => {
+    it('includes CLI commands prominently', () => {
       const { stdout } = runCli('prime');
-      // MCP tools should be mentioned prominently at top
-      expect(stdout).toContain('memory_search');
-      expect(stdout).toContain('memory_capture');
-      // Should emphasize MCP over CLI
-      expect(stdout).toMatch(/MUST use MCP/i);
-    });
-
-    it('includes CLI fallback reference (search, learn, list only)', () => {
-      const { stdout } = runCli('prime');
-      // CLI fallback should mention only these three commands
-      expect(stdout).toContain('ca search');
-      expect(stdout).toContain('ca learn');
-      expect(stdout).toContain('ca list');
-      // Should NOT mention check-plan or stats in CLI fallback
-      expect(stdout).not.toContain('check-plan');
-      expect(stdout).not.toContain('ca stats');
+      // CLI commands should be mentioned prominently at top
+      expect(stdout).toContain('npx ca search');
+      expect(stdout).toContain('npx ca learn');
+      // Should emphasize CLI commands
+      expect(stdout).toMatch(/MUST use CLI/i);
     });
 
     it('includes quality gate (novel, specific; actionable as soft preference)', () => {

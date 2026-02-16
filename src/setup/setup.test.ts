@@ -150,18 +150,17 @@ describe('Setup Commands - Generated Content', () => {
       expect(content).toMatch(/never\s+edit.*index\.jsonl/i);
     });
 
-    it('mentions MCP and CLI alternatives for JSONL operations', async () => {
+    it('mentions CLI alternatives for JSONL operations', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Must mention MCP tool and CLI as alternatives
-      expect(content).toContain('memory_capture');
-      expect(content).toContain('ca learn');
+      // Must mention CLI as the alternative
+      expect(content).toContain('npx ca learn');
     });
 
-    it('MCP Tools section appears near top of Compound Agent section', async () => {
+    it('CLI Commands section appears near top of Compound Agent section', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
@@ -169,13 +168,13 @@ describe('Setup Commands - Generated Content', () => {
 
       // Find positions
       const sectionStart = content.indexOf('## Compound Agent Integration');
-      const mcpTools = content.indexOf('### MCP Tools');
+      const cliCommands = content.indexOf('### CLI Commands');
       const mandatoryRecall = content.indexOf('### Mandatory Recall');
 
-      // MCP Tools must appear before Mandatory Recall section (v0.2.6 structure)
+      // CLI Commands must appear before Mandatory Recall section
       expect(sectionStart).toBeGreaterThan(-1);
-      expect(mcpTools).toBeGreaterThan(sectionStart);
-      expect(mcpTools).toBeLessThan(mandatoryRecall);
+      expect(cliCommands).toBeGreaterThan(sectionStart);
+      expect(cliCommands).toBeLessThan(mandatoryRecall);
     });
 
     it('explains consequences of direct edits', async () => {
@@ -279,46 +278,58 @@ describe('Setup Commands - Generated Content', () => {
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Should tell Claude what to do when pattern detected (v0.2.4: uses MCP tools)
-      expect(content).toMatch(/memory_capture|ca learn/i);
+      // Should tell Claude what to do when pattern detected (CLI-first)
+      expect(content).toContain('npx ca learn');
     });
   });
 
   /**
-   * Tests for v0.2.4: MCP-based capture and retrieval
+   * Tests for CLI-first documentation in AGENTS.md
    */
-  describe('MCP tools documentation in AGENTS.md (v0.2.4)', () => {
-    it('documents memory_search tool', async () => {
+  describe('CLI commands documentation in AGENTS.md', () => {
+    it('documents npx ca search command', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Should document memory_search MCP tool
-      expect(content).toContain('memory_search');
+      // Should document CLI search command
+      expect(content).toContain('npx ca search');
       expect(content).toMatch(/before.*architectural|architectural.*decisions/i);
     });
 
-    it('documents memory_capture tool', async () => {
+    it('documents npx ca learn command', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Should document memory_capture MCP tool
-      expect(content).toContain('memory_capture');
-      expect(content).toMatch(/user corrects|mistakes|corrections/i);
+      // Should document CLI learn command
+      expect(content).toContain('npx ca learn');
+      expect(content).toMatch(/user corrects|corrections|discoveries/i);
     });
 
-    it('includes MCP tools table', async () => {
+    it('includes CLI commands table', async () => {
       runCli('init');
 
       const agentsPath = join(getTempDir(), 'AGENTS.md');
       const content = await readFile(agentsPath, 'utf-8');
 
-      // Should have MCP Tools section with table
-      expect(content).toContain('MCP Tools');
-      expect(content).toContain('| Tool | Purpose |');
+      // Should have CLI Commands section with table
+      expect(content).toContain('CLI Commands');
+      expect(content).toContain('| Command | Purpose |');
+    });
+
+    it('does NOT reference MCP tools as primary interface', async () => {
+      runCli('init');
+
+      const agentsPath = join(getTempDir(), 'AGENTS.md');
+      const content = await readFile(agentsPath, 'utf-8');
+
+      // Should NOT have MCP-first language
+      expect(content).not.toContain('MCP Tools (ALWAYS USE THESE)');
+      expect(content).not.toContain('MCP tools (preferred)');
+      expect(content).not.toContain('You MUST use MCP tools');
     });
   });
 

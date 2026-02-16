@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { clusterBySimilarity, synthesizePattern, writeCctPatterns } from '../compound/index.js';
-import { embedText } from '../memory/embeddings/index.js';
+import { embedText, isModelUsable } from '../memory/embeddings/index.js';
 import { readMemoryItems } from '../memory/storage/index.js';
 
 /**
@@ -29,12 +29,28 @@ export function registerCompoundCommands(program: Command): void {
         return;
       }
 
+      // Check if embedding model is available
+      const modelCheck = await isModelUsable();
+      if (!modelCheck.usable) {
+        console.error(`Error: Embedding model unavailable — ${modelCheck.reason}`);
+        console.error('Run: npx ca download-model');
+        process.exitCode = 1;
+        return;
+      }
+
       // Compute embeddings for all items
       const embeddings: number[][] = [];
-      for (const item of items) {
-        const text = `${item.trigger} ${item.insight}`;
-        const vec = await embedText(text);
-        embeddings.push(Array.isArray(vec) ? vec : Array.from(vec));
+      try {
+        for (const item of items) {
+          const text = `${item.trigger} ${item.insight}`;
+          const vec = await embedText(text);
+          embeddings.push(Array.isArray(vec) ? vec : Array.from(vec));
+        }
+      } catch (err) {
+        console.error(`Error computing embeddings: ${err instanceof Error ? err.message : String(err)}`);
+        console.error('Run: npx ca download-model');
+        process.exitCode = 1;
+        return;
       }
 
       // Cluster by similarity

@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.6] - 2026-02-16
+
+### Changed
+
+- **CLI-first interface**: All templates, AGENTS.md, and prime output now reference CLI commands (`npx ca search`, `npx ca learn`) as the primary interface. MCP tool references (`memory_search`, `memory_capture`) removed from user-facing content.
+- **Agent roles as skills**: Extracted agent role definitions (test-writer, implementer, security-reviewer, etc.) from inline agent templates into dedicated skill files under `agent-role-skills-*.ts`. Agent templates are now thin wrappers referencing skills.
+- **Adaptive multi-teammate scaling**: Phase skills (work, review, compound) now encourage deploying MULTIPLE teammates of the same role (multiple test-writers, multiple implementers) scaled to workload complexity.
+- **Parallelization emphasis**: Agent role skills for natural-fit roles (test-writer, implementer, reviewers, context-analyzer, lesson-extractor) now include guidance on spawning parallel opus subagents for independent subtasks.
+- **Command templates simplified**: Slash command templates deduplicated by referencing shared agent role skills instead of inlining full role descriptions.
+
+### Fixed
+
+- **[P0] Shell injection in `verify-gates`**: Replaced `execSync` with `execFileSync` to prevent shell interpretation of epic IDs. Added regex validation (`/^[a-zA-Z0-9_-]+$/`) to reject IDs with metacharacters.
+- **[P1] Brittle parsing in `verify-gates`**: Primary path now uses `bd show --json` for structured JSON parsing. Text regex parsing retained as fallback only.
+- **[P1] `compound` command resilience**: Added `isModelUsable()` preflight check before embedding loop. Gracefully exits with actionable error (`Run: npx ca download-model`) instead of crashing.
+
+## [1.2.5] - 2026-02-16
+
+### Changed
+
+- **Skills synced with commands**: Enforcement content (phase gates, anti-MEMORY.md warnings, adaptive reviewer tiers, verification gates) copied from slash command templates into skill SKILL.md templates so both formats contain the same workflow enforcement.
+- **ESLint config**: Excluded `examples/` directory so `pnpm lint` works without requiring `pnpm build` first.
+
 ## [1.2.4] - 2026-02-15
 
 ### Changed
@@ -102,7 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Renamed** from learning-agent (CLI: `lna`) to compound-agent (CLI: `ca`)
 - **Architecture**: 3-layer design (Beads foundation, Semantic Memory, Workflows)
-- **MCP-first integration**: MCP tools are the primary interface; CLI serves as fallback
+- **MCP integration**: MCP tools available alongside CLI commands
 - **Memory storage**: Items stored in `.claude/lessons/index.jsonl` (backward compatible with v0.x lessons)
 - **Hook system**: UserPromptSubmit and PostToolUse hooks for context-aware memory injection
 - **MCP `memory_capture`**: Supports all memory types (lesson, solution, pattern, preference), severity, confirmation, supersedes, and related fields
@@ -470,7 +493,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.4...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.6...HEAD
+[1.2.6]: https://github.com/Nathandela/learning_agent/compare/v1.2.5...v1.2.6
+[1.2.5]: https://github.com/Nathandela/learning_agent/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/Nathandela/learning_agent/compare/v1.2.1...v1.2.4
 [1.2.1]: https://github.com/Nathandela/learning_agent/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Nathandela/learning_agent/compare/v1.1.0...v1.2.0

@@ -77,10 +77,10 @@ const LOW_CONFIDENCE_PLANNING = [
 
 /** Reminder messages */
 const CORRECTION_REMINDER =
-  'Remember: You have memory tools available - memory_capture to save insights, memory_search to find past solutions.';
+  'Remember: You have memory tools available - `npx ca learn` to save insights, `npx ca search` to find past solutions.';
 
 const PLANNING_REMINDER =
-  'If you\'re uncertain or hesitant, remember your memory tools: memory_search may have relevant context from past sessions.';
+  'If you\'re uncertain or hesitant, remember your memory tools: `npx ca search` may have relevant context from past sessions.';
 
 /** Check if prompt matches correction patterns */
 export function detectCorrection(prompt: string): boolean {
@@ -151,7 +151,7 @@ let lastFailedTarget: string | null = null;
 let sameTargetCount = 0;
 
 /** Tip message for failures */
-const FAILURE_TIP = 'Tip: Multiple failures detected. memory_search may have solutions for similar issues.';
+const FAILURE_TIP = 'Tip: Multiple failures detected. `npx ca search` may have solutions for similar issues.';
 
 /**
  * PostToolUseFailure hook output format.

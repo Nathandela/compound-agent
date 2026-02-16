@@ -62,7 +62,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
         const templateContent = templateMatch![1];
 
-        // v0.2.4: uses memory_search MCP tool, CLI commands still use ca prefix
+        // CLI-first: all commands use npx ca prefix
         expect(templateContent).toContain('npx ca search');
         expect(templateContent).toContain('npx ca learn');
 
@@ -154,13 +154,11 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(agentsTemplate).toMatch(/NEVER.*edit.*index\.jsonl/i);
     });
 
-    it('lists MCP tools as primary and CLI as fallback', () => {
-      // MCP tools are primary
-      expect(agentsTemplate).toContain('memory_capture');
-      expect(agentsTemplate).toContain('memory_search');
-      // CLI is fallback
-      expect(agentsTemplate).toContain('CLI (fallback only)');
+    it('lists CLI commands as primary interface', () => {
+      // CLI commands are primary
       expect(agentsTemplate).toContain('npx ca learn');
+      expect(agentsTemplate).toContain('npx ca search');
+      expect(agentsTemplate).toContain('CLI Commands (ALWAYS USE THESE)');
     });
 
     it('mentions schema/validation/sync issues from manual edits', () => {

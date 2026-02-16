@@ -23,6 +23,7 @@ Analyze the repository to understand its structure, coding conventions, tech sta
 4. Note coding conventions (naming, file organization, patterns)
 5. Check for existing documentation (README, CONTRIBUTING, CLAUDE.md)
 6. Summarize findings concisely
+7. For large repositories, spawn opus subagents to analyze different directory trees in parallel. Merge findings.
 
 ## Collaboration
 Return findings directly to the caller for synthesis into the plan.
@@ -54,6 +55,7 @@ Search compound-agent memory to find relevant lessons, patterns, and decisions f
 3. Search with multiple query variations for coverage
 4. Filter results by relevance and recency
 5. Summarize applicable lessons concisely
+6. For broad topics, spawn opus subagents with different query variations in parallel. Merge and deduplicate results.
 
 ## Collaboration
 Return findings directly to the caller for synthesis into the plan.
@@ -86,6 +88,7 @@ Review code changes for security vulnerabilities including OWASP top 10, injecti
 5. Check for hardcoded secrets or credentials
 6. Verify error messages do not leak sensitive info
 7. Check dependency versions for known CVEs
+8. For large diffs, spawn opus subagents to review different file groups in parallel (e.g., 1 per module). Merge findings and deduplicate.
 
 ## Collaboration
 Share cross-cutting findings via SendMessage: security issues impacting architecture go to architecture-reviewer; secrets in test fixtures go to test-coverage-reviewer.
@@ -117,6 +120,7 @@ Review code for architectural consistency, pattern compliance, module boundary i
 4. Verify public API surface is minimal
 5. Ensure new code follows existing conventions
 6. Check that dependencies flow in the correct direction
+7. For changes spanning multiple modules, spawn opus subagents to review each module boundary in parallel.
 
 ## Collaboration
 Share cross-cutting findings via SendMessage: architecture issues with performance implications go to performance-reviewer; structural violations creating security risks go to security-reviewer.
@@ -147,6 +151,7 @@ Review code for performance bottlenecks, algorithmic complexity issues, unnecess
 4. Verify I/O operations are batched where possible
 5. Check for missing indexes on database queries
 6. Verify resources are properly closed/released
+7. For multiple hot paths, spawn opus subagents to profile different modules in parallel.
 
 ## Collaboration
 Share cross-cutting findings via SendMessage: performance issues needing test coverage go to test-coverage-reviewer; performance fixes requiring architectural changes go to architecture-reviewer.
@@ -178,6 +183,7 @@ Review tests for meaningful assertions, edge case coverage, and absence of cargo
 5. Verify no mocked business logic (vi.mock on the thing being tested)
 6. Check test names describe expected behavior
 7. Ensure property-based tests exist for pure functions
+8. For many test files, spawn opus subagents to review test files in parallel (1 per test file).
 
 ## Collaboration
 Share cross-cutting findings via SendMessage: cargo-cult tests hiding security issues go to security-reviewer; unnecessary test complexity goes to simplicity-reviewer.

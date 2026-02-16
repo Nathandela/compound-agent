@@ -9,8 +9,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { writeFile } from 'node:fs/promises';
-
 import { appendLesson } from '../memory/storage/jsonl.js';
 import { closeDb } from '../memory/storage/sqlite/index.js';
 import { syncIfNeeded } from '../memory/storage/sqlite/sync.js';
@@ -372,42 +370,28 @@ describe('Prime Command', () => {
   });
 
   // ============================================================================
-  // MCP Warning: Prime warns when MCP is not configured
+  // CLI-First: No MCP warning in CLI-first mode
   // ============================================================================
 
-  describe('MCP Missing Warning', () => {
-    it('includes MCP warning when .mcp.json does not exist', async () => {
-      // No .mcp.json in tempDir
-      const output = await getPrimeContext(tempDir);
-      expect(output).toContain('WARNING');
-      expect(output).toMatch(/MCP.*not registered|MCP server not registered/i);
-      expect(output).toContain('npx ca setup');
-    });
-
-    it('includes MCP warning when .mcp.json has no compound-agent entry', async () => {
-      // Create .mcp.json without compound-agent
-      await writeFile(join(tempDir, '.mcp.json'), JSON.stringify({ mcpServers: {} }, null, 2), 'utf-8');
-
-      const output = await getPrimeContext(tempDir);
-      expect(output).toContain('WARNING');
-      expect(output).toMatch(/MCP.*not registered|MCP server not registered/i);
-    });
-
-    it('does NOT include MCP warning when .mcp.json has compound-agent', async () => {
-      // Create .mcp.json with compound-agent entry
-      const mcpConfig = {
-        mcpServers: {
-          'compound-agent': {
-            command: 'npx',
-            args: ['-y', 'compound-agent@latest', 'mcp'],
-          },
-        },
-      };
-      await writeFile(join(tempDir, '.mcp.json'), JSON.stringify(mcpConfig, null, 2), 'utf-8');
-
+  describe('CLI-First Mode', () => {
+    it('does NOT include MCP warning (CLI-first mode)', async () => {
+      // No .mcp.json in tempDir — should NOT warn since we're CLI-first
       const output = await getPrimeContext(tempDir);
       expect(output).not.toContain('WARNING');
       expect(output).not.toMatch(/MCP server not registered/i);
+    });
+
+    it('includes CLI commands in trust language', async () => {
+      const output = await getPrimeContext(tempDir);
+      expect(output).toContain('npx ca search');
+      expect(output).toContain('npx ca learn');
+    });
+
+    it('does NOT reference MCP tools as primary interface', async () => {
+      const output = await getPrimeContext(tempDir);
+      expect(output).not.toContain('memory_search');
+      expect(output).not.toContain('memory_capture');
+      expect(output).not.toContain('MCP Tools (ALWAYS USE THESE)');
     });
   });
 

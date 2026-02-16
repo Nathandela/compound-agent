@@ -26,6 +26,7 @@ Cluster similar lessons from memory and synthesize them into testable CCT (Compo
    - Confidence level based on cluster size
 5. Write patterns to \`.claude/lessons/cct-patterns.jsonl\`
 6. Skip singleton lessons (not enough signal to form a pattern)
+7. For many clusters, spawn opus subagents to synthesize patterns from different clusters in parallel.
 
 ## Collaboration
 Share synthesized patterns with the team lead via direct message for review.

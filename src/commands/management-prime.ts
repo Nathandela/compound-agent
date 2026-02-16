@@ -11,32 +11,30 @@ import { getRepoRoot } from '../cli-utils.js';
 import { loadSessionLessons } from '../memory/retrieval/index.js';
 import { syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem, Source } from '../memory/index.js';
-import { hasMcpServerInMcpJson } from '../setup/index.js';
-
 /**
  * Beads-style trust language template.
  *
  * Uses explicit prohibitions, workflow sequencing, and NEVER/MUST language
  * following Beads conventions for maximum adherence.
  *
- * IMPORTANT: Prioritizes MCP tools over CLI commands.
+ * CLI-first: all lesson operations use `npx ca` commands.
  */
 const TRUST_LANGUAGE_TEMPLATE = `# Compound Agent Active
 
-> **Context Recovery**: Run \`ca prime\` after compaction, clear, or new session
+> **Context Recovery**: Run \`npx ca prime\` after compaction, clear, or new session
 
-## MCP Tools (ALWAYS USE THESE)
+## CLI Commands (ALWAYS USE THESE)
 
-**You MUST use MCP tools, NOT CLI commands:**
+**You MUST use CLI commands for lesson management:**
 
-| Tool | Purpose |
-|------|---------|
-| \`memory_search\` | Search lessons - call BEFORE architectural decisions |
-| \`memory_capture\` | Capture lessons - call AFTER corrections or discoveries |
+| Command | Purpose |
+|---------|---------|
+| \`npx ca search "query"\` | Search lessons - call BEFORE architectural decisions |
+| \`npx ca learn "insight"\` | Capture lessons - call AFTER corrections or discoveries |
 
 ## Core Constraints
 
-**Default**: Use MCP tools for lesson management
+**Default**: Use CLI commands for lesson management
 **Prohibited**: NEVER edit .claude/lessons/ files directly
 
 **Default**: Propose lessons freely after corrections
@@ -44,15 +42,15 @@ const TRUST_LANGUAGE_TEMPLATE = `# Compound Agent Active
 
 ## Retrieval Protocol
 
-You MUST call \`memory_search\` BEFORE:
+You MUST call \`npx ca search\` BEFORE:
 - Architectural decisions or complex planning
 - Implementing patterns you've done before in this repo
 
-**NEVER skip memory_search for complex decisions.** Past mistakes will repeat.
+**NEVER skip search for complex decisions.** Past mistakes will repeat.
 
 ## Capture Protocol
 
-Call \`memory_capture\` AFTER:
+Run \`npx ca learn\` AFTER:
 - User corrects you ("no", "wrong", "actually...")
 - You self-correct after iteration failures
 - Test fails then you fix it
@@ -63,10 +61,6 @@ Call \`memory_capture\` AFTER:
 - Actionable (preferred, not mandatory)
 
 **Workflow**: Search BEFORE deciding, capture AFTER learning.
-
-## CLI (fallback only)
-
-When MCP is unavailable: \`ca search "query"\`, \`ca learn "insight"\`, \`ca list\`
 `;
 
 /**
@@ -112,7 +106,7 @@ function formatLessonForPrime(lesson: MemoryItem): string {
 export async function getPrimeContext(repoRoot?: string): Promise<string> {
   const root = repoRoot ?? getRepoRoot();
 
-  // Sync SQLite index before loading — ensures MCP searches have fresh data
+  // Sync SQLite index before loading — ensures searches have fresh data
   // after git pull or external JSONL changes.
   try {
     await syncIfNeeded(root);
@@ -125,15 +119,6 @@ export async function getPrimeContext(repoRoot?: string): Promise<string> {
 
   // Build output: trust language first
   let output = TRUST_LANGUAGE_TEMPLATE;
-
-  // Warn if MCP server is not registered
-  const hasMcp = await hasMcpServerInMcpJson(root);
-  if (!hasMcp) {
-    output += `
-WARNING: MCP server not registered. Run 'npx ca setup' to enable memory_search/memory_capture tools.
-
-`;
-  }
 
   // Add Emergency Recall section if we have high-severity lessons
   if (lessons.length > 0) {

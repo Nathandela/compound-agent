@@ -160,29 +160,32 @@ export const AGENTS_MD_TEMPLATE = `
 ${AGENTS_SECTION_START_MARKER}
 ## Compound Agent Integration
 
-This project uses compound-agent for session memory via **MCP tools** (preferred).
+This project uses compound-agent for session memory via **CLI commands**.
 
-### MCP Tools (ALWAYS USE THESE)
+### CLI Commands (ALWAYS USE THESE)
 
-**You MUST use MCP tools, NOT CLI commands:**
+**You MUST use CLI commands for lesson management:**
 
-| Tool | Purpose |
-|------|---------|
-| \`memory_search\` | Search lessons - use BEFORE architectural decisions |
-| \`memory_capture\` | Capture lessons - use AFTER corrections or discoveries |
+| Command | Purpose |
+|---------|---------|
+| \`npx ca search "query"\` | Search lessons - use BEFORE architectural decisions |
+| \`npx ca learn "insight"\` | Capture lessons - use AFTER corrections or discoveries |
+| \`npx ca list\` | List all stored lessons |
+| \`npx ca show <id>\` | Show details of a specific lesson |
+| \`npx ca wrong <id>\` | Mark a lesson as incorrect |
 
 ### Mandatory Recall
 
-You MUST call \`memory_search\` BEFORE:
+You MUST call \`npx ca search\` BEFORE:
 - Architectural decisions or complex planning
 - Patterns you've implemented before in this repo
 - After user corrections ("actually...", "wrong", "use X instead")
 
-**NEVER skip memory_search for complex decisions.** Past mistakes will repeat.
+**NEVER skip search for complex decisions.** Past mistakes will repeat.
 
 ### Capture Protocol
 
-Call \`memory_capture\` AFTER:
+Run \`npx ca learn\` AFTER:
 - User corrects you
 - Test fail → fix → pass cycles
 - You discover project-specific knowledge
@@ -201,12 +204,7 @@ Before capturing, verify the lesson is:
 **WARNING: NEVER edit .claude/lessons/index.jsonl directly.**
 
 The JSONL file requires proper ID generation, schema validation, and SQLite sync.
-Use \`memory_capture\` MCP tool or CLI (\`npx ca learn\`) - never manual edits.
-
-### CLI (fallback only)
-
-CLI commands are for manual/terminal use when MCP is unavailable:
-\`npx ca search "query"\`, \`npx ca learn "insight"\`, \`npx ca list\`
+Use CLI (\`npx ca learn\`) — never manual edits.
 
 See [documentation](https://github.com/Nathandela/compound_agent) for more details.
 ${AGENTS_SECTION_END_MARKER}

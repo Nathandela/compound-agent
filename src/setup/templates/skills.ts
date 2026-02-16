@@ -17,7 +17,10 @@ Explore the problem space before committing to a solution. This phase produces a
 ## Methodology
 1. Ask "why" before "how" -- understand the real problem
 2. Search memory with \`npx ca search\` for similar past features and known constraints
-3. Spawn docs-explorer and code-explorer as subagents in parallel to research the topic. Synthesize their findings.
+3. Spawn research subagents in parallel -- use MULTIPLE when the topic spans several domains:
+   - Deploy docs-explorer(s) and code-explorer(s) as opus subagents for broad coverage
+   - Scale subagent count to the number of distinct domains being researched
+   - Synthesize all findings before moving to divergent phase
 4. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences
 5. Divergent phase: generate multiple approaches without filtering
 6. Identify constraints and non-functional requirements (performance, security, etc.)
@@ -69,7 +72,10 @@ Create a concrete implementation plan by decomposing work into small, testable t
 ## Methodology
 1. Review brainstorm output for decisions and open questions
 2. Search memory with \`npx ca search\` for architectural patterns and past mistakes
-3. Spawn docs-analyst, repo-analyst, and memory-analyst in parallel to research constraints and patterns.
+3. Spawn research subagents in parallel for maximum coverage:
+   - Deploy docs-analyst, repo-analyst, and memory-analyst as opus subagents
+   - For complex features spanning multiple domains, deploy MULTIPLE analysts per type
+   - Synthesize all findings before decomposing into tasks
 4. Synthesize research findings into a coherent approach. Flag conflicts between ADRs and proposed plan.
 5. Use \`AskUserQuestion\` to resolve ambiguities, conflicting constraints, or priority trade-offs before decomposing
 6. Decompose into tasks small enough to verify individually
@@ -125,8 +131,10 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 1. Pick tasks from \`bd ready\` or \`$ARGUMENTS\`
 2. Mark tasks in progress: \`bd update <id> --status=in_progress\`
 3. Run \`npx ca search\` per agent/subtask for targeted context. Display results.
-4. Define what can be parallelized. Aim for clean implementation with parallelized team work.
-5. Deploy an AgentTeam with test-writer and implementer. Test-writer writes failing tests first, implementer makes them pass.
+4. Assess parallelization: identify independent tasks that can be worked simultaneously
+5. Deploy an AgentTeam with MULTIPLE test-writers and implementers scaled to workload:
+   - Scale teammate count to the number of independent tasks -- never a single pair for many tasks
+   - Each pair works on a subset of tasks; pairs coordinate via SendMessage on shared interfaces
 6. Agents communicate via SendMessage when working on overlapping areas.
 7. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
 8. If blocked, use AskUserQuestion to get user direction.
@@ -153,6 +161,12 @@ for complex changes. For all changes, \`/implementation-reviewer\` is the minimu
 - \`bd ready\` to find available tasks
 - \`bd update <id> --status=in_progress\` when starting
 - \`bd close <id>\` when all tests pass
+
+## Parallelization Strategy
+- **Always prefer parallel work**: independent tasks should be assigned to different teammate pairs simultaneously
+- **Scale the team adaptively**: deploy multiple test-writer + implementer pairs proportional to independent task count
+- **Subagent spawning within teammates**: each teammate should spawn opus subagents for independent subtasks (e.g., a test-writer spawning subagents to write tests for multiple modules in parallel)
+- **Coordinate on shared interfaces**: teammates working on overlapping APIs must communicate via SendMessage before implementing
 
 ## Common Pitfalls
 - Lead writing code instead of delegating to agents
@@ -192,7 +206,9 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
    - **Medium** (100-500): add architecture, performance, edge-case (7 total)
    - **Large** (500+): all 11 reviewers including docs, consistency, error-handling, pattern-matcher
-4. Spawn selected reviewers in an AgentTeam to work in parallel.
+4. Spawn selected reviewers in an AgentTeam. For large diffs (500+ lines), deploy MULTIPLE instances of high-value reviewers:
+   - Split files/modules across reviewer instances for security and test-coverage reviewers
+   - Each instance reviews a subset; instances coordinate via SendMessage to avoid duplicate findings
 5. Reviewers communicate findings to each other via \`SendMessage\`
 6. Collect, consolidate, and deduplicate all findings
 7. Classify by severity: P1 (critical/blocking), P2 (important), P3 (minor)
@@ -254,7 +270,9 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
 
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
-2. Spawn the analysis pipeline in an AgentTeam to parallelize work with communication:
+2. Spawn the analysis pipeline in an AgentTeam. Scale agents to the volume of changes:
+   - For large diffs, deploy multiple context-analyzers (one per major changed module) and multiple lesson-extractors
+   - All agents coordinate via SendMessage: context-analyzers feed lesson-extractors, which feed pattern-matcher and solution-writer
    - context-analyzer: gathers cycle context (diffs, test output)
    - lesson-extractor: identifies corrections, surprises, discoveries
    - docs-reviewer: scans \`docs/\` for outdated content and ADRs that need updating

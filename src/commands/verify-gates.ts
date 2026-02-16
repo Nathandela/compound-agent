@@ -4,8 +4,11 @@
  * Usage: ca verify-gates <epic-id>
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import type { Command } from 'commander';
+
+/** Strict pattern for valid beads epic IDs. */
+const EPIC_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
 export interface GateCheck {
   name: string;
@@ -19,9 +22,21 @@ interface DepTask {
 }
 
 /**
- * Parse the DEPENDS ON section from `bd show` output.
+ * Parse dependencies from `bd show --json` output.
  */
-function parseDeps(output: string): DepTask[] {
+function parseDepsJson(raw: string): DepTask[] {
+  const data = JSON.parse(raw);
+  const depsArray = data.depends_on ?? data.dependencies ?? [];
+  return depsArray.map((dep: { title?: string; status?: string }) => ({
+    closed: dep.status === 'closed',
+    title: dep.title ?? '',
+  }));
+}
+
+/**
+ * Fallback: parse the DEPENDS ON section from `bd show` text output.
+ */
+function parseDepsText(output: string): DepTask[] {
   const deps: DepTask[] = [];
   const lines = output.split('\n');
   let inDeps = false;
@@ -32,15 +47,12 @@ function parseDeps(output: string): DepTask[] {
       continue;
     }
     if (inDeps) {
-      // Dependency lines start with "  ->" or similar arrow
-      // Match any beads ID prefix (e.g., learning_agent-xxx, my-project-xxx)
       const match = line.match(
         /^\s+→\s+(✓|○)\s+\S+-\S+:\s+(.+?)\s+●/,
       );
       if (match && match[1] && match[2]) {
         deps.push({ closed: match[1] === '✓', title: match[2] });
       } else if (line.trim() !== '' && !line.startsWith('  ')) {
-        // Left the DEPENDS ON section
         break;
       }
     }
@@ -72,8 +84,20 @@ function checkGate(
  * Run all gate checks for the given epic and return results.
  */
 export async function runVerifyGates(epicId: string): Promise<GateCheck[]> {
-  const raw = execSync(`bd show ${epicId}`, { encoding: 'utf-8' });
-  const deps = parseDeps(raw);
+  if (!EPIC_ID_PATTERN.test(epicId)) {
+    throw new Error(`Invalid epic ID: "${epicId}" (must be alphanumeric with hyphens/underscores)`);
+  }
+
+  const raw = execFileSync('bd', ['show', epicId, '--json'], { encoding: 'utf-8' });
+
+  let deps: DepTask[];
+  try {
+    deps = parseDepsJson(raw);
+  } catch {
+    // Fallback to text parsing if --json output is not valid JSON
+    const textRaw = execFileSync('bd', ['show', epicId], { encoding: 'utf-8' });
+    deps = parseDepsText(textRaw);
+  }
 
   return [
     checkGate(deps, 'Review:', 'Review task'),
