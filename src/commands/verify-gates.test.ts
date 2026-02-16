@@ -16,13 +16,13 @@ import { runVerifyGates, type GateCheck } from './verify-gates.js';
 
 const mockExecFileSync = vi.mocked(execFileSync);
 
-// Helper to build bd show --json output
+// Helper to build bd show --json output (array format, matching real bd CLI)
 function bdShowJson(opts: {
   epicId?: string;
   title?: string;
   deps?: Array<{ closed: boolean; title: string; id: string }>;
 }): string {
-  return JSON.stringify({
+  return JSON.stringify([{
     id: `learning_agent-${opts.epicId ?? 'test1'}`,
     title: opts.title ?? 'EPIC: Test epic',
     status: 'open',
@@ -31,7 +31,7 @@ function bdShowJson(opts: {
       title: dep.title,
       status: dep.closed ? 'closed' : 'open',
     })),
-  });
+  }]);
 }
 
 // Helper to build bd show text output (fallback path)
@@ -255,7 +255,7 @@ describe('verify-gates', () => {
   // ==========================================================================
 
   it('parses deps with different beads project prefixes', async () => {
-    mockExecFileSync.mockReturnValue(JSON.stringify({
+    mockExecFileSync.mockReturnValue(JSON.stringify([{
       id: 'my-project-abc1',
       title: 'EPIC: Test epic',
       status: 'open',
@@ -263,7 +263,7 @@ describe('verify-gates', () => {
         { id: 'my-project-r1', title: 'Review: check', status: 'closed' },
         { id: 'my-project-c1', title: 'Compound: capture', status: 'closed' },
       ],
-    }));
+    }]));
 
     const checks = await runVerifyGates('abc1');
     expect(checks.every(c => c.status === 'pass')).toBe(true);

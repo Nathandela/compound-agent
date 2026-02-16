@@ -26,7 +26,9 @@ interface DepTask {
  */
 function parseDepsJson(raw: string): DepTask[] {
   const data = JSON.parse(raw);
-  const depsArray = data.depends_on ?? data.dependencies ?? [];
+  const issue = Array.isArray(data) ? data[0] : data;
+  if (!issue) return [];
+  const depsArray = issue.depends_on ?? issue.dependencies ?? [];
   return depsArray.map((dep: { title?: string; status?: string }) => ({
     closed: dep.status === 'closed',
     title: dep.title ?? '',
