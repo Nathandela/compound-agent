@@ -17,10 +17,10 @@ Explore the problem space before committing to a solution. This phase produces a
 ## Methodology
 1. Ask "why" before "how" -- understand the real problem
 2. Search memory with \`npx ca search\` for similar past features and known constraints
-3. Spawn research subagents in parallel -- use MULTIPLE when the topic spans several domains:
-   - Deploy docs-explorer(s) and code-explorer(s) as opus subagents for broad coverage
-   - Scale subagent count to the number of distinct domains being researched
-   - Synthesize all findings before moving to divergent phase
+3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
+   - Available agents: \`.claude/agents/compound/repo-analyst.md\`, \`memory-analyst.md\`
+   - Or use \`subagent_type: Explore\` for ad-hoc research
+   - Deploy MULTIPLE when topic spans several domains; synthesize all findings before proceeding
 4. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences
 5. Divergent phase: generate multiple approaches without filtering
 6. Identify constraints and non-functional requirements (performance, security, etc.)
@@ -72,9 +72,9 @@ Create a concrete implementation plan by decomposing work into small, testable t
 ## Methodology
 1. Review brainstorm output for decisions and open questions
 2. Search memory with \`npx ca search\` for architectural patterns and past mistakes
-3. Spawn research subagents in parallel for maximum coverage:
-   - Deploy docs-analyst, repo-analyst, and memory-analyst as opus subagents
-   - For complex features spanning multiple domains, deploy MULTIPLE analysts per type
+3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
+   - Available agents: \`.claude/agents/compound/repo-analyst.md\`, \`memory-analyst.md\`
+   - For complex features, deploy MULTIPLE analysts per domain area
    - Synthesize all findings before decomposing into tasks
 4. Synthesize research findings into a coherent approach. Flag conflicts between ADRs and proposed plan.
 5. Use \`AskUserQuestion\` to resolve ambiguities, conflicting constraints, or priority trade-offs before decomposing
@@ -132,9 +132,9 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 2. Mark tasks in progress: \`bd update <id> --status=in_progress\`
 3. Run \`npx ca search\` per agent/subtask for targeted context. Display results.
 4. Assess parallelization: identify independent tasks that can be worked simultaneously
-5. Deploy an AgentTeam with MULTIPLE test-writers and implementers scaled to workload:
-   - Scale teammate count to the number of independent tasks -- never a single pair for many tasks
-   - Each pair works on a subset of tasks; pairs coordinate via SendMessage on shared interfaces
+5. Deploy an **AgentTeam** (TeamCreate + Task with \`team_name\`) with MULTIPLE test-writers and implementers:
+   - Role skills: \`.claude/skills/compound/agents/{test-writer,implementer}/SKILL.md\`
+   - Scale teammate count to independent tasks; pairs coordinate via SendMessage on shared interfaces
 6. Agents communicate via SendMessage when working on overlapping areas.
 7. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
 8. If blocked, use AskUserQuestion to get user direction.
@@ -206,9 +206,9 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
    - **Medium** (100-500): add architecture, performance, edge-case (7 total)
    - **Large** (500+): all 11 reviewers including docs, consistency, error-handling, pattern-matcher
-4. Spawn selected reviewers in an AgentTeam. For large diffs (500+ lines), deploy MULTIPLE instances of high-value reviewers:
-   - Split files/modules across reviewer instances for security and test-coverage reviewers
-   - Each instance reviews a subset; instances coordinate via SendMessage to avoid duplicate findings
+4. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with \`team_name\`):
+   - Role skills: \`.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer}/SKILL.md\`
+   - For large diffs (500+), deploy MULTIPLE instances; split files across instances, coordinate via SendMessage
 5. Reviewers communicate findings to each other via \`SendMessage\`
 6. Collect, consolidate, and deduplicate all findings
 7. Classify by severity: P1 (critical/blocking), P2 (important), P3 (minor)
@@ -270,15 +270,11 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
 
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
-2. Spawn the analysis pipeline in an AgentTeam. Scale agents to the volume of changes:
-   - For large diffs, deploy multiple context-analyzers (one per major changed module) and multiple lesson-extractors
-   - All agents coordinate via SendMessage: context-analyzers feed lesson-extractors, which feed pattern-matcher and solution-writer
-   - context-analyzer: gathers cycle context (diffs, test output)
-   - lesson-extractor: identifies corrections, surprises, discoveries
-   - docs-reviewer: scans \`docs/\` for outdated content and ADRs that need updating
-   - pattern-matcher: checks \`npx ca search\` for duplicates and related items
-   - solution-writer: drafts final memory items
-   - compounding: synthesizes accumulated lessons into CCT patterns
+2. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with \`team_name\`):
+   - Role skills: \`.claude/skills/compound/agents/{context-analyzer,lesson-extractor,pattern-matcher,solution-writer,compounding}/SKILL.md\`
+   - For large diffs, deploy MULTIPLE context-analyzers and lesson-extractors
+   - Pipeline: context-analyzers -> lesson-extractors -> pattern-matcher + solution-writer -> compounding
+   - Agents coordinate via SendMessage throughout the pipeline
 3. Agents pass results through the pipeline via \`SendMessage\`. The lead coordinates: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
 4. Apply quality filters: novelty check (>0.85 similarity = skip), specificity check
 5. Classify each item by type: lesson, solution, pattern, or preference
