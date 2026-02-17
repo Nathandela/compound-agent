@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.7] - 2026-02-17
+
+### Changed
+
+- **Explicit agent mechanism language in phase skills**: Each phase now clearly distinguishes subagents (Task tool, lightweight research) from AgentTeam teammates (TeamCreate + Task with `team_name`, dedicated role skills). Relative paths to agent definitions and role skill files included in every step.
+  - Brainstorm/Plan: "Spawn **subagents** via Task tool" referencing `.claude/agents/compound/*.md`
+  - Work/Review/Compound: "Deploy an **AgentTeam** (TeamCreate + Task with `team_name`)" referencing `.claude/skills/compound/agents/*/SKILL.md`
+
+### Fixed
+
+- **`verify-gates` JSON array unwrap**: `bd show --json` returns an array, not an object. `parseDepsJson()` now unwraps the first element before reading `depends_on`. Previously caused false gate failures on valid epics.
+
 ## [1.2.6] - 2026-02-16
 
 ### Changed
@@ -493,7 +505,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.6...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.7...HEAD
+[1.2.7]: https://github.com/Nathandela/learning_agent/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/Nathandela/learning_agent/compare/v1.2.5...v1.2.6
 [1.2.5]: https://github.com/Nathandela/learning_agent/compare/v1.2.4...v1.2.5
 [1.2.4]: https://github.com/Nathandela/learning_agent/compare/v1.2.1...v1.2.4
