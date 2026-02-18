@@ -105,6 +105,7 @@ describe('Stop Audit Hook', () => {
       writeState({
         current_phase: 'review',
         phase_index: 4,
+        skills_read: ['.claude/skills/compound/compound/SKILL.md'],
         gates_passed: [],
       });
 
@@ -121,6 +122,18 @@ describe('Stop Audit Hook', () => {
       writeState({
         current_phase: 'brainstorm',
         phase_index: 1,
+      });
+
+      const result = processStopAudit(repoRoot);
+      expect(result).toEqual({});
+    });
+
+    it('returns {} when gated phase has no transition evidence yet', () => {
+      writeState({
+        current_phase: 'plan',
+        phase_index: 2,
+        skills_read: ['.claude/skills/compound/plan/SKILL.md'],
+        gates_passed: [],
       });
 
       const result = processStopAudit(repoRoot);
