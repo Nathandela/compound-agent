@@ -4,7 +4,7 @@
  * Follows TDD: These tests are written BEFORE implementation.
  */
 
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -370,28 +370,20 @@ describe('Prime Command', () => {
   });
 
   // ============================================================================
-  // CLI-First: No MCP warning in CLI-first mode
+  // CLI-First Mode
   // ============================================================================
 
   describe('CLI-First Mode', () => {
-    it('does NOT include MCP warning (CLI-first mode)', async () => {
-      // No .mcp.json in tempDir — should NOT warn since we're CLI-first
-      const output = await getPrimeContext(tempDir);
-      expect(output).not.toContain('WARNING');
-      expect(output).not.toMatch(/MCP server not registered/i);
-    });
-
     it('includes CLI commands in trust language', async () => {
       const output = await getPrimeContext(tempDir);
       expect(output).toContain('npx ca search');
       expect(output).toContain('npx ca learn');
     });
 
-    it('does NOT reference MCP tools as primary interface', async () => {
+    it('does NOT reference MCP tools', async () => {
       const output = await getPrimeContext(tempDir);
       expect(output).not.toContain('memory_search');
       expect(output).not.toContain('memory_capture');
-      expect(output).not.toContain('MCP Tools (ALWAYS USE THESE)');
     });
   });
 
@@ -400,7 +392,7 @@ describe('Prime Command', () => {
   // ============================================================================
 
   describe('Auto-Sync on Prime (session start freshness)', () => {
-    it('syncs SQLite index so MCP searches have fresh data', async () => {
+    it('syncs SQLite index so searches have fresh data', async () => {
       // 1. Add a lesson and force-sync the SQLite index
       await appendLesson(tempDir, createFullLesson('L001', 'First lesson', 'high'));
       await syncIfNeeded(tempDir, { force: true });
@@ -414,6 +406,54 @@ describe('Prime Command', () => {
       // 4. Verify SQLite was synced — a subsequent syncIfNeeded should be a no-op
       const synced = await syncIfNeeded(tempDir);
       expect(synced).toBe(false); // false means already up-to-date
+    });
+  });
+
+  describe('Active LFG Session Injection', () => {
+    it('injects phase context when phase state is active', async () => {
+      const statePath = join(tempDir, '.claude', '.ca-phase-state.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+      await writeFile(
+        statePath,
+        JSON.stringify({
+          lfg_active: true,
+          epic_id: 'learning_agent-5dfm',
+          current_phase: 'work',
+          phase_index: 3,
+          skills_read: ['.claude/skills/compound/work/SKILL.md'],
+          gates_passed: ['post-plan'],
+          started_at: '2026-02-18T21:00:00.000Z',
+        }),
+        'utf-8'
+      );
+
+      const output = await getPrimeContext(tempDir);
+      expect(output).toContain('ACTIVE LFG SESSION');
+      expect(output).toContain('learning_agent-5dfm');
+      expect(output).toContain('work (3/5)');
+      expect(output).toContain('npx ca phase-check start work');
+      expect(output).toContain('.claude/skills/compound/work/SKILL.md');
+    });
+
+    it('does not inject phase context when lfg_active is false', async () => {
+      const statePath = join(tempDir, '.claude', '.ca-phase-state.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+      await writeFile(
+        statePath,
+        JSON.stringify({
+          lfg_active: false,
+          epic_id: 'learning_agent-5dfm',
+          current_phase: 'work',
+          phase_index: 3,
+          skills_read: [],
+          gates_passed: [],
+          started_at: '2026-02-18T21:00:00.000Z',
+        }),
+        'utf-8'
+      );
+
+      const output = await getPrimeContext(tempDir);
+      expect(output).not.toContain('ACTIVE LFG SESSION');
     });
   });
 

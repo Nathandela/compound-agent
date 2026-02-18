@@ -7,6 +7,9 @@
 import { execFileSync } from 'node:child_process';
 import type { Command } from 'commander';
 
+import { getRepoRoot } from '../cli-utils.js';
+import { cleanPhaseState, getPhaseState } from './phase-check.js';
+
 /** Strict pattern for valid beads epic IDs. */
 const EPIC_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
@@ -19,6 +22,10 @@ export interface GateCheck {
 interface DepTask {
   closed: boolean;
   title: string;
+}
+
+interface VerifyGatesOptions {
+  repoRoot?: string;
 }
 
 /**
@@ -82,14 +89,15 @@ function checkGate(
   return { name: gateName, status: 'pass' };
 }
 
-/**
- * Run all gate checks for the given epic and return results.
- */
-export async function runVerifyGates(epicId: string): Promise<GateCheck[]> {
+export async function runVerifyGates(
+  epicId: string,
+  options: VerifyGatesOptions = {}
+): Promise<GateCheck[]> {
   if (!EPIC_ID_PATTERN.test(epicId)) {
     throw new Error(`Invalid epic ID: "${epicId}" (must be alphanumeric with hyphens/underscores)`);
   }
 
+  const repoRoot = options.repoRoot ?? getRepoRoot();
   const raw = execFileSync('bd', ['show', epicId, '--json'], { encoding: 'utf-8' });
 
   let deps: DepTask[];
@@ -101,10 +109,20 @@ export async function runVerifyGates(epicId: string): Promise<GateCheck[]> {
     deps = parseDepsText(textRaw);
   }
 
-  return [
+  const checks = [
     checkGate(deps, 'Review:', 'Review task'),
     checkGate(deps, 'Compound:', 'Compound task'),
   ];
+
+  const allPassed = checks.every((check) => check.status === 'pass');
+  if (allPassed) {
+    const state = getPhaseState(repoRoot);
+    if (state !== null && state.lfg_active && state.gates_passed.includes('final')) {
+      cleanPhaseState(repoRoot);
+    }
+  }
+
+  return checks;
 }
 
 const STATUS_LABEL: Record<string, string> = {
@@ -118,7 +136,7 @@ export function registerVerifyGatesCommand(program: Command): void {
     .description('Verify workflow gates are satisfied before epic closure')
     .action(async (epicId: string) => {
       try {
-        const checks = await runVerifyGates(epicId);
+        const checks = await runVerifyGates(epicId, { repoRoot: getRepoRoot() });
 
         console.log(`Gate checks for epic ${epicId}:\n`);
         for (const check of checks) {

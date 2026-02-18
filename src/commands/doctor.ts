@@ -13,8 +13,7 @@ import { isModelAvailable } from '../memory/embeddings/index.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
 import {
   getClaudeSettingsPath,
-  hasClaudeHook,
-  hasMcpServerInMcpJson,
+  hasAllCompoundAgentHooks,
   readClaudeSettings,
 } from '../setup/index.js';
 
@@ -59,7 +58,7 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
   let hooksOk = false;
   try {
     const settings = await readClaudeSettings(settingsPath);
-    hooksOk = hasClaudeHook(settings);
+    hooksOk = hasAllCompoundAgentHooks(settings);
   } catch {
     // settings.json may not exist
   }
@@ -67,13 +66,7 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
     ? { name: 'Claude hooks', status: 'pass' }
     : { name: 'Claude hooks', status: 'fail', fix: 'Run: npx ca setup' });
 
-  // 6. MCP server
-  const mcpOk = await hasMcpServerInMcpJson(repoRoot);
-  checks.push(mcpOk
-    ? { name: 'MCP server', status: 'pass' }
-    : { name: 'MCP server', status: 'fail', fix: 'Run: npx ca setup' });
-
-  // 7. Embedding model
+  // 6. Embedding model
   let modelOk = false;
   try {
     modelOk = isModelAvailable();

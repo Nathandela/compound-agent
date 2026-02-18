@@ -115,6 +115,37 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(settings.hooks.SessionStart[1].hooks[0].command).toContain('ca');
     });
 
+    it('installs all 5 hook types', async () => {
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+      runSetupClaude();
+
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+      const expectedHookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse'];
+      for (const hookType of expectedHookTypes) {
+        expect(settings.hooks[hookType], `missing hook type: ${hookType}`).toBeDefined();
+        expect(settings.hooks[hookType].length, `empty hook array for: ${hookType}`).toBeGreaterThan(0);
+      }
+    });
+
+    it('--uninstall removes all 5 hook types', async () => {
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+      runSetupClaude();
+      runSetupClaude('--uninstall');
+
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+      const hookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse'];
+      for (const hookType of hookTypes) {
+        const hookArray = settings.hooks?.[hookType] ?? [];
+        expect(hookArray, `hook type ${hookType} should be empty after uninstall`).toHaveLength(0);
+      }
+    });
+
     it('is idempotent - does not duplicate hook on re-run', async () => {
       await mkdir(join(tempDir, '.claude'), { recursive: true });
 

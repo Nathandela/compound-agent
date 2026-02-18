@@ -21,6 +21,7 @@ import {
   registerCaptureCommands,
   registerLoopCommands,
   registerManagementCommands,
+  registerPhaseCheckCommand,
   registerRetrievalCommands,
   registerSetupCommands,
 } from './commands/index.js';
@@ -84,6 +85,7 @@ registerManagementCommands(program);
 registerSetupCommands(program);
 registerCompoundCommands(program);
 registerLoopCommands(program);
+registerPhaseCheckCommand(program);
 
 // ============================================================================
 // Parse and Execute

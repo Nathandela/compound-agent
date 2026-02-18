@@ -153,7 +153,7 @@ export type {
 export { formatLessonsCheck, formatMemoryCheck, loadSessionLessons, loadSessionMemory, retrieveForPlan } from './memory/retrieval/index.js';
 export type { PlanRetrievalResult } from './memory/retrieval/index.js';
 
-// Context recovery API (for MCP server integration)
+// Context recovery API
 export { getPrimeContext } from './commands/index.js';
 
 // Audit API

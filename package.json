@@ -1,14 +1,13 @@
 {
   "name": "compound-agent",
-  "version": "1.2.8",
+  "version": "1.2.9",
   "description": "Semantically-intelligent workflow plugin for Claude Code",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "bin": {
     "compound-agent": "./dist/cli.js",
-    "ca": "./dist/cli.js",
-    "compound-agent-mcp": "./dist/mcp.js"
+    "ca": "./dist/cli.js"
   },
   "exports": {
     ".": {
@@ -72,7 +71,6 @@
     "vitest": "^2.0.0"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "1.26.0",
     "better-sqlite3": "^11.0.0",
     "chalk": "5.6.2",
     "commander": "^12.0.0",

@@ -65,6 +65,15 @@ describe('LFG Phase Integration', () => {
       expect(lfgSkill).toMatch(/\[Phase N\/5\]/);
     });
 
+    it('uses phase-check state machine commands', () => {
+      expect(lfgSkill).toContain('phase-check init');
+      expect(lfgSkill).toContain('phase-check start');
+      expect(lfgSkill).toContain('phase-check gate post-plan');
+      expect(lfgSkill).toContain('phase-check gate gate-3');
+      expect(lfgSkill).toContain('phase-check gate gate-4');
+      expect(lfgSkill).toContain('phase-check gate final');
+    });
+
     it('contains phase control (skip/resume/retry)', () => {
       expect(lfgSkill).toMatch(/skip/i);
       expect(lfgSkill).toMatch(/resume/i);
@@ -77,6 +86,7 @@ describe('LFG Phase Integration', () => {
 
     it('contains session close protocol', () => {
       expect(lfgSkill).toContain('SESSION CLOSE');
+      expect(lfgSkill).toContain('phase-clean');
     });
 
     it('references verify-gates', () => {

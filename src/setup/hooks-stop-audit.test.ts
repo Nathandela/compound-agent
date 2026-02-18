@@ -1,0 +1,130 @@
+/**
+ * Unit tests for Stop hook phase audit handler.
+ *
+ * TDD GATE: Imports from a module that does NOT exist yet.
+ * Tests should fail with import errors, not logic errors.
+ */
+
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { processStopAudit } from './hooks-stop-audit.js';
+
+describe('Stop Audit Hook', () => {
+  let repoRoot: string;
+  let stateDir: string;
+  let stateFile: string;
+
+  beforeEach(async () => {
+    repoRoot = await mkdtemp(join(tmpdir(), 'stop-audit-'));
+    stateDir = join(repoRoot, '.claude');
+    stateFile = join(stateDir, '.ca-phase-state.json');
+  });
+
+  afterEach(async () => {
+    await rm(repoRoot, { recursive: true, force: true });
+  });
+
+  function writeState(state: Record<string, unknown>): void {
+    const base = {
+      lfg_active: true,
+      epic_id: 'learning_agent-5dfm',
+      current_phase: 'work',
+      phase_index: 3,
+      skills_read: [],
+      gates_passed: [],
+      started_at: new Date().toISOString(),
+    };
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(stateFile, JSON.stringify({ ...base, ...state }), 'utf-8');
+  }
+
+  // ---- Safety invariants (required in every hook test file) ----
+
+  describe('safety invariants', () => {
+    it('returns {} when no state file exists', () => {
+      const result = processStopAudit(repoRoot);
+      expect(result).toEqual({});
+    });
+
+    it('returns {} when state file is corrupted', () => {
+      mkdirSync(stateDir, { recursive: true });
+      writeFileSync(stateFile, '<<<not json>>>', 'utf-8');
+
+      const result = processStopAudit(repoRoot);
+      expect(result).toEqual({});
+    });
+
+    it('returns {} when lfg_active is false', () => {
+      writeState({
+        lfg_active: false,
+        current_phase: 'work',
+        skills_read: [],
+        gates_passed: [],
+        started_at: new Date().toISOString(),
+      });
+
+      const result = processStopAudit(repoRoot);
+      expect(result).toEqual({});
+    });
+
+    it('never throws — returns {} on any error', () => {
+      expect(() => processStopAudit('')).not.toThrow();
+      const result = processStopAudit('');
+      expect(result).toEqual({});
+    });
+  });
+
+  // ---- Behavior tests ----
+
+  describe('when stop_hook_active is false', () => {
+    it('returns {}', () => {
+      writeState({});
+
+      const result = processStopAudit(repoRoot, true);
+      expect(result).toEqual({});
+    });
+  });
+
+  describe('when gate is verified for current phase', () => {
+    it('returns {} (allows stop)', () => {
+      writeState({
+        gates_passed: ['gate-3'],
+      });
+
+      const result = processStopAudit(repoRoot);
+      expect(result).toEqual({});
+    });
+  });
+
+  describe('when gate is NOT verified and completing', () => {
+    it('returns continue:false with stopReason', () => {
+      writeState({
+        current_phase: 'review',
+        phase_index: 4,
+        gates_passed: [],
+      });
+
+      const result = processStopAudit(repoRoot);
+      expect(result.continue).toBe(false);
+      expect(result.stopReason).toBeDefined();
+      expect(result.stopReason).toMatch(/PHASE GATE/i);
+      expect(result.stopReason).toMatch(/gate-4/);
+    });
+  });
+
+  describe('mid-phase (not transitioning)', () => {
+    it('returns {} when no stop_hook_active flag', () => {
+      writeState({
+        current_phase: 'brainstorm',
+        phase_index: 1,
+      });
+
+      const result = processStopAudit(repoRoot);
+      expect(result).toEqual({});
+    });
+  });
+});

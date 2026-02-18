@@ -1,7 +1,7 @@
 /**
  * One-shot setup command - Configure everything for compound-agent.
  *
- * Combines: init + Claude hooks + MCP server + optionally model download.
+ * Combines: init + Claude hooks + optionally model download.
  */
 
 import { existsSync } from 'node:fs';
@@ -15,17 +15,16 @@ import { LESSONS_PATH } from '../memory/storage/index.js';
 import { out } from '../commands/index.js';
 import {
   addAllCompoundAgentHooks,
-  addMcpServerToMcpJson,
   getClaudeSettingsPath,
+  hasAllCompoundAgentHooks,
   hasClaudeHook,
-  hasMcpServerInMcpJson,
   readClaudeSettings,
   removeAgentsSection,
   removeClaudeMdReference,
   removeCompoundAgentHook,
-  removeMcpServerFromMcpJson,
   writeClaudeSettings,
 } from './claude-helpers.js';
+import { installPreCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
   ensureClaudeMdReference,
@@ -44,7 +43,7 @@ interface SetupResult {
   lessonsDir: string;
   agentsMd: boolean;
   hooks: boolean;
-  mcpServer: boolean;
+  gitHooks: HookInstallResult['status'] | 'skipped';
   model: 'downloaded' | 'already_exists' | 'failed' | 'skipped';
 }
 
@@ -64,11 +63,9 @@ async function ensureLessonsDirectory(repoRoot: string): Promise<string> {
 }
 
 /**
- * Configure Claude Code settings: hooks in settings.json, MCP in .mcp.json.
- * Per Claude Code docs, hooks go in .claude/settings.json, MCP goes in .mcp.json.
+ * Configure Claude Code settings: hooks in settings.json.
  */
-async function configureClaudeSettings(repoRoot: string): Promise<{ hooks: boolean; mcpServer: boolean }> {
-  // 1. Configure hooks in .claude/settings.json
+async function configureClaudeSettings(): Promise<{ hooks: boolean }> {
   const settingsPath = getClaudeSettingsPath(false);
   let settings: Record<string, unknown>;
   try {
@@ -77,24 +74,19 @@ async function configureClaudeSettings(repoRoot: string): Promise<{ hooks: boole
     settings = {};
   }
 
-  const hadHooks = hasClaudeHook(settings);
+  const hadHooks = hasAllCompoundAgentHooks(settings);
   addAllCompoundAgentHooks(settings);
   await writeClaudeSettings(settingsPath, settings);
 
-  // 2. Configure MCP in .mcp.json (project scope, shareable)
-  const hadMcp = await hasMcpServerInMcpJson(repoRoot);
-  const mcpAdded = await addMcpServerToMcpJson(repoRoot);
-
   return {
     hooks: !hadHooks,
-    mcpServer: mcpAdded && !hadMcp,
   };
 }
 
 /**
  * Run one-shot setup.
  */
-export async function runSetup(options: { skipModel?: boolean }): Promise<SetupResult> {
+export async function runSetup(options: { skipModel?: boolean; skipHooks?: boolean }): Promise<SetupResult> {
   const repoRoot = getRepoRoot();
 
   // 1. Initialize lessons directory
@@ -121,8 +113,14 @@ export async function runSetup(options: { skipModel?: boolean }): Promise<SetupR
   // 8. Install agent role skills
   await installAgentRoleSkills(repoRoot);
 
-  // 9. Configure Claude settings (hooks in settings.json, MCP in .mcp.json)
-  const { hooks, mcpServer } = await configureClaudeSettings(repoRoot);
+  // 8b. Install pre-commit git hook
+  let gitHooks: HookInstallResult['status'] | 'skipped' = 'skipped';
+  if (!options.skipHooks) {
+    gitHooks = (await installPreCommitHook(repoRoot)).status;
+  }
+
+  // 9. Configure Claude settings (hooks in settings.json)
+  const { hooks } = await configureClaudeSettings();
 
   // 7. Download model (unless skipped)
   let modelStatus: 'downloaded' | 'already_exists' | 'failed' | 'skipped' = 'skipped';
@@ -144,7 +142,7 @@ export async function runSetup(options: { skipModel?: boolean }): Promise<SetupR
     lessonsDir,
     agentsMd: agentsMdUpdated,
     hooks,
-    mcpServer,
+    gitHooks,
     model: modelStatus,
   };
 }
@@ -202,12 +200,6 @@ export async function runUninstall(repoRoot: string, dryRun: boolean): Promise<s
     }
   } catch {
     // settings.json may not exist
-  }
-
-  // Remove MCP server from .mcp.json
-  if (await hasMcpServerInMcpJson(repoRoot)) {
-    if (!dryRun) await removeMcpServerFromMcpJson(repoRoot);
-    actions.push('Removed compound-agent from .mcp.json');
   }
 
   // Remove AGENTS.md section
@@ -297,11 +289,11 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{ up
     }
   }
 
-  // Ensure hooks and MCP config are current
+  // Ensure hooks config is current
   let configUpdated = false;
   if (!dryRun) {
-    const { hooks, mcpServer } = await configureClaudeSettings(repoRoot);
-    configUpdated = hooks || mcpServer;
+    const { hooks } = await configureClaudeSettings();
+    configUpdated = hooks;
   }
 
   return { updated, added, skipped, configUpdated };
@@ -326,14 +318,31 @@ export async function runStatus(repoRoot: string): Promise<void> {
   let hooksInstalled = false;
   try {
     const settings = await readClaudeSettings(settingsPath);
-    hooksInstalled = hasClaudeHook(settings);
+    hooksInstalled = hasAllCompoundAgentHooks(settings);
   } catch {
     // No settings
   }
   console.log(`  Hooks:              ${hooksInstalled ? 'installed' : 'not installed'}`);
+}
 
-  const mcpInstalled = await hasMcpServerInMcpJson(repoRoot);
-  console.log(`  MCP server:         ${mcpInstalled ? 'installed' : 'not installed'}`);
+function printSetupGitHooksStatus(gitHooks: HookInstallResult['status'] | 'skipped'): void {
+  if (gitHooks === 'skipped') {
+    console.log('  Git hooks: Skipped (--skip-hooks)');
+    return;
+  }
+  if (gitHooks === 'not_git_repo') {
+    console.log('  Git hooks: Skipped (not a git repository)');
+    return;
+  }
+  if (gitHooks === 'installed') {
+    console.log('  Git hooks: Installed');
+    return;
+  }
+  if (gitHooks === 'appended') {
+    console.log('  Git hooks: Appended to existing pre-commit hook');
+    return;
+  }
+  console.log('  Git hooks: Already configured');
 }
 
 /**
@@ -342,19 +351,22 @@ export async function runStatus(repoRoot: string): Promise<void> {
  * from being consumed by the parent when other subcommands like "claude"
  * define the same flags.
  */
+// eslint-disable-next-line max-lines-per-function -- command router keeps related setup flows in one place
 export function registerSetupAllCommand(setupCommand: Command): void {
-  setupCommand.description('One-shot setup: init + hooks + MCP server + model');
+  setupCommand.description('One-shot setup: init + hooks + model');
 
   setupCommand
     .command('all', { isDefault: true })
     .description('Run full setup (default)')
     .option('--skip-model', 'Skip embedding model download')
+    .option('--skip-hooks', 'Skip git hooks installation')
     .option('--uninstall', 'Remove all generated files and configuration')
     .option('--update', 'Regenerate files (preserves user customizations)')
     .option('--status', 'Show installation status')
     .option('--dry-run', 'Show what would change without changing')
     .action(async (options: {
       skipModel?: boolean;
+      skipHooks?: boolean;
       uninstall?: boolean;
       update?: boolean;
       status?: boolean;
@@ -387,7 +399,7 @@ export function registerSetupAllCommand(setupCommand: Command): void {
           if (result.added > 0) console.log(`  ${prefix}Added: ${result.added} file(s)`);
         }
         if (result.skipped > 0) console.log(`  Skipped: ${result.skipped} user-customized file(s)`);
-        if (result.configUpdated) console.log(`  ${prefix}Config: hooks/MCP updated`);
+        if (result.configUpdated) console.log(`  ${prefix}Config: hooks updated`);
         return;
       }
 
@@ -397,13 +409,13 @@ export function registerSetupAllCommand(setupCommand: Command): void {
       }
 
       // Default: full setup
-      const result = await runSetup({ skipModel: options.skipModel });
+      const result = await runSetup({ skipModel: options.skipModel, skipHooks: options.skipHooks });
 
       out.success('Compound agent setup complete');
       console.log(`  Lessons directory: ${result.lessonsDir}`);
       console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
       console.log(`  Claude hooks: ${result.hooks ? 'Installed' : 'Already configured'}`);
-      console.log(`  MCP server: ${result.mcpServer ? 'Registered in .mcp.json' : 'Already configured'}`);
+      printSetupGitHooksStatus(result.gitHooks);
       switch (result.model) {
         case 'skipped':
           console.log('  Model: Skipped (--skip-model)');

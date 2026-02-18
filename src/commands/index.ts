@@ -28,6 +28,7 @@ import { registerVerifyGatesCommand } from './verify-gates.js';
 
 export { registerCaptureCommands } from './capture.js';
 export { registerLoopCommands } from './loop.js';
+export { expectedGateForPhase, getPhaseState, registerPhaseCheckCommand, updatePhaseState } from './phase-check.js';
 export { registerRetrievalCommands } from './retrieval.js';
 
 // Re-export types and helpers from management modules

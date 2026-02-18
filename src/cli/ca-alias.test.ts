@@ -39,16 +39,15 @@ describe('CLI', { tags: ['integration'] }, () => {
         expect(pkg.bin!['ca']).toBe(pkg.bin!['compound-agent']);
       });
 
-      it('has required bin entries (ca, compound-agent, compound-agent-mcp)', async () => {
+      it('has required bin entries (ca, compound-agent)', async () => {
         const pkgPath = join(process.cwd(), 'package.json');
         const pkgContent = await readFile(pkgPath, 'utf8');
         const pkg = JSON.parse(pkgContent) as { bin?: Record<string, string> };
 
         const binKeys = Object.keys(pkg.bin ?? {});
-        expect(binKeys).toHaveLength(3);
+        expect(binKeys).toHaveLength(2);
         expect(binKeys).toContain('ca');
         expect(binKeys).toContain('compound-agent');
-        expect(binKeys).toContain('compound-agent-mcp');
       });
     });
 

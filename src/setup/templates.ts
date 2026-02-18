@@ -51,6 +51,12 @@ export const CLAUDE_HOOK_MARKERS = [
   'ca hooks run user-prompt',
   'ca hooks run post-tool-failure',
   'ca hooks run post-tool-success',
+  'ca hooks run phase-guard',
+  'ca hooks run read-tracker',
+  'ca hooks run stop-audit',
+  // v1.2.9 canonical names
+  'ca hooks run post-read',
+  'ca hooks run phase-audit',
 ];
 
 /** Claude Code SessionStart hook configuration (v0.2.4: uses prime for trust language) */
@@ -108,17 +114,46 @@ export const CLAUDE_POST_TOOL_SUCCESS_HOOK_CONFIG = {
   ],
 };
 
+/** Claude Code PreToolUse hook config for phase guard */
+export const CLAUDE_PHASE_GUARD_HOOK_CONFIG = {
+  matcher: 'Edit|Write',
+  hooks: [
+    {
+      type: 'command',
+      command: 'npx ca hooks run phase-guard 2>/dev/null || true',
+    },
+  ],
+};
+
+/** Claude Code PostToolUse hook config for skill-read tracking. */
+export const CLAUDE_POST_READ_HOOK_CONFIG = {
+  matcher: 'Read',
+  hooks: [
+    {
+      type: 'command',
+      command: 'npx ca hooks run post-read 2>/dev/null || true',
+    },
+  ],
+};
+
+/** Claude Code Stop hook config for phase gate verification. */
+export const CLAUDE_PHASE_AUDIT_HOOK_CONFIG = {
+  matcher: '',
+  hooks: [
+    {
+      type: 'command',
+      command: 'npx ca hooks run phase-audit 2>/dev/null || true',
+    },
+  ],
+};
+
+// Back-compat aliases for test imports and older references.
+export const CLAUDE_READ_TRACKER_HOOK_CONFIG = CLAUDE_POST_READ_HOOK_CONFIG;
+export const CLAUDE_STOP_AUDIT_HOOK_CONFIG = CLAUDE_PHASE_AUDIT_HOOK_CONFIG;
+
 // Note: PreCommit is NOT a valid Claude Code hook type.
 // The remind-capture functionality is handled by git pre-commit hooks instead.
 // See installPreCommitHook() in hooks.ts for git hook installation.
-
-/** MCP server configuration for Claude Code settings */
-export const MCP_SERVER_CONFIG = {
-  'compound-agent': {
-    command: 'npx',
-    args: ['compound-agent-mcp'],
-  },
-};
 
 // ============================================================================
 // Init Command Constants
@@ -266,6 +301,22 @@ export const PLUGIN_MANIFEST = {
       {
         matcher: 'Bash|Edit|Write',
         hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-success 2>/dev/null || true' }],
+      },
+      {
+        matcher: 'Read',
+        hooks: [{ type: 'command', command: 'npx ca hooks run post-read 2>/dev/null || true' }],
+      },
+    ],
+    PreToolUse: [
+      {
+        matcher: 'Edit|Write',
+        hooks: [{ type: 'command', command: 'npx ca hooks run phase-guard 2>/dev/null || true' }],
+      },
+    ],
+    Stop: [
+      {
+        matcher: '',
+        hooks: [{ type: 'command', command: 'npx ca hooks run phase-audit 2>/dev/null || true' }],
       },
     ],
     // Note: PreCommit is handled by git hooks, not Claude Code hooks

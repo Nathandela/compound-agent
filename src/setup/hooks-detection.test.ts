@@ -4,8 +4,9 @@
  * Tests the UserPromptSubmit and PostToolUseFailure hook logic.
  */
 
-import { readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
@@ -14,7 +15,10 @@ import {
   processToolFailure,
   processToolSuccess,
   processUserPrompt,
+  readFailureState,
   resetFailureState,
+  STATE_FILE_NAME,
+  writeFailureState,
 } from './hooks.js';
 
 describe('Hook Detection Functions', () => {
@@ -234,6 +238,133 @@ describe('Failure Tracking Functions', () => {
 
     it('handles being called with no prior state', () => {
       expect(() => processToolSuccess()).not.toThrow();
+    });
+  });
+});
+
+describe('Cross-Process Failure State Persistence', () => {
+  let stateDir: string;
+
+  function freshStateDir(): string {
+    const dir = join(tmpdir(), `ca-test-state-${Date.now()}-${Math.random().toString(36).slice(2)}`);
+    mkdirSync(dir, { recursive: true });
+    return dir;
+  }
+
+  afterEach(() => {
+    resetFailureState(stateDir);
+  });
+
+  describe('readFailureState / writeFailureState', () => {
+    it('writes state to file and reads it back', () => {
+      stateDir = freshStateDir();
+      const state = { count: 2, lastTarget: 'npm', sameTargetCount: 1, timestamp: Date.now() };
+      writeFailureState(stateDir, state);
+
+      const filePath = join(stateDir, STATE_FILE_NAME);
+      expect(existsSync(filePath)).toBe(true);
+
+      const read = readFailureState(stateDir);
+      expect(read.count).toBe(2);
+      expect(read.lastTarget).toBe('npm');
+      expect(read.sameTargetCount).toBe(1);
+    });
+
+    it('returns defaults when no state file exists', () => {
+      stateDir = freshStateDir();
+      const read = readFailureState(stateDir);
+      expect(read.count).toBe(0);
+      expect(read.lastTarget).toBeNull();
+      expect(read.sameTargetCount).toBe(0);
+    });
+
+    it('returns defaults when state file is corrupted', () => {
+      stateDir = freshStateDir();
+      const filePath = join(stateDir, STATE_FILE_NAME);
+      writeFileSync(filePath, 'not valid json{{{', 'utf-8');
+
+      const read = readFailureState(stateDir);
+      expect(read.count).toBe(0);
+      expect(read.lastTarget).toBeNull();
+      expect(read.sameTargetCount).toBe(0);
+    });
+
+    it('returns defaults when state file is stale (>1h old)', () => {
+      stateDir = freshStateDir();
+      const staleTimestamp = Date.now() - 61 * 60 * 1000; // 61 minutes ago
+      const state = { count: 5, lastTarget: 'npm', sameTargetCount: 3, timestamp: staleTimestamp };
+      writeFailureState(stateDir, state);
+
+      const read = readFailureState(stateDir);
+      expect(read.count).toBe(0);
+      expect(read.lastTarget).toBeNull();
+      expect(read.sameTargetCount).toBe(0);
+    });
+  });
+
+  describe('processToolFailure with persistence', () => {
+    it('accumulates failures across simulated process boundaries', () => {
+      stateDir = freshStateDir();
+
+      // "Process 1": first failure
+      const r1 = processToolFailure('Bash', { command: 'npm test' }, stateDir);
+      expect(r1.hookSpecificOutput).toBeUndefined();
+
+      // Reset in-memory state to simulate new process
+      resetFailureState();
+
+      // "Process 2": second failure on same target - should trigger tip
+      const r2 = processToolFailure('Bash', { command: 'npm test' }, stateDir);
+      expect(r2.hookSpecificOutput).toBeDefined();
+      expect(r2.hookSpecificOutput?.additionalContext).toContain('Multiple failures');
+    });
+
+    it('triggers total threshold across simulated processes', () => {
+      stateDir = freshStateDir();
+
+      // "Process 1": first failure
+      processToolFailure('Bash', { command: 'npm test' }, stateDir);
+      resetFailureState(); // simulate new process
+
+      // "Process 2": second failure (different target)
+      processToolFailure('Edit', { file_path: '/file.ts' }, stateDir);
+      resetFailureState(); // simulate new process
+
+      // "Process 3": third failure (different target) - should trigger total threshold
+      const r3 = processToolFailure('Write', { file_path: '/other.ts' }, stateDir);
+      expect(r3.hookSpecificOutput).toBeDefined();
+      expect(r3.hookSpecificOutput?.additionalContext).toContain('npx ca search');
+    });
+  });
+
+  describe('processToolSuccess with persistence', () => {
+    it('deletes state file on success', () => {
+      stateDir = freshStateDir();
+      processToolFailure('Bash', { command: 'npm test' }, stateDir);
+
+      const filePath = join(stateDir, STATE_FILE_NAME);
+      expect(existsSync(filePath)).toBe(true);
+
+      processToolSuccess(stateDir);
+      expect(existsSync(filePath)).toBe(false);
+    });
+
+    it('handles missing state file gracefully', () => {
+      stateDir = freshStateDir();
+      expect(() => processToolSuccess(stateDir)).not.toThrow();
+    });
+  });
+
+  describe('resetFailureState with persistence', () => {
+    it('deletes state file when stateDir provided', () => {
+      stateDir = freshStateDir();
+      processToolFailure('Bash', { command: 'npm test' }, stateDir);
+
+      const filePath = join(stateDir, STATE_FILE_NAME);
+      expect(existsSync(filePath)).toBe(true);
+
+      resetFailureState(stateDir);
+      expect(existsSync(filePath)).toBe(false);
     });
   });
 });

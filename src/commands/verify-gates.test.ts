@@ -5,6 +5,10 @@
  */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { existsSync } from 'node:fs';
+import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 // Mock execFileSync before importing the module under test
 vi.mock('node:child_process', () => ({
@@ -267,5 +271,86 @@ describe('verify-gates', () => {
 
     const checks = await runVerifyGates('abc1');
     expect(checks.every(c => c.status === 'pass')).toBe(true);
+  });
+
+  describe('phase-state cleanup', () => {
+    async function writePhaseState(repoRoot: string, gatesPassed: string[]): Promise<string> {
+      const stateDir = join(repoRoot, '.claude');
+      const statePath = join(stateDir, '.ca-phase-state.json');
+      await mkdir(stateDir, { recursive: true });
+      await writeFile(
+        statePath,
+        JSON.stringify({
+          lfg_active: true,
+          epic_id: 'learning_agent-5dfm',
+          current_phase: 'compound',
+          phase_index: 5,
+          skills_read: [],
+          gates_passed: gatesPassed,
+          started_at: new Date().toISOString(),
+        }),
+        'utf-8'
+      );
+      return statePath;
+    }
+
+    it('deletes phase state when checks pass and final gate is already recorded', async () => {
+      const repoRoot = await mkdtemp(join(tmpdir(), 'verify-gates-clean-'));
+      try {
+        const statePath = await writePhaseState(repoRoot, ['post-plan', 'gate-3', 'gate-4', 'final']);
+
+        mockExecFileSync.mockReturnValue(bdShowJson({
+          deps: [
+            { closed: true, title: 'Review: check implementation', id: 'r1' },
+            { closed: true, title: 'Compound: capture learnings', id: 'c1' },
+          ],
+        }));
+
+        const checks = await runVerifyGates('test1', { repoRoot });
+        expect(checks.every(c => c.status === 'pass')).toBe(true);
+        expect(existsSync(statePath)).toBe(false);
+      } finally {
+        await rm(repoRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('keeps phase state when checks pass but final gate is not recorded', async () => {
+      const repoRoot = await mkdtemp(join(tmpdir(), 'verify-gates-keep-'));
+      try {
+        const statePath = await writePhaseState(repoRoot, ['post-plan', 'gate-3', 'gate-4']);
+
+        mockExecFileSync.mockReturnValue(bdShowJson({
+          deps: [
+            { closed: true, title: 'Review: check implementation', id: 'r1' },
+            { closed: true, title: 'Compound: capture learnings', id: 'c1' },
+          ],
+        }));
+
+        const checks = await runVerifyGates('test1', { repoRoot });
+        expect(checks.every(c => c.status === 'pass')).toBe(true);
+        expect(existsSync(statePath)).toBe(true);
+      } finally {
+        await rm(repoRoot, { recursive: true, force: true });
+      }
+    });
+
+    it('keeps phase state when any verify-gates check fails', async () => {
+      const repoRoot = await mkdtemp(join(tmpdir(), 'verify-gates-fail-'));
+      try {
+        const statePath = await writePhaseState(repoRoot, ['post-plan', 'gate-3', 'gate-4', 'final']);
+
+        mockExecFileSync.mockReturnValue(bdShowJson({
+          deps: [
+            { closed: true, title: 'Review: check implementation', id: 'r1' },
+          ],
+        }));
+
+        const checks = await runVerifyGates('test1', { repoRoot });
+        expect(checks.some(c => c.status === 'fail')).toBe(true);
+        expect(existsSync(statePath)).toBe(true);
+      } finally {
+        await rm(repoRoot, { recursive: true, force: true });
+      }
+    });
   });
 });

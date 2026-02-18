@@ -15,13 +15,15 @@ import {
   AGENTS_SECTION_START_MARKER,
   CLAUDE_HOOK_CONFIG,
   CLAUDE_HOOK_MARKERS,
+  CLAUDE_PHASE_AUDIT_HOOK_CONFIG,
+  CLAUDE_PHASE_GUARD_HOOK_CONFIG,
+  CLAUDE_POST_READ_HOOK_CONFIG,
   CLAUDE_POST_TOOL_FAILURE_HOOK_CONFIG,
   CLAUDE_POST_TOOL_SUCCESS_HOOK_CONFIG,
   CLAUDE_PRECOMPACT_HOOK_CONFIG,
   CLAUDE_REF_END_MARKER,
   CLAUDE_REF_START_MARKER,
   CLAUDE_USER_PROMPT_HOOK_CONFIG,
-  MCP_SERVER_CONFIG,
 } from './templates.js';
 import type { ClaudeHooksResult } from './types.js';
 
@@ -59,7 +61,7 @@ export function hasClaudeHook(settings: Record<string, unknown>): boolean {
   if (!hooks) return false;
 
   // Check all hook types we manage
-  const hookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse'];
+  const hookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse', 'PreToolUse', 'Stop'];
 
   return hookTypes.some((hookType) => {
     const hookArray = hooks[hookType];
@@ -72,6 +74,26 @@ export function hasClaudeHook(settings: Record<string, unknown>): boolean {
       );
     });
   });
+}
+
+/**
+ * Check whether every required hook type/config is installed.
+ * This is stricter than hasClaudeHook(), which only checks for any marker.
+ */
+export function hasAllCompoundAgentHooks(settings: Record<string, unknown>): boolean {
+  const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+  if (!hooks) return false;
+
+  return (
+    hasHookTypeAny(hooks.SessionStart ?? [], ['ca prime']) &&
+    hasHookTypeAny(hooks.PreCompact ?? [], ['ca prime']) &&
+    hasHookTypeAny(hooks.UserPromptSubmit ?? [], ['ca hooks run user-prompt']) &&
+    hasHookTypeAny(hooks.PostToolUseFailure ?? [], ['ca hooks run post-tool-failure']) &&
+    hasHookTypeAny(hooks.PostToolUse ?? [], ['ca hooks run post-tool-success']) &&
+    hasHookTypeAny(hooks.PostToolUse ?? [], ['ca hooks run post-read', 'ca hooks run read-tracker']) &&
+    hasHookTypeAny(hooks.PreToolUse ?? [], ['ca hooks run phase-guard']) &&
+    hasHookTypeAny(hooks.Stop ?? [], ['ca hooks run phase-audit', 'ca hooks run stop-audit'])
+  );
 }
 
 /**
@@ -89,7 +111,7 @@ export function addCompoundAgentHook(settings: Record<string, unknown>): void {
 }
 
 /**
- * Add all hooks: SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse.
+ * Add all hooks managed by compound-agent.
  * Note: PreCommit is handled by git hooks, not Claude Code hooks.
  */
 export function addAllCompoundAgentHooks(settings: Record<string, unknown>): void {
@@ -102,7 +124,7 @@ export function addAllCompoundAgentHooks(settings: Record<string, unknown>): voi
   if (!hooks.SessionStart) {
     hooks.SessionStart = [];
   }
-  if (!hasHookType(hooks.SessionStart, 'ca prime')) {
+  if (!hasHookTypeAny(hooks.SessionStart, ['ca prime'])) {
     hooks.SessionStart.push(CLAUDE_HOOK_CONFIG);
   }
 
@@ -110,7 +132,7 @@ export function addAllCompoundAgentHooks(settings: Record<string, unknown>): voi
   if (!hooks.PreCompact) {
     hooks.PreCompact = [];
   }
-  if (!hasHookType(hooks.PreCompact, 'ca prime')) {
+  if (!hasHookTypeAny(hooks.PreCompact, ['ca prime'])) {
     hooks.PreCompact.push(CLAUDE_PRECOMPACT_HOOK_CONFIG);
   }
 
@@ -118,7 +140,7 @@ export function addAllCompoundAgentHooks(settings: Record<string, unknown>): voi
   if (!hooks.UserPromptSubmit) {
     hooks.UserPromptSubmit = [];
   }
-  if (!hasHookType(hooks.UserPromptSubmit, 'ca hooks run user-prompt')) {
+  if (!hasHookTypeAny(hooks.UserPromptSubmit, ['ca hooks run user-prompt'])) {
     hooks.UserPromptSubmit.push(CLAUDE_USER_PROMPT_HOOK_CONFIG);
   }
 
@@ -126,7 +148,7 @@ export function addAllCompoundAgentHooks(settings: Record<string, unknown>): voi
   if (!hooks.PostToolUseFailure) {
     hooks.PostToolUseFailure = [];
   }
-  if (!hasHookType(hooks.PostToolUseFailure, 'ca hooks run post-tool-failure')) {
+  if (!hasHookTypeAny(hooks.PostToolUseFailure, ['ca hooks run post-tool-failure'])) {
     hooks.PostToolUseFailure.push(CLAUDE_POST_TOOL_FAILURE_HOOK_CONFIG);
   }
 
@@ -134,8 +156,29 @@ export function addAllCompoundAgentHooks(settings: Record<string, unknown>): voi
   if (!hooks.PostToolUse) {
     hooks.PostToolUse = [];
   }
-  if (!hasHookType(hooks.PostToolUse, 'ca hooks run post-tool-success')) {
+  if (!hasHookTypeAny(hooks.PostToolUse, ['ca hooks run post-tool-success'])) {
     hooks.PostToolUse.push(CLAUDE_POST_TOOL_SUCCESS_HOOK_CONFIG);
+  }
+
+  // PostToolUse - read tracker (tracks skill file reads)
+  if (!hasHookTypeAny(hooks.PostToolUse, ['ca hooks run post-read', 'ca hooks run read-tracker'])) {
+    hooks.PostToolUse.push(CLAUDE_POST_READ_HOOK_CONFIG);
+  }
+
+  // PreToolUse - phase guard (warns before Edit/Write without skill read)
+  if (!hooks.PreToolUse) {
+    hooks.PreToolUse = [];
+  }
+  if (!hasHookTypeAny(hooks.PreToolUse, ['ca hooks run phase-guard'])) {
+    hooks.PreToolUse.push(CLAUDE_PHASE_GUARD_HOOK_CONFIG);
+  }
+
+  // Stop - audit hook (blocks stop when phase gate not passed)
+  if (!hooks.Stop) {
+    hooks.Stop = [];
+  }
+  if (!hasHookTypeAny(hooks.Stop, ['ca hooks run phase-audit', 'ca hooks run stop-audit'])) {
+    hooks.Stop.push(CLAUDE_PHASE_AUDIT_HOOK_CONFIG);
   }
 
   // Note: remind-capture functionality is handled by git pre-commit hooks
@@ -143,135 +186,13 @@ export function addAllCompoundAgentHooks(settings: Record<string, unknown>): voi
 }
 
 /**
- * Check if a hook type already has a command containing the marker.
+ * Check if a hook type already has a command containing any marker.
  */
-function hasHookType(hookArray: unknown[], marker: string): boolean {
+function hasHookTypeAny(hookArray: unknown[], markers: string[]): boolean {
   return hookArray.some((entry) => {
     const hookEntry = entry as { hooks?: Array<{ command?: string }> };
-    return hookEntry.hooks?.some((h) => h.command?.includes(marker));
+    return hookEntry.hooks?.some((h) => markers.some((marker) => h.command?.includes(marker)));
   });
-}
-
-// ============================================================================
-// MCP Configuration (.mcp.json - project scope)
-// ============================================================================
-
-/**
- * Get the path to .mcp.json (project-scope MCP config).
- * This is the correct location for MCP servers per Claude Code docs.
- */
-export function getMcpJsonPath(repoRoot?: string): string {
-  const root = repoRoot ?? getRepoRoot();
-  return join(root, '.mcp.json');
-}
-
-/**
- * Read and parse .mcp.json.
- */
-export async function readMcpJson(mcpPath: string): Promise<Record<string, unknown>> {
-  if (!existsSync(mcpPath)) {
-    return {};
-  }
-  const content = await readFile(mcpPath, 'utf-8');
-  return JSON.parse(content) as Record<string, unknown>;
-}
-
-/**
- * Write .mcp.json atomically.
- */
-export async function writeMcpJson(mcpPath: string, config: Record<string, unknown>): Promise<void> {
-  const tempPath = mcpPath + '.tmp';
-  await writeFile(tempPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
-  await rename(tempPath, mcpPath);
-}
-
-/**
- * Add MCP server configuration to .mcp.json.
- * Returns true if added, false if already exists.
- */
-export async function addMcpServerToMcpJson(repoRoot?: string): Promise<boolean> {
-  const mcpPath = getMcpJsonPath(repoRoot);
-  const config = await readMcpJson(mcpPath);
-
-  if (!config.mcpServers) {
-    config.mcpServers = {};
-  }
-  const mcpServers = config.mcpServers as Record<string, unknown>;
-
-  if (mcpServers['compound-agent']) {
-    return false; // Already configured
-  }
-
-  Object.assign(mcpServers, MCP_SERVER_CONFIG);
-  await writeMcpJson(mcpPath, config);
-  return true;
-}
-
-/**
- * Check if MCP server is configured in .mcp.json.
- */
-export async function hasMcpServerInMcpJson(repoRoot?: string): Promise<boolean> {
-  const mcpPath = getMcpJsonPath(repoRoot);
-  const config = await readMcpJson(mcpPath);
-  const mcpServers = config.mcpServers as Record<string, unknown> | undefined;
-  return !!mcpServers?.['compound-agent'];
-}
-
-/**
- * Remove MCP server from .mcp.json.
- */
-export async function removeMcpServerFromMcpJson(repoRoot?: string): Promise<boolean> {
-  const mcpPath = getMcpJsonPath(repoRoot);
-  const config = await readMcpJson(mcpPath);
-  const mcpServers = config.mcpServers as Record<string, unknown> | undefined;
-
-  if (!mcpServers?.['compound-agent']) {
-    return false;
-  }
-
-  delete mcpServers['compound-agent'];
-  await writeMcpJson(mcpPath, config);
-  return true;
-}
-
-// Legacy functions for backwards compatibility (settings.json)
-// These are deprecated - use the McpJson functions above
-
-/**
- * @deprecated Use addMcpServerToMcpJson instead
- */
-export function addMcpServer(settings: Record<string, unknown>): boolean {
-  if (!settings.mcpServers) {
-    settings.mcpServers = {};
-  }
-  const mcpServers = settings.mcpServers as Record<string, unknown>;
-
-  if (mcpServers['compound-agent']) {
-    return false; // Already configured
-  }
-
-  Object.assign(mcpServers, MCP_SERVER_CONFIG);
-  return true;
-}
-
-/**
- * @deprecated Use hasMcpServerInMcpJson instead
- */
-export function hasMcpServer(settings: Record<string, unknown>): boolean {
-  const mcpServers = settings.mcpServers as Record<string, unknown> | undefined;
-  return !!mcpServers?.['compound-agent'];
-}
-
-/**
- * @deprecated Use removeMcpServerFromMcpJson instead
- */
-export function removeMcpServer(settings: Record<string, unknown>): boolean {
-  const mcpServers = settings.mcpServers as Record<string, unknown> | undefined;
-  if (!mcpServers?.['compound-agent']) {
-    return false;
-  }
-  delete mcpServers['compound-agent'];
-  return true;
 }
 
 /**
@@ -285,7 +206,7 @@ export function removeCompoundAgentHook(settings: Record<string, unknown>): bool
   let anyRemoved = false;
 
   // Hook types we manage
-  const hookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse'];
+  const hookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse', 'PreToolUse', 'Stop'];
 
   for (const hookType of hookTypes) {
     if (!hooks[hookType]) continue;
@@ -335,12 +256,12 @@ export async function installClaudeHooksForInit(repoRoot: string): Promise<Claud
     return { installed: false, action: 'error', error: 'Failed to parse settings.json' };
   }
 
-  if (hasClaudeHook(settings)) {
+  if (hasAllCompoundAgentHooks(settings)) {
     return { installed: true, action: 'already_installed' };
   }
 
   try {
-    addCompoundAgentHook(settings);
+    addAllCompoundAgentHooks(settings);
     await writeClaudeSettings(settingsPath, settings);
     return { installed: true, action: 'installed' };
   } catch (err) {

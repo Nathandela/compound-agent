@@ -147,6 +147,15 @@ describe('PHASE_SKILLS', () => {
     expect(PHASE_SKILLS.lfg).toContain('FINAL GATE');
   });
 
+  it('lfg skill references phase-check init/start/gate flow', () => {
+    expect(PHASE_SKILLS.lfg).toContain('phase-check init');
+    expect(PHASE_SKILLS.lfg).toContain('phase-check start');
+    expect(PHASE_SKILLS.lfg).toContain('phase-check gate post-plan');
+    expect(PHASE_SKILLS.lfg).toContain('phase-check gate gate-3');
+    expect(PHASE_SKILLS.lfg).toContain('phase-check gate gate-4');
+    expect(PHASE_SKILLS.lfg).toContain('phase-check gate final');
+  });
+
   it('lfg skill contains phase control (skip/resume/retry)', () => {
     expect(PHASE_SKILLS.lfg).toMatch(/skip/i);
     expect(PHASE_SKILLS.lfg).toMatch(/resume/i);

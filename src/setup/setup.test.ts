@@ -385,22 +385,6 @@ describe('Setup Commands - Generated Content', () => {
       }
     });
 
-    it('removes MCP server from .mcp.json', async () => {
-      runCli('setup --skip-model');
-
-      const mcpPath = join(getTempDir(), '.mcp.json');
-      expect(existsSync(mcpPath)).toBe(true);
-      const before = JSON.parse(await readFile(mcpPath, 'utf-8'));
-      expect(before.mcpServers?.['compound-agent']).toBeDefined();
-
-      runCli('setup --uninstall');
-
-      if (existsSync(mcpPath)) {
-        const after = JSON.parse(await readFile(mcpPath, 'utf-8'));
-        expect(after.mcpServers?.['compound-agent']).toBeUndefined();
-      }
-    });
-
     it('removes AGENTS.md section', async () => {
       runCli('init');
 
@@ -566,50 +550,16 @@ describe('Setup Commands - Generated Content', () => {
       expect(content).toBe('My custom learn command');
     });
 
-    it('ensures hooks and MCP config are current after update', async () => {
-      runCli('setup --skip-model');
-
-      // Remove .mcp.json to simulate missing config
-      const mcpPath = join(getTempDir(), '.mcp.json');
-      await rm(mcpPath, { force: true });
-      expect(existsSync(mcpPath)).toBe(false);
-
-      runCli('setup --update');
-
-      // .mcp.json should be recreated by --update
-      expect(existsSync(mcpPath)).toBe(true);
-      const mcpConfig = JSON.parse(await readFile(mcpPath, 'utf-8'));
-      expect(mcpConfig.mcpServers?.['compound-agent']).toBeDefined();
-    });
-
-    it('does not duplicate MCP config if already present during update', async () => {
-      runCli('setup --skip-model');
-
-      // MCP should already exist
-      const mcpPath = join(getTempDir(), '.mcp.json');
-      const before = JSON.parse(await readFile(mcpPath, 'utf-8'));
-      expect(before.mcpServers?.['compound-agent']).toBeDefined();
-
-      runCli('setup --update');
-
-      // Should still have exactly one entry
-      const after = JSON.parse(await readFile(mcpPath, 'utf-8'));
-      expect(after.mcpServers?.['compound-agent']).toBeDefined();
-      const serverKeys = Object.keys(after.mcpServers);
-      const caCount = serverKeys.filter((k: string) => k === 'compound-agent').length;
-      expect(caCount).toBe(1);
-    });
-
     it('reports config status in --update output', async () => {
       runCli('setup --skip-model');
 
-      // Remove .mcp.json to trigger config update
-      const mcpPath = join(getTempDir(), '.mcp.json');
-      await rm(mcpPath, { force: true });
+      // Remove hooks to trigger config update
+      const settingsPath = join(getTempDir(), '.claude', 'settings.json');
+      await writeFile(settingsPath, '{}', 'utf-8');
 
       const result = runCli('setup --update');
       // Should mention config was updated
-      expect(result.combined).toMatch(/config|hooks|MCP/i);
+      expect(result.combined).toMatch(/config|hooks/i);
     });
   });
 
@@ -622,7 +572,7 @@ describe('Setup Commands - Generated Content', () => {
 
       const result = runCli('setup --status');
       expect(result.combined).toMatch(/agent/i);
-      expect(result.combined).toMatch(/hook|MCP/i);
+      expect(result.combined).toMatch(/hook/i);
     });
 
     it('shows not-installed status before setup', () => {
@@ -863,6 +813,58 @@ describe('Setup Commands - Generated Content', () => {
 
       const skillsDir = join(getTempDir(), '.claude', 'skills', 'compound');
       expect(existsSync(skillsDir)).toBe(false);
+    });
+  });
+
+  /**
+   * Tests for g1r9: setup installs pre-commit git hook
+   */
+  describe('Pre-commit hook installation via setup (g1r9)', () => {
+    it('setup installs pre-commit git hook when .git/hooks exists', async () => {
+      // Create .git/hooks directory to simulate a git repo
+      const hooksDir = join(getTempDir(), '.git', 'hooks');
+      await mkdir(hooksDir, { recursive: true });
+
+      runCli('setup --skip-model');
+
+      const hookPath = join(hooksDir, 'pre-commit');
+      expect(existsSync(hookPath)).toBe(true);
+      const content = await readFile(hookPath, 'utf-8');
+      expect(content).toContain('Compound Agent');
+    });
+
+    it('setup skips pre-commit hook gracefully when no .git directory', () => {
+      // No .git directory - setup should not error
+      const result = runCli('setup --skip-model');
+      expect(result.combined).toContain('setup complete');
+
+      // No hook should be created
+      const hookPath = join(getTempDir(), '.git', 'hooks', 'pre-commit');
+      expect(existsSync(hookPath)).toBe(false);
+    });
+
+    it('setup does not duplicate pre-commit hook on re-run', async () => {
+      const hooksDir = join(getTempDir(), '.git', 'hooks');
+      await mkdir(hooksDir, { recursive: true });
+
+      runCli('setup --skip-model');
+      runCli('setup --skip-model');
+
+      const hookPath = join(hooksDir, 'pre-commit');
+      const content = await readFile(hookPath, 'utf-8');
+      // Marker should appear exactly once
+      const matches = content.match(/Compound Agent pre-commit hook/g);
+      expect(matches?.length).toBe(1);
+    });
+
+    it('setup --skip-hooks does not install pre-commit hook', async () => {
+      const hooksDir = join(getTempDir(), '.git', 'hooks');
+      await mkdir(hooksDir, { recursive: true });
+
+      runCli('setup --skip-model --skip-hooks');
+
+      const hookPath = join(hooksDir, 'pre-commit');
+      expect(existsSync(hookPath)).toBe(false);
     });
   });
 });

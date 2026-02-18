@@ -10,27 +10,22 @@ import { formatError } from '../cli-error-format.js';
 import { out } from '../commands/index.js';
 import { getRepoRoot } from '../cli-utils.js';
 import {
-  addCompoundAgentHook,
+  addAllCompoundAgentHooks,
   getClaudeSettingsPath,
-  getMcpJsonPath,
-  hasClaudeHook,
-  hasMcpServerInMcpJson,
+  hasAllCompoundAgentHooks,
   readClaudeSettings,
   removeAgentsSection,
   removeClaudeMdReference,
   removeCompoundAgentHook,
-  removeMcpServerFromMcpJson,
   writeClaudeSettings,
 } from './claude-helpers.js';
 
 /** Status check result */
 interface StatusResult {
   settingsFile: string;
-  mcpFile: string;
   exists: boolean;
   validJson: boolean;
   hookInstalled: boolean;
-  mcpInstalled: boolean;
   slashCommands: {
     learn: boolean;
     search: boolean;
@@ -51,17 +46,14 @@ async function handleStatus(
   const repoRoot = getRepoRoot();
   const learnMdPath = join(repoRoot, '.claude', 'commands', 'learn.md');
   const searchMdPath = join(repoRoot, '.claude', 'commands', 'search.md');
-  const mcpPath = getMcpJsonPath(repoRoot);
 
   const learnExists = existsSync(learnMdPath);
   const searchExists = existsSync(searchMdPath);
-  const mcpExists = existsSync(mcpPath);
-  const mcpInstalled = mcpExists && await hasMcpServerInMcpJson(repoRoot);
 
   let status: 'connected' | 'partial' | 'disconnected';
-  if (alreadyInstalled && mcpInstalled && learnExists && searchExists) {
+  if (alreadyInstalled && learnExists && searchExists) {
     status = 'connected';
-  } else if (alreadyInstalled || mcpInstalled || learnExists || searchExists) {
+  } else if (alreadyInstalled || learnExists || searchExists) {
     status = 'partial';
   } else {
     status = 'disconnected';
@@ -69,11 +61,9 @@ async function handleStatus(
 
   const result: StatusResult = {
     settingsFile: displayPath,
-    mcpFile: '.mcp.json',
     exists: existsSync(settingsPath),
     validJson: true,
     hookInstalled: alreadyInstalled,
-    mcpInstalled,
     slashCommands: { learn: learnExists, search: searchExists },
     status,
   };
@@ -89,11 +79,7 @@ async function handleStatus(
   console.log(`Hooks file: ${displayPath}`);
   console.log(`  ${result.exists ? '[ok]' : '[missing]'} File exists`);
   console.log(`  ${result.validJson ? '[ok]' : '[error]'} Valid JSON`);
-  console.log(`  ${result.hookInstalled ? '[ok]' : '[warn]'} SessionStart hook installed`);
-  console.log('');
-  console.log('MCP config: .mcp.json');
-  console.log(`  ${mcpExists ? '[ok]' : '[missing]'} File exists`);
-  console.log(`  ${mcpInstalled ? '[ok]' : '[warn]'} compound-agent MCP server`);
+  console.log(`  ${result.hookInstalled ? '[ok]' : '[warn]'} Compound Agent hooks installed`);
   console.log('');
   console.log('Slash commands:');
   console.log(`  ${learnExists ? '[ok]' : '[warn]'} /learn command`);
@@ -140,11 +126,10 @@ async function handleUninstall(
     await writeClaudeSettings(settingsPath, settings);
   }
 
-  const removedMcp = await removeMcpServerFromMcpJson(repoRoot);
   const removedAgents = await removeAgentsSection(repoRoot);
   const removedClaudeMd = await removeClaudeMdReference(repoRoot);
 
-  const anyRemoved = removedHook || removedMcp || removedAgents || removedClaudeMd;
+  const anyRemoved = removedHook || removedAgents || removedClaudeMd;
 
   if (anyRemoved) {
     if (options.json) {
@@ -152,14 +137,12 @@ async function handleUninstall(
         installed: false,
         location: displayPath,
         action: 'removed',
-        mcpRemoved: removedMcp,
         agentsMdRemoved: removedAgents,
         claudeMdRemoved: removedClaudeMd,
       }));
     } else {
       out.success('Compound agent removed');
       if (removedHook) console.log(`  Hooks: ${displayPath}`);
-      if (removedMcp) console.log('  MCP: .mcp.json');
       if (removedAgents) console.log('  AGENTS.md: Compound Agent section removed');
       if (removedClaudeMd) console.log('  CLAUDE.md: Compound Agent reference removed');
     }
@@ -202,7 +185,7 @@ async function handleInstall(
       console.log(JSON.stringify({
         installed: true,
         location: displayPath,
-        hooks: ['SessionStart'],
+        hooks: ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse', 'PreToolUse', 'Stop'],
         action: 'unchanged',
       }));
     } else {
@@ -213,20 +196,20 @@ async function handleInstall(
   }
 
   const fileExists = existsSync(settingsPath);
-  addCompoundAgentHook(settings);
+  addAllCompoundAgentHooks(settings);
   await writeClaudeSettings(settingsPath, settings);
 
   if (options.json) {
     console.log(JSON.stringify({
       installed: true,
       location: displayPath,
-      hooks: ['SessionStart'],
+      hooks: ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse', 'PreToolUse', 'Stop'],
       action: fileExists ? 'updated' : 'created',
     }));
   } else {
     out.success(options.global ? 'Claude Code hooks installed (global)' : 'Claude Code hooks installed (project-level)');
     console.log(`  Location: ${displayPath}`);
-    console.log('  Hook: SessionStart (startup|resume|compact)');
+    console.log('  Hooks: SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse, PreToolUse, Stop');
     console.log('');
     console.log('Lessons will be loaded automatically at session start.');
     if (!options.global) {
@@ -246,7 +229,7 @@ async function handleInstall(
 export function registerClaudeSubcommand(setupCommand: Command): void {
   setupCommand
     .command('claude')
-    .description('Install Claude Code SessionStart hooks')
+    .description('Install Claude Code hooks')
     .option('--global', 'Install to global ~/.claude/ instead of project')
     .option('--uninstall', 'Remove compound-agent hooks')
     .option('--status', 'Check status of Claude Code integration')
@@ -268,7 +251,7 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
         process.exit(1);
       }
 
-      const alreadyInstalled = hasClaudeHook(settings);
+      const alreadyInstalled = hasAllCompoundAgentHooks(settings);
 
       if (options.status) {
         await handleStatus(alreadyInstalled, displayPath, settingsPath, options);

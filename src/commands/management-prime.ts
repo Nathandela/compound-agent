@@ -11,6 +11,7 @@ import { getRepoRoot } from '../cli-utils.js';
 import { loadSessionLessons } from '../memory/retrieval/index.js';
 import { syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem, Source } from '../memory/index.js';
+import { getPhaseState } from './phase-check.js';
 /**
  * Beads-style trust language template.
  *
@@ -94,6 +95,29 @@ function formatLessonForPrime(lesson: MemoryItem): string {
   return `- **${lesson.insight}**${tags}\n  Learned: ${date} via ${source}`;
 }
 
+function formatActiveLfgSection(repoRoot: string): string | null {
+  const state = getPhaseState(repoRoot);
+  if (state === null || !state.lfg_active) return null;
+
+  const skillsRead = state.skills_read.length === 0 ? '(none)' : state.skills_read.join(', ');
+  const gatesPassed = state.gates_passed.length === 0 ? '(none)' : state.gates_passed.join(', ');
+
+  return `
+---
+
+# ACTIVE LFG SESSION
+
+Epic: ${state.epic_id}
+Phase: ${state.current_phase} (${state.phase_index}/5)
+Skills read: ${skillsRead}
+Gates passed: ${gatesPassed}
+Started: ${state.started_at}
+
+Resume from phase ${state.current_phase}. Run: \`npx ca phase-check start ${state.current_phase}\`
+Read the skill file first: \`.claude/skills/compound/${state.current_phase}/SKILL.md\`
+`;
+}
+
 /**
  * Generate prime context output for Claude Code.
  *
@@ -132,6 +156,11 @@ Critical lessons from past corrections:
 
 ${formattedLessons}
 `;
+  }
+
+  const lfgSection = formatActiveLfgSection(root);
+  if (lfgSection !== null) {
+    output += lfgSection;
   }
 
   return output;

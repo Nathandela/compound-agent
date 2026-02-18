@@ -479,6 +479,28 @@ exit 0
         expect(hookEntry.hooks[0].command).toContain('prime');
       });
 
+      it('init installs all 5 Claude Code hook types', async () => {
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+        runCli('init', tempDir);
+
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+        // All 5 hook types must be present
+        expect(settings.hooks.SessionStart).toBeDefined();
+        expect(settings.hooks.PreCompact).toBeDefined();
+        expect(settings.hooks.UserPromptSubmit).toBeDefined();
+        expect(settings.hooks.PostToolUseFailure).toBeDefined();
+        expect(settings.hooks.PostToolUse).toBeDefined();
+
+        // Verify each has the correct command
+        expect(settings.hooks.PreCompact[0].hooks[0].command).toContain('ca prime');
+        expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('ca hooks run user-prompt');
+        expect(settings.hooks.PostToolUseFailure[0].hooks[0].command).toContain('ca hooks run post-tool-failure');
+        expect(settings.hooks.PostToolUse[0].hooks[0].command).toContain('ca hooks run post-tool-success');
+      });
+
       it('init creates Claude hooks even if .claude directory does not exist', async () => {
         runCli('init', tempDir);
 

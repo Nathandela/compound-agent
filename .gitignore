@@ -6,6 +6,8 @@ dist/
 
 # Cache
 .claude/.cache/
+.claude/.ca-failure-state.json
+.claude/.ca-phase-state.json
 
 # OS
 .DS_Store

@@ -2,12 +2,15 @@
  * Hooks command - Git hooks management.
  */
 
-import { chmodSync, existsSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
 import { formatError } from '../cli-error-format.js';
+import { processPhaseGuard } from './hooks-phase-guard.js';
+import { processReadTracker } from './hooks-read-tracker.js';
+import { processStopAudit } from './hooks-stop-audit.js';
 import {
   HOOK_MARKER,
   COMPOUND_AGENT_HOOK_BLOCK,
@@ -145,10 +148,64 @@ export function processUserPrompt(prompt: string): UserPromptHookOutput {
 const SAME_TARGET_THRESHOLD = 2;
 const TOTAL_FAILURE_THRESHOLD = 3;
 
-/** In-memory failure counters */
+/** State file name for cross-process persistence */
+export const STATE_FILE_NAME = '.ca-failure-state.json';
+
+/** Max age for state file before it's considered stale (1 hour) */
+const STATE_MAX_AGE_MS = 60 * 60 * 1000;
+
+/** Persisted failure state shape */
+export interface FailureState {
+  count: number;
+  lastTarget: string | null;
+  sameTargetCount: number;
+  timestamp: number;
+}
+
+/** In-memory failure counters (fallback when no stateDir provided) */
 let failureCount = 0;
 let lastFailedTarget: string | null = null;
 let sameTargetCount = 0;
+
+/** Default (empty) failure state */
+function defaultState(): FailureState {
+  return { count: 0, lastTarget: null, sameTargetCount: 0, timestamp: Date.now() };
+}
+
+/** Read failure state from file. Returns defaults on any error or if stale. */
+export function readFailureState(stateDir: string): FailureState {
+  try {
+    const filePath = join(stateDir, STATE_FILE_NAME);
+    if (!existsSync(filePath)) return defaultState();
+    const raw = readFileSync(filePath, 'utf-8');
+    const parsed = JSON.parse(raw) as FailureState;
+    // Check staleness
+    if (Date.now() - parsed.timestamp > STATE_MAX_AGE_MS) return defaultState();
+    return parsed;
+  } catch {
+    return defaultState();
+  }
+}
+
+/** Write failure state to file. Silently ignores errors. */
+export function writeFailureState(stateDir: string, state: FailureState): void {
+  try {
+    const filePath = join(stateDir, STATE_FILE_NAME);
+    writeFileSync(filePath, JSON.stringify(state), 'utf-8');
+  } catch {
+    // Fall back silently - never crash the hook process
+  }
+}
+
+/** Delete state file. Silently ignores errors. */
+function deleteStateFile(stateDir: string): void {
+  try {
+    const filePath = join(stateDir, STATE_FILE_NAME);
+    if (existsSync(filePath)) unlinkSync(filePath);
+  } catch {
+    // Fall back silently
+  }
+}
 
 /** Tip message for failures */
 const FAILURE_TIP = 'Tip: Multiple failures detected. `npx ca search` may have solutions for similar issues.';
@@ -163,11 +220,12 @@ export interface PostToolFailureHookOutput {
   };
 }
 
-/** Reset failure state (exported for testing) */
-export function resetFailureState(): void {
+/** Reset failure state (exported for testing). Deletes state file when stateDir provided. */
+export function resetFailureState(stateDir?: string): void {
   failureCount = 0;
   lastFailedTarget = null;
   sameTargetCount = 0;
+  if (stateDir) deleteStateFile(stateDir);
 }
 
 /** Extract a failure target from tool name and input */
@@ -185,11 +243,21 @@ function getFailureTarget(toolName: string, toolInput: Record<string, unknown>):
 
 /**
  * Process a tool failure and determine if a tip should be shown.
+ * When stateDir is provided, persists state to file for cross-process tracking.
  */
 export function processToolFailure(
   toolName: string,
-  toolInput: Record<string, unknown>
+  toolInput: Record<string, unknown>,
+  stateDir?: string
 ): PostToolFailureHookOutput {
+  // Load persisted state if stateDir provided, otherwise use in-memory
+  if (stateDir) {
+    const persisted = readFailureState(stateDir);
+    failureCount = persisted.count;
+    lastFailedTarget = persisted.lastTarget;
+    sameTargetCount = persisted.sameTargetCount;
+  }
+
   failureCount++;
   const target = getFailureTarget(toolName, toolInput);
   if (target !== null && target === lastFailedTarget) {
@@ -202,7 +270,7 @@ export function processToolFailure(
     sameTargetCount >= SAME_TARGET_THRESHOLD ||
     failureCount >= TOTAL_FAILURE_THRESHOLD;
   if (shouldShowTip) {
-    resetFailureState();
+    resetFailureState(stateDir);
     return {
       hookSpecificOutput: {
         hookEventName: 'PostToolUseFailure',
@@ -210,14 +278,26 @@ export function processToolFailure(
       },
     };
   }
+
+  // Persist updated state if stateDir provided
+  if (stateDir) {
+    writeFailureState(stateDir, {
+      count: failureCount,
+      lastTarget: lastFailedTarget,
+      sameTargetCount,
+      timestamp: Date.now(),
+    });
+  }
+
   return {};
 }
 
 /**
  * Process a tool success - clear failure state.
+ * When stateDir is provided, deletes the state file.
  */
-export function processToolSuccess(): void {
-  resetFailureState();
+export function processToolSuccess(stateDir?: string): void {
+  resetFailureState(stateDir);
 }
 
 /**
@@ -402,6 +482,7 @@ async function runUserPromptHook(): Promise<void> {
 /**
  * Run the PostToolUseFailure hook.
  * Reads JSON from stdin, tracks failure, outputs tip if threshold reached.
+ * Uses file-based persistence for cross-process failure tracking.
  */
 async function runPostToolFailureHook(): Promise<void> {
   try {
@@ -416,7 +497,8 @@ async function runPostToolFailureHook(): Promise<void> {
       return;
     }
 
-    const result = processToolFailure(data.tool_name, data.tool_input ?? {});
+    const stateDir = join(process.cwd(), '.claude');
+    const result = processToolFailure(data.tool_name, data.tool_input ?? {}, stateDir);
     console.log(JSON.stringify(result));
   } catch {
     console.log(JSON.stringify({}));
@@ -425,16 +507,38 @@ async function runPostToolFailureHook(): Promise<void> {
 
 /**
  * Run the PostToolUse hook for success.
- * Reads JSON from stdin, clears failure state.
+ * Reads JSON from stdin, clears failure state and state file.
  */
 async function runPostToolSuccessHook(): Promise<void> {
   try {
     await readStdin();
-    processToolSuccess();
+    const stateDir = join(process.cwd(), '.claude');
+    processToolSuccess(stateDir);
     console.log(JSON.stringify({}));
   } catch {
     console.log(JSON.stringify({}));
   }
+}
+
+/** Run a tool-based hook: read stdin JSON, extract tool_name/tool_input, call processor. */
+async function runToolHook(
+  processor: (repoRoot: string, toolName: string, toolInput: Record<string, unknown>) => unknown
+): Promise<void> {
+  try {
+    const input = await readStdin();
+    const data = JSON.parse(input) as { tool_name?: string; tool_input?: Record<string, unknown> };
+    if (!data.tool_name) { console.log(JSON.stringify({})); return; }
+    console.log(JSON.stringify(processor(process.cwd(), data.tool_name, data.tool_input ?? {})));
+  } catch { console.log(JSON.stringify({})); }
+}
+
+/** Run the Stop audit hook. */
+async function runStopAuditHook(): Promise<void> {
+  try {
+    const input = await readStdin();
+    const data = JSON.parse(input) as { stop_hook_active?: boolean };
+    console.log(JSON.stringify(processStopAudit(process.cwd(), data.stop_hook_active ?? false)));
+  } catch { console.log(JSON.stringify({})); }
 }
 
 /**
@@ -463,11 +567,25 @@ export function registerHooksCommand(program: Command): void {
       } else if (hook === 'post-tool-success') {
         // PostToolUse hook - clears failure state on success
         await runPostToolSuccessHook();
+      } else if (hook === 'phase-guard') {
+        await runToolHook(processPhaseGuard);
+      } else if (hook === 'post-read' || hook === 'read-tracker') {
+        await runToolHook(processReadTracker);
+      } else if (hook === 'phase-audit' || hook === 'stop-audit') {
+        // Stop hook - stop audit
+        await runStopAuditHook();
       } else {
         if (options.json) {
           console.log(JSON.stringify({ error: `Unknown hook: ${hook}` }));
         } else {
-          console.error(formatError('hooks', 'UNKNOWN_HOOK', `Unknown hook: ${hook}`, 'Valid hooks: pre-session, post-tool-failure, post-tool-success'));
+          console.error(
+            formatError(
+              'hooks',
+              'UNKNOWN_HOOK',
+              `Unknown hook: ${hook}`,
+              'Valid hooks: pre-commit, user-prompt, post-tool-failure, post-tool-success, post-read, phase-guard, phase-audit'
+            )
+          );
         }
         process.exit(1);
       }
