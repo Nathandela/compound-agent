@@ -74,6 +74,37 @@ describe('WORKFLOW_COMMANDS', () => {
         );
       }
     });
+
+    it('every phase command enforces reading the skill file first (MANDATORY)', () => {
+      for (const key of PHASE_FILENAMES) {
+        expect(WORKFLOW_COMMANDS[key], `${key} missing MANDATORY read enforcement`).toMatch(
+          /MANDATORY.*Read tool/i,
+        );
+      }
+    });
+
+    it('every phase command references the skill file path', () => {
+      const SINGLE_PHASE_FILENAMES = PHASE_FILENAMES.filter((k) => k !== 'lfg.md');
+      for (const key of SINGLE_PHASE_FILENAMES) {
+        const phase = key.replace('.md', '');
+        expect(
+          WORKFLOW_COMMANDS[key],
+          `${key} missing skill file path`,
+        ).toContain(`.claude/skills/compound/${phase}/SKILL.md`);
+      }
+    });
+
+    it('lfg.md references reading its own skill file', () => {
+      expect(WORKFLOW_COMMANDS['lfg.md']).toContain('.claude/skills/compound/lfg/SKILL.md');
+    });
+
+    it('phase commands do NOT have Key steps summaries (forces reading the skill)', () => {
+      for (const key of PHASE_FILENAMES) {
+        expect(WORKFLOW_COMMANDS[key], `${key} should not have Key steps`).not.toContain(
+          'Key steps',
+        );
+      }
+    });
   });
 
   describe('utility commands (unchanged)', () => {

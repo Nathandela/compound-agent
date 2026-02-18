@@ -802,7 +802,7 @@ describe('Setup Commands - Generated Content', () => {
    * Tests for phase skill template installation
    */
   describe('Phase skill template installation', () => {
-    it('creates .claude/skills/compound/<phase>/SKILL.md for 5 phases', async () => {
+    it('creates .claude/skills/compound/<phase>/SKILL.md for all phases', async () => {
       runCli('init');
 
       const skillsDir = join(getTempDir(), '.claude', 'skills', 'compound');

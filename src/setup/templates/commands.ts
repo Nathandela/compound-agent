@@ -12,13 +12,7 @@ $ARGUMENTS
 
 # Brainstorm
 
-Run the **brainstorm** phase. Follow the brainstorm skill for full instructions.
-
-Key steps:
-- Search memory and explore docs for prior context
-- Clarify scope and constraints via AskUserQuestion
-- Propose 2-3 approaches with tradeoffs
-- Create a beads epic from conclusions
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/brainstorm/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
 `,
 
   'plan.md': `---
@@ -30,13 +24,7 @@ $ARGUMENTS
 
 # Plan
 
-Run the **plan** phase. Follow the plan skill for full instructions.
-
-Key steps:
-- Spawn subagents to research constraints and patterns
-- Decompose into tasks with acceptance criteria
-- Create review and compound blocking tasks
-- Verify POST-PLAN gates
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/plan/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
 `,
 
   'work.md': `---
@@ -48,13 +36,7 @@ $ARGUMENTS
 
 # Work
 
-Run the **work** phase. Follow the work skill for full instructions.
-
-Key steps:
-- Deploy AgentTeam with test-writers and implementers
-- Lead coordinates, delegates, does not code directly
-- Commit incrementally as tests pass
-- Run verification gates before closing tasks
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/work/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
 `,
 
   'review.md': `---
@@ -66,13 +48,7 @@ $ARGUMENTS
 
 # Review
 
-Run the **review** phase. Follow the review skill for full instructions.
-
-Key steps:
-- Run quality gates, then spawn reviewers in parallel
-- Classify findings as P1/P2/P3
-- Fix all P1 findings before proceeding
-- Submit to /implementation-reviewer as mandatory gate
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/review/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
 `,
 
   'compound.md': `---
@@ -84,13 +60,7 @@ $ARGUMENTS
 
 # Compound
 
-Run the **compound** phase. Follow the compound skill for full instructions.
-
-Key steps:
-- Spawn analysis agents in an AgentTeam
-- Apply quality filters, then store via npx ca learn
-- Delegate CCT synthesis to compounding agent
-- Verify FINAL GATE before closing epic
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/compound/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
 `,
 
   'lfg.md': `---
@@ -103,13 +73,7 @@ $ARGUMENTS
 
 # LFG
 
-Run all 5 phases. Follow each phase skill for full instructions.
-
-- Brainstorm: explore and define the problem
-- Plan: decompose into tasks with dependencies
-- Work: delegate to AgentTeam for TDD
-- Review: multi-agent review with severity classification
-- Compound: capture lessons via npx ca learn
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/lfg/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full orchestration workflow you must follow.
 `,
 
   // =========================================================================

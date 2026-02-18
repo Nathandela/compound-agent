@@ -5,14 +5,15 @@ import { PHASE_SKILLS } from './skills.js';
 /**
  * LFG phase structural tests.
  *
- * After v1.2.6 refactor:
- * - lfg.md is a thin wrapper (< 500 chars) referencing the skill
- * - Phase gates (PHASE GATE 3, 4, FINAL GATE) live in skills, not commands
- * - Individual phase commands are also thin wrappers
+ * After v1.2.8 refactor:
+ * - lfg.md is a thin wrapper (< 500 chars) that enforces reading the lfg skill
+ * - lfg SKILL.md has the full orchestration: phase gates, progress, skip/resume/retry
+ * - Phase gates also live in individual phase skills
  */
 
 describe('LFG Phase Integration', () => {
   const lfgCommand = WORKFLOW_COMMANDS['lfg.md'];
+  const lfgSkill = PHASE_SKILLS['lfg'];
 
   describe('lfg.md command (thin wrapper)', () => {
     it('exists in WORKFLOW_COMMANDS', () => {
@@ -32,15 +33,62 @@ describe('LFG Phase Integration', () => {
       expect(lfgCommand.length).toBeLessThanOrEqual(500);
     });
 
-    it('references all 5 phases', () => {
-      const phases = ['brainstorm', 'plan', 'work', 'review', 'compound'];
-      for (const phase of phases) {
-        expect(lfgCommand.toLowerCase()).toContain(phase);
-      }
+    it('enforces reading the lfg skill file first', () => {
+      expect(lfgCommand).toContain('.claude/skills/compound/lfg/SKILL.md');
+      expect(lfgCommand).toMatch(/MANDATORY.*Read tool/i);
     });
   });
 
-  describe('gates relocated to skills (not commands)', () => {
+  describe('lfg SKILL.md (orchestration logic)', () => {
+    it('exists in PHASE_SKILLS', () => {
+      expect(lfgSkill).toBeDefined();
+    });
+
+    it('starts with YAML frontmatter', () => {
+      expect(lfgSkill.trimStart()).toMatch(/^---/);
+    });
+
+    it('lists all 5 phase skill file paths', () => {
+      const phases = ['brainstorm', 'plan', 'work', 'review', 'compound'];
+      for (const phase of phases) {
+        expect(lfgSkill).toContain(`.claude/skills/compound/${phase}/SKILL.md`);
+      }
+    });
+
+    it('contains phase gates', () => {
+      expect(lfgSkill).toContain('GATE 3');
+      expect(lfgSkill).toContain('GATE 4');
+      expect(lfgSkill).toContain('FINAL GATE');
+    });
+
+    it('contains phase execution protocol with progress announcements', () => {
+      expect(lfgSkill).toMatch(/\[Phase N\/5\]/);
+    });
+
+    it('contains phase control (skip/resume/retry)', () => {
+      expect(lfgSkill).toMatch(/skip/i);
+      expect(lfgSkill).toMatch(/resume/i);
+      expect(lfgSkill).toMatch(/retry/i);
+    });
+
+    it('contains stop conditions', () => {
+      expect(lfgSkill).toContain('Stop Conditions');
+    });
+
+    it('contains session close protocol', () => {
+      expect(lfgSkill).toContain('SESSION CLOSE');
+    });
+
+    it('references verify-gates', () => {
+      expect(lfgSkill).toContain('verify-gates');
+    });
+
+    it('stays under 6000 characters', () => {
+      expect(lfgSkill.length).toBeLessThanOrEqual(6000);
+    });
+  });
+
+  describe('gates in individual phase skills', () => {
     it('PHASE GATE 3 in work skill', () => {
       expect(PHASE_SKILLS['work']).toContain('PHASE GATE 3');
     });
@@ -89,7 +137,7 @@ describe('LFG Phase Integration', () => {
   });
 
   describe('cross-template consistency', () => {
-    it('every phase referenced in lfg.md exists as its own command in WORKFLOW_COMMANDS', () => {
+    it('every phase referenced in lfg skill exists as its own command', () => {
       const phases = ['brainstorm', 'plan', 'work', 'review', 'compound'];
       for (const phase of phases) {
         expect(
@@ -107,6 +155,10 @@ describe('LFG Phase Integration', () => {
           `${phase} not found in PHASE_SKILLS`,
         ).toBeDefined();
       }
+    });
+
+    it('lfg has its own skill in PHASE_SKILLS', () => {
+      expect(PHASE_SKILLS['lfg']).toBeDefined();
     });
   });
 });

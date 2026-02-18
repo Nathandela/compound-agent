@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { PHASE_SKILLS } from './skills.js';
 
-const EXPECTED_KEYS = ['brainstorm', 'plan', 'work', 'review', 'compound'];
+const EXPECTED_KEYS = ['brainstorm', 'plan', 'work', 'review', 'compound', 'lfg'];
 
 describe('PHASE_SKILLS', () => {
-  it('has exactly 5 entries', () => {
-    expect(Object.keys(PHASE_SKILLS)).toHaveLength(5);
+  it('has exactly 6 entries', () => {
+    expect(Object.keys(PHASE_SKILLS)).toHaveLength(6);
   });
 
   it('has all expected keys', () => {
@@ -27,9 +27,13 @@ describe('PHASE_SKILLS', () => {
     }
   });
 
-  it('every template has a ## Methodology section', () => {
+  it('every phase skill has a ## Methodology section (lfg uses Phase Execution Protocol)', () => {
     for (const [key, content] of Object.entries(PHASE_SKILLS)) {
-      expect(content, `${key} missing ## Methodology`).toContain('## Methodology');
+      if (key === 'lfg') {
+        expect(content, `${key} missing ## Phase Execution Protocol`).toContain('## Phase Execution Protocol');
+      } else {
+        expect(content, `${key} missing ## Methodology`).toContain('## Methodology');
+      }
     }
   });
 
@@ -121,5 +125,39 @@ describe('PHASE_SKILLS', () => {
 
   it('compound skill contains SendMessage for team coordination', () => {
     expect(PHASE_SKILLS.compound).toMatch(/SendMessage/);
+  });
+
+  // --- LFG orchestration skill ---
+
+  it('lfg skill contains READ BEFORE EXECUTE rule', () => {
+    expect(PHASE_SKILLS.lfg).toContain('READ BEFORE EXECUTE');
+    expect(PHASE_SKILLS.lfg).toContain('Read tool');
+  });
+
+  it('lfg skill lists all 5 phase skill file paths', () => {
+    const phases = ['brainstorm', 'plan', 'work', 'review', 'compound'];
+    for (const phase of phases) {
+      expect(PHASE_SKILLS.lfg).toContain(`.claude/skills/compound/${phase}/SKILL.md`);
+    }
+  });
+
+  it('lfg skill contains phase gates', () => {
+    expect(PHASE_SKILLS.lfg).toContain('GATE 3');
+    expect(PHASE_SKILLS.lfg).toContain('GATE 4');
+    expect(PHASE_SKILLS.lfg).toContain('FINAL GATE');
+  });
+
+  it('lfg skill contains phase control (skip/resume/retry)', () => {
+    expect(PHASE_SKILLS.lfg).toMatch(/skip/i);
+    expect(PHASE_SKILLS.lfg).toMatch(/resume/i);
+    expect(PHASE_SKILLS.lfg).toMatch(/retry/i);
+  });
+
+  it('lfg skill contains session close protocol', () => {
+    expect(PHASE_SKILLS.lfg).toContain('SESSION CLOSE');
+  });
+
+  it('lfg skill references verify-gates', () => {
+    expect(PHASE_SKILLS.lfg).toContain('verify-gates');
   });
 });
