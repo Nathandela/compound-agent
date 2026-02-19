@@ -7,7 +7,7 @@ import { appendLesson, appendMemoryItem } from '../storage/jsonl.js';
 import { closeDb, getRetrievalStats, rebuildIndex } from '../storage/sqlite/index.js';
 import { createFullLesson, createQuickLesson, createSolution } from '../../test-utils.js';
 
-import { loadSessionLessons, loadSessionMemory } from './session.js';
+import { loadSessionLessons } from './session.js';
 
 describe('session retrieval', () => {
   let tempDir: string;
@@ -167,17 +167,13 @@ describe('session retrieval', () => {
     });
   });
 
-  describe('loadSessionMemory', () => {
-    it('is an alias for loadSessionLessons', () => {
-      expect(loadSessionMemory).toBe(loadSessionLessons);
-    });
-
+  describe('loadSessionLessons with mixed memory types', () => {
     it('returns high-severity items of any memory type', async () => {
       await appendLesson(tempDir, createFullLesson('L001', 'lesson insight', 'high'));
       const sol = { ...createSolution('S001', 'solution insight'), severity: 'high' as const, evidence: 'evidence' };
       await appendMemoryItem(tempDir, sol);
 
-      const items = await loadSessionMemory(tempDir);
+      const items = await loadSessionLessons(tempDir);
       expect(items).toHaveLength(2);
       const ids = items.map((i) => i.id);
       expect(ids).toContain('L001');

@@ -10,7 +10,14 @@ import type { Command } from 'commander';
 import { getRepoRoot } from '../cli-utils.js';
 import { clusterBySimilarity, synthesizePattern, writeCctPatterns } from '../compound/index.js';
 import { embedText, isModelUsable } from '../memory/embeddings/index.js';
-import { readMemoryItems } from '../memory/storage/index.js';
+import {
+  closeDb,
+  contentHash,
+  getCachedEmbedding,
+  openDb,
+  readMemoryItems,
+  setCachedEmbedding,
+} from '../memory/storage/index.js';
 
 /**
  * Register compound commands on the program.
@@ -38,12 +45,22 @@ export function registerCompoundCommands(program: Command): void {
         return;
       }
 
-      // Compute embeddings for all items
+      // Open DB to enable embedding cache
+      openDb(repoRoot);
+
+      // Compute embeddings for all items (with cache)
       const embeddings: number[][] = [];
       try {
         for (const item of items) {
           const text = `${item.trigger} ${item.insight}`;
-          const vec = await embedText(text);
+          const hash = contentHash(item.trigger, item.insight);
+
+          let vec = getCachedEmbedding(repoRoot, item.id, hash);
+          if (!vec) {
+            vec = await embedText(text);
+            setCachedEmbedding(repoRoot, item.id, vec, hash);
+          }
+
           embeddings.push(Array.isArray(vec) ? vec : Array.from(vec));
         }
       } catch (err) {
@@ -51,6 +68,8 @@ export function registerCompoundCommands(program: Command): void {
         console.error('Run: npx ca download-model');
         process.exitCode = 1;
         return;
+      } finally {
+        closeDb();
       }
 
       // Cluster by similarity

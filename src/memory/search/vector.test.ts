@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { fc, test as fcTest } from '@fast-check/vitest';
 
 import { CCT_PATTERNS_PATH } from '../../compound/types.js';
 import { appendLesson } from '../storage/jsonl.js';
@@ -14,7 +15,7 @@ import {
 } from '../storage/sqlite/index.js';
 import { createQuickLesson } from '../../test-utils.js';
 
-import { cosineSimilarity, searchVector } from './vector.js';
+import { clearCctEmbeddingCache, cosineSimilarity, searchVector } from './vector.js';
 
 describe('vector search', () => {
   describe('cosineSimilarity', () => {
@@ -60,6 +61,48 @@ describe('vector search', () => {
       const v2 = [1, 2];
       expect(() => cosineSimilarity(v1, v2)).toThrow('Vectors must have same length');
     });
+
+    describe('property-based tests', () => {
+      const DIM = 10;
+      const vectorArb = (len: number) =>
+        fc.array(fc.float({ min: -100, max: 100, noNaN: true, noDefaultInfinity: true }), {
+          minLength: len,
+          maxLength: len,
+        });
+      const nonZeroVectorArb = (len: number) => vectorArb(len).filter((v) => v.some((x) => x !== 0));
+
+      fcTest.prop([nonZeroVectorArb(DIM), nonZeroVectorArb(DIM)])(
+        'result is always in [-1, 1]',
+        (a, b) => {
+          const result = cosineSimilarity(a, b);
+          expect(result).toBeGreaterThanOrEqual(-1);
+          expect(result).toBeLessThanOrEqual(1);
+        }
+      );
+
+      fcTest.prop([nonZeroVectorArb(DIM), nonZeroVectorArb(DIM)])(
+        'symmetric: similarity(a, b) === similarity(b, a)',
+        (a, b) => {
+          expect(cosineSimilarity(a, b)).toBe(cosineSimilarity(b, a));
+        }
+      );
+
+      fcTest.prop([nonZeroVectorArb(DIM)])(
+        'self-similarity is 1.0',
+        (v) => {
+          expect(cosineSimilarity(v, v)).toBeCloseTo(1.0, 5);
+        }
+      );
+
+      fcTest.prop([vectorArb(DIM)])(
+        'zero vector against any vector returns 0',
+        (v) => {
+          const zero = new Array(DIM).fill(0) as number[];
+          expect(cosineSimilarity(zero, v)).toBe(0);
+          expect(cosineSimilarity(v, zero)).toBe(0);
+        }
+      );
+    });
   });
 
   describe('searchVector', () => {
@@ -71,6 +114,7 @@ describe('vector search', () => {
 
     afterEach(async () => {
       closeDb();
+      clearCctEmbeddingCache();
       await rm(tempDir, { recursive: true, force: true });
       vi.restoreAllMocks();
     });
@@ -341,6 +385,36 @@ describe('vector search', () => {
         const results = await searchVector(tempDir, 'test', { limit: 10 });
         expect(results).toHaveLength(1);
         expect(results[0]!.lesson.id).toBe('L001');
+      });
+
+      it('caches CCT pattern embeddings across searches', async () => {
+        // Write a CCT pattern file
+        const cctPath = join(tempDir, CCT_PATTERNS_PATH);
+        await mkdir(dirname(cctPath), { recursive: true });
+        const pattern = {
+          id: 'CCT-ca0e0001',
+          name: 'caching test',
+          description: 'verify CCT embedding cache works',
+          frequency: 2,
+          testable: false,
+          sourceIds: ['L001'],
+          created: '2026-01-01T00:00:00Z',
+        };
+        await writeFile(cctPath, JSON.stringify(pattern) + '\n', 'utf-8');
+
+        const spy = vi.spyOn(await import('../embeddings/nomic.js'), 'embedText')
+          .mockResolvedValue([1, 0, 0]);
+
+        // First search: query embed + CCT pattern embed = 2 calls
+        await searchVector(tempDir, 'cache test', { limit: 10 });
+        expect(spy).toHaveBeenCalledTimes(2);
+
+        spy.mockClear();
+
+        // Second search: query embed only, CCT pattern should be cached = 1 call
+        await searchVector(tempDir, 'cache test again', { limit: 10 });
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy).toHaveBeenCalledWith('cache test again');
       });
 
       it('CCT patterns respect limit', async () => {

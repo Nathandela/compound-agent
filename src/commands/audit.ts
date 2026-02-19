@@ -51,7 +51,8 @@ export function registerAuditCommands(program: Command): void {
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Audit failed';
         console.error(formatError('audit', 'AUDIT_ERROR', msg, 'Check repo configuration'));
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
 
       if (opts.json) {
@@ -84,7 +85,7 @@ export function registerAuditCommands(program: Command): void {
       }
 
       if (report.summary.errors > 0) {
-        process.exit(1);
+        process.exitCode = 1;
       }
     });
 }

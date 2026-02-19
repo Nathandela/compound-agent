@@ -10,7 +10,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
-import { openDb, closeDb, getDb, DB_PATH } from './connection.js';
+import { openDb, closeDb, DB_PATH } from './connection.js';
 
 describe('cross-repo DB isolation', () => {
   let repoA: string;
@@ -51,19 +51,14 @@ describe('cross-repo DB isolation', () => {
     expect(count.cnt).toBe(0);
   });
 
-  it('getDb returns the most recently opened DB', () => {
-    openDb(repoA);
-    openDb(repoB);
-    const db = getDb();
-    // Should be the repoB database (last opened)
-    expect(db).not.toBeNull();
-  });
-
   it('closeDb closes all connections', () => {
-    openDb(repoA);
+    const dbBefore = openDb(repoA);
     openDb(repoB);
     closeDb();
-    expect(getDb()).toBeNull();
+    // After close, re-opening should create a new instance
+    const dbAfter = openDb(repoA);
+    expect(dbAfter).not.toBe(dbBefore);
+    closeDb();
   });
 
   it('in-memory DB is isolated from file-based DBs', () => {

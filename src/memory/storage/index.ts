@@ -27,14 +27,12 @@ export type { DbOptions, RetrievalStat, SyncOptions } from './sqlite/index.js';
 
 // Compaction (archive + tombstone removal)
 export {
-  archiveOldLessons,
   ARCHIVE_AGE_DAYS,
   ARCHIVE_DIR,
   compact,
   countTombstones,
   getArchivePath,
   needsCompaction,
-  rewriteWithoutTombstones,
   TOMBSTONE_THRESHOLD,
 } from './compact.js';
 export type { CompactResult } from './compact.js';

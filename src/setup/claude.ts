@@ -248,7 +248,8 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
         } else {
           console.error(formatError('setup', 'PARSE_ERROR', 'Failed to parse settings file', 'Check if JSON is valid'));
         }
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
 
       const alreadyInstalled = hasAllCompoundAgentHooks(settings);

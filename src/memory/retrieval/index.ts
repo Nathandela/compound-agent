@@ -6,8 +6,8 @@
  */
 
 // Session-start retrieval
-export { loadSessionLessons, loadSessionMemory } from './session.js';
+export { loadSessionLessons } from './session.js';
 
 // Plan-time retrieval
-export { formatLessonsCheck, formatMemoryCheck, retrieveForPlan } from './plan.js';
+export { formatLessonsCheck, retrieveForPlan } from './plan.js';
 export type { PlanRetrievalResult } from './plan.js';

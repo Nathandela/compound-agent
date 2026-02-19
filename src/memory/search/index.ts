@@ -10,15 +10,14 @@
 
 // Vector search
 export { cosineSimilarity, searchVector } from './vector.js';
-export type { ScoredLesson, ScoredMemoryItem, SearchVectorOptions } from './vector.js';
+export type { ScoredLesson, SearchVectorOptions } from './vector.js';
 
 // Ranking
 export {
   calculateScore,
   confirmationBoost,
   rankLessons,
-  rankMemoryItems,
   recencyBoost,
   severityBoost,
 } from './ranking.js';
-export type { RankedLesson, RankedMemoryItem } from './ranking.js';
+export type { RankedLesson } from './ranking.js';

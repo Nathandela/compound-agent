@@ -587,7 +587,7 @@ export function registerHooksCommand(program: Command): void {
             )
           );
         }
-        process.exit(1);
+        process.exitCode = 1;
       }
     });
 }

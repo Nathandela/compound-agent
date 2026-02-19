@@ -17,9 +17,6 @@ export interface RankedLesson extends ScoredLesson {
   finalScore?: number;
 }
 
-/** Alias for RankedLesson for unified memory API consumers. */
-export type RankedMemoryItem = RankedLesson;
-
 const RECENCY_THRESHOLD_DAYS = 30;
 const HIGH_SEVERITY_BOOST = 1.5;
 const MEDIUM_SEVERITY_BOOST = 1.0;
@@ -87,8 +84,7 @@ export function calculateScore(item: MemoryItem, vectorSimilarity: number): numb
  * Rank lessons by combined score.
  * Returns new array sorted by finalScore descending.
  *
- * Works with ScoredLesson[] (backward compat, uses .lesson field).
- * For ScoredMemoryItem[], use the .item field — same underlying data.
+ * Works with ScoredLesson[] (uses .lesson field).
  */
 export function rankLessons(lessons: ScoredLesson[]): RankedLesson[] {
   return lessons
@@ -99,9 +95,3 @@ export function rankLessons(lessons: ScoredLesson[]): RankedLesson[] {
     .sort((a, b) => (b.finalScore ?? 0) - (a.finalScore ?? 0));
 }
 
-/**
- * Rank memory items by combined score.
- * Primary API for unified memory types. Uses .item field.
- * Returns new array sorted by finalScore descending.
- */
-export const rankMemoryItems = rankLessons;

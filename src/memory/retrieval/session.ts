@@ -62,8 +62,3 @@ export async function loadSessionLessons(
 
   return topLessons;
 }
-
-/**
- * @deprecated Use loadSessionMemory. Backward-compat alias.
- */
-export const loadSessionMemory = loadSessionLessons;

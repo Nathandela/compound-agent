@@ -41,7 +41,8 @@ export function registerInvalidationCommands(program: Command): void {
       const lesson = items.find((l) => l.id === id);
       if (!lesson) {
         console.error(formatError('wrong', 'NOT_FOUND', `Lesson not found: ${id}`, 'Use "ca list" to see available lessons'));
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
 
       // Check if already invalidated
@@ -85,7 +86,8 @@ export function registerInvalidationCommands(program: Command): void {
       const lesson = items.find((l) => l.id === id);
       if (!lesson) {
         console.error(formatError('validate', 'NOT_FOUND', `Lesson not found: ${id}`, 'Use "ca list" to see available lessons'));
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
 
       // Check if not invalidated

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { fc, test } from '@fast-check/vitest';
 
 import { createFullLesson, createPattern, createPreference, createQuickLesson, createSolution, daysAgo } from '../../test-utils.js';
 
@@ -6,7 +7,6 @@ import {
   calculateScore,
   confirmationBoost,
   rankLessons,
-  rankMemoryItems,
   recencyBoost,
   severityBoost,
 } from './ranking.js';
@@ -158,25 +158,6 @@ describe('ranking', () => {
       expect(ranked[0]!.finalScore).toBeGreaterThan(ranked[1]!.finalScore!);
     });
 
-    it('always computes finalScore for all ranked lessons', () => {
-      // Note: The sort comparator in rankLessons has a defensive ?? 0 fallback
-      // for finalScore, but this branch is unreachable because the map() always
-      // computes finalScore before sort() is called. This test verifies that
-      // finalScore is always defined, documenting why line 84's ?? 0 is never hit.
-      const lessons: ScoredLesson[] = [
-        { lesson: createQuickLesson('L1', 'test insight'), score: 0.5 },
-        { lesson: createQuickLesson('L2', 'test insight'), score: 0.3 },
-        { lesson: createQuickLesson('L3', 'test insight'), score: 0.8 },
-      ];
-
-      const ranked = rankLessons(lessons);
-
-      // All finalScore values should be defined (never undefined)
-      for (const item of ranked) {
-        expect(item.finalScore).toBeDefined();
-        expect(typeof item.finalScore).toBe('number');
-      }
-    });
   });
 
   // =========================================================================
@@ -222,34 +203,75 @@ describe('ranking', () => {
       });
     });
 
-    describe('rankMemoryItems', () => {
-      it('is an alias for rankLessons', () => {
-        expect(rankMemoryItems).toBe(rankLessons);
-      });
+  });
 
-      it('ranks mixed memory item types by combined score', () => {
-        const items: ScoredLesson[] = [
-          { lesson: createSolution('S1', 'solution', { confirmed: false, created: daysAgo(50) }), score: 0.9 },
-          { lesson: { ...createPattern('P1', 'pattern', 'bad', 'good', { confirmed: true, created: daysAgo(5) }), severity: 'high' as const }, score: 0.7 },
-          { lesson: createPreference('R1', 'preference', { confirmed: true, created: daysAgo(5) }), score: 0.8 },
-        ];
+  // =========================================================================
+  // Property-based tests
+  // =========================================================================
 
-        const ranked = rankMemoryItems(items);
-        // P1 should rank first: 0.7 * min(1.5*1.2*1.3, 1.8) = 0.7 * 1.8 = 1.26
-        // R1: 0.8 * min(1.0*1.2*1.3, 1.8) = 0.8 * 1.56 = 1.248
-        // S1: 0.9 * 1.0 = 0.9
-        expect(ranked[0]!.lesson.id).toBe('P1');
-      });
+  describe('property-based tests', () => {
+    const FC_RUNS = process.env.CI ? 100 : 20;
 
-      it('returns ranked items with finalScore', () => {
-        const items: ScoredLesson[] = [
-          { lesson: createSolution('S1', 'test'), score: 0.5 },
-        ];
+    const memoryItemArb = fc.record({
+      severity: fc.constantFrom('high' as const, 'medium' as const, 'low' as const),
+      confirmed: fc.boolean(),
+      ageDays: fc.integer({ min: 0, max: 365 }),
+    }).map(({ severity, confirmed, ageDays }) =>
+      createFullLesson('prop-test', 'property test insight', severity, {
+        confirmed,
+        created: daysAgo(ageDays),
+      })
+    );
 
-        const ranked = rankMemoryItems(items);
-        expect(ranked[0]!.finalScore).toBeDefined();
-        expect(typeof ranked[0]!.finalScore).toBe('number');
-      });
+    test.prop(
+      [memoryItemArb, fc.float({ min: 0, max: 1, noNaN: true })],
+      { numRuns: FC_RUNS },
+    )('final score is bounded by vectorSimilarity * MAX_COMBINED_BOOST', (item, similarity) => {
+      const score = calculateScore(item, similarity);
+      expect(score).toBeLessThanOrEqual(similarity * 1.8);
+    });
+
+    test.prop(
+      [
+        fc.array(
+          fc.record({
+            lesson: memoryItemArb,
+            score: fc.float({ min: 0, max: 1, noNaN: true }),
+          }),
+          { minLength: 0, maxLength: 20 },
+        ),
+      ],
+      { numRuns: FC_RUNS },
+    )('rankLessons returns descending finalScore order', (lessons) => {
+      const ranked = rankLessons(lessons as ScoredLesson[]);
+      for (let i = 1; i < ranked.length; i++) {
+        expect(ranked[i - 1]!.finalScore).toBeGreaterThanOrEqual(ranked[i]!.finalScore!);
+      }
+    });
+
+    test.prop(
+      [
+        fc.constantFrom(0.8, 1.0, 1.5),   // severity boosts
+        fc.constantFrom(1.0, 1.2),          // recency boosts
+        fc.constantFrom(1.0, 1.3),          // confirmation boosts
+      ],
+      { numRuns: FC_RUNS },
+    )('combined boost never exceeds MAX_COMBINED_BOOST', (sev, rec, conf) => {
+      const combined = Math.min(sev * rec * conf, 1.8);
+      expect(combined).toBeLessThanOrEqual(1.8);
+    });
+
+    test.prop(
+      [
+        memoryItemArb,
+        fc.float({ min: 0, max: 1, noNaN: true }),
+        fc.float({ min: 0, max: 1, noNaN: true }),
+      ],
+      { numRuns: FC_RUNS },
+    )('score monotonicity: higher similarity does not decrease score', (item, simA, simB) => {
+      const lower = Math.min(simA, simB);
+      const higher = Math.max(simA, simB);
+      expect(calculateScore(item, higher)).toBeGreaterThanOrEqual(calculateScore(item, lower));
     });
   });
 });

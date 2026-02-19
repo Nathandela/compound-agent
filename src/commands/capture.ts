@@ -121,14 +121,16 @@ async function handleLearn(cmd: Command, insight: string, options: LearnOptions)
   const typeResult = MemoryItemTypeSchema.safeParse(options.type);
   if (!typeResult.success) {
     console.error(formatError('learn', 'INVALID_TYPE', `Invalid type: "${options.type}"`, 'Use --type lesson|solution|pattern|preference'));
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   const itemType: MemoryItemType = typeResult.data;
 
   // Validate pattern flags when type=pattern
   if (itemType === 'pattern' && (!options.patternBad || !options.patternGood)) {
     console.error(formatError('learn', 'MISSING_PATTERN', 'type=pattern requires --pattern-bad and --pattern-good', 'Use: learn "insight" --type pattern --pattern-bad "old" --pattern-good "new"'));
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   // Validate severity if provided
@@ -137,7 +139,8 @@ async function handleLearn(cmd: Command, insight: string, options: LearnOptions)
     const result = SeveritySchema.safeParse(options.severity);
     if (!result.success) {
       console.error(formatError('learn', 'INVALID_SEVERITY', `Invalid severity: "${options.severity}"`, 'Use --severity high|medium|low'));
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     severity = result.data;
   }
@@ -206,7 +209,8 @@ async function handleDetect(options: { input: string; save?: boolean; yes?: bool
     } else {
       console.error(formatError('detect', 'MISSING_FLAG', '--save requires --yes', 'Use: detect --input <file> --save --yes'));
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   let input;
@@ -219,7 +223,8 @@ async function handleDetect(options: { input: string; save?: boolean; yes?: bool
     } else {
       console.error(formatError('detect', 'INVALID_INPUT', message, 'Check the file is valid JSON matching the expected schema'));
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   const result = await detectAndPropose(repoRoot, input);
 
@@ -281,7 +286,8 @@ async function handleCapture(cmd: Command, options: CaptureOptions): Promise<voi
       } else {
         console.error(formatError('capture', 'INVALID_INPUT', message, 'Check the file is valid JSON matching the expected schema'));
       }
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     const result = await detectAndPropose(repoRoot, input);
     if (!result) {
@@ -302,7 +308,8 @@ async function handleCapture(cmd: Command, options: CaptureOptions): Promise<voi
     } else {
       console.error(formatError('capture', 'MISSING_OPTIONS', msg, 'Provide --trigger and --insight, or --input'));
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (!options.yes && !process.stdin.isTTY) {
@@ -311,7 +318,8 @@ async function handleCapture(cmd: Command, options: CaptureOptions): Promise<voi
     } else {
       console.error(formatError('capture', 'NON_INTERACTIVE', '--yes required in non-interactive mode', 'Use: capture --trigger "..." --insight "..." --yes'));
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (options.json) {

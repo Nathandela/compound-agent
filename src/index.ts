@@ -117,12 +117,11 @@ export {
   confirmationBoost,
   cosineSimilarity,
   rankLessons,
-  rankMemoryItems,
   recencyBoost,
   searchVector,
   severityBoost,
 } from './memory/search/index.js';
-export type { RankedLesson, RankedMemoryItem, ScoredLesson, ScoredMemoryItem, SearchVectorOptions } from './memory/search/index.js';
+export type { RankedLesson, ScoredLesson, SearchVectorOptions } from './memory/search/index.js';
 
 // Capture API (quality filters + trigger detection)
 export {
@@ -150,7 +149,7 @@ export type {
 } from './memory/capture/index.js';
 
 // Retrieval API (session + plan time)
-export { formatLessonsCheck, formatMemoryCheck, loadSessionLessons, loadSessionMemory, retrieveForPlan } from './memory/retrieval/index.js';
+export { formatLessonsCheck, loadSessionLessons, retrieveForPlan } from './memory/retrieval/index.js';
 export type { PlanRetrievalResult } from './memory/retrieval/index.js';
 
 // Context recovery API
@@ -175,12 +174,8 @@ export type { CctPattern, ClusterResult } from './compound/index.js';
 // Types and schemas
 export {
   generateId,
-  LegacyLessonSchema,
-  LegacyTombstoneSchema,
   LessonItemSchema,
-  LessonRecordSchema,
   LessonSchema,
-  LessonTypeSchema,
   MemoryItemRecordSchema,
   MemoryItemSchema,
   MemoryItemTypeSchema,

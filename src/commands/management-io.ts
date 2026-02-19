@@ -31,7 +31,8 @@ async function exportAction(options: { since?: string; tags?: string }): Promise
     const sinceDate = new Date(options.since);
     if (Number.isNaN(sinceDate.getTime())) {
       console.error(formatError('export', 'INVALID_DATE', `Invalid date format: ${options.since}`, 'Use ISO8601 format (e.g., 2024-01-15)'));
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
     filtered = filtered.filter((item) => new Date(item.created) >= sinceDate);
   }
@@ -57,7 +58,8 @@ async function importAction(file: string): Promise<void> {
     } else {
       console.error(formatError('import', 'READ_ERROR', `Error reading file: ${(err as Error).message}`, 'Check file permissions'));
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const { items: existingItems } = await readMemoryItems(repoRoot);

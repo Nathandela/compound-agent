@@ -35,7 +35,8 @@ export function registerRulesCommands(program: Command): void {
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load rules config';
         console.error(formatError('rules', 'CONFIG_ERROR', msg, 'Check .claude/rules.json syntax'));
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
 
       if (config.rules.length === 0) {
@@ -75,7 +76,7 @@ export function registerRulesCommands(program: Command): void {
       console.log(`Rules: ${total} checked, ${errors} error(s), ${warnings} warning(s), ${passed} passed`);
 
       if (errors > 0) {
-        process.exit(1);
+        process.exitCode = 1;
       }
     });
 }

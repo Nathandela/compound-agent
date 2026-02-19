@@ -29,15 +29,16 @@ import {
 import type { RankedLesson } from '../memory/search/index.js';
 
 /**
- * Parse numeric limit and exit with user-friendly output on invalid input.
+ * Parse numeric limit with user-friendly error output on invalid input.
+ * Returns null on failure so callers can set exitCode and return.
  */
-function parseLimitOrExit(rawLimit: string, optionName: string, commandName: string): number {
+function parseLimitOrNull(rawLimit: string, optionName: string, commandName: string): number | null {
   try {
     return parseLimit(rawLimit, optionName);
   } catch (err) {
     const message = err instanceof Error ? err.message : `Invalid ${optionName}`;
     console.error(formatError(commandName, 'INVALID_LIMIT', message, `Use --${optionName} with a positive integer`));
-    process.exit(1);
+    return null;
   }
 }
 
@@ -141,7 +142,11 @@ function outputSessionLessonsHuman(lessons: MemoryItem[], quiet: boolean): void 
 
 async function searchAction(cmd: Command, query: string, options: { limit: string }): Promise<void> {
   const repoRoot = getRepoRoot();
-  const limit = parseLimitOrExit(options.limit, 'limit', 'search');
+  const limit = parseLimitOrNull(options.limit, 'limit', 'search');
+  if (limit === null) {
+    process.exitCode = 1;
+    return;
+  }
   const { verbose, quiet } = getGlobalOpts(cmd);
 
   await syncIfNeeded(repoRoot);
@@ -152,7 +157,8 @@ async function searchAction(cmd: Command, query: string, options: { limit: strin
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Search failed';
     console.error(formatError('search', 'SEARCH_FAILED', message, 'Check your query syntax'));
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
   if (results.length > 0) {
     incrementRetrievalCount(repoRoot, results.map((lesson) => lesson.id));
@@ -182,7 +188,11 @@ async function searchAction(cmd: Command, query: string, options: { limit: strin
 
 async function listAction(cmd: Command, options: { limit: string; invalidated?: boolean }): Promise<void> {
   const repoRoot = getRepoRoot();
-  const limit = parseLimitOrExit(options.limit, 'limit', 'list');
+  const limit = parseLimitOrNull(options.limit, 'limit', 'list');
+  if (limit === null) {
+    process.exitCode = 1;
+    return;
+  }
   const { verbose, quiet } = getGlobalOpts(cmd);
 
   const { items, skippedCount } = await readMemoryItems(repoRoot);
@@ -273,14 +283,19 @@ async function loadSessionAction(cmd: Command, options: { json?: boolean }): Pro
 
 async function checkPlanAction(cmd: Command, options: { plan?: string; json?: boolean; limit: string }): Promise<void> {
   const repoRoot = getRepoRoot();
-  const limit = parseLimitOrExit(options.limit, 'limit', 'check-plan');
+  const limit = parseLimitOrNull(options.limit, 'limit', 'check-plan');
+  if (limit === null) {
+    process.exitCode = 1;
+    return;
+  }
   const { quiet } = getGlobalOpts(cmd);
 
   const planText = options.plan ?? (await readPlanFromStdin());
 
   if (!planText) {
     console.error(formatError('check-plan', 'NO_PLAN', 'No plan provided', 'Use --plan <text> or pipe text to stdin'));
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const usability = await isModelUsable();
@@ -295,7 +310,8 @@ async function checkPlanAction(cmd: Command, options: { plan?: string; json?: bo
     } else {
       console.error(formatError('check-plan', 'MODEL_UNAVAILABLE', usability.reason, usability.action));
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   try {
@@ -323,7 +339,7 @@ async function checkPlanAction(cmd: Command, options: { plan?: string; json?: bo
     } else {
       console.error(formatError('check-plan', 'PLAN_CHECK_FAILED', message, 'Check model installation and try again'));
     }
-    process.exit(1);
+    process.exitCode = 1;
   }
 }
 

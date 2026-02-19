@@ -17,12 +17,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MemoryItem } from '../types.js';
 
 import {
-  archiveOldLessons,
   compact,
   countTombstones,
   getArchivePath,
   needsCompaction,
-  rewriteWithoutTombstones,
   ARCHIVE_DIR,
   TOMBSTONE_THRESHOLD,
 } from './compact.js';
@@ -89,30 +87,6 @@ describe('Compaction', () => {
     const oldDate = new Date();
     oldDate.setDate(oldDate.getDate() - 100); // 100 days ago
     return createLesson(id, insight, { created: oldDate.toISOString() });
-  };
-
-  /**
-   * Read raw JSONL content (including tombstones)
-   */
-  const readRawJsonl = async (repoRoot: string): Promise<string> => {
-    const filePath = join(repoRoot, LESSONS_PATH);
-    try {
-      return await readFile(filePath, 'utf-8');
-    } catch {
-      return '';
-    }
-  };
-
-  /**
-   * Read archive file content
-   */
-  const readArchive = async (repoRoot: string, yearMonth: string): Promise<string> => {
-    const archivePath = join(repoRoot, ARCHIVE_DIR, `${yearMonth}.jsonl`);
-    try {
-      return await readFile(archivePath, 'utf-8');
-    } catch {
-      return '';
-    }
   };
 
   describe('getArchivePath', () => {
@@ -202,182 +176,6 @@ describe('Compaction', () => {
 
       const needs = await needsCompaction(tempDir);
       expect(needs).toBe(true);
-    });
-  });
-
-  describe('rewriteWithoutTombstones', () => {
-    it('removes tombstones from JSONL', async () => {
-      await appendLesson(tempDir, createLesson('L001', 'keep'));
-      await appendLesson(tempDir, createLesson('L002', 'delete me'));
-      await appendLesson(tempDir, { ...createLesson('L002', 'delete me'), deleted: true });
-
-      await rewriteWithoutTombstones(tempDir);
-
-      const raw = await readRawJsonl(tempDir);
-      const lines = raw.trim().split('\n').filter(Boolean);
-      expect(lines).toHaveLength(1);
-
-      const parsed = JSON.parse(lines[0]!) as MemoryItem;
-      expect(parsed.id).toBe('L001');
-    });
-
-    it('preserves all non-deleted lessons', async () => {
-      await appendLesson(tempDir, createLesson('L001', 'first'));
-      await appendLesson(tempDir, createLesson('L002', 'second'));
-      await appendLesson(tempDir, createLesson('L003', 'third'));
-
-      await rewriteWithoutTombstones(tempDir);
-
-      const { lessons } = await readLessons(tempDir);
-      expect(lessons).toHaveLength(3);
-    });
-
-    it('applies last-write-wins for duplicates', async () => {
-      await appendLesson(tempDir, createLesson('L001', 'original'));
-      await appendLesson(tempDir, createLesson('L001', 'updated'));
-
-      await rewriteWithoutTombstones(tempDir);
-
-      const raw = await readRawJsonl(tempDir);
-      const lines = raw.trim().split('\n').filter(Boolean);
-      expect(lines).toHaveLength(1);
-
-      const parsed = JSON.parse(lines[0]!) as MemoryItem;
-      expect(parsed.insight).toBe('updated');
-    });
-
-    it('handles empty file gracefully', async () => {
-      const filePath = join(tempDir, LESSONS_PATH);
-      await mkdir(join(tempDir, '.claude', 'lessons'), { recursive: true });
-      await writeFile(filePath, '', 'utf-8');
-
-      await rewriteWithoutTombstones(tempDir);
-
-      const raw = await readRawJsonl(tempDir);
-      expect(raw.trim()).toBe('');
-    });
-  });
-
-  describe('archiveOldLessons', () => {
-    it('archives lessons older than 90 days with 0 retrievals', async () => {
-      const oldLesson = createOldLesson('L001', 'old lesson');
-      const newLesson = createLesson('L002', 'new lesson');
-
-      await appendLesson(tempDir, oldLesson);
-      await appendLesson(tempDir, newLesson);
-
-      const archived = await archiveOldLessons(tempDir);
-
-      expect(archived).toBe(1);
-
-      // New lesson should remain in main file
-      const { lessons } = await readLessons(tempDir);
-      expect(lessons).toHaveLength(1);
-      expect(lessons[0]!.id).toBe('L002');
-    });
-
-    it('does not archive lessons with retrievalCount > 0', async () => {
-      const oldButRetrieved = createOldLesson('L001', 'old but retrieved');
-      oldButRetrieved.retrievalCount = 5;
-
-      await appendLesson(tempDir, oldButRetrieved);
-
-      const archived = await archiveOldLessons(tempDir);
-
-      expect(archived).toBe(0);
-
-      const { lessons } = await readLessons(tempDir);
-      expect(lessons).toHaveLength(1);
-    });
-
-    it('does not archive lessons less than 90 days old', async () => {
-      const recentLesson = createLesson('L001', 'recent');
-      // 30 days ago - not old enough
-      const recentDate = new Date();
-      recentDate.setDate(recentDate.getDate() - 30);
-      (recentLesson as MemoryItem).created = recentDate.toISOString();
-
-      await appendLesson(tempDir, recentLesson);
-
-      const archived = await archiveOldLessons(tempDir);
-
-      expect(archived).toBe(0);
-    });
-
-    it('creates archive directory if missing', async () => {
-      await appendLesson(tempDir, createOldLesson('L001', 'archive me'));
-
-      await archiveOldLessons(tempDir);
-
-      const archiveDir = join(tempDir, ARCHIVE_DIR);
-      const stats = await stat(archiveDir);
-      expect(stats.isDirectory()).toBe(true);
-    });
-
-    it('groups archived lessons by month', async () => {
-      // Create lessons from different months
-      const jan = createLesson('L001', 'jan lesson', {
-        created: '2024-01-15T10:00:00Z',
-      });
-      const feb = createLesson('L002', 'feb lesson', {
-        created: '2024-02-15T10:00:00Z',
-      });
-
-      await appendLesson(tempDir, jan);
-      await appendLesson(tempDir, feb);
-
-      await archiveOldLessons(tempDir);
-
-      const janArchive = await readArchive(tempDir, '2024-01');
-      const febArchive = await readArchive(tempDir, '2024-02');
-
-      expect(janArchive).toContain('jan lesson');
-      expect(febArchive).toContain('feb lesson');
-    });
-
-    it('appends to existing archive files', async () => {
-      // Create initial archive
-      const archiveDir = join(tempDir, ARCHIVE_DIR);
-      await mkdir(archiveDir, { recursive: true });
-      const existingLesson = { ...createLesson('L000', 'existing'), created: '2024-01-01T10:00:00Z' };
-      await writeFile(
-        join(archiveDir, '2024-01.jsonl'),
-        JSON.stringify(existingLesson) + '\n',
-        'utf-8'
-      );
-
-      // Add new old lesson
-      const oldLesson = createLesson('L001', 'new old lesson', {
-        created: '2024-01-15T10:00:00Z',
-      });
-      await appendLesson(tempDir, oldLesson);
-
-      await archiveOldLessons(tempDir);
-
-      const janArchive = await readArchive(tempDir, '2024-01');
-      expect(janArchive).toContain('existing');
-      expect(janArchive).toContain('new old lesson');
-    });
-
-    it('preserves original lesson data in archive', async () => {
-      const oldLesson = createOldLesson('L001', 'archive me');
-      oldLesson.tags = ['special', 'archive'];
-
-      await appendLesson(tempDir, oldLesson);
-      await archiveOldLessons(tempDir);
-
-      const { lessons } = await readLessons(tempDir);
-      expect(lessons).toHaveLength(0);
-
-      // Find the archive file
-      const oldDate = new Date();
-      oldDate.setDate(oldDate.getDate() - 100);
-      const yearMonth = `${oldDate.getFullYear()}-${String(oldDate.getMonth() + 1).padStart(2, '0')}`;
-      const archiveContent = await readArchive(tempDir, yearMonth);
-      const archived = JSON.parse(archiveContent.trim()) as MemoryItem;
-
-      expect(archived.id).toBe('L001');
-      expect(archived.tags).toEqual(['special', 'archive']);
     });
   });
 

@@ -15,8 +15,6 @@ export const DB_PATH = '.claude/.cache/lessons.sqlite';
 
 /** Database connections keyed by resolved DB path */
 const dbMap = new Map<string, DatabaseType>();
-/** Last opened DB path for backward-compat getDb() */
-let lastDbPath: string | null = null;
 
 /**
  * Check if the database has the expected schema version.
@@ -44,7 +42,6 @@ export function openDb(repoRoot: string, options: DbOptions = {}): DatabaseType 
 
   const cached = dbMap.get(key);
   if (cached) {
-    lastDbPath = key;
     return cached;
   }
 
@@ -69,7 +66,6 @@ export function openDb(repoRoot: string, options: DbOptions = {}): DatabaseType 
 
   createSchema(database);
   dbMap.set(key, database);
-  lastDbPath = key;
   return database;
 }
 
@@ -81,15 +77,4 @@ export function closeDb(): void {
     database.close();
   }
   dbMap.clear();
-  lastDbPath = null;
-}
-
-/**
- * Get the current database instance (for internal use).
- * @deprecated Prefer openDb(repoRoot) for explicit repo-scoped access.
- * @returns Current database instance or null
- */
-export function getDb(): DatabaseType | null {
-  if (!lastDbPath) return null;
-  return dbMap.get(lastDbPath) ?? null;
 }

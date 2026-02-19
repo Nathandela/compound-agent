@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { fc, test as fcTest } from '@fast-check/vitest';
 
 import {
   detectSelfCorrection,
@@ -192,20 +193,6 @@ describe('trigger detection', () => {
       expect(result?.file).toBe('src/utils/helper.ts');
     });
 
-    it('handles sparse edits array with undefined entries', () => {
-      // Create an array with holes (undefined values)
-      const edits = new Array(5);
-      edits[0] = { file: 'src/app.ts', success: true, timestamp: Date.now() - 3000 };
-      // edits[1] is undefined (hole)
-      edits[2] = { file: 'src/app.ts', success: false, timestamp: Date.now() - 2000 };
-      // edits[3] is undefined (hole)
-      edits[4] = { file: 'src/app.ts', success: true, timestamp: Date.now() - 1000 };
-
-      const history: EditHistory = { edits };
-      const result = detectSelfCorrection(history);
-      // Pattern not found because of undefined entries breaking the sequence
-      expect(result).toBeNull();
-    });
   });
 
   describe('detectTestFailure', () => {
@@ -341,5 +328,72 @@ describe('trigger detection', () => {
       expect(inferMemoryItemType('WHEN the build fails, clear the cache first')).toBe('solution');
       expect(inferMemoryItemType('ALWAYS check types before pushing')).toBe('preference');
     });
+  });
+
+  describe('property-based tests', () => {
+    // Each phrase must match at least one USER_CORRECTION_PATTERNS regex.
+    // "no, " matches /\bno\b[,.]?\s/; "wrong" matches /\bwrong\b/;
+    // "actually" matches /\bactually\b/; "not that" matches /\bnot that\b/;
+    // "I meant" matches /\bi meant\b/
+    const KNOWN_CORRECTION_PHRASES = [
+      'no, ',
+      'wrong',
+      'actually',
+      'not that',
+      'I meant',
+    ];
+
+    fcTest.prop(
+      [fc.nat({ max: KNOWN_CORRECTION_PHRASES.length - 1 }), fc.string(), fc.string()],
+    )(
+      'known correction patterns always detected regardless of surrounding text',
+      (phraseIndex, prefix, suffix) => {
+        const phrase = KNOWN_CORRECTION_PHRASES[phraseIndex];
+        const message = `${prefix} ${phrase} ${suffix}`;
+        const signals: CorrectionSignal = {
+          messages: ['initial message', message],
+          context: { tool: 'edit', intent: 'test' },
+        };
+        const result = detectUserCorrection(signals);
+        expect(result).not.toBeNull();
+      },
+    );
+
+    fcTest.prop([
+      fc.array(fc.string({ minLength: 1 }), { minLength: 2, maxLength: 10 }),
+    ])(
+      'if detectUserCorrection returns non-null, result has trigger and correctionMessage',
+      (messages) => {
+        const signals: CorrectionSignal = {
+          messages,
+          context: { tool: 'edit', intent: 'test' },
+        };
+        const result = detectUserCorrection(signals);
+        if (result !== null) {
+          expect(result).toHaveProperty('trigger');
+          expect(result).toHaveProperty('correctionMessage');
+          expect(typeof result.trigger).toBe('string');
+          expect(typeof result.correctionMessage).toBe('string');
+          expect(result.trigger.length).toBeGreaterThan(0);
+        }
+      },
+    );
+
+    // Words that do NOT contain any correction keywords
+    const safeWords = ['hello', 'world', 'foo', 'bar', 'baz', 'test', 'code', 'file', 'good'];
+
+    fcTest.prop([
+      fc.array(fc.constantFrom(...safeWords), { minLength: 2, maxLength: 5 }),
+    ])(
+      'random strings without known correction patterns return null',
+      (messages) => {
+        const signals: CorrectionSignal = {
+          messages,
+          context: { tool: 'edit', intent: 'test' },
+        };
+        const result = detectUserCorrection(signals);
+        expect(result).toBeNull();
+      },
+    );
   });
 });

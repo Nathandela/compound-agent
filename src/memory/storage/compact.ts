@@ -14,7 +14,7 @@ import { MemoryItemSchema } from '../types.js';
 import type { MemoryItem } from '../types.js';
 import { getLessonAgeDays } from '../../utils.js';
 
-import { LESSONS_PATH, readMemoryItems } from './jsonl.js';
+import { LESSONS_PATH } from './jsonl.js';
 
 /** Relative path to archive directory from repo root */
 export const ARCHIVE_DIR = '.claude/lessons/archive';
@@ -108,33 +108,6 @@ export async function needsCompaction(repoRoot: string): Promise<boolean> {
 }
 
 /**
- * Rewrite the JSONL file without tombstones.
- * Applies last-write-wins deduplication.
- */
-export async function rewriteWithoutTombstones(repoRoot: string): Promise<number> {
-  const filePath = join(repoRoot, LESSONS_PATH);
-  const tempPath = filePath + '.tmp';
-
-  // Read deduplicated lessons (already handles last-write-wins)
-  const { items } = await readMemoryItems(repoRoot);
-
-  // Count tombstones before rewrite
-  const tombstoneCount = await countTombstones(repoRoot);
-
-  // Ensure directory exists
-  await mkdir(dirname(filePath), { recursive: true });
-
-  // Write clean lessons to temp file
-  const lines = items.map((item) => JSON.stringify(item) + '\n');
-  await writeFile(tempPath, lines.join(''), 'utf-8');
-
-  // Atomic rename
-  await rename(tempPath, filePath);
-
-  return tombstoneCount;
-}
-
-/**
  * Determine if a lesson should be archived based on age and retrieval count.
  * Lessons are archived if older than ARCHIVE_AGE_DAYS and never retrieved.
  *
@@ -146,61 +119,6 @@ function shouldArchive(lesson: MemoryItem): boolean {
 
   // Archive if: older than threshold AND never retrieved
   return ageDays > ARCHIVE_AGE_DAYS && (lesson.retrievalCount === undefined || lesson.retrievalCount === 0);
-}
-
-/**
- * Archive old lessons that haven't been retrieved.
- * Moves lessons >90 days old with 0 retrievals to archive files.
- * Returns the number of lessons archived.
- */
-export async function archiveOldLessons(repoRoot: string): Promise<number> {
-  const { items } = await readMemoryItems(repoRoot);
-
-  const toArchive: MemoryItem[] = [];
-  const toKeep: MemoryItem[] = [];
-
-  for (const item of items) {
-    if (shouldArchive(item)) {
-      toArchive.push(item);
-    } else {
-      toKeep.push(item);
-    }
-  }
-
-  if (toArchive.length === 0) {
-    return 0;
-  }
-
-  // Group lessons by archive file (YYYY-MM)
-  const archiveGroups = new Map<string, MemoryItem[]>();
-  for (const lesson of toArchive) {
-    const created = new Date(lesson.created);
-    const archivePath = getArchivePath(repoRoot, created);
-    const group = archiveGroups.get(archivePath) ?? [];
-    group.push(lesson);
-    archiveGroups.set(archivePath, group);
-  }
-
-  // Create archive directory
-  const archiveDir = join(repoRoot, ARCHIVE_DIR);
-  await mkdir(archiveDir, { recursive: true });
-
-  // Append to archive files
-  for (const [archivePath, archiveLessons] of archiveGroups) {
-    const lines = archiveLessons.map((l) => JSON.stringify(l) + '\n').join('');
-    await appendFile(archivePath, lines, 'utf-8');
-  }
-
-  // Rewrite main file without archived lessons
-  const filePath = join(repoRoot, LESSONS_PATH);
-  const tempPath = filePath + '.tmp';
-  await mkdir(dirname(filePath), { recursive: true });
-
-  const lines = toKeep.map((lesson) => JSON.stringify(lesson) + '\n');
-  await writeFile(tempPath, lines.join(''), 'utf-8');
-  await rename(tempPath, filePath);
-
-  return toArchive.length;
 }
 
 /**

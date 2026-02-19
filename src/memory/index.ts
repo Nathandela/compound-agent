@@ -7,12 +7,8 @@
 // Types and schemas (from types.ts)
 export {
   generateId,
-  LegacyLessonSchema,
-  LegacyTombstoneSchema,
   LessonItemSchema,
-  LessonRecordSchema,
   LessonSchema,
-  LessonTypeSchema,
   MemoryItemRecordSchema,
   MemoryItemSchema,
   MemoryItemTypeSchema,
@@ -67,10 +63,9 @@ export {
 export {
   cosineSimilarity,
   rankLessons,
-  rankMemoryItems,
   searchVector,
 } from './search/index.js';
-export type { RankedLesson, RankedMemoryItem, ScoredLesson, ScoredMemoryItem } from './search/index.js';
+export type { RankedLesson, ScoredLesson } from './search/index.js';
 
 // Capture API
 export {
@@ -85,7 +80,7 @@ export {
 } from './capture/index.js';
 
 // Retrieval API
-export { loadSessionLessons, loadSessionMemory, retrieveForPlan } from './retrieval/index.js';
+export { loadSessionLessons, retrieveForPlan } from './retrieval/index.js';
 
 // Storage extras
 export {

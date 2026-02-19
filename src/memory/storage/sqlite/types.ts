@@ -53,9 +53,6 @@ export interface MemoryItemRow {
   pattern_good: string | null;
 }
 
-/** @deprecated Use MemoryItemRow instead */
-export type LessonRow = MemoryItemRow;
-
 /** Cached embedding data */
 export interface CachedEmbeddingData {
   embedding: Buffer;

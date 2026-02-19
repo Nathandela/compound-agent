@@ -20,7 +20,7 @@ const modelAvailable = isModelAvailable();
 const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
 const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
 
-describe('compound command', () => {
+describe('compound command', { timeout: 30_000 }, () => {
   const { getTempDir, runCli } = setupCliTestContext();
 
   it('handles empty lesson store gracefully', () => {

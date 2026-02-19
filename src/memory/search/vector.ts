@@ -11,6 +11,19 @@ import { contentHash, getCachedEmbedding, readMemoryItems, setCachedEmbedding } 
 import type { MemoryItem } from '../types.js';
 
 /**
+ * In-memory embedding cache for CCT patterns.
+ * CCT patterns don't have rows in the SQLite lessons table,
+ * so setCachedEmbedding (UPDATE-only) is a no-op for them.
+ * This Map caches embeddings keyed by "id:contentHash".
+ */
+const cctEmbeddingCache = new Map<string, number[]>();
+
+/** Clear the CCT embedding cache. Exported for testing. */
+export function clearCctEmbeddingCache(): void {
+  cctEmbeddingCache.clear();
+}
+
+/**
  * Calculate cosine similarity between two vectors.
  * Returns value between -1 (opposite) and 1 (identical).
  */
@@ -44,9 +57,6 @@ export interface ScoredLesson {
   lesson: MemoryItem;
   score: number;
 }
-
-/** Alias for ScoredLesson for unified memory API consumers. */
-export type ScoredMemoryItem = ScoredLesson;
 
 /** Options for vector search */
 export interface SearchVectorOptions {
@@ -130,11 +140,19 @@ export async function searchVector(
     }
   }
 
-  // Score CCT patterns
+  // Score CCT patterns (use in-memory cache since they lack SQLite rows)
   for (const pattern of cctPatterns) {
     try {
       const text = `${pattern.name} ${pattern.description}`;
-      const vec = await embedText(text);
+      const hash = contentHash(pattern.name, pattern.description);
+      const cacheKey = `${pattern.id}:${hash}`;
+
+      let vec = cctEmbeddingCache.get(cacheKey);
+      if (!vec) {
+        vec = await embedText(text);
+        cctEmbeddingCache.set(cacheKey, vec);
+      }
+
       const score = cosineSimilarity(queryVector, vec);
       scored.push({ lesson: cctToMemoryItem(pattern), score });
     } catch {

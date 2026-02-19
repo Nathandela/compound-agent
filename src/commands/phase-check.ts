@@ -184,7 +184,11 @@ function registerPhaseSubcommands(
     .command('init <epic-id>')
     .description('Initialize phase state for an epic')
     .action((epicId: string) => {
-      if (!EPIC_ID_PATTERN.test(epicId)) { console.error(`Invalid epic ID: "${epicId}"`); process.exit(1); }
+      if (!EPIC_ID_PATTERN.test(epicId)) {
+        console.error(`Invalid epic ID: "${epicId}"`);
+        process.exitCode = 1;
+        return;
+      }
       if (getDryRun()) { console.log(`[dry-run] Would initialize phase state for epic ${epicId} in ${repoRoot()}`); return; }
       initPhaseState(repoRoot(), epicId);
       console.log(`Phase state initialized for ${epicId}. Current phase: brainstorm (1/5).`);
@@ -194,10 +198,18 @@ function registerPhaseSubcommands(
     .command('start <phase>')
     .description('Start or resume a phase')
     .action((phase: string) => {
-      if (!isPhaseName(phase)) { console.error(`Invalid phase: "${phase}". Valid phases: ${PHASES.join(', ')}`); process.exit(1); }
+      if (!isPhaseName(phase)) {
+        console.error(`Invalid phase: "${phase}". Valid phases: ${PHASES.join(', ')}`);
+        process.exitCode = 1;
+        return;
+      }
       if (getDryRun()) { console.log(`[dry-run] Would start phase ${phase}`); return; }
       const state = startPhase(repoRoot(), phase);
-      if (state === null) { console.error('No active phase state. Run: ca phase-check init <epic-id>'); process.exit(1); }
+      if (state === null) {
+        console.error('No active phase state. Run: ca phase-check init <epic-id>');
+        process.exitCode = 1;
+        return;
+      }
       console.log(`Phase updated: ${state.current_phase} (${state.phase_index}/5).`);
     });
 
@@ -205,10 +217,18 @@ function registerPhaseSubcommands(
     .command('gate <gate-name>')
     .description('Record a phase gate as passed')
     .action((gateName: string) => {
-      if (!isGateName(gateName)) { console.error(`Invalid gate: "${gateName}". Valid gates: ${GATES.join(', ')}`); process.exit(1); }
+      if (!isGateName(gateName)) {
+        console.error(`Invalid gate: "${gateName}". Valid gates: ${GATES.join(', ')}`);
+        process.exitCode = 1;
+        return;
+      }
       if (getDryRun()) { console.log(`[dry-run] Would record gate ${gateName}`); return; }
       const state = recordGatePassed(repoRoot(), gateName);
-      if (state === null) { console.error('No active phase state. Run: ca phase-check init <epic-id>'); process.exit(1); }
+      if (state === null) {
+        console.error('No active phase state. Run: ca phase-check init <epic-id>');
+        process.exitCode = 1;
+        return;
+      }
       if (gateName === 'final') {
         console.log('Final gate recorded. Phase state cleaned.');
         return;

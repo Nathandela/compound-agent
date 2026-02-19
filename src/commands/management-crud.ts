@@ -38,7 +38,8 @@ async function showAction(id: string, options: { json?: boolean }): Promise<void
       const msg = wasDeleted ? `Lesson ${id} not found (deleted)` : `Lesson ${id} not found`;
       console.error(formatError('show', 'NOT_FOUND', msg, 'Use "ca list" to see available lessons'));
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (options.json) {
@@ -93,7 +94,8 @@ async function updateAction(id: string, options: UpdateOptions): Promise<void> {
     } else {
       console.error(formatError('update', 'NO_FIELDS', 'No fields to update', 'Specify at least one: --insight, --tags, --severity, ...'));
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   const { items } = await readMemoryItems(repoRoot);
@@ -107,7 +109,8 @@ async function updateAction(id: string, options: UpdateOptions): Promise<void> {
       const msg = wasDeleted ? `Lesson ${id} is deleted` : `Lesson ${id} not found`;
       console.error(formatError('update', 'NOT_FOUND', msg, 'Use "ca list" to see available lessons'));
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   if (options.severity !== undefined) {
@@ -118,7 +121,8 @@ async function updateAction(id: string, options: UpdateOptions): Promise<void> {
       } else {
         console.error(formatError('update', 'INVALID_SEVERITY', `Invalid severity: "${options.severity}"`, 'Use --severity high|medium|low'));
       }
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
   }
 
@@ -131,7 +135,8 @@ async function updateAction(id: string, options: UpdateOptions): Promise<void> {
     } else {
       console.error(formatError('update', 'VALIDATION_FAILED', `Schema validation failed: ${validationResult.error.message}`, 'Check field values and try again'));
     }
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   await appendMemoryItem(repoRoot, updatedItem);
@@ -186,7 +191,8 @@ async function deleteAction(ids: string[], options: { json?: boolean }): Promise
       out.warn(`${warning.id}: ${warning.message}`);
     }
     if (deleted.length === 0 && warnings.length > 0) {
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
   }
 }
