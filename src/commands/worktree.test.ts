@@ -17,15 +17,29 @@ vi.mock('node:fs', () => ({
   writeFileSync: vi.fn(),
   copyFileSync: vi.fn(),
   mkdirSync: vi.fn(),
-  statSync: vi.fn(),
 }));
 
 vi.mock('../cli-utils.js', () => ({
   getRepoRoot: vi.fn(() => '/fake/repo'),
+  parseBdShowDeps: vi.fn((raw: string) => {
+    const data = JSON.parse(raw);
+    const issue = Array.isArray(data) ? data[0] : data;
+    return (issue?.depends_on ?? []).map((d: any) => ({
+      id: d.id,
+      title: d.title,
+      status: d.status,
+    }));
+  }),
+  shortId: vi.fn((fullId: string) => fullId.replace(/^[^-]+-/, '')),
+  validateEpicId: vi.fn((id: string) => {
+    if (!/^[a-zA-Z0-9._-]+$/.test(id)) {
+      throw new Error(`Invalid epic ID: "${id}"`);
+    }
+  }),
 }));
 
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, copyFileSync, mkdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from 'node:fs';
 import { getRepoRoot } from '../cli-utils.js';
 import {
   runWorktreeCreate,
@@ -38,9 +52,9 @@ import {
 const mockExecFileSync = vi.mocked(execFileSync);
 const mockExistsSync = vi.mocked(existsSync);
 const mockReadFileSync = vi.mocked(readFileSync);
+const mockWriteFileSync = vi.mocked(writeFileSync);
 const mockCopyFileSync = vi.mocked(copyFileSync);
 const mockMkdirSync = vi.mocked(mkdirSync);
-const mockStatSync = vi.mocked(statSync);
 const mockGetRepoRoot = vi.mocked(getRepoRoot);
 
 // Helper: bd show --json output for an epic with deps
@@ -66,10 +80,8 @@ function worktreeListPorcelain(entries: Array<{ path: string; branch: string }>)
 
 describe('worktree create', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
     mockGetRepoRoot.mockReturnValue('/fake/repo');
-    // Default: .git is a directory (main repo)
-    mockStatSync.mockReturnValue({ isDirectory: () => true } as any);
     // Default: no existing worktree
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
@@ -85,12 +97,12 @@ describe('worktree create', () => {
     mockReadFileSync.mockReturnValue('');
   });
 
-  it('rejects invalid epic IDs', async () => {
-    await expect(runWorktreeCreate('test; rm -rf /')).rejects.toThrow(/invalid epic id/i);
-    await expect(runWorktreeCreate('$(whoami)')).rejects.toThrow(/invalid epic id/i);
+  it('rejects invalid epic IDs', () => {
+    expect(() => runWorktreeCreate('test; rm -rf /')).toThrow(/invalid epic id/i);
+    expect(() => runWorktreeCreate('$(whoami)')).toThrow(/invalid epic id/i);
   });
 
-  it('skips creation when worktree already exists', async () => {
+  it('skips creation when worktree already exists', () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
         return worktreeListPorcelain([
@@ -101,12 +113,12 @@ describe('worktree create', () => {
       return '';
     });
 
-    const result = await runWorktreeCreate('epic1');
+    const result = runWorktreeCreate('epic1');
     expect(result.alreadyExists).toBe(true);
   });
 
-  it('creates worktree with correct path and branch', async () => {
-    const result = await runWorktreeCreate('epic1');
+  it('creates worktree with correct path and branch', () => {
+    const result = runWorktreeCreate('epic1');
 
     expect(mockExecFileSync).toHaveBeenCalledWith(
       'git',
@@ -117,8 +129,8 @@ describe('worktree create', () => {
     expect(result.branch).toBe('epic/epic1');
   });
 
-  it('runs pnpm install in worktree', async () => {
-    await runWorktreeCreate('epic1');
+  it('runs pnpm install in worktree', () => {
+    runWorktreeCreate('epic1');
 
     expect(mockExecFileSync).toHaveBeenCalledWith(
       'pnpm',
@@ -127,8 +139,8 @@ describe('worktree create', () => {
     );
   });
 
-  it('copies lessons JSONL to worktree', async () => {
-    await runWorktreeCreate('epic1');
+  it('copies lessons JSONL to worktree', () => {
+    runWorktreeCreate('epic1');
 
     expect(mockMkdirSync).toHaveBeenCalledWith(
       expect.stringContaining('repo-wt-epic1'),
@@ -137,18 +149,18 @@ describe('worktree create', () => {
     expect(mockCopyFileSync).toHaveBeenCalled();
   });
 
-  it('runs ca setup --skip-model in worktree', async () => {
-    await runWorktreeCreate('epic1');
+  it('runs ca setup --skip-model in worktree', () => {
+    runWorktreeCreate('epic1');
 
     expect(mockExecFileSync).toHaveBeenCalledWith(
-      'npx',
-      ['ca', 'setup', '--skip-model'],
+      'pnpm',
+      ['exec', 'ca', 'setup', '--skip-model'],
       expect.objectContaining({ cwd: '/fake/repo-wt-epic1' }),
     );
   });
 
-  it('creates Merge task and wires dependency', async () => {
-    await runWorktreeCreate('epic1');
+  it('creates Merge task and wires dependency', () => {
+    runWorktreeCreate('epic1');
 
     // Should create merge task
     expect(mockExecFileSync).toHaveBeenCalledWith(
@@ -165,35 +177,50 @@ describe('worktree create', () => {
     );
   });
 
-  it('returns summary with worktree path, branch, and merge task ID', async () => {
-    const result = await runWorktreeCreate('epic1');
+  it('returns summary with worktree path, branch, and merge task ID', () => {
+    const result = runWorktreeCreate('epic1');
 
     expect(result.worktreePath).toBe('/fake/repo-wt-epic1');
     expect(result.branch).toBe('epic/epic1');
     expect(result.mergeTaskId).toBe('m001');
     expect(result.alreadyExists).toBe(false);
   });
+
+  it('throws when bd create returns empty ID', () => {
+    mockExecFileSync.mockImplementation((cmd, args) => {
+      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
+        return 'worktree /fake/repo\nHEAD abc123\nbranch refs/heads/main\n';
+      }
+      if (cmd === 'bd' && args?.[0] === 'create') {
+        return '';
+      }
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+
+    expect(() => runWorktreeCreate('epic1')).toThrow(/no task id/i);
+  });
 });
 
 describe('worktree wire-deps', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
   });
 
-  it('rejects invalid epic IDs', async () => {
-    await expect(runWorktreeWireDeps('bad; id')).rejects.toThrow(/invalid epic id/i);
+  it('rejects invalid epic IDs', () => {
+    expect(() => runWorktreeWireDeps('bad; id')).toThrow(/invalid epic id/i);
   });
 
-  it('exits gracefully when no Merge task exists', async () => {
+  it('exits gracefully when no Merge task exists', () => {
     mockExecFileSync.mockReturnValue(bdShowJson([
       { title: 'Review: check', status: 'open', id: 'r1' },
     ]));
 
-    const result = await runWorktreeWireDeps('epic1');
-    expect(result.noWorktree).toBe(true);
+    const result = runWorktreeWireDeps('epic1');
+    expect(result.noMergeTask).toBe(true);
   });
 
-  it('wires Review and Compound tasks as merge dependencies', async () => {
+  it('wires Review and Compound tasks as merge dependencies', () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'bd' && args?.[0] === 'show') {
         return bdShowJson([
@@ -205,7 +232,7 @@ describe('worktree wire-deps', () => {
       return '';
     });
 
-    const result = await runWorktreeWireDeps('epic1');
+    const result = runWorktreeWireDeps('epic1');
 
     expect(mockExecFileSync).toHaveBeenCalledWith(
       'bd', ['dep', 'add', 'merge1', 'review1'], expect.any(Object),
@@ -213,11 +240,11 @@ describe('worktree wire-deps', () => {
     expect(mockExecFileSync).toHaveBeenCalledWith(
       'bd', ['dep', 'add', 'merge1', 'compound1'], expect.any(Object),
     );
-    expect(result.noWorktree).toBe(false);
+    expect(result.noMergeTask).toBe(false);
     expect(result.wired).toEqual(['review1', 'compound1']);
   });
 
-  it('warns but does not error when Review or Compound is missing', async () => {
+  it('warns but does not error when Review or Compound is missing', () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'bd' && args?.[0] === 'show') {
         return bdShowJson([
@@ -227,112 +254,136 @@ describe('worktree wire-deps', () => {
       return '';
     });
 
-    const result = await runWorktreeWireDeps('epic1');
-    expect(result.noWorktree).toBe(false);
+    const result = runWorktreeWireDeps('epic1');
+    expect(result.noMergeTask).toBe(false);
     expect(result.wired).toEqual([]);
     expect(result.warnings.length).toBeGreaterThan(0);
   });
 });
 
 describe('worktree merge', () => {
-  beforeEach(() => {
-    vi.resetAllMocks();
-  });
+  /** Standard mock for merge tests: routes git and pnpm calls. */
+  function setupMergeMocks(overrides?: {
+    currentBranch?: string;
+    worktreeEntries?: Array<{ path: string; branch: string }>;
+    mergeThrows?: Error;
+    testThrows?: Error;
+  }) {
+    const entries = overrides?.worktreeEntries ?? [
+      { path: '/fake/repo', branch: 'main' },
+      { path: '/fake/repo-wt-epic1', branch: 'epic/epic1' },
+    ];
+    const currentBranch = overrides?.currentBranch ?? 'main';
 
-  it('rejects invalid epic IDs', async () => {
-    await expect(runWorktreeMerge('bad; id')).rejects.toThrow(/invalid epic id/i);
-  });
-
-  it('discovers main repo and worktree paths', async () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'git' && args?.[0] === 'rev-parse' && args?.[1] === '--git-common-dir') {
         return '/fake/repo/.git\n';
       }
-      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
-        return worktreeListPorcelain([
-          { path: '/fake/repo', branch: 'main' },
-          { path: '/fake/repo-wt-epic1', branch: 'epic/epic1' },
-        ]);
+      if (cmd === 'git' && args?.[0] === '-C' && args?.[2] === 'rev-parse' && args?.[3] === '--abbrev-ref') {
+        return `${currentBranch}\n`;
       }
-      if (cmd === 'git' && args?.[0] === 'merge') {
+      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
+        return worktreeListPorcelain(entries);
+      }
+      if (cmd === 'git' && args?.[0] === 'merge' && args?.[1] === 'main') {
+        if (overrides?.mergeThrows) throw overrides.mergeThrows;
         return '';
       }
       if (cmd === 'pnpm' && args?.[0] === 'test') {
+        if (overrides?.testThrows) throw overrides.testThrows;
         return '';
       }
       return '';
     });
     mockExistsSync.mockReturnValue(true);
     mockReadFileSync.mockReturnValue('');
+  }
 
-    const result = await runWorktreeMerge('epic1');
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rejects invalid epic IDs', () => {
+    expect(() => runWorktreeMerge('bad; id')).toThrow(/invalid epic id/i);
+  });
+
+  it('discovers main repo and worktree paths', () => {
+    setupMergeMocks();
+
+    const result = runWorktreeMerge('epic1');
     expect(result.mainRepo).toBe('/fake/repo');
   });
 
-  it('reports conflicts when merge fails', async () => {
-    mockExecFileSync.mockImplementation((cmd, args) => {
-      if (cmd === 'git' && args?.[0] === 'rev-parse') {
-        return '/fake/repo/.git\n';
-      }
-      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
-        return worktreeListPorcelain([
-          { path: '/fake/repo', branch: 'main' },
-          { path: '/fake/repo-wt-epic1', branch: 'epic/epic1' },
-        ]);
-      }
-      if (cmd === 'git' && args?.[0] === 'merge' && args?.[1] === 'main') {
-        throw new Error('CONFLICT (content): Merge conflict in file.ts');
-      }
-      return '';
+  it('throws when worktree not found', () => {
+    setupMergeMocks({
+      worktreeEntries: [{ path: '/fake/repo', branch: 'main' }],
     });
 
-    await expect(runWorktreeMerge('epic1')).rejects.toThrow(/conflict/i);
+    expect(() => runWorktreeMerge('nonexistent')).toThrow(/worktree not found/i);
   });
 
-  it('merges JSONL by deduplicating on id field', async () => {
+  it('throws when main repo not on main branch', () => {
+    setupMergeMocks({ currentBranch: 'feature-branch' });
+
+    expect(() => runWorktreeMerge('epic1')).toThrow(/expected "main"/i);
+  });
+
+  it('reports conflicts when merge fails', () => {
+    setupMergeMocks({
+      mergeThrows: new Error('CONFLICT (content): Merge conflict in file.ts'),
+    });
+
+    expect(() => runWorktreeMerge('epic1')).toThrow(/conflict/i);
+  });
+
+  it('throws when tests fail with worktree path in message', () => {
+    setupMergeMocks({
+      testThrows: new Error('Test suite failed'),
+    });
+
+    expect(() => runWorktreeMerge('epic1')).toThrow(/repo-wt-epic1/);
+  });
+
+  it('merges JSONL by line-based dedup', () => {
     const mainJsonl = '{"id":"lesson-1","text":"main lesson"}\n';
     const wtJsonl = '{"id":"lesson-1","text":"main lesson"}\n{"id":"lesson-2","text":"new lesson"}\n';
 
-    mockExecFileSync.mockImplementation((cmd, args) => {
-      if (cmd === 'git' && args?.[0] === 'rev-parse') {
-        return '/fake/repo/.git\n';
-      }
-      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
-        return worktreeListPorcelain([
-          { path: '/fake/repo', branch: 'main' },
-          { path: '/fake/repo-wt-epic1', branch: 'epic/epic1' },
-        ]);
-      }
-      return '';
-    });
-    mockExistsSync.mockReturnValue(true);
+    setupMergeMocks();
     mockReadFileSync.mockImplementation((p: any) => {
-      const path = String(p);
-      if (path.includes('repo-wt-epic1')) return wtJsonl;
+      const filePath = String(p);
+      if (filePath.includes('repo-wt-epic1')) return wtJsonl;
       return mainJsonl;
     });
 
-    const result = await runWorktreeMerge('epic1');
+    const result = runWorktreeMerge('epic1');
     expect(result.newLessons).toBe(1);
   });
 
-  it('removes worktree and deletes branch after successful merge', async () => {
-    mockExecFileSync.mockImplementation((cmd, args) => {
-      if (cmd === 'git' && args?.[0] === 'rev-parse') {
-        return '/fake/repo/.git\n';
-      }
-      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
-        return worktreeListPorcelain([
-          { path: '/fake/repo', branch: 'main' },
-          { path: '/fake/repo-wt-epic1', branch: 'epic/epic1' },
-        ]);
-      }
-      return '';
-    });
-    mockExistsSync.mockReturnValue(true);
-    mockReadFileSync.mockReturnValue('');
+  it('JSONL line-based dedup preserves same-ID updates', () => {
+    // Same ID but different content -- line-based dedup sees them as different lines
+    const mainJsonl = '{"id":"1","text":"old"}\n';
+    const wtJsonl = '{"id":"1","text":"new"}\n';
 
-    await runWorktreeMerge('epic1');
+    setupMergeMocks();
+    mockReadFileSync.mockImplementation((p: any) => {
+      const filePath = String(p);
+      if (filePath.includes('repo-wt-epic1')) return wtJsonl;
+      return mainJsonl;
+    });
+
+    runWorktreeMerge('epic1');
+
+    // The worktree line is NOT in main (different text), so it should be appended
+    expect(mockWriteFileSync).toHaveBeenCalled();
+    const writtenContent = String(mockWriteFileSync.mock.calls[0][1]);
+    expect(writtenContent).toContain('{"id":"1","text":"old"}');
+    expect(writtenContent).toContain('{"id":"1","text":"new"}');
+  });
+
+  it('removes worktree and deletes branch after successful merge', () => {
+    setupMergeMocks();
+
+    runWorktreeMerge('epic1');
 
     expect(mockExecFileSync).toHaveBeenCalledWith(
       'git', ['worktree', 'remove', '/fake/repo-wt-epic1'], expect.any(Object),
@@ -345,11 +396,11 @@ describe('worktree merge', () => {
 
 describe('worktree list', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
     mockGetRepoRoot.mockReturnValue('/fake/repo');
   });
 
-  it('returns empty list when no worktrees match convention', async () => {
+  it('returns empty list when no worktrees match convention', () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'git' && args?.[0] === 'worktree') {
         return worktreeListPorcelain([
@@ -359,11 +410,11 @@ describe('worktree list', () => {
       return '';
     });
 
-    const result = await runWorktreeList();
+    const result = runWorktreeList();
     expect(result).toEqual([]);
   });
 
-  it('returns worktree entries matching -wt- convention', async () => {
+  it('returns worktree entries matching -wt- convention', () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'git' && args?.[0] === 'worktree') {
         return worktreeListPorcelain([
@@ -377,7 +428,7 @@ describe('worktree list', () => {
       return '';
     });
 
-    const result = await runWorktreeList();
+    const result = runWorktreeList();
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
       epicId: 'epic1',
@@ -389,15 +440,15 @@ describe('worktree list', () => {
 
 describe('worktree cleanup', () => {
   beforeEach(() => {
-    vi.resetAllMocks();
+    vi.clearAllMocks();
     mockGetRepoRoot.mockReturnValue('/fake/repo');
   });
 
-  it('rejects invalid epic IDs', async () => {
-    await expect(runWorktreeCleanup('bad; id')).rejects.toThrow(/invalid epic id/i);
+  it('rejects invalid epic IDs', () => {
+    expect(() => runWorktreeCleanup('bad; id')).toThrow(/invalid epic id/i);
   });
 
-  it('throws when worktree not found', async () => {
+  it('throws when worktree not found', () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'git' && args?.[0] === 'worktree') {
         return worktreeListPorcelain([
@@ -407,10 +458,10 @@ describe('worktree cleanup', () => {
       return '';
     });
 
-    await expect(runWorktreeCleanup('nonexistent')).rejects.toThrow(/not found/i);
+    expect(() => runWorktreeCleanup('nonexistent')).toThrow(/not found/i);
   });
 
-  it('requires --force for dirty worktrees', async () => {
+  it('requires --force for dirty worktrees', () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
         return worktreeListPorcelain([
@@ -425,10 +476,10 @@ describe('worktree cleanup', () => {
       return '';
     });
 
-    await expect(runWorktreeCleanup('epic1')).rejects.toThrow(/uncommitted/i);
+    expect(() => runWorktreeCleanup('epic1')).toThrow(/uncommitted/i);
   });
 
-  it('proceeds with --force even if dirty', async () => {
+  it('proceeds with --force even if dirty', () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
         return worktreeListPorcelain([
@@ -447,11 +498,11 @@ describe('worktree cleanup', () => {
       return '';
     });
 
-    const result = await runWorktreeCleanup('epic1', { force: true });
+    const result = runWorktreeCleanup('epic1', { force: true });
     expect(result.removed).toBe(true);
   });
 
-  it('removes worktree, deletes branch, and closes Merge task', async () => {
+  it('uses -d by default for branch delete', () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
         return worktreeListPorcelain([
@@ -470,13 +521,65 @@ describe('worktree cleanup', () => {
       return '';
     });
 
-    const result = await runWorktreeCleanup('epic1');
+    runWorktreeCleanup('epic1');
+
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      'git', ['branch', '-d', 'epic/epic1'], expect.any(Object),
+    );
+  });
+
+  it('uses -D with --force for branch delete', () => {
+    mockExecFileSync.mockImplementation((cmd, args) => {
+      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
+        return worktreeListPorcelain([
+          { path: '/fake/repo', branch: 'main' },
+          { path: '/fake/repo-wt-epic1', branch: 'epic/epic1' },
+        ]);
+      }
+      if (cmd === 'git' && args?.[0] === 'status') {
+        return ' M dirty-file.ts\n';
+      }
+      if (cmd === 'bd' && args?.[0] === 'show') {
+        return bdShowJson([
+          { title: 'Merge: merge epic/epic1 to main', status: 'open', id: 'merge1' },
+        ]);
+      }
+      return '';
+    });
+
+    runWorktreeCleanup('epic1', { force: true });
+
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      'git', ['branch', '-D', 'epic/epic1'], expect.any(Object),
+    );
+  });
+
+  it('removes worktree, deletes branch, and closes Merge task', () => {
+    mockExecFileSync.mockImplementation((cmd, args) => {
+      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
+        return worktreeListPorcelain([
+          { path: '/fake/repo', branch: 'main' },
+          { path: '/fake/repo-wt-epic1', branch: 'epic/epic1' },
+        ]);
+      }
+      if (cmd === 'git' && args?.[0] === 'status') {
+        return '';
+      }
+      if (cmd === 'bd' && args?.[0] === 'show') {
+        return bdShowJson([
+          { title: 'Merge: merge epic/epic1 to main', status: 'open', id: 'merge1' },
+        ]);
+      }
+      return '';
+    });
+
+    const result = runWorktreeCleanup('epic1');
 
     expect(mockExecFileSync).toHaveBeenCalledWith(
       'git', ['worktree', 'remove', '/fake/repo-wt-epic1'], expect.any(Object),
     );
     expect(mockExecFileSync).toHaveBeenCalledWith(
-      'git', ['branch', '-D', 'epic/epic1'], expect.any(Object),
+      'git', ['branch', '-d', 'epic/epic1'], expect.any(Object),
     );
     expect(mockExecFileSync).toHaveBeenCalledWith(
       'bd', ['close', 'merge1'], expect.any(Object),

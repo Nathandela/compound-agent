@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.11] - 2026-02-19
+
+### Added
+
+- **Git worktree integration** (`ca worktree`): Isolate epic work in separate git worktrees for parallel execution. Five subcommands:
+  - `ca worktree create <epic-id>` — Create worktree, install deps, copy lessons, create Merge beads task
+  - `ca worktree wire-deps <epic-id>` — Connect Review/Compound tasks as merge blockers (graceful no-op without worktree)
+  - `ca worktree merge <epic-id>` — Two-phase merge: resolve conflicts in worktree, then land clean on main
+  - `ca worktree list` — Show active worktrees with epic and merge task status
+  - `ca worktree cleanup <epic-id>` — Remove worktree, branch, and close Merge task (--force for dirty worktrees)
+- **`/compound:set-worktree` slash command**: Set up a worktree before running `/compound:lfg` for isolated epic execution
+- **Conditional Merge gate in `verify-gates`**: Worktree epics require the Merge task to be closed before epic closure. Non-worktree epics unaffected.
+- **Plan skill wire-deps step**: Plan phase now calls `ca worktree wire-deps` to connect merge dependencies when a worktree is active.
+
+### Changed
+
+- **Worktree merge safety hardening**: Added branch verification (asserts main repo is on `main`), worktree existence guard, structured error messages with worktree paths for conflict resolution and test failures
+- **JSONL reconciliation**: Switched from ID-based to line-based deduplication to preserve last-write-wins semantics for same-ID updates and deletes
+- **Worktree cleanup safety**: Branch deletion uses `-d` (safe) by default; `-D` (force) only with `--force` flag
+- **Shared beads utilities**: Extracted `validateEpicId`, `parseBdShowDeps`, and `shortId` to `cli-utils.ts`, eliminating duplication between `worktree.ts` and `verify-gates.ts`
+- **Sync API**: All worktree functions are now synchronous (removed misleading `async` wrapper around purely synchronous `execFileSync` calls)
+
 ## [1.2.10] - 2026-02-19
 
 ### Fixed
@@ -534,7 +556,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.10...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.11...HEAD
+[1.2.11]: https://github.com/Nathandela/learning_agent/compare/v1.2.10...v1.2.11
 [1.2.10]: https://github.com/Nathandela/learning_agent/compare/v1.2.9...v1.2.10
 [1.2.9]: https://github.com/Nathandela/learning_agent/compare/v1.2.7...v1.2.9
 [1.2.7]: https://github.com/Nathandela/learning_agent/compare/v1.2.6...v1.2.7

@@ -9,15 +9,7 @@ import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from
 import path from 'node:path';
 import type { Command } from 'commander';
 
-import { getRepoRoot } from '../cli-utils.js';
-
-const EPIC_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
-
-function validateEpicId(epicId: string): void {
-  if (!EPIC_ID_PATTERN.test(epicId)) {
-    throw new Error(`Invalid epic ID: "${epicId}" (must be alphanumeric with hyphens/underscores)`);
-  }
-}
+import { getRepoRoot, parseBdShowDeps, shortId, validateEpicId } from '../cli-utils.js';
 
 /** Parse worktree entries from `git worktree list --porcelain` output. */
 function parseWorktreeList(raw: string): Array<{ path: string; branch: string }> {
@@ -34,25 +26,6 @@ function parseWorktreeList(raw: string): Array<{ path: string; branch: string }>
   return entries;
 }
 
-/** Parse deps from `bd show --json` output. */
-function parseDepsJson(raw: string): Array<{ id: string; title: string; status: string }> {
-  const data = JSON.parse(raw);
-  const issue = Array.isArray(data) ? data[0] : data;
-  if (!issue) return [];
-  const depsArray = issue.depends_on ?? issue.dependencies ?? [];
-  return depsArray.map((dep: { id?: string; title?: string; status?: string }) => ({
-    id: dep.id ?? '',
-    title: dep.title ?? '',
-    status: dep.status ?? 'open',
-  }));
-}
-
-/** Extract short ID from full beads ID (e.g., "learning_agent-m001" -> "m001"). */
-function shortId(fullId: string): string {
-  const parts = fullId.split('-');
-  return parts[parts.length - 1] ?? fullId;
-}
-
 // ============================================================================
 // worktree create
 // ============================================================================
@@ -64,7 +37,7 @@ export interface WorktreeCreateResult {
   alreadyExists: boolean;
 }
 
-export async function runWorktreeCreate(epicId: string): Promise<WorktreeCreateResult> {
+export function runWorktreeCreate(epicId: string): WorktreeCreateResult {
   validateEpicId(epicId);
 
   const repoRoot = getRepoRoot();
@@ -94,12 +67,12 @@ export async function runWorktreeCreate(epicId: string): Promise<WorktreeCreateR
     copyFileSync(srcJsonl, dstJsonl);
   }
 
-  // Run setup
-  execFileSync('npx', ['ca', 'setup', '--skip-model'], { cwd: worktreePath, encoding: 'utf-8' });
+  // Run setup (pnpm exec guarantees the local installed binary)
+  execFileSync('pnpm', ['exec', 'ca', 'setup', '--skip-model'], { cwd: worktreePath, encoding: 'utf-8' });
 
   // Create Merge task
   const mergeTitle = `Merge: merge ${branch} to main`;
-  const mergeDesc = `INSTRUCTIONS: This task merges the worktree branch back to main. Run \`npx ca worktree merge ${epicId}\` when all other blocking tasks are resolved.`;
+  const mergeDesc = `INSTRUCTIONS: This task merges the worktree branch back to main. Worktree path: ${worktreePath}. Run \`pnpm exec ca worktree merge ${epicId}\` when all other blocking tasks are resolved.`;
   const bdOutput = execFileSync('bd', [
     'create',
     `--title=${mergeTitle}`,
@@ -111,6 +84,9 @@ export async function runWorktreeCreate(epicId: string): Promise<WorktreeCreateR
   // Parse merge task ID from bd output (e.g., "Created learning_agent-m001")
   const idMatch = bdOutput.match(/(\S+)$/);
   const mergeFullId = idMatch?.[1] ?? '';
+  if (!mergeFullId) {
+    throw new Error('bd create returned no task ID');
+  }
   const mergeTaskId = shortId(mergeFullId);
 
   // Wire dep: epic depends on merge
@@ -124,20 +100,20 @@ export async function runWorktreeCreate(epicId: string): Promise<WorktreeCreateR
 // ============================================================================
 
 export interface WireDepsResult {
-  noWorktree: boolean;
+  noMergeTask: boolean;
   wired: string[];
   warnings: string[];
 }
 
-export async function runWorktreeWireDeps(epicId: string): Promise<WireDepsResult> {
+export function runWorktreeWireDeps(epicId: string): WireDepsResult {
   validateEpicId(epicId);
 
   const raw = execFileSync('bd', ['show', epicId, '--json'], { encoding: 'utf-8' });
-  const deps = parseDepsJson(raw);
+  const deps = parseBdShowDeps(raw);
 
   const mergeDep = deps.find(d => d.title.startsWith('Merge:'));
   if (!mergeDep) {
-    return { noWorktree: true, wired: [], warnings: [] };
+    return { noMergeTask: true, wired: [], warnings: [] };
   }
   const mergeId = shortId(mergeDep.id);
 
@@ -163,7 +139,7 @@ export async function runWorktreeWireDeps(epicId: string): Promise<WireDepsResul
     warnings.push('No Compound task found — it may not exist yet');
   }
 
-  return { noWorktree: false, wired, warnings };
+  return { noMergeTask: false, wired, warnings };
 }
 
 // ============================================================================
@@ -175,7 +151,7 @@ export interface WorktreeMergeResult {
   newLessons: number;
 }
 
-export async function runWorktreeMerge(epicId: string): Promise<WorktreeMergeResult> {
+export function runWorktreeMerge(epicId: string): WorktreeMergeResult {
   validateEpicId(epicId);
 
   const branch = `epic/${epicId}`;
@@ -184,70 +160,72 @@ export async function runWorktreeMerge(epicId: string): Promise<WorktreeMergeRes
   const gitCommonDir = execFileSync('git', ['rev-parse', '--git-common-dir'], { encoding: 'utf-8' }).trim();
   const mainRepo = path.resolve(gitCommonDir, '..');
 
+  // Verify main repo is on the main branch
+  const currentBranch = execFileSync(
+    'git', ['-C', mainRepo, 'rev-parse', '--abbrev-ref', 'HEAD'], { encoding: 'utf-8' },
+  ).trim();
+  if (currentBranch !== 'main') {
+    throw new Error(`Main repo is on branch "${currentBranch}", expected "main". Checkout main before merging.`);
+  }
+
   // Discover worktree path
   const listRaw = execFileSync('git', ['worktree', 'list', '--porcelain'], { encoding: 'utf-8' });
   const entries = parseWorktreeList(listRaw);
   const wtEntry = entries.find(e => e.branch === branch);
-  const worktreePath = wtEntry?.path ?? '';
+  if (!wtEntry) {
+    throw new Error(`Worktree not found for branch "${branch}". Run \`ca worktree list\` to see active worktrees.`);
+  }
+  const worktreePath = wtEntry.path;
 
-  // Phase 1: Sync (in worktree)
+  // Phase 1: Sync (merge main into worktree)
   try {
     execFileSync('git', ['merge', 'main'], { cwd: worktreePath, encoding: 'utf-8' });
   } catch (err) {
-    throw new Error(`Merge conflict in worktree: ${err instanceof Error ? err.message : String(err)}`);
+    throw new Error(
+      `Merge conflict in worktree at ${worktreePath}. ` +
+      `Resolve conflicts there and run \`ca worktree merge ${epicId}\` again. ` +
+      `Detail: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 
-  // Run tests
-  execFileSync('pnpm', ['test'], { cwd: worktreePath, encoding: 'utf-8' });
-
-  // Commit merge (no-op if fast-forward)
+  // Phase 2: Run tests in worktree
   try {
-    execFileSync('git', ['commit', '--no-edit'], { cwd: worktreePath, encoding: 'utf-8' });
-  } catch {
-    // Already committed or fast-forward — ignore
+    execFileSync('pnpm', ['test'], { cwd: worktreePath, encoding: 'utf-8' });
+  } catch (err) {
+    throw new Error(
+      `Tests failed in worktree at ${worktreePath}. ` +
+      `Fix failures before merging. ` +
+      `Detail: ${err instanceof Error ? err.message : String(err)}`
+    );
   }
 
-  // Phase 2: Land (on main)
+  // Phase 3: Land (merge worktree branch into main)
   execFileSync('git', ['-C', mainRepo, 'merge', branch, '--no-edit'], { encoding: 'utf-8' });
 
-  // Merge JSONL
+  // Phase 4: Reconcile JSONL (handle uncommitted worktree changes not captured by git merge).
+  // Uses line-based dedup: appends any worktree lines not already in main.
+  // This preserves last-write-wins semantics for same-ID updates/deletes.
   const mainJsonlPath = path.join(mainRepo, '.claude', 'lessons', 'index.jsonl');
   const wtJsonlPath = path.join(worktreePath, '.claude', 'lessons', 'index.jsonl');
   let newLessons = 0;
 
   if (existsSync(wtJsonlPath)) {
-    const mainLines = existsSync(mainJsonlPath)
-      ? readFileSync(mainJsonlPath, 'utf-8').split('\n').filter(Boolean)
-      : [];
+    const mainContent = existsSync(mainJsonlPath)
+      ? readFileSync(mainJsonlPath, 'utf-8')
+      : '';
+    const mainLineSet = new Set(mainContent.split('\n').filter(Boolean));
     const wtLines = readFileSync(wtJsonlPath, 'utf-8').split('\n').filter(Boolean);
 
-    const mainIds = new Set<string>();
-    for (const line of mainLines) {
-      try {
-        const parsed = JSON.parse(line);
-        if (parsed.id) mainIds.add(parsed.id);
-      } catch { /* skip malformed */ }
-    }
-
-    const newLines: string[] = [];
-    for (const line of wtLines) {
-      try {
-        const parsed = JSON.parse(line);
-        if (parsed.id && !mainIds.has(parsed.id)) {
-          newLines.push(line);
-        }
-      } catch { /* skip malformed */ }
-    }
-
+    const newLines = wtLines.filter(line => !mainLineSet.has(line));
     if (newLines.length > 0) {
-      const existing = mainLines.join('\n');
-      const appended = existing ? `${existing}\n${newLines.join('\n')}\n` : `${newLines.join('\n')}\n`;
+      const base = mainContent.trimEnd();
+      const appended = base ? `${base}\n${newLines.join('\n')}\n` : `${newLines.join('\n')}\n`;
       writeFileSync(mainJsonlPath, appended, 'utf-8');
       newLessons = newLines.length;
     }
   }
 
-  // Clean up worktree and branch
+  // Phase 5: Clean up worktree and branch
   execFileSync('git', ['worktree', 'remove', worktreePath], { encoding: 'utf-8' });
   execFileSync('git', ['branch', '-d', branch], { encoding: 'utf-8' });
 
@@ -265,7 +243,7 @@ export interface WorktreeEntry {
   status: string;
 }
 
-export async function runWorktreeList(): Promise<WorktreeEntry[]> {
+export function runWorktreeList(): WorktreeEntry[] {
   const listRaw = execFileSync('git', ['worktree', 'list', '--porcelain'], { encoding: 'utf-8' });
   const entries = parseWorktreeList(listRaw);
 
@@ -302,10 +280,10 @@ export interface WorktreeCleanupResult {
   mergeTaskClosed: boolean;
 }
 
-export async function runWorktreeCleanup(
+export function runWorktreeCleanup(
   epicId: string,
   options: { force?: boolean } = {},
-): Promise<WorktreeCleanupResult> {
+): WorktreeCleanupResult {
   validateEpicId(epicId);
 
   const listRaw = execFileSync('git', ['worktree', 'list', '--porcelain'], { encoding: 'utf-8' });
@@ -334,14 +312,15 @@ export async function runWorktreeCleanup(
     : ['worktree', 'remove', wtEntry.path];
   execFileSync('git', removeArgs, { encoding: 'utf-8' });
 
-  // Delete branch
-  execFileSync('git', ['branch', '-D', branch], { encoding: 'utf-8' });
+  // Delete branch: -d (safe) by default, -D (force) only with --force
+  const branchFlag = options.force ? '-D' : '-d';
+  execFileSync('git', ['branch', branchFlag, branch], { encoding: 'utf-8' });
 
   // Find and close Merge task
   let mergeTaskClosed = false;
   try {
     const raw = execFileSync('bd', ['show', epicId, '--json'], { encoding: 'utf-8' });
-    const deps = parseDepsJson(raw);
+    const deps = parseBdShowDeps(raw);
     const mergeDep = deps.find(d => d.title.startsWith('Merge:'));
     if (mergeDep) {
       const mergeId = shortId(mergeDep.id);
@@ -367,9 +346,9 @@ function handleError(err: unknown): void {
 function addCreateCommand(wt: Command): void {
   wt.command('create <epic-id>')
     .description('Create a new worktree for an epic')
-    .action(async (epicId: string) => {
+    .action((epicId: string) => {
       try {
-        const result = await runWorktreeCreate(epicId);
+        const result = runWorktreeCreate(epicId);
         if (result.alreadyExists) {
           console.log(`Worktree already exists at ${result.worktreePath}`);
           return;
@@ -385,10 +364,10 @@ function addCreateCommand(wt: Command): void {
 function addWireDepsCommand(wt: Command): void {
   wt.command('wire-deps <epic-id>')
     .description('Wire Review/Compound tasks as merge dependencies')
-    .action(async (epicId: string) => {
+    .action((epicId: string) => {
       try {
-        const result = await runWorktreeWireDeps(epicId);
-        if (result.noWorktree) {
+        const result = runWorktreeWireDeps(epicId);
+        if (result.noMergeTask) {
           console.log('No worktree detected, working on main branch');
           return;
         }
@@ -405,9 +384,9 @@ function addWireDepsCommand(wt: Command): void {
 function addMergeCommand(wt: Command): void {
   wt.command('merge <epic-id>')
     .description('Merge worktree branch back to main')
-    .action(async (epicId: string) => {
+    .action((epicId: string) => {
       try {
-        const result = await runWorktreeMerge(epicId);
+        const result = runWorktreeMerge(epicId);
         console.log(`Merged epic/${epicId} to main`);
         console.log(`  New lessons: ${result.newLessons}`);
       } catch (err) { handleError(err); }
@@ -417,9 +396,9 @@ function addMergeCommand(wt: Command): void {
 function addListCommand(wt: Command): void {
   wt.command('list')
     .description('List active worktrees')
-    .action(async () => {
+    .action(() => {
       try {
-        const entries = await runWorktreeList();
+        const entries = runWorktreeList();
         if (entries.length === 0) {
           console.log('No active worktrees.');
           return;
@@ -437,9 +416,9 @@ function addCleanupCommand(wt: Command): void {
   wt.command('cleanup <epic-id>')
     .description('Remove a worktree and clean up associated resources')
     .option('--force', 'Force removal even with uncommitted changes')
-    .action(async (epicId: string, opts: { force?: boolean }) => {
+    .action((epicId: string, opts: { force?: boolean }) => {
       try {
-        const result = await runWorktreeCleanup(epicId, { force: opts.force });
+        const result = runWorktreeCleanup(epicId, { force: opts.force });
         console.log(`Worktree removed for epic/${epicId}`);
         if (result.mergeTaskClosed) {
           console.log('Merge task closed.');

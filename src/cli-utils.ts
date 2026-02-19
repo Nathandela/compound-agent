@@ -43,3 +43,45 @@ export function parseLimit(value: string, name: string): number {
 export function getRepoRoot(): string {
   return process.env['COMPOUND_AGENT_ROOT'] ?? process.cwd();
 }
+
+// ============================================================================
+// Beads shared utilities
+// ============================================================================
+
+/** Strict pattern for valid beads epic/task IDs. */
+export const EPIC_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/** Validate an epic ID, throwing if invalid. */
+export function validateEpicId(epicId: string): void {
+  if (!EPIC_ID_PATTERN.test(epicId)) {
+    throw new Error(`Invalid epic ID: "${epicId}" (must be alphanumeric with hyphens/underscores)`);
+  }
+}
+
+export interface BeadsDep {
+  id: string;
+  title: string;
+  status: string;
+}
+
+/** Parse dependencies from `bd show --json` output. */
+export function parseBdShowDeps(raw: string): BeadsDep[] {
+  const data = JSON.parse(raw);
+  const issue = Array.isArray(data) ? data[0] : data;
+  if (!issue) return [];
+  const depsArray = issue.depends_on ?? issue.dependencies ?? [];
+  return depsArray.map((dep: { id?: string; title?: string; status?: string }) => ({
+    id: dep.id ?? '',
+    title: dep.title ?? '',
+    status: dep.status ?? 'open',
+  }));
+}
+
+/**
+ * Extract short ID from full beads ID (e.g., "learning_agent-m001" -> "m001").
+ * Assumes beads short IDs are the last hyphen-delimited segment.
+ */
+export function shortId(fullId: string): string {
+  const parts = fullId.split('-');
+  return parts[parts.length - 1] ?? fullId;
+}

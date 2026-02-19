@@ -175,6 +175,16 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca rules check` | Run repository-defined rule checks |
 | `ca test-summary` | Run tests and output a compact summary |
 
+### Worktree
+
+| Command | Description |
+|---------|-------------|
+| `ca worktree create <epic-id>` | Create isolated worktree for an epic |
+| `ca worktree wire-deps <epic-id>` | Wire Review/Compound as merge blockers |
+| `ca worktree merge <epic-id>` | Two-phase merge back to main |
+| `ca worktree list` | List active worktrees with status |
+| `ca worktree cleanup <epic-id>` | Remove worktree and clean up (--force for dirty) |
+
 ### Automation
 
 | Command | Description |
@@ -213,6 +223,7 @@ Installed to `.claude/commands/compound/` during setup. Invoked as slash command
 | `/compound:review` | Review | Multi-agent review (security, architecture, performance, tests, simplicity) |
 | `/compound:compound` | Compound | Capture lessons, solutions, patterns into memory |
 | `/compound:lfg` | All | Chain all phases sequentially |
+| `/compound:set-worktree` | Setup | Create isolated git worktree for an epic |
 
 ## Memory Types
 

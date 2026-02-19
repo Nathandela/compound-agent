@@ -7,11 +7,8 @@
 import { execFileSync } from 'node:child_process';
 import type { Command } from 'commander';
 
-import { getRepoRoot } from '../cli-utils.js';
+import { getRepoRoot, parseBdShowDeps, validateEpicId } from '../cli-utils.js';
 import { cleanPhaseState, getPhaseState } from './phase-check.js';
-
-/** Strict pattern for valid beads epic IDs. */
-const EPIC_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
 export interface GateCheck {
   name: string;
@@ -29,17 +26,10 @@ interface VerifyGatesOptions {
 }
 
 /**
- * Parse dependencies from `bd show --json` output.
+ * Parse dependencies from `bd show --json` output into DepTask format.
  */
 function parseDepsJson(raw: string): DepTask[] {
-  const data = JSON.parse(raw);
-  const issue = Array.isArray(data) ? data[0] : data;
-  if (!issue) return [];
-  const depsArray = issue.depends_on ?? issue.dependencies ?? [];
-  return depsArray.map((dep: { title?: string; status?: string }) => ({
-    closed: dep.status === 'closed',
-    title: dep.title ?? '',
-  }));
+  return parseBdShowDeps(raw).map(d => ({ closed: d.status === 'closed', title: d.title }));
 }
 
 /**
@@ -93,9 +83,7 @@ export async function runVerifyGates(
   epicId: string,
   options: VerifyGatesOptions = {}
 ): Promise<GateCheck[]> {
-  if (!EPIC_ID_PATTERN.test(epicId)) {
-    throw new Error(`Invalid epic ID: "${epicId}" (must be alphanumeric with hyphens/underscores)`);
-  }
+  validateEpicId(epicId);
 
   const repoRoot = options.repoRoot ?? getRepoRoot();
   const raw = execFileSync('bd', ['show', epicId, '--json'], { encoding: 'utf-8' });
