@@ -81,7 +81,9 @@ npx ca setup --skip-model
 
 ### pnpm Users
 
-pnpm v9+ blocks native addon builds by default. Add to your `package.json`:
+pnpm v9+ blocks native addon builds by default. Running `npx ca setup` automatically detects pnpm and adds the required config to your `package.json`.
+
+If you prefer to configure manually, add to your `package.json`:
 
 ```json
 {

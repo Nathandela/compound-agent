@@ -188,3 +188,96 @@ export async function installAgentRoleSkills(repoRoot: string): Promise<boolean>
   }
   return created;
 }
+
+// ============================================================================
+// pnpm native build configuration
+// ============================================================================
+
+/** Native addon packages that require pnpm onlyBuiltDependencies opt-in. */
+const REQUIRED_BUILD_DEPS = ['better-sqlite3', 'node-llama-cpp'];
+
+/** Result of pnpm build config check/update. */
+export interface PnpmConfigResult {
+  /** Whether this is a pnpm project (pnpm-lock.yaml or packageManager field). */
+  isPnpm: boolean;
+  /** Whether the config was already correct (no changes needed). */
+  alreadyConfigured: boolean;
+  /** Package names that were added to onlyBuiltDependencies. */
+  added: string[];
+}
+
+/**
+ * Ensure pnpm projects have onlyBuiltDependencies configured for native addons.
+ *
+ * pnpm v9+ blocks native addon compilation by default. This function detects
+ * pnpm projects (via pnpm-lock.yaml or packageManager field) and adds the
+ * required packages to pnpm.onlyBuiltDependencies in the consumer's package.json.
+ *
+ * Idempotent: does not duplicate entries or overwrite existing config.
+ */
+export async function ensurePnpmBuildConfig(repoRoot: string): Promise<PnpmConfigResult> {
+  const lockPath = join(repoRoot, 'pnpm-lock.yaml');
+  const hasLockfile = existsSync(lockPath);
+  const pkgPath = join(repoRoot, 'package.json');
+  const hasPkgJson = existsSync(pkgPath);
+
+  // Detect pnpm: lockfile OR packageManager field starting with "pnpm"
+  if (!hasLockfile) {
+    if (!hasPkgJson) {
+      return { isPnpm: false, alreadyConfigured: false, added: [] };
+    }
+    const pkg = readPkgJsonSafe(pkgPath, await readFile(pkgPath, 'utf-8'));
+    if (pkg === null) return { isPnpm: false, alreadyConfigured: false, added: [] };
+    const pm = typeof pkg.packageManager === 'string' ? pkg.packageManager : '';
+    if (!pm.startsWith('pnpm')) {
+      return { isPnpm: false, alreadyConfigured: false, added: [] };
+    }
+    // pnpm detected via packageManager field — fall through to config merge
+    return mergePnpmConfig(pkgPath, pkg);
+  }
+
+  if (!hasPkgJson) {
+    return { isPnpm: true, alreadyConfigured: false, added: [] };
+  }
+
+  const pkg = readPkgJsonSafe(pkgPath, await readFile(pkgPath, 'utf-8'));
+  if (pkg === null) return { isPnpm: true, alreadyConfigured: false, added: [] };
+  return mergePnpmConfig(pkgPath, pkg);
+}
+
+function readPkgJsonSafe(pkgPath: string, raw: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    console.error(`Warning: Could not parse ${pkgPath} — skipping pnpm build config.\nFix the JSON syntax and re-run setup.`);
+    return null;
+  }
+}
+
+async function mergePnpmConfig(pkgPath: string, pkg: Record<string, unknown>): Promise<PnpmConfigResult> {
+  // Get or create pnpm.onlyBuiltDependencies
+  if (!pkg.pnpm || typeof pkg.pnpm !== 'object') {
+    pkg.pnpm = {};
+  }
+  const pnpmConfig = pkg.pnpm as Record<string, unknown>;
+
+  if (!Array.isArray(pnpmConfig.onlyBuiltDependencies)) {
+    pnpmConfig.onlyBuiltDependencies = [];
+  }
+  const existing = pnpmConfig.onlyBuiltDependencies as string[];
+
+  const added: string[] = [];
+  for (const dep of REQUIRED_BUILD_DEPS) {
+    if (!existing.includes(dep)) {
+      existing.push(dep);
+      added.push(dep);
+    }
+  }
+
+  if (added.length === 0) {
+    return { isPnpm: true, alreadyConfigured: true, added: [] };
+  }
+
+  await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
+  return { isPnpm: true, alreadyConfigured: false, added };
+}

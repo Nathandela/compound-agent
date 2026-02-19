@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.10] - 2026-02-19
+
+### Fixed
+
+- **pnpm native build auto-configuration**: `ca setup` and `ca init` now detect pnpm projects (via `pnpm-lock.yaml`) and automatically add `better-sqlite3` and `node-llama-cpp` to `pnpm.onlyBuiltDependencies` in the consumer's `package.json`. Prevents the "better-sqlite3 failed to load" error that pnpm v9+ users encountered when native addon builds were silently blocked.
+- **Improved error message**: `better-sqlite3` load failure now suggests running `npx ca setup` as the primary fix.
+
 ## [1.2.9] - 2026-02-19
 
 ### Added
@@ -527,7 +534,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.9...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.10...HEAD
+[1.2.10]: https://github.com/Nathandela/learning_agent/compare/v1.2.9...v1.2.10
 [1.2.9]: https://github.com/Nathandela/learning_agent/compare/v1.2.7...v1.2.9
 [1.2.7]: https://github.com/Nathandela/learning_agent/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/Nathandela/learning_agent/compare/v1.2.5...v1.2.6

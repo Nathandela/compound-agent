@@ -867,4 +867,142 @@ describe('Setup Commands - Generated Content', () => {
       expect(existsSync(hookPath)).toBe(false);
     });
   });
+
+  /**
+   * Tests for pnpm onlyBuiltDependencies auto-configuration
+   */
+  describe('pnpm onlyBuiltDependencies auto-configuration', () => {
+    it('adds onlyBuiltDependencies when pnpm-lock.yaml exists and package.json has no pnpm config', async () => {
+      // Create pnpm-lock.yaml to signal this is a pnpm project
+      await writeFile(join(getTempDir(), 'pnpm-lock.yaml'), 'lockfileVersion: 9\n', 'utf-8');
+      // Create a minimal package.json (consumer project)
+      await writeFile(join(getTempDir(), 'package.json'), JSON.stringify({ name: 'test-consumer', version: '1.0.0' }, null, 2) + '\n', 'utf-8');
+
+      runCli('setup --skip-model');
+
+      const pkg = JSON.parse(await readFile(join(getTempDir(), 'package.json'), 'utf-8'));
+      expect(pkg.pnpm).toBeDefined();
+      expect(pkg.pnpm.onlyBuiltDependencies).toContain('better-sqlite3');
+      expect(pkg.pnpm.onlyBuiltDependencies).toContain('node-llama-cpp');
+    });
+
+    it('does not modify package.json when no pnpm-lock.yaml exists', async () => {
+      // No pnpm-lock.yaml → not a pnpm project
+      const original = JSON.stringify({ name: 'test-consumer', version: '1.0.0' }, null, 2) + '\n';
+      await writeFile(join(getTempDir(), 'package.json'), original, 'utf-8');
+
+      runCli('setup --skip-model');
+
+      const content = await readFile(join(getTempDir(), 'package.json'), 'utf-8');
+      expect(content).toBe(original);
+    });
+
+    it('does not duplicate entries when already configured', async () => {
+      await writeFile(join(getTempDir(), 'pnpm-lock.yaml'), 'lockfileVersion: 9\n', 'utf-8');
+      await writeFile(join(getTempDir(), 'package.json'), JSON.stringify({
+        name: 'test-consumer',
+        pnpm: { onlyBuiltDependencies: ['better-sqlite3', 'node-llama-cpp'] },
+      }, null, 2) + '\n', 'utf-8');
+
+      runCli('setup --skip-model');
+
+      const pkg = JSON.parse(await readFile(join(getTempDir(), 'package.json'), 'utf-8'));
+      const deps: string[] = pkg.pnpm.onlyBuiltDependencies;
+      // Each entry should appear exactly once
+      expect(deps.filter((d: string) => d === 'better-sqlite3').length).toBe(1);
+      expect(deps.filter((d: string) => d === 'node-llama-cpp').length).toBe(1);
+    });
+
+    it('preserves existing pnpm config and merges missing deps', async () => {
+      await writeFile(join(getTempDir(), 'pnpm-lock.yaml'), 'lockfileVersion: 9\n', 'utf-8');
+      await writeFile(join(getTempDir(), 'package.json'), JSON.stringify({
+        name: 'test-consumer',
+        pnpm: {
+          onlyBuiltDependencies: ['better-sqlite3'],
+          overrides: { 'some-pkg': '1.0.0' },
+        },
+      }, null, 2) + '\n', 'utf-8');
+
+      runCli('setup --skip-model');
+
+      const pkg = JSON.parse(await readFile(join(getTempDir(), 'package.json'), 'utf-8'));
+      expect(pkg.pnpm.onlyBuiltDependencies).toContain('better-sqlite3');
+      expect(pkg.pnpm.onlyBuiltDependencies).toContain('node-llama-cpp');
+      // Should preserve existing overrides
+      expect(pkg.pnpm.overrides).toEqual({ 'some-pkg': '1.0.0' });
+    });
+
+    it('does not modify package.json when no package.json exists', async () => {
+      await writeFile(join(getTempDir(), 'pnpm-lock.yaml'), 'lockfileVersion: 9\n', 'utf-8');
+      // No package.json
+
+      // Should not throw
+      const result = runCli('setup --skip-model');
+      expect(result.combined).toContain('setup complete');
+
+      // package.json should not have been created by pnpm config step
+      // (init creates lessons dir, not package.json)
+      expect(existsSync(join(getTempDir(), 'package.json'))).toBe(false);
+    });
+
+    it('init also adds onlyBuiltDependencies for pnpm projects', async () => {
+      await writeFile(join(getTempDir(), 'pnpm-lock.yaml'), 'lockfileVersion: 9\n', 'utf-8');
+      await writeFile(join(getTempDir(), 'package.json'), JSON.stringify({ name: 'test-consumer' }, null, 2) + '\n', 'utf-8');
+
+      runCli('init');
+
+      const pkg = JSON.parse(await readFile(join(getTempDir(), 'package.json'), 'utf-8'));
+      expect(pkg.pnpm).toBeDefined();
+      expect(pkg.pnpm.onlyBuiltDependencies).toContain('better-sqlite3');
+      expect(pkg.pnpm.onlyBuiltDependencies).toContain('node-llama-cpp');
+    });
+
+    it('detects pnpm via packageManager field when no lockfile exists', async () => {
+      // No pnpm-lock.yaml, but packageManager field signals pnpm
+      await writeFile(join(getTempDir(), 'package.json'), JSON.stringify({
+        name: 'test-consumer',
+        packageManager: 'pnpm@10.28.2',
+      }, null, 2) + '\n', 'utf-8');
+
+      runCli('setup --skip-model');
+
+      const pkg = JSON.parse(await readFile(join(getTempDir(), 'package.json'), 'utf-8'));
+      expect(pkg.pnpm).toBeDefined();
+      expect(pkg.pnpm.onlyBuiltDependencies).toContain('better-sqlite3');
+      expect(pkg.pnpm.onlyBuiltDependencies).toContain('node-llama-cpp');
+    });
+
+    it('skips pnpm config when packageManager is not pnpm and no lockfile', async () => {
+      const original = JSON.stringify({
+        name: 'test-consumer',
+        packageManager: 'npm@10.0.0',
+      }, null, 2) + '\n';
+      await writeFile(join(getTempDir(), 'package.json'), original, 'utf-8');
+
+      runCli('setup --skip-model');
+
+      const content = await readFile(join(getTempDir(), 'package.json'), 'utf-8');
+      expect(content).toBe(original);
+    });
+
+    it('handles malformed package.json gracefully', async () => {
+      await writeFile(join(getTempDir(), 'pnpm-lock.yaml'), 'lockfileVersion: 9\n', 'utf-8');
+      await writeFile(join(getTempDir(), 'package.json'), '{ invalid json !!!', 'utf-8');
+
+      // Should not throw — setup continues despite malformed JSON
+      const result = runCli('setup --skip-model');
+      expect(result.combined).toContain('setup complete');
+      // package.json should remain unchanged (not overwritten)
+      const content = await readFile(join(getTempDir(), 'package.json'), 'utf-8');
+      expect(content).toBe('{ invalid json !!!');
+    });
+
+    it('reports pnpm config status in setup output', async () => {
+      await writeFile(join(getTempDir(), 'pnpm-lock.yaml'), 'lockfileVersion: 9\n', 'utf-8');
+      await writeFile(join(getTempDir(), 'package.json'), JSON.stringify({ name: 'test-consumer' }, null, 2) + '\n', 'utf-8');
+
+      const result = runCli('setup --skip-model');
+      expect(result.combined).toMatch(/pnpm.*config|onlyBuiltDependencies/i);
+    });
+  });
 });

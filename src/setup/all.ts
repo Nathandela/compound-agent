@@ -28,12 +28,14 @@ import { installPreCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
   ensureClaudeMdReference,
+  ensurePnpmBuildConfig,
   GENERATED_MARKER,
   installAgentRoleSkills,
   installAgentTemplates,
   installPhaseSkills,
   installWorkflowCommands,
   updateAgentsMd,
+  type PnpmConfigResult,
 } from './primitives.js';
 import { LEGACY_ROOT_SLASH_COMMANDS } from './templates.js';
 import { AGENT_TEMPLATES, AGENT_ROLE_SKILLS, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
@@ -45,6 +47,7 @@ interface SetupResult {
   hooks: boolean;
   gitHooks: HookInstallResult['status'] | 'skipped';
   model: 'downloaded' | 'already_exists' | 'failed' | 'skipped';
+  pnpmConfig: PnpmConfigResult;
 }
 
 /**
@@ -88,6 +91,9 @@ async function configureClaudeSettings(): Promise<{ hooks: boolean }> {
  */
 export async function runSetup(options: { skipModel?: boolean; skipHooks?: boolean }): Promise<SetupResult> {
   const repoRoot = getRepoRoot();
+
+  // 0. Ensure pnpm native build config (before anything that needs native addons)
+  const pnpmConfig = await ensurePnpmBuildConfig(repoRoot);
 
   // 1. Initialize lessons directory
   const lessonsDir = await ensureLessonsDirectory(repoRoot);
@@ -144,6 +150,7 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
     hooks,
     gitHooks,
     model: modelStatus,
+    pnpmConfig,
   };
 }
 
@@ -345,6 +352,15 @@ function printSetupGitHooksStatus(gitHooks: HookInstallResult['status'] | 'skipp
   console.log('  Git hooks: Already configured');
 }
 
+function printPnpmConfigStatus(result: PnpmConfigResult): void {
+  if (!result.isPnpm) return; // Not a pnpm project, nothing to report
+  if (result.alreadyConfigured) {
+    console.log('  pnpm config: onlyBuiltDependencies already configured');
+  } else if (result.added.length > 0) {
+    console.log(`  pnpm config: Added onlyBuiltDependencies [${result.added.join(', ')}]`);
+  }
+}
+
 /**
  * Register the one-shot setup action as the default subcommand of setup.
  * Using a default subcommand prevents its options (--uninstall, --dry-run)
@@ -416,6 +432,7 @@ export function registerSetupAllCommand(setupCommand: Command): void {
       console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
       console.log(`  Claude hooks: ${result.hooks ? 'Installed' : 'Already configured'}`);
       printSetupGitHooksStatus(result.gitHooks);
+      printPnpmConfigStatus(result.pnpmConfig);
       switch (result.model) {
         case 'skipped':
           console.log('  Model: Skipped (--skip-model)');

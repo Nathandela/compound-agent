@@ -15,11 +15,13 @@ import { installPreCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
   ensureClaudeMdReference,
+  ensurePnpmBuildConfig,
   installAgentRoleSkills,
   installAgentTemplates,
   installPhaseSkills,
   installWorkflowCommands,
   updateAgentsMd,
+  type PnpmConfigResult,
 } from './primitives.js';
 import type { ClaudeHooksResult } from './types.js';
 
@@ -51,6 +53,9 @@ async function initAction(
 ): Promise<void> {
   const repoRoot = getRepoRoot();
   const { quiet } = getGlobalOpts(cmd);
+
+  // Ensure pnpm native build config before anything else
+  const pnpmConfig = await ensurePnpmBuildConfig(repoRoot);
 
   await createLessonsDirectory(repoRoot);
   await createIndexFile(repoRoot);
@@ -93,6 +98,7 @@ async function initAction(
       hooks: hooksChanged,
       hookStatus: hookResult?.status ?? 'skipped',
       claudeHooks: claudeHooksInstalled,
+      pnpmConfig: pnpmConfig.isPnpm ? { added: pnpmConfig.added, alreadyConfigured: pnpmConfig.alreadyConfigured } : null,
     }));
     return;
   }
@@ -104,6 +110,7 @@ async function initAction(
   printAgentsMdStatus(agentsMdUpdated, options.skipAgents);
   printHookStatus(hookResult, options.skipHooks);
   printClaudeHooksStatus(claudeHooksResult, options.skipClaude);
+  printPnpmConfigStatus(pnpmConfig);
 }
 
 function printAgentsMdStatus(updated: boolean, skipped?: boolean): void {
@@ -139,6 +146,15 @@ function printClaudeHooksStatus(result: ClaudeHooksResult, skipped?: boolean): v
     console.log('  Claude hooks: Already installed');
   } else if (result.error) {
     console.log(`  Claude hooks: Error - ${result.error}`);
+  }
+}
+
+function printPnpmConfigStatus(result: PnpmConfigResult): void {
+  if (!result.isPnpm) return;
+  if (result.alreadyConfigured) {
+    console.log('  pnpm config: onlyBuiltDependencies already configured');
+  } else if (result.added.length > 0) {
+    console.log(`  pnpm config: Added onlyBuiltDependencies [${result.added.join(', ')}]`);
   }
 }
 
