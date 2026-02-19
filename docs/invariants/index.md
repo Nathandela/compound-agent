@@ -25,7 +25,6 @@ Formal invariants (data, safety, liveness) for each module, following Lamport's 
 | [jsonl_source_of_truth_invariants.md](jsonl_source_of_truth_invariants.md) | JSONL as single source of truth |
 | [lna-cli-alias.md](lna-cli-alias.md) | `ca` CLI alias |
 | [load-session-output.md](load-session-output.md) | `load-session` command output format |
-| [mcp_invariants.md](mcp_invariants.md) | MCP server module |
 | [pre-commit-hook-insertion.md](pre-commit-hook-insertion.md) | Pre-commit hook installation |
 | [prime-invariants.md](prime-invariants.md) | `prime` command for trust language generation |
 | [setup-claude-defaults.md](setup-claude-defaults.md) | `setup claude` default behavior |

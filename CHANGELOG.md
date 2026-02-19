@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.9] - 2026-02-19
+
+### Added
+
+- **`ca phase-check` command**: Manage LFG phase state with `init`, `status`, `clean`, and `gate <name>` subcommands. State persisted in `.claude/.ca-phase-state.json`.
+- **PreToolUse phase guard hook** (`ca hooks run phase-guard`): Warns when Edit or Write tools are used before the current phase's skill file has been read.
+- **PostToolUse read tracker hook** (`ca hooks run read-tracker`): Tracks skill file reads in `.ca-phase-state.json` so the phase guard can verify compliance.
+- **Stop audit hook** (`ca hooks run stop-audit`): Blocks Claude from stopping if no phase gate has been passed when `stop_hook_active` is set in phase state.
+- **Phase state persistence**: `.claude/.ca-phase-state.json` stores LFG phase tracking data across hook invocations.
+- **Failure state persistence**: `.claude/.ca-failure-state.json` persists PostToolUseFailure counters across process restarts.
+
+### Changed
+
+- **`ca init`** now installs all 5 Claude Code hooks: SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse (previously only SessionStart).
+- **`ca setup claude`** now installs all 5 Claude Code hooks (previously only SessionStart).
+- **`ca setup`** now installs the git pre-commit hook in addition to Claude Code hooks.
+
+### Removed
+
+- **MCP server**: `compound-agent-mcp` binary and `@modelcontextprotocol/sdk` dependency removed. Use CLI commands instead.
+- **`.mcp.json`**: Configuration file is no longer generated or needed.
+
 ## [1.2.7] - 2026-02-17
 
 ### Changed
@@ -505,7 +527,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.7...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.2.9...HEAD
+[1.2.9]: https://github.com/Nathandela/learning_agent/compare/v1.2.7...v1.2.9
 [1.2.7]: https://github.com/Nathandela/learning_agent/compare/v1.2.6...v1.2.7
 [1.2.6]: https://github.com/Nathandela/learning_agent/compare/v1.2.5...v1.2.6
 [1.2.5]: https://github.com/Nathandela/learning_agent/compare/v1.2.4...v1.2.5

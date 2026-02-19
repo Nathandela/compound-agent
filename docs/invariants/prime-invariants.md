@@ -18,7 +18,7 @@ The `prime` command generates trust language guidelines for Claude Code that inc
 - Includes top 3-5 high-severity lessons from `loadSessionLessons()`
 
 **Exported Function**:
-- `getPrimeContext(): Promise<string>` - For MCP server integration
+- `getPrimeContext(): Promise<string>` - For CLI and hook integration
 
 **State**:
 - Reads lessons from `.claude/lessons/index.jsonl`
@@ -183,10 +183,10 @@ When no high-severity lessons exist:
 - **Test**: Manual review for signal-to-noise ratio
 
 ### L3: getPrimeContext() API Stability
-- **Property**: Exported function signature MUST remain stable for MCP server
+- **Property**: Exported function signature MUST remain stable for CLI and hook integration
 - **Signature**: `export async function getPrimeContext(repoRoot?: string): Promise<string>`
 - **Default**: Use `getRepoRoot()` if not provided
-- **Test**: Integration test with MCP server mock
+- **Test**: Integration test with hook pipeline
 
 ### L4: Trust Language Updates Reflect Reality
 - **Property**: Trust language MUST stay synchronized with actual system behavior
@@ -326,7 +326,7 @@ Critical lessons from past corrections:
 1. **`src/commands/management/prime.ts`** (modify existing)
    - Keep existing `registerPrimeCommand()` function
    - Replace `PRIME_WORKFLOW_CONTEXT` constant with `generatePrimeContext()` function
-   - Add `getPrimeContext()` export for MCP server
+   - Add `getPrimeContext()` export for CLI and hook integration
 
 2. **`src/commands/management/prime.test.ts`** (create new)
    - Test output structure (3 sections)
@@ -336,7 +336,7 @@ Critical lessons from past corrections:
    - Test `getPrimeContext()` API
 
 3. **`src/index.ts`** (modify)
-   - Export `getPrimeContext` for MCP server use
+   - Export `getPrimeContext` for CLI and hook integration
 
 ### Function Signature
 
@@ -438,7 +438,7 @@ Before marking work complete, ALL must pass:
 - [ ] Emergency Recall section present when lessons exist
 - [ ] Emergency Recall section omitted when zero lessons
 - [ ] Lessons use `loadSessionLessons()` (no duplicate logic)
-- [ ] `getPrimeContext()` exported for MCP server
+- [ ] `getPrimeContext()` exported for CLI and hook integration
 - [ ] Zero lessons case handled gracefully
 - [ ] Execution time < 100ms (p95)
 - [ ] All edge cases handled

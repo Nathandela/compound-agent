@@ -28,10 +28,11 @@ LAYER 1: BEADS (Foundation)
 
 ```
 project_root/
-+-- .mcp.json                    <- MCP server config
 +-- AGENTS.md                    <- Workflow instructions for Claude
 +-- .claude/
     +-- settings.json            <- Claude Code hooks
+    +-- .ca-phase-state.json     <- LFG phase tracking (generated)
+    +-- .ca-failure-state.json   <- Hook failure counters (generated)
     +-- lessons/
     |   +-- index.jsonl          <- Source of truth (git-tracked)
     |   +-- archive/             <- Compacted old items
@@ -65,7 +66,7 @@ Every cycle through the loop makes subsequent cycles smarter. A bug found in rev
 # Install as dev dependency
 pnpm add -D compound-agent
 
-# One-shot setup (creates dirs, hooks, MCP server, downloads model)
+# One-shot setup (creates dirs, hooks, downloads model)
 npx ca setup
 
 # Skip the ~278MB model download (do it later)
@@ -98,8 +99,8 @@ Then run `pnpm install`.
 |--------|----------|---------|
 | Create lessons store | `.claude/lessons/` | JSONL + cache directory |
 | Install AGENTS.md | project root | Workflow instructions for Claude |
-| Configure hooks | `.claude/settings.json` | SessionStart, PreCompact, UserPromptSubmit, PostToolUse hooks |
-| Register MCP server | `.mcp.json` | `memory_search`, `memory_capture` tools |
+| Configure hooks | `.claude/settings.json` | SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse hooks |
+| Install git pre-commit hook | `.git/hooks/pre-commit` | Lesson capture reminder before commits |
 | Install workflow commands | `.claude/commands/compound/` | Slash commands for each phase |
 | Install agent definitions | `.claude/agents/compound/` | Specialized agent roles |
 | Install phase skills | `.claude/skills/compound/` | Process instructions per phase |
@@ -167,6 +168,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca import <file>` | Import items from JSONL file |
 | `ca prime` | Load workflow context (used by hooks) |
 | `ca verify-gates <epic-id>` | Verify review + compound tasks exist and are closed |
+| `ca phase-check` | Manage LFG phase state (init/status/clean/gate) |
 | `ca audit` | Run audit checks against the codebase |
 | `ca rules check` | Run repository-defined rule checks |
 | `ca test-summary` | Run tests and output a compact summary |
@@ -187,7 +189,7 @@ Generated scripts detect three markers: `EPIC_COMPLETE` (success), `EPIC_FAILED`
 
 | Command | Description |
 |---------|-------------|
-| `ca setup` | One-shot setup (hooks + MCP + model) |
+| `ca setup` | One-shot setup (hooks + git pre-commit + model) |
 | `ca setup --skip-model` | Setup without model download |
 | `ca setup --uninstall` | Remove all generated files |
 | `ca setup --update` | Regenerate files (preserves user customizations) |
@@ -196,16 +198,6 @@ Generated scripts detect three markers: `EPIC_COMPLETE` (success), `EPIC_FAILED`
 | `ca setup claude --status` | Check Claude Code integration health |
 | `ca setup claude --uninstall` | Remove Claude hooks only |
 | `ca download-model` | Download the embedding model |
-
-## MCP Tools
-
-Compound Agent exposes three MCP endpoints. These are the primary interface for Claude -- preferred over CLI commands.
-
-| Endpoint | Type | Purpose |
-|----------|------|---------|
-| `memory_search` | Tool | Search memory items by semantic similarity. Supports `query`, `maxResults`, and `type` filter. |
-| `memory_capture` | Tool | Capture a new memory item. Accepts `insight`, `trigger`, `tags`, `type`, `severity`, `pattern`, and relationship fields. |
-| `memory://prime` | Resource | Workflow context with high-severity memory items for session start. |
 
 ## Workflow Commands
 
@@ -326,7 +318,6 @@ pnpm lint             # Type check + ESLint
 | Embeddings | node-llama-cpp + EmbeddingGemma-300M |
 | CLI | Commander.js |
 | Schema | Zod |
-| MCP | @modelcontextprotocol/sdk |
 | Issue Tracking | Beads (bd) |
 
 ## Documentation

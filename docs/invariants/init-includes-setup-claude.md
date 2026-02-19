@@ -7,7 +7,7 @@ Initialize compound-agent in a repository with a single command that sets up:
 - Lessons directory structure (.claude/lessons/)
 - AGENTS.md integration documentation
 - Git pre-commit hooks
-- Claude Code SessionStart hooks (NEW in this feature)
+- All 5 Claude Code hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse)
 
 ### Change Summary
 **Before**: `init` only set up AGENTS.md and git hooks. Claude hooks required separate `setup claude` command.
@@ -19,15 +19,16 @@ Initialize compound-agent in a repository with a single command that sets up:
 ## Data Invariants
 
 ### I1: Claude Hooks Default Behavior
-**Invariant**: `init` command installs Claude hooks to project-local settings by default
+**Invariant**: `init` command installs all 5 Claude hooks to project-local settings by default
 - Default scope: `.claude/settings.json` (project-local, matching `setup claude` default)
+- Installs: SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse
 - Same behavior as `setup claude` (no `--global` flag)
 - Never installs to global unless explicitly requested
 - Consistent with v0.2.1 `setup claude` defaults
 
 **Rationale**: Project-local is safer default. Users expect repo-scoped init.
 
-**Test Strategy**: Run `init`, verify `.claude/settings.json` exists and contains hook
+**Test Strategy**: Run `init`, verify `.claude/settings.json` exists and contains all 5 hooks
 
 ### I2: Flag Semantics
 **Invariant**: `--skip-claude` flag controls Claude hooks installation
@@ -312,7 +313,7 @@ npx ca init
 ### Relationship to `--skip-hooks`
 **Clarification**: `--skip-hooks` refers to GIT hooks, NOT Claude hooks
 - `--skip-hooks` → skips git pre-commit hook
-- `--skip-claude` → skips Claude Code SessionStart hook
+- `--skip-claude` → skips all Claude Code hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse)
 - These are independent flags
 
 **Rationale**: Different hook types, different purposes, different skip flags

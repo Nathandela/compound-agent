@@ -12,7 +12,7 @@ The project was renamed from **learning-agent** to **compound-agent** in the com
 | CLI command | `lna` | `ca` |
 | CLI long name | `learning-agent` | `compound-agent` |
 | MCP server name | `learning-agent` | `compound-agent` |
-| MCP binary | `learning-agent-mcp` | `compound-agent-mcp` |
+| MCP binary | `learning-agent-mcp` | `compound-agent-mcp` (removed in v1.2.9) |
 | MCP tool: search | `lesson_search` | `memory_search` |
 | MCP tool: capture | `lesson_capture` | `memory_capture` |
 | MCP resource | `lessons://prime` | `memory://prime` |
@@ -44,7 +44,7 @@ npm install -g compound-agent
 
 ### 3. Run setup
 
-The setup command reconfigures hooks, MCP server registration, AGENTS.md, and slash commands:
+The setup command reconfigures hooks, AGENTS.md, and slash commands:
 
 ```bash
 npx ca setup
@@ -54,8 +54,9 @@ This is idempotent and safe to run multiple times. It will:
 - Create/update `.claude/lessons/` directory
 - Update AGENTS.md with compound-agent section
 - Register Claude Code hooks in `.claude/settings.json`
-- Register MCP server in `.mcp.json`
 - Download the embedding model (skip with `--skip-model` if already downloaded)
+
+> **Note**: MCP server registration (`.mcp.json`) was removed in v1.2.9. The `compound-agent-mcp` binary no longer exists.
 
 ### 4. Remove old configuration
 
@@ -73,7 +74,7 @@ Check `.claude/settings.json` for old hook references to `lna` or `learning-agen
 
 ### 5. Restart Claude Code
 
-Restart Claude Code to pick up the new MCP server registration and hooks.
+Restart Claude Code to pick up the new hooks configuration.
 
 ### 6. Verify
 
@@ -143,7 +144,9 @@ All commands work the same way -- only the binary name changed.
 The package is not installed or not in your PATH. Run `npm install --save-dev compound-agent` and use `npx ca` to invoke.
 
 **MCP tools not appearing in Claude Code**
-Run `npx ca setup` to register the MCP server, then restart Claude Code. Verify with `npx ca setup --status`.
+> Not applicable in v1.2.9 -- the MCP server was removed. There are no MCP tools to register.
+
+(For pre-v1.2.9) Run `npx ca setup` to register the MCP server, then restart Claude Code. Verify with `npx ca setup --status`.
 
 **Old hooks still firing**
 Check `.claude/settings.json` for references to `lna` or `learning-agent`. Remove them and run `npx ca setup` to install the new hooks.
@@ -160,3 +163,26 @@ npx ca rebuild
 npx ca download-model
 ```
 The model is stored in `~/.node-llama-cpp/models/` and is shared across projects.
+
+---
+
+## Migrating from v1.2.8 to v1.2.9
+
+### Breaking Changes
+
+**MCP Server Removed**
+
+The `compound-agent-mcp` binary and `@modelcontextprotocol/sdk` dependency have been removed. There is no replacement MCP server — functionality is handled entirely via CLI commands and Claude Code hooks.
+
+**Migration steps:**
+1. Remove any `.mcp.json` entry for `compound-agent-mcp` if present
+2. Run `npx ca setup` to install the updated Claude Code hooks (now 8 hook registrations)
+3. Update any scripts calling `compound-agent-mcp` to use `npx ca` instead
+
+### New Features in v1.2.9
+
+- `ca phase-check` — Phase state management CLI (init/status/clean/gate)
+- PreToolUse phase guard hook — enforces reading phase skill before editing
+- PostToolUse read tracker — tracks skill file reads in phase state
+- Stop audit hook — blocks phase transitions without gate verification
+- Run `npx ca setup` to get all new hooks installed

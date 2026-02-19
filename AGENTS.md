@@ -353,16 +353,6 @@ Tests check `SKIP_EMBEDDING_TESTS` environment variable:
 
 This section explains HOW and WHEN Claude should interact with the compound-agent memory system.
 
-### MCP Tools (Primary)
-
-| Tool / Resource | Purpose |
-|-----------------|---------|
-| `memory_search` | Search memory items by query (semantic + keyword) |
-| `memory_capture` | Capture a new memory item after user confirmation |
-| `memory://prime` | Resource: workflow context with high-severity memory items |
-
-MCP tools are the preferred interface. Use CLI only as fallback.
-
 ### Workflow Commands
 
 | Command | Phase | Description |
@@ -374,7 +364,7 @@ MCP tools are the preferred interface. Use CLI only as fallback.
 | `/compound:compound` | Compound | Capture knowledge, feed back into memory |
 | `/compound:lfg` | All | Chain all 5 phases sequentially |
 
-### CLI (fallback only)
+### CLI
 
 | Command | Purpose |
 |---------|---------|
@@ -384,6 +374,7 @@ MCP tools are the preferred interface. Use CLI only as fallback.
 | `npx ca list` | List all lessons |
 | `npx ca stats` | Database health |
 | `npx ca verify-gates <epic-id>` | Verify review + compound tasks exist and are closed |
+| `npx ca phase-check` | Manage LFG phase state (init/status/clean/gate) |
 
 ### Core Principle
 
@@ -398,11 +389,11 @@ MCP tools are the preferred interface. Use CLI only as fallback.
 
 #### Session Start (Automatic via hooks)
 
-`npx ca prime` runs automatically via `.claude/plugin.json` hooks at SessionStart and PreCompact.
+`npx ca prime` runs automatically via `.claude/settings.json` hooks at SessionStart and PreCompact.
 
 #### Before Architectural Decisions
 
-Before making architectural decisions or choosing between approaches, use `memory_search` to check for relevant past lessons.
+Before making architectural decisions or choosing between approaches, run `npx ca search <query>` to check for relevant past lessons.
 
 ---
 
@@ -441,7 +432,7 @@ Learned: [insight]. Confirm to save?
 - Keep insight concise (one sentence)
 - User must explicitly confirm with "yes" or similar
 - Silence or other response = do not save
-- After confirmation, use `memory_capture` MCP tool (preferred) or `npx ca learn --yes`
+- After confirmation, use `npx ca learn --yes`
 
 ---
 
@@ -450,8 +441,7 @@ Learned: [insight]. Confirm to save?
 **WARNING: NEVER directly edit `.claude/lessons/index.jsonl`.**
 
 Direct edits bypass schema validation, embedding sync, and SQLite index updates. Always use:
-1. `memory_capture` MCP tool (preferred)
-2. `npx ca learn` CLI (fallback)
+1. `npx ca learn` CLI
 
 ---
 
@@ -470,7 +460,7 @@ Direct edits bypass schema validation, embedding sync, and SQLite index updates.
 ### Setup
 
 Run `npx ca init` in a project root to configure:
-- `.claude/plugin.json` - Hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUse)
+- `.claude/settings.json` - Hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse)
 - `AGENTS.md` - Agent instructions
 - `.claude/CLAUDE.md` - Project reference
 - `.claude/commands/` - Slash commands (/learn, /show, /wrong, /stats)

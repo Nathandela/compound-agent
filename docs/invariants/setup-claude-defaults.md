@@ -3,7 +3,7 @@
 ## Module: CLI Command `setup claude`
 
 ### Purpose
-Configure Claude Code to automatically load high-severity lessons at session start by installing a SessionStart hook.
+Configure Claude Code to automatically load high-severity lessons by installing all 5 Claude Code hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse).
 
 ### Current Behavior (v0.2.0)
 - Default: `~/.claude/settings.json` (global - affects ALL projects)
@@ -58,9 +58,9 @@ Configure Claude Code to automatically load high-severity lessons at session sta
 
 ### I5: Settings File Schema
 **Invariant**: Settings JSON structure is preserved
-- `hooks.SessionStart` is always an array
-- Our hook entry has exact structure: `{ matcher, hooks: [{ type, command }] }`
-- Existing SessionStart hooks are never deleted
+- All 5 hook event arrays (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse) are always arrays
+- Our hook entries have exact structure: `{ matcher, hooks: [{ type, command }] }`
+- Existing hooks in any event array are never deleted
 - Non-hook fields (permissions, mcpServers) are never modified
 - JSON is always valid (parseable)
 

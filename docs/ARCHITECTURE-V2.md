@@ -156,6 +156,7 @@ The compound engineering cycle, triggered by explicit slash commands.
 | `/compound:review` | Review | Multi-agent review with inter-communication |
 | `/compound:compound` | Compound | Capture knowledge, feed back into memory |
 | `/compound:lfg` | All | Chain all phases sequentially |
+| `ca phase-check` | All | Phase state management (init/status/clean/gate) |
 
 ---
 
@@ -338,28 +339,27 @@ Skills can reference each other and can be project-specific or shared.
 ```json
 {
   "hooks": {
-    "SessionStart": [
-      { "type": "command", "command": "npx ca prime" }
+    "SessionStart": [{ "type": "command", "command": "npx ca prime" }],
+    "PreCompact": [{ "type": "command", "command": "npx ca prime" }],
+    "UserPromptSubmit": [{ "type": "command", "command": "npx ca hooks run user-prompt" }],
+    "PostToolUseFailure": [{ "type": "command", "command": "npx ca hooks run post-tool-failure" }],
+    "PostToolUse": [
+      { "type": "command", "command": "npx ca hooks run post-tool-success" },
+      { "type": "command", "command": "npx ca hooks run read-tracker" }
     ],
-    "PreCompact": [
-      { "type": "command", "command": "npx ca prime" }
-    ],
-    "UserPromptSubmit": [
-      { "type": "command", "command": "npx ca hooks run user-prompt" }
-    ]
+    "PreToolUse": [{ "type": "command", "command": "npx ca hooks run phase-guard" }],
+    "Stop": [{ "type": "command", "command": "npx ca hooks run stop-audit" }]
   }
 }
 ```
 
 - **SessionStart/PreCompact**: Load high-severity memory items + workflow context
 - **UserPromptSubmit**: Detect correction/planning language, inject relevant memory
-
-### MCP Tools
-
-| Tool | Purpose |
-|------|---------|
-| `memory_search` | Search memory items (semantic) |
-| `memory_capture` | Store new memory item |
+- **PostToolUseFailure**: Capture tool failures for analysis
+- **PostToolUse (post-tool-success)**: Capture successful tool use patterns
+- **PostToolUse (read-tracker)**: Track skill file reads in phase state
+- **PreToolUse (phase-guard)**: Enforce reading phase skill file before editing
+- **Stop (stop-audit)**: Block phase transitions without gate verification
 
 ### Slash Commands
 
@@ -414,8 +414,6 @@ The transition preserves all existing investment:
 | `lessons.sqlite` | `lessons.sqlite` | Rebuild from JSONL |
 | `learn` CLI | `compound-agent capture` | Alias preserved |
 | `search` CLI | `compound-agent search` | Same interface |
-| `lesson_search` MCP | `memory_search` MCP | Renamed |
-| `lesson_capture` MCP | `memory_capture` MCP | Renamed |
 | All 1000+ tests | Kept | Test paths updated |
 
 **Phase 1**: Rename + extend schema (non-breaking)
@@ -537,18 +535,17 @@ npx compound-agent setup
 | Drop agent definitions | `.claude/agents/compound/*.md` | Specialized agent roles (reviewers, researchers, etc.) |
 | Drop slash commands | `.claude/commands/compound/*.md` | `/compound:plan`, `/compound:work`, etc. |
 | Drop phase skills | `.claude/skills/compound/*.md` | Process instructions for each workflow phase |
-| Configure hooks | `.claude/settings.json` | SessionStart, PreCompact, UserPromptSubmit, PostToolUse hooks |
-| Register MCP server | `.mcp.json` | `memory_search`, `memory_capture` tools |
+| Configure hooks | `.claude/settings.json` | SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse, PreToolUse, Stop hooks |
 | Create memory store | `.claude/lessons/` | JSONL + cache directory |
 | Download embedding model | `~/.node-llama-cpp/models/` | First-use only, ~278MB |
 
 ### What the npm Package Provides
 
-The runtime: MCP server process, CLI commands, SQLite database management, embedding model, vector search, JSONL storage. Everything that needs code execution.
+The runtime: CLI commands, SQLite database management, embedding model, vector search, JSONL storage. Everything that needs code execution.
 
 ### What the Generated Files Provide
 
-The Claude Code integration: agent definitions, slash commands, phase skills, hooks, MCP config. Everything that needs to be discovered by Claude Code natively.
+The Claude Code integration: agent definitions, slash commands, phase skills, hooks. Everything that needs to be discovered by Claude Code natively.
 
 ### Updates
 

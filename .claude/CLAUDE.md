@@ -161,7 +161,6 @@ pnpm lint      # Zero violations
 | Embeddings | node-llama-cpp + EmbeddingGemma-300M |
 | CLI | Commander.js |
 | Schema | Zod |
-| MCP | @modelcontextprotocol/sdk |
 
 ---
 
