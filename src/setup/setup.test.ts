@@ -692,14 +692,14 @@ describe('Setup Commands - Generated Content', () => {
    * Tests for workflow command template installation
    */
   describe('Workflow command template installation', () => {
-    it('creates .claude/commands/compound/ with 13 .md files', async () => {
+    it('creates .claude/commands/compound/ with 14 .md files', async () => {
       runCli('init');
 
       const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
       expect(existsSync(commandsDir)).toBe(true);
 
       const files = readdirSync(commandsDir).filter((f) => f.endsWith('.md'));
-      expect(files.length).toBe(13);
+      expect(files.length).toBe(14);
     });
 
     it('creates all expected workflow command files', async () => {
@@ -737,7 +737,7 @@ describe('Setup Commands - Generated Content', () => {
 
       const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
       const files = readdirSync(commandsDir).filter((f) => f.endsWith('.md'));
-      expect(files.length).toBe(13);
+      expect(files.length).toBe(14);
     });
 
     it('--skip-agents skips workflow command installation', async () => {

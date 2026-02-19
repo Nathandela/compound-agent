@@ -25,6 +25,7 @@ import { registerReviewerCommand } from './reviewer.js';
 import { registerRulesCommands } from './rules.js';
 import { registerTestSummaryCommand } from './test-summary.js';
 import { registerVerifyGatesCommand } from './verify-gates.js';
+import { registerWorktreeCommands } from './worktree.js';
 
 export { registerCaptureCommands } from './capture.js';
 export { registerLoopCommands } from './loop.js';
@@ -73,4 +74,5 @@ export function registerManagementCommands(program: Command): void {
   registerRulesCommands(program);
   registerTestSummaryCommand(program);
   registerVerifyGatesCommand(program);
+  registerWorktreeCommands(program);
 }

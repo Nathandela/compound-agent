@@ -8,6 +8,7 @@ const PHASE_FILENAMES = [
   'review.md',
   'compound.md',
   'lfg.md',
+  'set-worktree.md',
 ];
 
 const UTILITY_FILENAMES = [
@@ -21,8 +22,8 @@ const UTILITY_FILENAMES = [
 ];
 
 describe('WORKFLOW_COMMANDS', () => {
-  it('has exactly 13 entries (6 phase + 7 utility)', () => {
-    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(13);
+  it('has exactly 14 entries (7 phase + 7 utility)', () => {
+    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(14);
   });
 
   it('has all expected filenames', () => {

@@ -83,6 +83,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 8. Map dependencies between tasks
 9. Create beads issues: \`bd create --title="..." --type=task\`
 10. Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) that depend on work tasks — these survive compaction and surface via \`bd ready\` after work completes
+11. Run \`npx ca worktree wire-deps <epic-id>\` to connect merge dependencies (graceful no-op if no worktree is active)
 
 ## Memory Integration
 - Run \`npx ca search\` for patterns related to the feature area
@@ -115,6 +116,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 After creating all tasks, verify review and compound tasks exist:
 - Run \`bd list --status=open\` and check for a "Review:" task and a "Compound:" task
 - If either is missing, CREATE THEM NOW. The plan is NOT complete without these gates.
+- If a Merge: task exists in the dependency graph, verify it has Review and Compound as blockers (run \`bd show <merge-id>\` to confirm)
 `,
 
   work: `---
@@ -316,6 +318,49 @@ Before closing the epic:
 - Run \`pnpm test\` and \`pnpm lint\` -- must pass
 If verify-gates fails, the missing phase was SKIPPED. Go back and complete it.
 CRITICAL: 3/5 phases is NOT success. All 5 phases are required.
+`,
+
+  'set-worktree': `---
+name: Set Worktree
+description: Configure an isolated git worktree for parallel epic execution
+---
+
+# Set Worktree Skill
+
+## Overview
+Set up a git worktree to isolate epic work from the main branch. This creates a separate working directory, installs dependencies, and creates a Merge beads task that orchestrates the merge lifecycle.
+
+## Methodology
+1. Validate the epic exists: run \`bd show <epic-id>\` to confirm the epic is open
+2. Search memory with \`npx ca search "worktree"\` for past worktree lessons
+3. Run the worktree creation command: \`npx ca worktree create <epic-id>\`
+4. Verify output: confirm worktree path, branch name, and Merge task ID are reported
+5. Note the Merge task ID -- it will surface via \`bd ready\` after all work tasks complete
+6. Confirm the worktree is ready: check that \`.claude/\` directory exists in the worktree
+7. Inform the user: the worktree is set up, they can now run \`/compound:lfg\` to start work
+
+## What Happens Under the Hood
+- A git worktree is created at \`../<repo>-wt-<epic-id>\` on branch \`epic/<epic-id>\`
+- Dependencies are installed via \`pnpm install --frozen-lockfile\`
+- Lessons JSONL is copied (not symlinked) to the worktree
+- A Merge beads task is created with the epic as its dependent
+- When all work completes, the Merge task surfaces via \`bd ready\`
+
+## Memory Integration
+- Run \`npx ca search "worktree"\` before creating to check for known issues
+- Run \`npx ca learn\` if you discover worktree-specific knowledge
+
+## Common Pitfalls
+- Creating a worktree for an epic that already has one (the command checks for this)
+- Forgetting to run \`/compound:lfg\` after setup (the worktree alone does nothing)
+- Not noting the Merge task ID (needed for later reference)
+- Running from inside an existing worktree (must run from main repo)
+
+## Quality Criteria
+- Worktree was created successfully (path exists)
+- \`pnpm install\` completed without errors
+- Merge beads task exists and is linked to the epic
+- User was informed of next steps (\`/compound:lfg\`)
 `,
 
   lfg: `---
