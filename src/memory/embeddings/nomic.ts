@@ -168,8 +168,8 @@ export async function embedText(text: string): Promise<number[]> {
  * **Lazy loading:** First call loads the embedding model (~150MB, ~1-3s).
  * Subsequent calls use the cached model.
  *
- * **Performance:** More efficient than calling `embedText` in a loop
- * when processing multiple texts, as model loading happens only once.
+ * **Note:** Texts are embedded sequentially (node-llama-cpp uses a mutex lock).
+ * The only advantage over a manual loop is shared model initialization.
  *
  * @param texts - Array of texts to embed
  * @returns Array of 768-dimensional vectors, same order as input
