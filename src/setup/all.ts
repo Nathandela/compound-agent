@@ -113,16 +113,16 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   // 8. Install agent role skills
   await installAgentRoleSkills(repoRoot);
 
-  // 8b. Install pre-commit git hook
+  // 9. Install pre-commit git hook
   let gitHooks: HookInstallResult['status'] | 'skipped' = 'skipped';
   if (!options.skipHooks) {
     gitHooks = (await installPreCommitHook(repoRoot)).status;
   }
 
-  // 9. Configure Claude settings (hooks in settings.json)
+  // 10. Configure Claude settings (hooks in settings.json)
   const { hooks } = await configureClaudeSettings();
 
-  // 7. Download model (unless skipped)
+  // 11. Download model (unless skipped)
   let modelStatus: 'downloaded' | 'already_exists' | 'failed' | 'skipped' = 'skipped';
   if (!options.skipModel) {
     try {

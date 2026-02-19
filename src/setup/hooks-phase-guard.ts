@@ -24,9 +24,9 @@ export interface PhaseGuardOutput {
 export function processPhaseGuard(
   repoRoot: string,
   toolName: string,
-  toolInput: Record<string, unknown>
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _toolInput: Record<string, unknown>
 ): PhaseGuardOutput {
-  void toolInput;
   try {
     if (toolName !== 'Edit' && toolName !== 'Write') return {};
 

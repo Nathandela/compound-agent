@@ -583,7 +583,7 @@ export function registerHooksCommand(program: Command): void {
               'hooks',
               'UNKNOWN_HOOK',
               `Unknown hook: ${hook}`,
-              'Valid hooks: pre-commit, user-prompt, post-tool-failure, post-tool-success, post-read, phase-guard, phase-audit'
+              'Valid hooks: pre-commit, user-prompt, post-tool-failure, post-tool-success, post-read (or read-tracker), phase-guard, phase-audit (or stop-audit)'
             )
           );
         }
