@@ -25,7 +25,7 @@ import {
   registerRetrievalCommands,
   registerSetupCommands,
 } from './commands/index.js';
-import { VERSION } from './index.js';
+import { VERSION } from './version.js';
 import { closeDb } from './memory/storage/index.js';
 
 // ============================================================================

@@ -12,7 +12,8 @@ import type { Command } from 'commander';
 import { getRepoRoot } from '../cli-utils.js';
 import { isModelAvailable, resolveModel } from '../memory/embeddings/index.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
-import { out } from '../commands/index.js';
+import { getGlobalOpts, out } from '../commands/index.js';
+import { playInstallBanner } from './banner.js';
 import {
   addAllCompoundAgentHooks,
   getClaudeSettingsPath,
@@ -380,14 +381,14 @@ export function registerSetupAllCommand(setupCommand: Command): void {
     .option('--update', 'Regenerate files (preserves user customizations)')
     .option('--status', 'Show installation status')
     .option('--dry-run', 'Show what would change without changing')
-    .action(async (options: {
+    .action(async function (this: Command, options: {
       skipModel?: boolean;
       skipHooks?: boolean;
       uninstall?: boolean;
       update?: boolean;
       status?: boolean;
       dryRun?: boolean;
-    }) => {
+    }) {
       const repoRoot = getRepoRoot();
       const dryRun = options.dryRun ?? false;
 
@@ -426,6 +427,11 @@ export function registerSetupAllCommand(setupCommand: Command): void {
 
       // Default: full setup
       const result = await runSetup({ skipModel: options.skipModel, skipHooks: options.skipHooks });
+
+      const { quiet } = getGlobalOpts(this);
+      if (!quiet && process.stdout.isTTY) {
+        await playInstallBanner();
+      }
 
       out.success('Compound agent setup complete');
       console.log(`  Lessons directory: ${result.lessonsDir}`);

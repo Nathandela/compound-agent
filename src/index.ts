@@ -75,13 +75,8 @@
  * @module compound-agent
  */
 
-import { createRequire } from 'node:module';
-
-const _require = createRequire(import.meta.url);
-const _pkg = _require('../package.json') as { version: string };
-
 /** Package version, read from package.json. */
-export const VERSION: string = _pkg.version;
+export { VERSION } from './version.js';
 
 // Storage API (JSONL source of truth + SQLite index)
 export {

@@ -10,6 +10,7 @@ import type { Command } from 'commander';
 import { getRepoRoot } from '../cli-utils.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
 import { getGlobalOpts, out } from '../commands/index.js';
+import { playInstallBanner } from './banner.js';
 import { installClaudeHooksForInit } from './claude-helpers.js';
 import { installPreCommitHook, type HookInstallResult } from './hooks.js';
 import {
@@ -53,6 +54,10 @@ async function initAction(
 ): Promise<void> {
   const repoRoot = getRepoRoot();
   const { quiet } = getGlobalOpts(cmd);
+
+  if (!quiet && !options.json && process.stdout.isTTY) {
+    await playInstallBanner();
+  }
 
   // Ensure pnpm native build config before anything else
   const pnpmConfig = await ensurePnpmBuildConfig(repoRoot);
