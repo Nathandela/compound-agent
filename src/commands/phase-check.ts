@@ -175,6 +175,7 @@ function printStatusHuman(state: PhaseState | null): void {
   console.log(`  Started: ${state.started_at}`);
 }
 
+// eslint-disable-next-line max-lines-per-function -- command router registers multiple subcommands
 function registerPhaseSubcommands(
   phaseCheck: Command,
   getDryRun: () => boolean,

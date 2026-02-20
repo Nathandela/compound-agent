@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- template data file; each skill is a multiline string constant */
 /**
  * Phase skill SKILL.md templates for compound workflow phases.
  * Written to .claude/skills/compound/<phase>/SKILL.md during setup.
@@ -21,12 +22,13 @@ Explore the problem space before committing to a solution. This phase produces a
    - Available agents: \`.claude/agents/compound/repo-analyst.md\`, \`memory-analyst.md\`
    - Or use \`subagent_type: Explore\` for ad-hoc research
    - Deploy MULTIPLE when topic spans several domains; synthesize all findings before proceeding
-4. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences
-5. Divergent phase: generate multiple approaches without filtering
-6. Identify constraints and non-functional requirements (performance, security, etc.)
-7. Convergent phase: evaluate approaches against constraints
-8. Document decisions with rationale, list open questions, and create a beads epic
-9. Auto-create ADR files in \`docs/decisions/\` for significant decisions (lightweight: Status, Context, Decision, Consequences)
+4. When facing deep unknowns or complex technical domains, invoke the **researcher skill** (read \`.claude/skills/compound/researcher/SKILL.md\`) to produce a structured survey document before narrowing approaches
+5. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences
+6. Divergent phase: generate multiple approaches without filtering
+7. Identify constraints and non-functional requirements (performance, security, etc.)
+8. Convergent phase: evaluate approaches against constraints
+9. Document decisions with rationale, list open questions, and create a beads epic
+10. Auto-create ADR files in \`docs/decisions/\` for significant decisions (lightweight: Status, Context, Decision, Consequences)
 
 ## Memory Integration
 - Run \`npx ca search\` with relevant keywords before generating approaches
@@ -45,6 +47,7 @@ Explore the problem space before committing to a solution. This phase produces a
 - Not checking existing docs and ADRs for prior decisions
 - Over-scoping: trying to solve everything at once
 - Skipping the "why" and diving into "how"
+- Not invoking the researcher skill when the domain requires deep investigation
 - Not creating a beads epic from conclusions (losing brainstorm output)
 
 ## Quality Criteria
@@ -76,14 +79,15 @@ Create a concrete implementation plan by decomposing work into small, testable t
    - Available agents: \`.claude/agents/compound/repo-analyst.md\`, \`memory-analyst.md\`
    - For complex features, deploy MULTIPLE analysts per domain area
    - Synthesize all findings before decomposing into tasks
-4. Synthesize research findings into a coherent approach. Flag conflicts between ADRs and proposed plan.
-5. Use \`AskUserQuestion\` to resolve ambiguities, conflicting constraints, or priority trade-offs before decomposing
-6. Decompose into tasks small enough to verify individually
-7. Define acceptance criteria for each task
-8. Map dependencies between tasks
-9. Create beads issues: \`bd create --title="..." --type=task\`
-10. Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) that depend on work tasks — these survive compaction and surface via \`bd ready\` after work completes
-11. Run \`npx ca worktree wire-deps <epic-id>\` to connect merge dependencies (graceful no-op if no worktree is active)
+4. For decisions requiring deep technical grounding, invoke the **researcher skill** to produce a survey document. Review findings before decomposing into tasks.
+5. Synthesize research findings into a coherent approach. Flag conflicts between ADRs and proposed plan.
+6. Use \`AskUserQuestion\` to resolve ambiguities, conflicting constraints, or priority trade-offs before decomposing
+7. Decompose into tasks small enough to verify individually
+8. Define acceptance criteria for each task
+9. Map dependencies between tasks
+10. Create beads issues: \`bd create --title="..." --type=task\`
+11. Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) that depend on work tasks — these survive compaction and surface via \`bd ready\` after work completes
+12. Run \`npx ca worktree wire-deps <epic-id>\` to connect merge dependencies (graceful no-op if no worktree is active)
 
 ## Memory Integration
 - Run \`npx ca search\` for patterns related to the feature area
@@ -101,6 +105,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Missing dependencies between tasks
 - Not checking memory for past architectural decisions
 - Not reviewing existing ADRs and docs for constraints
+- Making architectural decisions without research backing (use the researcher skill for complex domains)
 - Planning implementation details too early (stay at task level)
 
 ## Quality Criteria
@@ -363,6 +368,114 @@ Set up a git worktree to isolate epic work from the main branch. This creates a 
 - User was informed of next steps (\`/compound:lfg\`)
 `,
 
+  researcher: `---
+name: Researcher
+description: Deep research producing structured survey documents for informed decision-making
+---
+
+# Researcher Skill
+
+## Overview
+Conduct deep research on a topic and produce a structured survey document following the project's research template. This skill spawns parallel research subagents to gather comprehensive information, then synthesizes findings into a PhD-depth document stored in \`docs/research/\`.
+
+## Methodology
+1. Identify the research question, scope, and exclusions
+2. Search memory with \`npx ca search\` for existing knowledge on the topic
+3. Spawn parallel research subagents via Task tool:
+   - **Web search specialist**: Uses WebSearch/WebFetch for academic papers, blog posts, benchmarks, and tools
+   - **Codebase explorer**: Uses \`subagent_type: Explore\` to find relevant existing code patterns
+   - **Docs scanner**: Reads \`docs/\` for prior research, ADRs, and standards that inform the topic
+4. Collect and deduplicate findings from all subagents
+5. Synthesize into TEMPLATE_FOR_RESEARCH.md format:
+   - Abstract (2-3 paragraphs)
+   - Introduction (problem statement, scope, definitions)
+   - Foundations (theoretical background)
+   - Taxonomy of Approaches (classification framework, visual table/tree)
+   - Analysis (one subsection per approach with theory, evidence, implementations, strengths/limitations)
+   - Comparative Synthesis (cross-cutting trade-off table)
+   - Open Problems & Gaps
+   - Conclusion
+   - References (full citations)
+   - Practitioner Resources (annotated tools/repos)
+6. Store output at \`docs/research/<topic-slug>.md\` (kebab-case filename)
+7. Report key findings back for upstream skill (brainstorm/plan) to act on
+
+## Memory Integration
+- Run \`npx ca search\` with topic keywords before starting research
+- Check for existing research docs in \`docs/research/\` that overlap
+- After completion, key findings can be captured via \`npx ca learn\`
+
+## Docs Integration
+- Scan \`docs/research/\` for prior survey documents on related topics
+- Check \`docs/decisions/\` for ADRs that inform or constrain the research scope
+- Reference existing project docs as primary sources where relevant
+
+## Output Format
+
+Every research document MUST follow this exact structure:
+
+# [Topic Title]
+
+*[Date]*
+
+## Abstract
+2-3 paragraph summary: what this survey covers, main approaches, key trade-offs.
+
+## 1. Introduction
+- Problem statement
+- Scope: covered and excluded
+- Key definitions
+
+## 2. Foundations
+Theoretical background. Assume technical reader, not domain specialist.
+
+## 3. Taxonomy of Approaches
+Classification framework. Present visually (table or tree) before details.
+
+## 4. Analysis
+One subsection per approach:
+### 4.x [Approach Name]
+- **Theory & mechanism**
+- **Literature evidence**
+- **Implementations & benchmarks**
+- **Strengths & limitations**
+
+## 5. Comparative Synthesis
+Cross-cutting trade-off table. No recommendations.
+
+## 6. Open Problems & Gaps
+Unsolved, under-researched, or risky areas.
+
+## 7. Conclusion
+Synthesis. No verdict.
+
+## References
+Full citations with URLs.
+
+## Practitioner Resources
+Annotated tools, repos, articles grouped by category.
+
+## Common Pitfalls
+- Shallow treatment: each approach needs theory, evidence, AND implementation examples
+- Missing taxonomy: always classify approaches before diving into analysis
+- Recommendation bias: present trade-offs, never recommend (ADR process decides)
+- Ignoring gaps: explicitly state where evidence is thin or conflicting
+- Not deduplicating subagent findings (leads to repetitive content)
+- Skipping the comparative synthesis table
+
+## Quality Criteria
+- PhD academic depth (reads like a technical survey paper)
+- Multiple research subagents were deployed in parallel
+- Memory was searched for existing knowledge
+- Existing docs/research were checked for overlap
+- Every approach has: theory, evidence, implementations, strengths/limitations
+- Comparative synthesis table present with clear trade-offs
+- Open problems honestly identified
+- Full references with URLs
+- Practitioner resources annotated
+- No recommendations -- landscape presentation only
+`,
+
   lfg: `---
 name: LFG
 description: Full-cycle orchestrator chaining all five phases with gates and controls
@@ -432,5 +545,76 @@ If a gate fails, DO NOT proceed. Fix the issue first.
 ## SESSION CLOSE -- INVIOLABLE
 Before saying "done": git status, git add, bd sync, git commit, bd sync, git push.
 If phase state gets stuck, use the escape hatch: \`npx ca phase-check clean\` (or \`npx ca phase-clean\`).
+`,
+
+  'test-cleaner': `---
+name: Test Cleaner
+description: Multi-phase test suite optimization with adversarial review
+---
+
+# Test Cleaner Skill
+
+## Overview
+Analyze, optimize, and clean a project's test suite through a multi-phase workflow with adversarial review. Produces machine-readable output and feeds findings into compound-agent memory.
+
+## Methodology
+
+### Phase 1: Analysis
+Spawn multiple analysis subagents in parallel:
+- **Cargo-cult detector**: Find fake tests, mocked business logic, trivial assertions
+- **Redundancy analyzer**: Identify overlapping/duplicate test coverage
+- **Independence checker**: Verify tests don't depend on execution order or shared state
+- **Invariant tracer**: Map which invariants each test verifies (Lamport framework)
+- **Coverage analyzer**: Identify untested code paths and modules
+
+### Phase 2: Planning
+Synthesize analysis results into a refined optimization plan:
+- Categorize findings by severity (P1/P2/P3)
+- Propose specific changes for each finding
+- Estimate impact on test suite speed and coverage
+- Iterate with subagents until the plan is comprehensive
+
+### Phase 3: Adversarial Review
+Expose the plan to two neutral reviewer subagents:
+- **Reviewer A** (Opus): Independent critique of the optimization plan
+- **Reviewer B** (Sonnet): Independent critique from a different perspective
+Both reviewers challenge assumptions, identify risks, and suggest improvements.
+Iterate: adapt the plan based on feedback until confident.
+
+### Phase 4: Execution
+Apply the agreed changes:
+- Machine-readable output format: \`ERROR [file:line] type: description\`
+- Include \`REMEDIATION\` suggestions and \`SEE\` references
+- Use \`pnpm test:segment\`, \`pnpm test:random\`, \`pnpm test:critical\` for targeted validation
+
+### Phase 5: Verification
+- Run full test suite after changes
+- Compare before/after metrics (count, duration, coverage)
+- Feed findings into compound-agent memory via \`npx ca learn\`
+
+## Test Scripts Integration
+- \`pnpm test:segment <module>\` -- Test specific module in isolation
+- \`pnpm test:random <pct>\` -- Deterministic random subset (seeded per-agent)
+- \`pnpm test:critical\` -- P1/critical tests only (fast CI feedback)
+
+## Memory Integration
+- Run \`npx ca search "test optimization"\` before starting
+- After completion, capture findings via \`npx ca learn\`
+- Feed patterns into CCT system for future sessions
+
+## Common Pitfalls
+- Deleting tests without verifying coverage is maintained elsewhere
+- Optimizing for speed at the cost of correctness
+- Not running the adversarial review (skipping Phase 3)
+- Making changes without machine-readable output
+- Not feeding results back into compound-agent memory
+
+## Quality Criteria
+- All 5 phases completed (analysis, planning, review, execution, verification)
+- Adversarial review with 2 independent reviewers was conducted
+- Machine-readable output format used throughout
+- Full test suite passes after changes
+- Coverage not degraded
+- Findings captured in compound-agent memory
 `,
 };

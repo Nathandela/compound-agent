@@ -88,8 +88,33 @@ $ARGUMENTS
 **MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/set-worktree/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
 `,
 
+  'research.md': `---
+name: compound:research
+description: Deep research on a topic producing a structured survey document
+argument-hint: "<topic to research>"
+---
+$ARGUMENTS
+
+# Research
+
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/researcher/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
+`,
+
+  'test-clean.md': `---
+name: compound:test-clean
+description: Multi-phase test suite optimization with adversarial review
+argument-hint: "<scope or module to analyze>"
+---
+$ARGUMENTS
+
+# Test Clean
+
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/test-cleaner/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
+`,
+
   // =========================================================================
-  // Utility commands (CLI wrappers)
+  // Utility commands (kept: learn, prime)
+  // Removed in v1.3: search, list, show, wrong, stats (CLI wrappers)
   // =========================================================================
 
   'learn.md': `---
@@ -109,34 +134,6 @@ Examples:
 npx ca learn "$ARGUMENTS"
 \`\`\`
 `,
-  'search.md': `---
-name: compound:search
-description: Search stored lessons for relevant context
-argument-hint: "<search query>"
----
-Search lessons for relevant context.
-
-Usage: /compound search <query>
-
-Examples:
-- /compound search "API authentication"
-- /compound search "data processing patterns"
-
-\`\`\`bash
-npx ca search "$ARGUMENTS"
-\`\`\`
-
-`,
-  'list.md': `---
-name: compound:list
-description: Show all stored lessons
----
-Show all stored lessons.
-
-\`\`\`bash
-npx ca list
-\`\`\`
-`,
   'prime.md': `---
 name: compound:prime
 description: Load compound-agent workflow context after compaction or context loss
@@ -145,42 +142,6 @@ Load compound-agent workflow context after compaction or context loss.
 
 \`\`\`bash
 npx ca prime
-\`\`\`
-`,
-  'show.md': `---
-name: compound:show
-description: Show details of a specific lesson
-argument-hint: "<lesson-id>"
----
-Show details of a specific lesson.
-
-Usage: /compound show <lesson-id>
-
-\`\`\`bash
-npx ca show "$ARGUMENTS"
-\`\`\`
-`,
-  'wrong.md': `---
-name: compound:wrong
-description: Mark a lesson as incorrect or invalid
-argument-hint: "<lesson-id>"
----
-Mark a lesson as incorrect or invalid.
-
-Usage: /compound wrong <lesson-id>
-
-\`\`\`bash
-npx ca wrong "$ARGUMENTS"
-\`\`\`
-`,
-  'stats.md': `---
-name: compound:stats
-description: Show compound-agent database statistics and health
----
-Show compound-agent database statistics and health.
-
-\`\`\`bash
-npx ca stats
 \`\`\`
 `,
 };

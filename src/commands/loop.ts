@@ -65,9 +65,36 @@ timestamp() { date '+%Y-%m-%d_%H-%M-%S'; }
 log() { echo "[$(timestamp)] $*"; }
 die() { log "FATAL: $*"; exit 1; }
 
-command -v python3 >/dev/null || die "python3 required for JSON parsing"
 command -v claude >/dev/null || die "claude CLI required"
 command -v bd >/dev/null || die "bd (beads) CLI required"
+
+# Detect JSON parser: prefer jq, fall back to python3
+HAS_JQ=false
+command -v jq >/dev/null 2>&1 && HAS_JQ=true
+if [ "$HAS_JQ" = false ]; then
+  command -v python3 >/dev/null 2>&1 || die "jq or python3 required for JSON parsing"
+fi
+
+# parse_json() - extract a value from JSON stdin
+# Uses jq (primary) with python3 fallback
+# Usage: echo '{"status":"open"}' | parse_json '.status'
+parse_json() {
+  local filter="$1"
+  if [ "$HAS_JQ" = true ]; then
+    jq -r "$filter"
+  else
+    python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+f = '$filter'.strip('.')
+parts = [p for p in f.split('.') if p]
+v = data
+for p in parts:
+    v = v[p]
+print(v)
+"
+  fi
+}
 
 mkdir -p "$LOG_DIR"
 ` + buildEpicSelector() + buildPromptFunction();
@@ -81,7 +108,7 @@ get_next_epic() {
     for epic_id in $EPIC_IDS; do
       case " $PROCESSED " in *" $epic_id "*) continue ;; esac
       local status
-      status=$(bd show "$epic_id" --json 2>/dev/null | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status',''))" 2>/dev/null || echo "")
+      status=$(bd show "$epic_id" --json 2>/dev/null | parse_json '.status' 2>/dev/null || echo "")
       if [ "$status" = "open" ]; then
         echo "$epic_id"
         return 0
@@ -91,14 +118,22 @@ get_next_epic() {
   else
     # Dynamic: get next ready epic from dependency graph, filtering processed
     local epic_id
-    epic_id=$(bd list --type=epic --ready --json --limit=10 2>/dev/null | python3 -c "
-import sys,json
+    if [ "$HAS_JQ" = true ]; then
+      epic_id=$(bd list --type=epic --ready --json --limit=10 2>/dev/null | jq -r '.[].id' 2>/dev/null | while read -r id; do
+        case " $PROCESSED " in *" $id "*) continue ;; esac
+        echo "$id"
+        break
+      done)
+    else
+      epic_id=$(bd list --type=epic --ready --json --limit=10 2>/dev/null | python3 -c "
+import sys, json
 processed = set('$PROCESSED'.split())
 items = json.load(sys.stdin)
 for item in items:
     if item['id'] not in processed:
         print(item['id'])
         break" 2>/dev/null || echo "")
+    fi
     if [ -z "$epic_id" ]; then
       return 1
     fi

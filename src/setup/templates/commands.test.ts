@@ -9,26 +9,38 @@ const PHASE_FILENAMES = [
   'compound.md',
   'lfg.md',
   'set-worktree.md',
+  'research.md',
+  'test-clean.md',
 ];
 
 const UTILITY_FILENAMES = [
   'learn.md',
+  'prime.md',
+];
+
+/** CLI wrapper commands removed in v1.3 — must NOT appear in WORKFLOW_COMMANDS. */
+const REMOVED_CLI_WRAPPERS = [
   'search.md',
   'list.md',
-  'prime.md',
   'show.md',
-  'wrong.md',
   'stats.md',
+  'wrong.md',
 ];
 
 describe('WORKFLOW_COMMANDS', () => {
-  it('has exactly 14 entries (7 phase + 7 utility)', () => {
-    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(14);
+  it('has exactly 11 entries (9 phase + 2 utility)', () => {
+    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(11);
   });
 
   it('has all expected filenames', () => {
     const expected = [...PHASE_FILENAMES, ...UTILITY_FILENAMES];
     expect(Object.keys(WORKFLOW_COMMANDS).sort()).toEqual(expected.sort());
+  });
+
+  it('does NOT contain removed CLI wrapper commands', () => {
+    for (const key of REMOVED_CLI_WRAPPERS) {
+      expect(Object.keys(WORKFLOW_COMMANDS)).not.toContain(key);
+    }
   });
 
   it('every key ends with .md', () => {
@@ -85,7 +97,7 @@ describe('WORKFLOW_COMMANDS', () => {
     });
 
     it('every phase command references the skill file path', () => {
-      const SINGLE_PHASE_FILENAMES = PHASE_FILENAMES.filter((k) => k !== 'lfg.md');
+      const SINGLE_PHASE_FILENAMES = PHASE_FILENAMES.filter((k) => k !== 'lfg.md' && k !== 'research.md' && k !== 'test-clean.md');
       for (const key of SINGLE_PHASE_FILENAMES) {
         const phase = key.replace('.md', '');
         expect(
@@ -99,6 +111,14 @@ describe('WORKFLOW_COMMANDS', () => {
       expect(WORKFLOW_COMMANDS['lfg.md']).toContain('.claude/skills/compound/lfg/SKILL.md');
     });
 
+    it('research.md references researcher skill file', () => {
+      expect(WORKFLOW_COMMANDS['research.md']).toContain('.claude/skills/compound/researcher/SKILL.md');
+    });
+
+    it('test-clean.md references test-cleaner skill file', () => {
+      expect(WORKFLOW_COMMANDS['test-clean.md']).toContain('.claude/skills/compound/test-cleaner/SKILL.md');
+    });
+
     it('phase commands do NOT have Key steps summaries (forces reading the skill)', () => {
       for (const key of PHASE_FILENAMES) {
         expect(WORKFLOW_COMMANDS[key], `${key} should not have Key steps`).not.toContain(
@@ -108,17 +128,13 @@ describe('WORKFLOW_COMMANDS', () => {
     });
   });
 
-  describe('utility commands (unchanged)', () => {
+  describe('utility commands (remaining)', () => {
     it('learn.md references ca learn', () => {
       expect(WORKFLOW_COMMANDS['learn.md']).toContain('ca learn');
     });
 
-    it('search.md references ca search', () => {
-      expect(WORKFLOW_COMMANDS['search.md']).toContain('ca search');
-    });
-
-    it('stats.md references ca stats', () => {
-      expect(WORKFLOW_COMMANDS['stats.md']).toContain('ca stats');
+    it('prime.md references ca prime', () => {
+      expect(WORKFLOW_COMMANDS['prime.md']).toContain('ca prime');
     });
   });
 

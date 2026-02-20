@@ -5,6 +5,9 @@
  */
 
 export { registerSetupAllCommand } from './all.js';
+export { checkBeadsAvailable, type BeadsCheckResult } from './beads-check.js';
+export { ensureGitignore, type GitignoreResult } from './gitignore.js';
+export { checkUserScope, type ScopeCheckResult } from './scope-check.js';
 export {
   getClaudeSettingsPath,
   hasAllCompoundAgentHooks,

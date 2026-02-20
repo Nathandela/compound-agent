@@ -11,7 +11,9 @@ import { getRepoRoot } from '../cli-utils.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
 import { getGlobalOpts, out } from '../commands/index.js';
 import { playInstallBanner } from './banner.js';
+import { checkBeadsAvailable } from './beads-check.js';
 import { installClaudeHooksForInit } from './claude-helpers.js';
+import { ensureGitignore, type GitignoreResult } from './gitignore.js';
 import { installPreCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
@@ -19,12 +21,15 @@ import {
   ensurePnpmBuildConfig,
   installAgentRoleSkills,
   installAgentTemplates,
+  installDocTemplates,
   installPhaseSkills,
   installWorkflowCommands,
   updateAgentsMd,
   type PnpmConfigResult,
 } from './primitives.js';
+import { checkUserScope } from './scope-check.js';
 import type { ClaudeHooksResult } from './types.js';
+import { runUpgrade, detectExistingInstall, type UpgradeResult } from './upgrade.js';
 
 /**
  * Create the lessons directory structure.
@@ -50,10 +55,30 @@ async function createIndexFile(repoRoot: string): Promise<void> {
 
 async function initAction(
   cmd: Command,
-  options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; json?: boolean }
+  options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; json?: boolean; update?: boolean }
 ): Promise<void> {
   const repoRoot = getRepoRoot();
   const { quiet } = getGlobalOpts(cmd);
+
+  // Pre-flight checks
+  const scopeResult = checkUserScope(repoRoot);
+  if (scopeResult.isUserScope && !quiet && !options.json) {
+    console.log(`  ${scopeResult.message}`);
+  }
+
+  const beadsResult = await checkBeadsAvailable();
+  if (!beadsResult.available && !quiet && !options.json) {
+    console.log(`  ${beadsResult.message}`);
+  }
+
+  // Upgrade detection
+  let upgradeResult: UpgradeResult | null = null;
+  if (options.update || detectExistingInstall(repoRoot)) {
+    upgradeResult = await runUpgrade(repoRoot);
+    if (!quiet && !options.json && upgradeResult.isUpgrade) {
+      console.log(`  ${upgradeResult.message}`);
+    }
+  }
 
   if (!quiet && !options.json && process.stdout.isTTY) {
     await playInstallBanner();
@@ -81,6 +106,7 @@ async function initAction(
     await installWorkflowCommands(repoRoot);
     await installPhaseSkills(repoRoot);
     await installAgentRoleSkills(repoRoot);
+    await installDocTemplates(repoRoot);
   }
 
   let hookResult: HookInstallResult | null = null;
@@ -93,18 +119,11 @@ async function initAction(
     claudeHooksResult = await installClaudeHooksForInit(repoRoot);
   }
 
+  // Ensure .gitignore has required patterns
+  const gitignoreResult = await ensureGitignore(repoRoot);
+
   if (options.json) {
-    const claudeHooksInstalled = claudeHooksResult.action === 'installed';
-    const hooksChanged = hookResult?.status === 'installed' || hookResult?.status === 'appended';
-    console.log(JSON.stringify({
-      initialized: true,
-      lessonsDir,
-      agentsMd: agentsMdUpdated,
-      hooks: hooksChanged,
-      hookStatus: hookResult?.status ?? 'skipped',
-      claudeHooks: claudeHooksInstalled,
-      pnpmConfig: pnpmConfig.isPnpm ? { added: pnpmConfig.added, alreadyConfigured: pnpmConfig.alreadyConfigured } : null,
-    }));
+    printInitJson({ lessonsDir, agentsMdUpdated, hookResult, claudeHooksResult, pnpmConfig, beadsResult, scopeResult, upgradeResult, gitignoreResult });
     return;
   }
 
@@ -116,6 +135,26 @@ async function initAction(
   printHookStatus(hookResult, options.skipHooks);
   printClaudeHooksStatus(claudeHooksResult, options.skipClaude);
   printPnpmConfigStatus(pnpmConfig);
+  printGitignoreStatus(gitignoreResult);
+}
+
+function printInitJson(ctx: {
+  lessonsDir: string; agentsMdUpdated: boolean; hookResult: HookInstallResult | null;
+  claudeHooksResult: ClaudeHooksResult; pnpmConfig: PnpmConfigResult;
+  beadsResult: { available: boolean }; scopeResult: { isUserScope: boolean };
+  upgradeResult: UpgradeResult | null; gitignoreResult: GitignoreResult;
+}): void {
+  const claudeHooksInstalled = ctx.claudeHooksResult.action === 'installed';
+  const hooksChanged = ctx.hookResult?.status === 'installed' || ctx.hookResult?.status === 'appended';
+  console.log(JSON.stringify({
+    initialized: true, lessonsDir: ctx.lessonsDir, agentsMd: ctx.agentsMdUpdated,
+    hooks: hooksChanged, hookStatus: ctx.hookResult?.status ?? 'skipped',
+    claudeHooks: claudeHooksInstalled,
+    pnpmConfig: ctx.pnpmConfig.isPnpm ? { added: ctx.pnpmConfig.added, alreadyConfigured: ctx.pnpmConfig.alreadyConfigured } : null,
+    beadsAvailable: ctx.beadsResult.available, userScope: ctx.scopeResult.isUserScope,
+    upgrade: ctx.upgradeResult ? { isUpgrade: ctx.upgradeResult.isUpgrade, removedCommands: ctx.upgradeResult.removedCommands, strippedHeaders: ctx.upgradeResult.strippedHeaders } : null,
+    gitignore: ctx.gitignoreResult.added,
+  }));
 }
 
 function printAgentsMdStatus(updated: boolean, skipped?: boolean): void {
@@ -163,6 +202,14 @@ function printPnpmConfigStatus(result: PnpmConfigResult): void {
   }
 }
 
+function printGitignoreStatus(result: GitignoreResult): void {
+  if (result.added.length > 0) {
+    console.log(`  .gitignore: Added [${result.added.join(', ')}]`);
+  } else {
+    console.log('  .gitignore: Already configured');
+  }
+}
+
 // ============================================================================
 // Command Registration
 // ============================================================================
@@ -178,7 +225,8 @@ export function registerInitCommand(program: Command): void {
     .option('--skip-hooks', 'Skip git hooks installation')
     .option('--skip-claude', 'Skip Claude Code hooks installation')
     .option('--json', 'Output result as JSON')
-    .action(async function (this: Command, options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; json?: boolean }) {
+    .option('--update', 'Run upgrade logic on existing install')
+    .action(async function (this: Command, options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; json?: boolean; update?: boolean }) {
       await initAction(this, options);
     });
 }

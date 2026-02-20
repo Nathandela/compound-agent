@@ -62,6 +62,7 @@ The following documents have been moved to `archive/` and are preserved for hist
 
 ## When to Read What
 
+- **New to compound-agent?** Run `npx ca setup` then read `docs/compound/HOW_TO_COMPOUND.md` (deployed to consumer repos)
 - **Starting a new feature?** Read [ARCHITECTURE-V2.md](ARCHITECTURE-V2.md) then check [invariants/](invariants/) for the relevant module
 - **Understanding a past decision?** Check [adr/](adr/) for architectural choices
 - **Setting up review?** See [verification/](verification/) for the subagent pipeline and exit criteria

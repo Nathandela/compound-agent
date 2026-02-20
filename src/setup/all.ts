@@ -14,6 +14,7 @@ import { isModelAvailable, resolveModel } from '../memory/embeddings/index.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
 import { getGlobalOpts, out } from '../commands/index.js';
 import { playInstallBanner } from './banner.js';
+import { checkBeadsAvailable, type BeadsCheckResult } from './beads-check.js';
 import {
   addAllCompoundAgentHooks,
   getClaudeSettingsPath,
@@ -25,6 +26,7 @@ import {
   removeCompoundAgentHook,
   writeClaudeSettings,
 } from './claude-helpers.js';
+import { ensureGitignore, type GitignoreResult } from './gitignore.js';
 import { installPreCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
@@ -33,13 +35,16 @@ import {
   GENERATED_MARKER,
   installAgentRoleSkills,
   installAgentTemplates,
+  installDocTemplates,
   installPhaseSkills,
   installWorkflowCommands,
   updateAgentsMd,
   type PnpmConfigResult,
 } from './primitives.js';
+import { checkUserScope, type ScopeCheckResult } from './scope-check.js';
 import { LEGACY_ROOT_SLASH_COMMANDS } from './templates.js';
 import { AGENT_TEMPLATES, AGENT_ROLE_SKILLS, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
+import { runUpgrade, detectExistingInstall, type UpgradeResult } from './upgrade.js';
 
 /** Result of one-shot setup */
 interface SetupResult {
@@ -49,6 +54,10 @@ interface SetupResult {
   gitHooks: HookInstallResult['status'] | 'skipped';
   model: 'downloaded' | 'already_exists' | 'failed' | 'skipped';
   pnpmConfig: PnpmConfigResult;
+  beads: BeadsCheckResult;
+  scope: ScopeCheckResult;
+  upgrade: UpgradeResult | null;
+  gitignore: GitignoreResult;
 }
 
 /**
@@ -93,6 +102,16 @@ async function configureClaudeSettings(): Promise<{ hooks: boolean }> {
 export async function runSetup(options: { skipModel?: boolean; skipHooks?: boolean }): Promise<SetupResult> {
   const repoRoot = getRepoRoot();
 
+  // Pre-flight checks
+  const scope = checkUserScope(repoRoot);
+  const beads = await checkBeadsAvailable();
+
+  // Upgrade detection
+  let upgrade: UpgradeResult | null = null;
+  if (detectExistingInstall(repoRoot)) {
+    upgrade = await runUpgrade(repoRoot);
+  }
+
   // 0. Ensure pnpm native build config (before anything that needs native addons)
   const pnpmConfig = await ensurePnpmBuildConfig(repoRoot);
 
@@ -120,7 +139,10 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   // 8. Install agent role skills
   await installAgentRoleSkills(repoRoot);
 
-  // 9. Install pre-commit git hook
+  // 9. Install documentation templates
+  await installDocTemplates(repoRoot);
+
+  // 10. Install pre-commit git hook
   let gitHooks: HookInstallResult['status'] | 'skipped' = 'skipped';
   if (!options.skipHooks) {
     gitHooks = (await installPreCommitHook(repoRoot)).status;
@@ -129,7 +151,10 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   // 10. Configure Claude settings (hooks in settings.json)
   const { hooks } = await configureClaudeSettings();
 
-  // 11. Download model (unless skipped)
+  // 11. Ensure .gitignore has required patterns
+  const gitignore = await ensureGitignore(repoRoot);
+
+  // 12. Download model (unless skipped)
   let modelStatus: 'downloaded' | 'already_exists' | 'failed' | 'skipped' = 'skipped';
   if (!options.skipModel) {
     try {
@@ -152,6 +177,10 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
     gitHooks,
     model: modelStatus,
     pnpmConfig,
+    beads,
+    scope,
+    upgrade,
+    gitignore,
   };
 }
 
@@ -331,6 +360,14 @@ export async function runStatus(repoRoot: string): Promise<void> {
     // No settings
   }
   console.log(`  Hooks:              ${hooksInstalled ? 'installed' : 'not installed'}`);
+
+  const beads = await checkBeadsAvailable();
+  console.log(`  Beads CLI:          ${beads.available ? 'available' : 'not found'}`);
+
+  const scope = checkUserScope(repoRoot);
+  if (scope.isUserScope) {
+    console.log('  Scope:              user-scope (reduced compounding value)');
+  }
 }
 
 function printSetupGitHooksStatus(gitHooks: HookInstallResult['status'] | 'skipped'): void {
@@ -362,13 +399,61 @@ function printPnpmConfigStatus(result: PnpmConfigResult): void {
   }
 }
 
+function printGitignoreStatus(result: GitignoreResult): void {
+  if (result.added.length > 0) {
+    console.log(`  .gitignore: Added [${result.added.join(', ')}]`);
+  } else {
+    console.log('  .gitignore: Already configured');
+  }
+}
+
+async function printSetupResult(result: SetupResult, quiet: boolean): Promise<void> {
+  if (!quiet && result.scope.isUserScope) {
+    console.log(`  ${result.scope.message}`);
+  }
+  if (!quiet && !result.beads.available) {
+    console.log(`  ${result.beads.message}`);
+  }
+  if (!quiet && result.upgrade?.isUpgrade) {
+    console.log(`  ${result.upgrade.message}`);
+  }
+  if (!quiet && process.stdout.isTTY) {
+    await playInstallBanner();
+  }
+
+  out.success('Compound agent setup complete');
+  console.log(`  Lessons directory: ${result.lessonsDir}`);
+  console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
+  console.log(`  Claude hooks: ${result.hooks ? 'Installed' : 'Already configured'}`);
+  printSetupGitHooksStatus(result.gitHooks);
+  printPnpmConfigStatus(result.pnpmConfig);
+  printGitignoreStatus(result.gitignore);
+  switch (result.model) {
+    case 'skipped':
+      console.log('  Model: Skipped (--skip-model)');
+      break;
+    case 'downloaded':
+      console.log('  Model: Downloaded');
+      break;
+    case 'already_exists':
+      console.log('  Model: Already exists');
+      break;
+    case 'failed':
+      console.log('  Model: Download failed (run `ca download-model` manually)');
+      break;
+  }
+  console.log('');
+  console.log('Next steps:');
+  console.log('  1. Restart Claude Code to load hooks');
+  console.log('  2. Use `npx ca search` and `npx ca learn` commands');
+}
+
 /**
  * Register the one-shot setup action as the default subcommand of setup.
  * Using a default subcommand prevents its options (--uninstall, --dry-run)
  * from being consumed by the parent when other subcommands like "claude"
  * define the same flags.
  */
-// eslint-disable-next-line max-lines-per-function -- command router keeps related setup flows in one place
 export function registerSetupAllCommand(setupCommand: Command): void {
   setupCommand.description('One-shot setup: init + hooks + model');
 
@@ -427,35 +512,7 @@ export function registerSetupAllCommand(setupCommand: Command): void {
 
       // Default: full setup
       const result = await runSetup({ skipModel: options.skipModel, skipHooks: options.skipHooks });
-
       const { quiet } = getGlobalOpts(this);
-      if (!quiet && process.stdout.isTTY) {
-        await playInstallBanner();
-      }
-
-      out.success('Compound agent setup complete');
-      console.log(`  Lessons directory: ${result.lessonsDir}`);
-      console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
-      console.log(`  Claude hooks: ${result.hooks ? 'Installed' : 'Already configured'}`);
-      printSetupGitHooksStatus(result.gitHooks);
-      printPnpmConfigStatus(result.pnpmConfig);
-      switch (result.model) {
-        case 'skipped':
-          console.log('  Model: Skipped (--skip-model)');
-          break;
-        case 'downloaded':
-          console.log('  Model: Downloaded');
-          break;
-        case 'already_exists':
-          console.log('  Model: Already exists');
-          break;
-        case 'failed':
-          console.log('  Model: Download failed (run `ca download-model` manually)');
-          break;
-      }
-      console.log('');
-      console.log('Next steps:');
-      console.log('  1. Restart Claude Code to load hooks');
-      console.log('  2. Use `npx ca search` and `npx ca learn` commands');
+      await printSetupResult(result, quiet);
     });
 }

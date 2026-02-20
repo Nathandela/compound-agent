@@ -4,7 +4,7 @@
  * Usage: ca doctor
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
@@ -12,6 +12,7 @@ import { getRepoRoot } from '../cli-utils.js';
 import { isModelAvailable } from '../memory/embeddings/index.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
 import {
+  checkBeadsAvailable,
   getClaudeSettingsPath,
   hasAllCompoundAgentHooks,
   readClaudeSettings,
@@ -76,6 +77,35 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
   checks.push(modelOk
     ? { name: 'Embedding model', status: 'pass' }
     : { name: 'Embedding model', status: 'warn', fix: 'Run: npx ca download-model' });
+
+  // 7. Beads CLI available
+  const beadsResult = await checkBeadsAvailable();
+  checks.push(beadsResult.available
+    ? { name: 'Beads CLI', status: 'pass' }
+    : { name: 'Beads CLI', status: 'warn', fix: 'Install beads: https://github.com/Nathandela/beads' });
+
+  // 8. .gitignore health
+  const gitignorePath = join(repoRoot, '.gitignore');
+  const requiredPatterns = ['node_modules/', '.claude/.cache/'];
+  let gitignoreOk = false;
+  if (existsSync(gitignorePath)) {
+    try {
+      const content = readFileSync(gitignorePath, 'utf-8');
+      const lines = new Set(content.split('\n').map(l => l.trim()));
+      gitignoreOk = requiredPatterns.every(p => lines.has(p));
+    } catch {
+      // read may fail
+    }
+  }
+  checks.push(gitignoreOk
+    ? { name: '.gitignore health', status: 'pass' }
+    : { name: '.gitignore health', status: 'warn', fix: 'Run: npx ca setup --update' });
+
+  // 9. Usage documentation
+  const docPath = join(repoRoot, 'docs', 'compound', 'HOW_TO_COMPOUND.md');
+  checks.push(existsSync(docPath)
+    ? { name: 'Usage documentation', status: 'pass' }
+    : { name: 'Usage documentation', status: 'warn', fix: 'Run: npx ca setup' });
 
   return checks;
 }

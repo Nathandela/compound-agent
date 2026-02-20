@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { PHASE_SKILLS } from './skills.js';
 
-const EXPECTED_KEYS = ['brainstorm', 'plan', 'work', 'review', 'compound', 'lfg', 'set-worktree'];
+const EXPECTED_KEYS = ['brainstorm', 'plan', 'work', 'review', 'compound', 'researcher', 'lfg', 'set-worktree', 'test-cleaner'];
 
 describe('PHASE_SKILLS', () => {
-  it('has exactly 7 entries', () => {
-    expect(Object.keys(PHASE_SKILLS)).toHaveLength(7);
+  it('has exactly 9 entries', () => {
+    expect(Object.keys(PHASE_SKILLS)).toHaveLength(9);
   });
 
   it('has all expected keys', () => {

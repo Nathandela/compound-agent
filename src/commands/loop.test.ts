@@ -69,9 +69,65 @@ describe('generateLoopScript', () => {
     expect(script).toContain('bd list --type=epic --ready');
   });
 
-  it('checks for python3 availability', () => {
+  // JSON-first bd parsing: jq as primary, python3 as fallback
+  it('uses jq as primary JSON parser', () => {
     const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
+    expect(script).toContain('jq');
+  });
+
+  it('defines a parse_json helper function', () => {
+    const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
+    expect(script).toMatch(/parse_json\s*\(\)/);
+  });
+
+  it('falls back to python3 when jq is unavailable', () => {
+    const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
+    // Should still contain python3 as fallback path
     expect(script).toContain('python3');
+  });
+
+  it('does not require python3 as a hard dependency', () => {
+    const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
+    // Should NOT die solely because python3 is missing -- jq is primary
+    // The die message should mention jq as an alternative (i.e., "jq or python3")
+    expect(script).not.toMatch(/die "python3 required/);
+    expect(script).toMatch(/jq or python3/);
+  });
+
+  it('uses bd show --json for epic status check', () => {
+    const script = generateLoopScript({
+      epics: ['epic-1'],
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+    });
+    expect(script).toContain('bd show "$epic_id" --json');
+  });
+
+  it('uses bd list --json for dynamic epic selection', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('bd list --type=epic --ready --json');
+  });
+
+  it('parses epic status from JSON via parse_json in explicit mode', () => {
+    const script = generateLoopScript({
+      epics: ['epic-1'],
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+    });
+    // parse_json should extract .status from bd show --json output
+    expect(script).toMatch(/parse_json\s+['"]\.status['"]/);
+  });
+
+  it('parses epic id from JSON array using jq in dynamic mode', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // jq path should extract .id from bd list --json array items
+    expect(script).toMatch(/jq\s.*\.id/);
+  });
+
+  it('detects json parser availability at script startup', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Should set a variable indicating which parser to use
+    expect(script).toMatch(/JSON_PARSER|HAS_JQ/);
   });
 
   it('supports dry run mode', () => {

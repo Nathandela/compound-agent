@@ -130,4 +130,81 @@ describe('Doctor Command', () => {
       await rm(emptyDir, { recursive: true, force: true });
     }
   });
+
+  // ============================================================================
+  // Beads CLI check
+  // ============================================================================
+
+  it('includes Beads CLI check in results', async () => {
+    const checks = await runDoctor(tempDir);
+    const beadsCheck = checks.find(c => c.name === 'Beads CLI');
+    expect(beadsCheck).toBeDefined();
+    // Status should be 'pass' or 'warn' (never 'fail')
+    expect(['pass', 'warn']).toContain(beadsCheck!.status);
+  });
+
+  it('Beads CLI check uses warn (not fail) when bd is missing', async () => {
+    const checks = await runDoctor(tempDir);
+    const beadsCheck = checks.find(c => c.name === 'Beads CLI');
+    expect(beadsCheck).toBeDefined();
+    if (beadsCheck!.status === 'warn') {
+      expect(beadsCheck!.fix).toContain('https://github.com/Nathandela/beads');
+    }
+  });
+
+  // ============================================================================
+  // .gitignore health check
+  // ============================================================================
+
+  it('passes .gitignore check when all patterns present', async () => {
+    await writeFile(
+      join(tempDir, '.gitignore'),
+      'node_modules/\n.claude/.cache/\n',
+      'utf-8'
+    );
+
+    const checks = await runDoctor(tempDir);
+    const gitignoreCheck = checks.find(c => c.name === '.gitignore health');
+    expect(gitignoreCheck).toBeDefined();
+    expect(gitignoreCheck!.status).toBe('pass');
+  });
+
+  it('warns .gitignore check when .gitignore is missing', async () => {
+    const checks = await runDoctor(tempDir);
+    const gitignoreCheck = checks.find(c => c.name === '.gitignore health');
+    expect(gitignoreCheck).toBeDefined();
+    expect(gitignoreCheck!.status).toBe('warn');
+  });
+
+  it('warns .gitignore check when patterns are missing', async () => {
+    await writeFile(join(tempDir, '.gitignore'), 'dist/\n', 'utf-8');
+
+    const checks = await runDoctor(tempDir);
+    const gitignoreCheck = checks.find(c => c.name === '.gitignore health');
+    expect(gitignoreCheck).toBeDefined();
+    expect(gitignoreCheck!.status).toBe('warn');
+    expect(gitignoreCheck!.fix).toContain('npx ca setup --update');
+  });
+
+  // ============================================================================
+  // Usage documentation check
+  // ============================================================================
+
+  it('passes usage documentation check when HOW_TO_COMPOUND.md exists', async () => {
+    await mkdir(join(tempDir, 'docs', 'compound'), { recursive: true });
+    await writeFile(join(tempDir, 'docs', 'compound', 'HOW_TO_COMPOUND.md'), '# How to Compound', 'utf-8');
+
+    const checks = await runDoctor(tempDir);
+    const docCheck = checks.find(c => c.name === 'Usage documentation');
+    expect(docCheck).toBeDefined();
+    expect(docCheck!.status).toBe('pass');
+  });
+
+  it('warns usage documentation check when HOW_TO_COMPOUND.md is missing', async () => {
+    const checks = await runDoctor(tempDir);
+    const docCheck = checks.find(c => c.name === 'Usage documentation');
+    expect(docCheck).toBeDefined();
+    expect(docCheck!.status).toBe('warn');
+    expect(docCheck!.fix).toContain('npx ca setup');
+  });
 });
