@@ -28,6 +28,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Test scripts**: `test:segment` (run tests for specific module), `test:random` (seeded random subset), `test:critical` (*.critical.test.ts convention)
 - **3 new doctor checks**: Beads CLI availability, `.gitignore` health, usage documentation presence
 
+### Fixed
+
+- **`setup --update --dry-run` no longer mutates files**: `runUpgrade()` now accepts a `dryRun` parameter propagated to all sub-functions (removeDeprecatedCommands, stripGeneratedHeaders, upgradeDocVersion)
+- **`setup --uninstall` respects plugin.json ownership**: Checks `name === "compound-agent"` before deleting; user-owned plugin manifests are preserved
+- **Upgrade ownership guard**: `removeDeprecatedCommands` checks file content for compound-agent markers before deleting, preventing silent removal of user-authored files with the same name
+- **Malformed settings.json no longer silently clobbered**: On parse error, `configureClaudeSettings` warns and skips instead of overwriting with empty config
+
 ### Changed
 
 - **`setup --update` overhaul**: Now uses path-based file detection (compound/ = managed) instead of marker-based. Runs upgrade pipeline and `.gitignore` remediation during update
