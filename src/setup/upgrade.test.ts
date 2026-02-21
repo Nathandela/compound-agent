@@ -212,6 +212,7 @@ describe('runUpgrade', () => {
     expect(result.isUpgrade).toBe(false);
     expect(result.removedCommands).toEqual([]);
     expect(result.strippedHeaders).toBe(0);
+    expect(result.docVersionUpdated).toBe(false);
     expect(result.message).toBeDefined();
   });
 
@@ -260,5 +261,37 @@ describe('runUpgrade', () => {
 
     expect(typeof result.message).toBe('string');
     expect(result.message.length).toBeGreaterThan(0);
+  });
+
+  it('updates doc version when HOW_TO_COMPOUND.md exists with old version', async () => {
+    // Set up existing install
+    const lessonsDir = join(tempDir, '.claude', 'lessons');
+    await mkdir(lessonsDir, { recursive: true });
+    await writeFile(join(lessonsDir, 'index.jsonl'), '', 'utf-8');
+
+    // Create doc with old version
+    const docDir = join(tempDir, 'docs', 'compound');
+    await mkdir(docDir, { recursive: true });
+    await writeFile(
+      join(docDir, 'HOW_TO_COMPOUND.md'),
+      '---\nversion: "0.0.1"\n---\nContent here',
+      'utf-8',
+    );
+
+    const result = await runUpgrade(tempDir);
+
+    expect(result.docVersionUpdated).toBe(true);
+    expect(result.message).toContain('Updated doc version');
+  });
+
+  it('returns docVersionUpdated: false when no doc file exists', async () => {
+    // Set up existing install
+    const lessonsDir = join(tempDir, '.claude', 'lessons');
+    await mkdir(lessonsDir, { recursive: true });
+    await writeFile(join(lessonsDir, 'index.jsonl'), '', 'utf-8');
+
+    const result = await runUpgrade(tempDir);
+
+    expect(result.docVersionUpdated).toBe(false);
   });
 });

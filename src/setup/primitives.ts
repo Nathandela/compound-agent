@@ -208,7 +208,7 @@ export async function installDocTemplates(repoRoot: string): Promise<boolean> {
   for (const [filename, template] of Object.entries(DOC_TEMPLATES)) {
     const filePath = join(docsDir, filename);
     if (!existsSync(filePath)) {
-      const content = template.replace('{{VERSION}}', VERSION);
+      const content = template.replace('{{VERSION}}', VERSION).replace('{{DATE}}', new Date().toISOString().slice(0, 10));
       await writeFile(filePath, content, 'utf-8');
       created = true;
     }

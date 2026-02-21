@@ -8,7 +8,7 @@
  *                         setupCliTestContext, createRunCli
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -354,6 +354,37 @@ export async function cleanupCliTestDir(tempDir: string): Promise<void> {
 }
 
 /**
+ * Parse a CLI args string into an array, respecting quoted strings.
+ * Simple implementation sufficient for test usage.
+ */
+function parseCliArgs(args: string): string[] {
+  const result: string[] = [];
+  let current = '';
+  let inQuote: string | null = null;
+
+  for (const char of args) {
+    if (inQuote) {
+      if (char === inQuote) {
+        inQuote = null;
+      } else {
+        current += char;
+      }
+    } else if (char === '"' || char === "'") {
+      inQuote = char;
+    } else if (char === ' ') {
+      if (current) {
+        result.push(current);
+        current = '';
+      }
+    } else {
+      current += char;
+    }
+  }
+  if (current) result.push(current);
+  return result;
+}
+
+/**
  * Run the CLI with given arguments.
  *
  * @param args - Command line arguments
@@ -362,12 +393,15 @@ export async function cleanupCliTestDir(tempDir: string): Promise<void> {
  */
 export function runCli(args: string, tempDir: string): CliResult {
   const cliPath = join(process.cwd(), 'dist', 'cli.js');
+  const argArray = parseCliArgs(args);
   try {
-    const stdout = execSync(`node ${cliPath} ${args} 2>&1`, {
+    const result = execFileSync('node', [cliPath, ...argArray], {
       cwd: tempDir,
       encoding: 'utf-8',
       env: { ...process.env, COMPOUND_AGENT_ROOT: tempDir },
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
+    const stdout = result;
     return { stdout, stderr: '', combined: stdout };
   } catch (error) {
     const err = error as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
@@ -392,12 +426,15 @@ export function runCliWithEnv(
   env: Record<string, string>
 ): CliResult {
   const cliPath = join(process.cwd(), 'dist', 'cli.js');
+  const argArray = parseCliArgs(args);
   try {
-    const stdout = execSync(`node ${cliPath} ${args} 2>&1`, {
+    const result = execFileSync('node', [cliPath, ...argArray], {
       cwd: tempDir,
       encoding: 'utf-8',
       env: { ...process.env, COMPOUND_AGENT_ROOT: tempDir, ...env },
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
+    const stdout = result;
     return { stdout, stderr: '', combined: stdout };
   } catch (error) {
     const err = error as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };

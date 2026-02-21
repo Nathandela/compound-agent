@@ -15,15 +15,12 @@ import { LESSONS_PATH } from '../memory/storage/index.js';
 import { getGlobalOpts, out } from '../commands/index.js';
 import { playInstallBanner } from './banner.js';
 import { checkBeadsAvailable, type BeadsCheckResult } from './beads-check.js';
+import { printGitignoreStatus, printPnpmConfigStatus, printSetupGitHooksStatus, runStatus } from './display-utils.js';
 import {
   addAllCompoundAgentHooks,
   getClaudeSettingsPath,
   hasAllCompoundAgentHooks,
-  hasClaudeHook,
   readClaudeSettings,
-  removeAgentsSection,
-  removeClaudeMdReference,
-  removeCompoundAgentHook,
   writeClaudeSettings,
 } from './claude-helpers.js';
 import { ensureGitignore, type GitignoreResult } from './gitignore.js';
@@ -44,6 +41,7 @@ import {
 import { checkUserScope, type ScopeCheckResult } from './scope-check.js';
 import { LEGACY_ROOT_SLASH_COMMANDS } from './templates.js';
 import { AGENT_TEMPLATES, AGENT_ROLE_SKILLS, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
+import { runUninstall } from './uninstall.js';
 import { runUpgrade, detectExistingInstall, type UpgradeResult } from './upgrade.js';
 
 /** Result of one-shot setup */
@@ -104,7 +102,7 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
 
   // Pre-flight checks
   const scope = checkUserScope(repoRoot);
-  const beads = await checkBeadsAvailable();
+  const beads = checkBeadsAvailable();
 
   // Upgrade detection
   let upgrade: UpgradeResult | null = null;
@@ -148,13 +146,13 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
     gitHooks = (await installPreCommitHook(repoRoot)).status;
   }
 
-  // 10. Configure Claude settings (hooks in settings.json)
+  // 11. Configure Claude settings (hooks in settings.json)
   const { hooks } = await configureClaudeSettings();
 
-  // 11. Ensure .gitignore has required patterns
+  // 12. Ensure .gitignore has required patterns
   const gitignore = await ensureGitignore(repoRoot);
 
-  // 12. Download model (unless skipped)
+  // 13. Download model (unless skipped)
   let modelStatus: 'downloaded' | 'already_exists' | 'failed' | 'skipped' = 'skipped';
   if (!options.skipModel) {
     try {
@@ -184,118 +182,40 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   };
 }
 
-/**
- * Remove all generated files and configuration.
- * NEVER removes .claude/lessons/ (user data).
- */
-export async function runUninstall(repoRoot: string, dryRun: boolean): Promise<string[]> {
-  const actions: string[] = [];
-
-  // Remove generated directories
-  const dirsToRemove = [
-    join(repoRoot, '.claude', 'agents', 'compound'),
-    join(repoRoot, '.claude', 'commands', 'compound'),
-    join(repoRoot, '.claude', 'skills', 'compound'),
-  ];
-  for (const dir of dirsToRemove) {
-    if (existsSync(dir)) {
-      if (!dryRun) await rm(dir, { recursive: true, force: true });
-      actions.push(`Removed ${dir}`);
-    }
-  }
-
-  // Remove legacy root-level slash commands (v1.0 migration)
-  // Only remove generated files — user-authored files are preserved.
-  for (const filename of LEGACY_ROOT_SLASH_COMMANDS) {
-    const filePath = join(repoRoot, '.claude', 'commands', filename);
-    if (existsSync(filePath)) {
-      const content = await readFile(filePath, 'utf-8');
-      if (content.startsWith(GENERATED_MARKER)) {
-        if (!dryRun) await rm(filePath);
-        actions.push(`Removed ${filePath}`);
-      }
-    }
-  }
-
-  // Remove plugin.json
-  const pluginPath = join(repoRoot, '.claude', 'plugin.json');
-  if (existsSync(pluginPath)) {
-    if (!dryRun) await rm(pluginPath);
-    actions.push(`Removed ${pluginPath}`);
-  }
-
-  // Remove hooks from settings.json
-  const settingsPath = getClaudeSettingsPath(false);
-  try {
-    const settings = await readClaudeSettings(settingsPath);
-    if (hasClaudeHook(settings)) {
-      if (!dryRun) {
-        removeCompoundAgentHook(settings);
-        await writeClaudeSettings(settingsPath, settings);
-      }
-      actions.push('Removed compound-agent hooks from settings.json');
-    }
-  } catch {
-    // settings.json may not exist
-  }
-
-  // Remove AGENTS.md section
-  if (!dryRun) {
-    const removed = await removeAgentsSection(repoRoot);
-    if (removed) actions.push('Removed compound-agent section from AGENTS.md');
-  } else {
-    const agentsPath = join(repoRoot, 'AGENTS.md');
-    if (existsSync(agentsPath)) {
-      const content = await readFile(agentsPath, 'utf-8');
-      if (content.includes('compound-agent:start')) {
-        actions.push('Removed compound-agent section from AGENTS.md');
-      }
-    }
-  }
-
-  // Remove CLAUDE.md reference
-  if (!dryRun) {
-    const removed = await removeClaudeMdReference(repoRoot);
-    if (removed) actions.push('Removed compound-agent reference from CLAUDE.md');
-  } else {
-    const claudeMdPath = join(repoRoot, '.claude', 'CLAUDE.md');
-    if (existsSync(claudeMdPath)) {
-      const content = await readFile(claudeMdPath, 'utf-8');
-      if (content.includes('compound-agent:claude-ref:start')) {
-        actions.push('Removed compound-agent reference from CLAUDE.md');
-      }
-    }
-  }
-
-  return actions;
-}
 
 /**
  * Update generated files with latest templates.
- * Files with GENERATED_MARKER are overwritten, user-customized files are skipped.
+ * Files inside compound/ subdirectories are always managed and overwritten.
  */
-export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{ updated: number; added: number; skipped: number; configUpdated: boolean }> {
+export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
+  updated: number;
+  added: number;
+  configUpdated: boolean;
+  upgrade: UpgradeResult;
+  gitignore: GitignoreResult;
+}> {
+  // Run upgrade pipeline (deprecated commands, headers, doc version)
+  const upgrade = await runUpgrade(repoRoot);
+
   let updated = 0;
   let added = 0;
-  let skipped = 0;
 
   async function processFile(filePath: string, content: string): Promise<void> {
-    const markedContent = GENERATED_MARKER + content;
     if (!existsSync(filePath)) {
       if (!dryRun) {
         await mkdir(dirname(filePath), { recursive: true });
-        await writeFile(filePath, markedContent, 'utf-8');
+        await writeFile(filePath, content, 'utf-8');
       }
       added++;
     } else {
       const existing = await readFile(filePath, 'utf-8');
-      if (existing.startsWith(GENERATED_MARKER)) {
-        if (existing !== markedContent) {
-          if (!dryRun) await writeFile(filePath, markedContent, 'utf-8');
-          updated++;
-        }
-      } else {
-        skipped++;
+      // Strip any legacy marker for comparison
+      const cleanExisting = existing.startsWith(GENERATED_MARKER)
+        ? existing.slice(GENERATED_MARKER.length)
+        : existing;
+      if (cleanExisting !== content) {
+        if (!dryRun) await writeFile(filePath, content, 'utf-8');
+        updated++;
       }
     }
   }
@@ -333,94 +253,27 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{ up
     configUpdated = hooks;
   }
 
-  return { updated, added, skipped, configUpdated };
+  // Ensure .gitignore has required patterns
+  const gitignore = dryRun ? { added: [] } : await ensureGitignore(repoRoot);
+
+  return { updated, added, configUpdated, upgrade, gitignore };
 }
 
-/**
- * Show installation status.
- */
-export async function runStatus(repoRoot: string): Promise<void> {
-  const agentsDir = join(repoRoot, '.claude', 'agents', 'compound');
-  const commandsDir = join(repoRoot, '.claude', 'commands', 'compound');
-  const skillsDir = join(repoRoot, '.claude', 'skills', 'compound');
-  const pluginPath = join(repoRoot, '.claude', 'plugin.json');
 
-  console.log('Compound Agent Status:');
-  console.log(`  Agent templates:    ${existsSync(agentsDir) ? 'installed' : 'not installed'}`);
-  console.log(`  Workflow commands:  ${existsSync(commandsDir) ? 'installed' : 'not installed'}`);
-  console.log(`  Phase skills:       ${existsSync(skillsDir) ? 'installed' : 'not installed'}`);
-  console.log(`  Plugin manifest:    ${existsSync(pluginPath) ? 'installed' : 'not installed'}`);
-
-  const settingsPath = getClaudeSettingsPath(false);
-  let hooksInstalled = false;
-  try {
-    const settings = await readClaudeSettings(settingsPath);
-    hooksInstalled = hasAllCompoundAgentHooks(settings);
-  } catch {
-    // No settings
-  }
-  console.log(`  Hooks:              ${hooksInstalled ? 'installed' : 'not installed'}`);
-
-  const beads = await checkBeadsAvailable();
-  console.log(`  Beads CLI:          ${beads.available ? 'available' : 'not found'}`);
-
-  const scope = checkUserScope(repoRoot);
-  if (scope.isUserScope) {
-    console.log('  Scope:              user-scope (reduced compounding value)');
-  }
-}
-
-function printSetupGitHooksStatus(gitHooks: HookInstallResult['status'] | 'skipped'): void {
-  if (gitHooks === 'skipped') {
-    console.log('  Git hooks: Skipped (--skip-hooks)');
-    return;
-  }
-  if (gitHooks === 'not_git_repo') {
-    console.log('  Git hooks: Skipped (not a git repository)');
-    return;
-  }
-  if (gitHooks === 'installed') {
-    console.log('  Git hooks: Installed');
-    return;
-  }
-  if (gitHooks === 'appended') {
-    console.log('  Git hooks: Appended to existing pre-commit hook');
-    return;
-  }
-  console.log('  Git hooks: Already configured');
-}
-
-function printPnpmConfigStatus(result: PnpmConfigResult): void {
-  if (!result.isPnpm) return; // Not a pnpm project, nothing to report
-  if (result.alreadyConfigured) {
-    console.log('  pnpm config: onlyBuiltDependencies already configured');
-  } else if (result.added.length > 0) {
-    console.log(`  pnpm config: Added onlyBuiltDependencies [${result.added.join(', ')}]`);
-  }
-}
-
-function printGitignoreStatus(result: GitignoreResult): void {
-  if (result.added.length > 0) {
-    console.log(`  .gitignore: Added [${result.added.join(', ')}]`);
-  } else {
-    console.log('  .gitignore: Already configured');
-  }
-}
+const MODEL_STATUS_MSG: Record<string, string> = {
+  skipped: 'Skipped (--skip-model)',
+  downloaded: 'Downloaded',
+  already_exists: 'Already exists',
+  failed: 'Download failed (run `ca download-model` manually)',
+};
 
 async function printSetupResult(result: SetupResult, quiet: boolean): Promise<void> {
-  if (!quiet && result.scope.isUserScope) {
-    console.log(`  ${result.scope.message}`);
+  if (!quiet) {
+    if (result.scope.isUserScope) console.log(`  ${result.scope.message}`);
+    if (!result.beads.available) console.log(`  ${result.beads.message}`);
+    if (result.upgrade?.isUpgrade) console.log(`  ${result.upgrade.message}`);
+    if (process.stdout.isTTY) await playInstallBanner();
   }
-  if (!quiet && !result.beads.available) {
-    console.log(`  ${result.beads.message}`);
-  }
-  if (!quiet && result.upgrade?.isUpgrade) {
-    console.log(`  ${result.upgrade.message}`);
-  }
-  if (!quiet && process.stdout.isTTY) {
-    await playInstallBanner();
-  }
-
   out.success('Compound agent setup complete');
   console.log(`  Lessons directory: ${result.lessonsDir}`);
   console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
@@ -428,24 +281,8 @@ async function printSetupResult(result: SetupResult, quiet: boolean): Promise<vo
   printSetupGitHooksStatus(result.gitHooks);
   printPnpmConfigStatus(result.pnpmConfig);
   printGitignoreStatus(result.gitignore);
-  switch (result.model) {
-    case 'skipped':
-      console.log('  Model: Skipped (--skip-model)');
-      break;
-    case 'downloaded':
-      console.log('  Model: Downloaded');
-      break;
-    case 'already_exists':
-      console.log('  Model: Already exists');
-      break;
-    case 'failed':
-      console.log('  Model: Download failed (run `ca download-model` manually)');
-      break;
-  }
-  console.log('');
-  console.log('Next steps:');
-  console.log('  1. Restart Claude Code to load hooks');
-  console.log('  2. Use `npx ca search` and `npx ca learn` commands');
+  console.log(`  Model: ${MODEL_STATUS_MSG[result.model]}`);
+  console.log('\nNext steps:\n  1. Restart Claude Code to load hooks\n  2. Use `npx ca search` and `npx ca learn` commands');
 }
 
 /**
@@ -494,13 +331,18 @@ export function registerSetupAllCommand(setupCommand: Command): void {
       if (options.update) {
         const result = await runUpdate(repoRoot, dryRun);
         const prefix = dryRun ? '[dry-run] ' : '';
+        if (result.upgrade.isUpgrade) {
+          console.log(`  ${prefix}${result.upgrade.message}`);
+        }
         if (result.updated === 0 && result.added === 0) {
           console.log(`${prefix}All generated files are up to date.`);
         } else {
           if (result.updated > 0) console.log(`  ${prefix}Updated: ${result.updated} file(s)`);
           if (result.added > 0) console.log(`  ${prefix}Added: ${result.added} file(s)`);
         }
-        if (result.skipped > 0) console.log(`  Skipped: ${result.skipped} user-customized file(s)`);
+        if (result.gitignore.added.length > 0) {
+          console.log(`  ${prefix}.gitignore: Added [${result.gitignore.added.join(', ')}]`);
+        }
         if (result.configUpdated) console.log(`  ${prefix}Config: hooks updated`);
         return;
       }

@@ -79,7 +79,7 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
     : { name: 'Embedding model', status: 'warn', fix: 'Run: npx ca download-model' });
 
   // 7. Beads CLI available
-  const beadsResult = await checkBeadsAvailable();
+  const beadsResult = checkBeadsAvailable();
   checks.push(beadsResult.available
     ? { name: 'Beads CLI', status: 'pass' }
     : { name: 'Beads CLI', status: 'warn', fix: 'Install beads: https://github.com/Nathandela/beads' });

@@ -7,7 +7,7 @@
  *          pnpm test:segment commands --reporter=json
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -25,11 +25,10 @@ if (!existsSync(moduleDir)) {
 }
 
 // Extra vitest args (everything after the module name)
-const extraArgs = process.argv.slice(3).join(' ');
-const cmd = `pnpm vitest run ${moduleDir} ${extraArgs}`.trim();
+const extraArgs = process.argv.slice(3);
 
 try {
-  execSync(cmd, { stdio: 'inherit' });
+  execFileSync('pnpm', ['vitest', 'run', moduleDir, ...extraArgs], { stdio: 'inherit' });
 } catch {
   process.exit(1);
 }

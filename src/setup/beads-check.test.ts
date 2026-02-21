@@ -29,18 +29,18 @@ describe('checkBeadsAvailable', () => {
   // bd found
   // ============================================================================
 
-  it('returns available: true when bd is found', async () => {
+  it('returns available: true when bd is found', () => {
     mockedExecSync.mockReturnValue('/usr/local/bin/bd\n');
 
-    const result = await checkBeadsAvailable();
+    const result = checkBeadsAvailable();
 
     expect(result.available).toBe(true);
   });
 
-  it('does not include a message when bd is found', async () => {
+  it('does not include a message when bd is found', () => {
     mockedExecSync.mockReturnValue('/usr/local/bin/bd\n');
 
-    const result = await checkBeadsAvailable();
+    const result = checkBeadsAvailable();
 
     expect(result.message).toBeUndefined();
   });
@@ -49,33 +49,33 @@ describe('checkBeadsAvailable', () => {
   // bd not found
   // ============================================================================
 
-  it('returns available: false when bd is not found', async () => {
+  it('returns available: false when bd is not found', () => {
     mockedExecSync.mockImplementation(() => {
       throw new Error('not found');
     });
 
-    const result = await checkBeadsAvailable();
+    const result = checkBeadsAvailable();
 
     expect(result.available).toBe(false);
   });
 
-  it('includes install URL in message when bd is not found', async () => {
+  it('includes install URL in message when bd is not found', () => {
     mockedExecSync.mockImplementation(() => {
       throw new Error('not found');
     });
 
-    const result = await checkBeadsAvailable();
+    const result = checkBeadsAvailable();
 
     expect(result.message).toBeDefined();
     expect(result.message).toContain('https://github.com/Nathandela/beads');
   });
 
-  it('includes helpful description when bd is not found', async () => {
+  it('includes helpful description when bd is not found', () => {
     mockedExecSync.mockImplementation(() => {
       throw new Error('not found');
     });
 
-    const result = await checkBeadsAvailable();
+    const result = checkBeadsAvailable();
 
     expect(result.message).toContain('Beads CLI not found');
   });
@@ -84,10 +84,10 @@ describe('checkBeadsAvailable', () => {
   // Return type
   // ============================================================================
 
-  it('returns BeadsCheckResult shape', async () => {
+  it('returns BeadsCheckResult shape', () => {
     mockedExecSync.mockReturnValue('/usr/local/bin/bd\n');
 
-    const result = await checkBeadsAvailable();
+    const result = checkBeadsAvailable();
 
     expect(result).toHaveProperty('available');
     expect(typeof result.available).toBe('boolean');
@@ -97,11 +97,11 @@ describe('checkBeadsAvailable', () => {
   // Non-blocking behavior
   // ============================================================================
 
-  it('does not throw when bd check fails', async () => {
+  it('does not throw when bd check fails', () => {
     mockedExecSync.mockImplementation(() => {
       throw new Error('command not found: bd');
     });
 
-    await expect(checkBeadsAvailable()).resolves.not.toThrow();
+    expect(() => checkBeadsAvailable()).not.toThrow();
   });
 });

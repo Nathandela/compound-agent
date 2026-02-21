@@ -2,7 +2,7 @@
  * CLI tests for the setup claude command.
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -26,12 +26,15 @@ describe('CLI', { tags: ['integration'] }, () => {
 
   const runSetupClaude = (args = ''): { stdout: string; stderr: string; combined: string } => {
     const cliPath = join(process.cwd(), 'dist', 'cli.js');
+    const argArray = args ? args.split(/\s+/).filter(Boolean) : [];
     try {
-      const stdout = execSync(`node ${cliPath} setup claude ${args} 2>&1`, {
+      const result = execFileSync('node', [cliPath, 'setup', 'claude', ...argArray], {
         cwd: tempDir,
         encoding: 'utf-8',
         env: { ...process.env, HOME: mockHome, COMPOUND_AGENT_ROOT: tempDir },
+        stdio: ['pipe', 'pipe', 'pipe'],
       });
+      const stdout = typeof result === 'string' ? result : result.toString();
       return { stdout, stderr: '', combined: stdout };
     } catch (error) {
       const err = error as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };

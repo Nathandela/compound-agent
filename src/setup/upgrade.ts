@@ -6,11 +6,13 @@
 import { existsSync } from 'node:fs';
 import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { VERSION } from '../version.js';
 
 export interface UpgradeResult {
   isUpgrade: boolean;
   removedCommands: string[];
   strippedHeaders: number;
+  docVersionUpdated: boolean;
   message: string;
 }
 
@@ -100,12 +102,14 @@ export async function runUpgrade(repoRoot: string): Promise<UpgradeResult> {
       isUpgrade: false,
       removedCommands: [],
       strippedHeaders: 0,
+      docVersionUpdated: false,
       message: 'No existing install detected. Nothing to upgrade.',
     };
   }
 
   const removedCommands = await removeDeprecatedCommands(repoRoot);
   const strippedHeaders = await stripGeneratedHeaders(repoRoot);
+  const docVersionUpdated = await upgradeDocVersion(repoRoot, VERSION);
 
   const parts: string[] = [];
   if (removedCommands.length > 0) {
@@ -114,9 +118,12 @@ export async function runUpgrade(repoRoot: string): Promise<UpgradeResult> {
   if (strippedHeaders > 0) {
     parts.push(`Stripped headers from ${strippedHeaders} file(s)`);
   }
+  if (docVersionUpdated) {
+    parts.push('Updated doc version');
+  }
   const message = parts.length > 0
     ? `Upgrade complete: ${parts.join(', ')}.`
     : 'Upgrade complete: no changes needed.';
 
-  return { isUpgrade, removedCommands, strippedHeaders, message };
+  return { isUpgrade, removedCommands, strippedHeaders, docVersionUpdated, message };
 }

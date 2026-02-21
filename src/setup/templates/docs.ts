@@ -7,7 +7,7 @@
 export const DOC_TEMPLATES: Record<string, string> = {
   'HOW_TO_COMPOUND.md': `---
 version: "{{VERSION}}"
-last-updated: "2026-02-20"
+last-updated: "{{DATE}}"
 summary: "Usage guide for compound-agent CLI, skills, and workflows"
 ---
 

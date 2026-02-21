@@ -2,6 +2,7 @@
  * Beads CLI availability checker.
  *
  * Informational only -- never blocks setup.
+ * Synchronous: uses execSync internally.
  */
 
 import { execSync } from 'node:child_process';
@@ -17,11 +18,11 @@ export interface BeadsCheckResult {
 /**
  * Check whether the Beads CLI (`bd`) is available.
  *
- * Non-blocking: always resolves, never throws.
+ * Non-blocking: never throws.
  */
-export async function checkBeadsAvailable(): Promise<BeadsCheckResult> {
+export function checkBeadsAvailable(): BeadsCheckResult {
   try {
-    execSync('which bd', { stdio: 'pipe', encoding: 'utf-8' });
+    execSync('command -v bd', { shell: '/bin/sh', stdio: 'pipe', encoding: 'utf-8' });
     return { available: true };
   } catch {
     return {

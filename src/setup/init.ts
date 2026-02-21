@@ -12,6 +12,7 @@ import { LESSONS_PATH } from '../memory/storage/index.js';
 import { getGlobalOpts, out } from '../commands/index.js';
 import { playInstallBanner } from './banner.js';
 import { checkBeadsAvailable } from './beads-check.js';
+import { printGitignoreStatus } from './display-utils.js';
 import { installClaudeHooksForInit } from './claude-helpers.js';
 import { ensureGitignore, type GitignoreResult } from './gitignore.js';
 import { installPreCommitHook, type HookInstallResult } from './hooks.js';
@@ -66,7 +67,7 @@ async function initAction(
     console.log(`  ${scopeResult.message}`);
   }
 
-  const beadsResult = await checkBeadsAvailable();
+  const beadsResult = checkBeadsAvailable();
   if (!beadsResult.available && !quiet && !options.json) {
     console.log(`  ${beadsResult.message}`);
   }
@@ -199,14 +200,6 @@ function printPnpmConfigStatus(result: PnpmConfigResult): void {
     console.log('  pnpm config: onlyBuiltDependencies already configured');
   } else if (result.added.length > 0) {
     console.log(`  pnpm config: Added onlyBuiltDependencies [${result.added.join(', ')}]`);
-  }
-}
-
-function printGitignoreStatus(result: GitignoreResult): void {
-  if (result.added.length > 0) {
-    console.log(`  .gitignore: Added [${result.added.join(', ')}]`);
-  } else {
-    console.log('  .gitignore: Already configured');
   }
 }
 
