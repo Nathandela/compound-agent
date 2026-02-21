@@ -76,7 +76,7 @@ This checks for \`.claude/\` directory, lessons index, embedding model, Claude h
 \`\`\`
 .claude/
   CLAUDE.md                    # Project instructions (always loaded)
-  compound-agent.json          # Config (external reviewers, etc.)
+  compound-agent.json          # Config (created by \`npx ca reviewer enable\`)
   settings.json                # Claude Code hooks
   plugin.json                  # Plugin manifest
   agents/compound/             # Subagent definitions

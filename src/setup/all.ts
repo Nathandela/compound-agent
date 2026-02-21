@@ -82,7 +82,9 @@ async function configureClaudeSettings(): Promise<{ hooks: boolean }> {
   try {
     settings = await readClaudeSettings(settingsPath);
   } catch {
-    settings = {};
+    // File exists but has malformed JSON — warn and skip to avoid data loss
+    console.error(`Warning: Could not parse ${settingsPath} — skipping hook installation.\nFix the JSON syntax and re-run setup.`);
+    return { hooks: false };
   }
 
   const hadHooks = hasAllCompoundAgentHooks(settings);
@@ -195,7 +197,7 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
   gitignore: GitignoreResult;
 }> {
   // Run upgrade pipeline (deprecated commands, headers, doc version)
-  const upgrade = await runUpgrade(repoRoot);
+  const upgrade = await runUpgrade(repoRoot, dryRun);
 
   let updated = 0;
   let added = 0;
@@ -300,7 +302,7 @@ export function registerSetupAllCommand(setupCommand: Command): void {
     .option('--skip-model', 'Skip embedding model download')
     .option('--skip-hooks', 'Skip git hooks installation')
     .option('--uninstall', 'Remove all generated files and configuration')
-    .option('--update', 'Regenerate files (preserves user customizations)')
+    .option('--update', 'Regenerate managed files in compound/ directories')
     .option('--status', 'Show installation status')
     .option('--dry-run', 'Show what would change without changing')
     .action(async function (this: Command, options: {

@@ -411,6 +411,21 @@ describe('Setup Commands - Generated Content', () => {
       expect(existsSync(join(getTempDir(), '.claude', 'plugin.json'))).toBe(false);
     });
 
+    it('skips plugin.json when name is not compound-agent', async () => {
+      runCli('init');
+
+      // Overwrite plugin.json with a different plugin's manifest
+      const pluginPath = join(getTempDir(), '.claude', 'plugin.json');
+      await writeFile(pluginPath, JSON.stringify({ name: 'other-plugin', version: '1.0.0' }));
+
+      runCli('setup --uninstall');
+
+      // File should still exist — not ours
+      expect(existsSync(pluginPath)).toBe(true);
+      const content = JSON.parse(await readFile(pluginPath, 'utf-8'));
+      expect(content.name).toBe('other-plugin');
+    });
+
     it('removes all commands in compound/ folder', async () => {
       runCli('init');
 
@@ -512,7 +527,7 @@ describe('Setup Commands - Generated Content', () => {
       const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
       const deprecated = ['search.md', 'list.md', 'show.md', 'stats.md', 'wrong.md'];
       for (const f of deprecated) {
-        await writeFile(join(commandsDir, f), 'deprecated content', 'utf-8');
+        await writeFile(join(commandsDir, f), 'Run npx ca search to find lessons', 'utf-8');
       }
 
       runCli('setup --update');
@@ -996,6 +1011,27 @@ describe('Setup Commands - Generated Content', () => {
 
       const result = runCli('setup --skip-model');
       expect(result.combined).toMatch(/pnpm.*config|onlyBuiltDependencies/i);
+    });
+  });
+
+  /**
+   * Tests for malformed settings.json safety
+   */
+  describe('Malformed settings.json safety', () => {
+    it('skips hook installation when settings.json has malformed JSON', async () => {
+      runCli('init');
+
+      // Write malformed JSON to settings.json
+      const settingsPath = join(getTempDir(), '.claude', 'settings.json');
+      await writeFile(settingsPath, '{ broken json !!!', 'utf-8');
+
+      // Re-run setup — should not clobber the file
+      const result = runCli('setup --skip-model');
+      expect(result.combined).toContain('setup complete');
+
+      // settings.json should be unchanged (not overwritten with {})
+      const content = await readFile(settingsPath, 'utf-8');
+      expect(content).toBe('{ broken json !!!');
     });
   });
 });

@@ -27,7 +27,7 @@ export function detectExistingInstall(repoRoot: string): boolean {
 }
 
 /** Remove deprecated CLI wrapper command files from .claude/commands/compound/. */
-export async function removeDeprecatedCommands(repoRoot: string): Promise<string[]> {
+export async function removeDeprecatedCommands(repoRoot: string, dryRun = false): Promise<string[]> {
   const commandsDir = join(repoRoot, '.claude', 'commands', 'compound');
   if (!existsSync(commandsDir)) return [];
 
@@ -35,15 +35,18 @@ export async function removeDeprecatedCommands(repoRoot: string): Promise<string
   for (const filename of DEPRECATED_COMMANDS) {
     const filePath = join(commandsDir, filename);
     if (existsSync(filePath)) {
-      await rm(filePath);
-      removed.push(filename);
+      const content = await readFile(filePath, 'utf-8');
+      if (content.includes('npx ca') || content.includes('compound-agent')) {
+        if (!dryRun) await rm(filePath);
+        removed.push(filename);
+      }
     }
   }
   return removed;
 }
 
 /** Strip generated headers from installed files in compound/ dirs. */
-export async function stripGeneratedHeaders(repoRoot: string): Promise<number> {
+export async function stripGeneratedHeaders(repoRoot: string, dryRun = false): Promise<number> {
   const dirs = [
     join(repoRoot, '.claude', 'commands', 'compound'),
     join(repoRoot, '.claude', 'skills', 'compound'),
@@ -53,23 +56,23 @@ export async function stripGeneratedHeaders(repoRoot: string): Promise<number> {
   let count = 0;
   for (const dir of dirs) {
     if (!existsSync(dir)) continue;
-    count += await stripHeadersRecursive(dir);
+    count += await stripHeadersRecursive(dir, dryRun);
   }
   return count;
 }
 
 /** Recursively walk a directory and strip headers from .md files. */
-async function stripHeadersRecursive(dir: string): Promise<number> {
+async function stripHeadersRecursive(dir: string, dryRun = false): Promise<number> {
   let count = 0;
   const entries = await readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
     const fullPath = join(dir, entry.name);
     if (entry.isDirectory()) {
-      count += await stripHeadersRecursive(fullPath);
+      count += await stripHeadersRecursive(fullPath, dryRun);
     } else if (entry.isFile() && entry.name.endsWith('.md')) {
       const content = await readFile(fullPath, 'utf-8');
       if (content.startsWith(GENERATED_HEADER)) {
-        await writeFile(fullPath, content.slice(GENERATED_HEADER.length), 'utf-8');
+        if (!dryRun) await writeFile(fullPath, content.slice(GENERATED_HEADER.length), 'utf-8');
         count++;
       }
     }
@@ -81,7 +84,7 @@ async function stripHeadersRecursive(dir: string): Promise<number> {
  * Update the version line in docs/compound/HOW_TO_COMPOUND.md during upgrade.
  * Returns true if the file was updated, false if missing or already current.
  */
-export async function upgradeDocVersion(repoRoot: string, newVersion: string): Promise<boolean> {
+export async function upgradeDocVersion(repoRoot: string, newVersion: string, dryRun = false): Promise<boolean> {
   const docPath = join(repoRoot, 'docs', 'compound', 'HOW_TO_COMPOUND.md');
   if (!existsSync(docPath)) return false;
 
@@ -89,12 +92,12 @@ export async function upgradeDocVersion(repoRoot: string, newVersion: string): P
   const updated = content.replace(/^(version: ")([^"]+)(")/m, `$1${newVersion}$3`);
   if (updated === content) return false;
 
-  await writeFile(docPath, updated, 'utf-8');
+  if (!dryRun) await writeFile(docPath, updated, 'utf-8');
   return true;
 }
 
 /** Run full upgrade flow. */
-export async function runUpgrade(repoRoot: string): Promise<UpgradeResult> {
+export async function runUpgrade(repoRoot: string, dryRun = false): Promise<UpgradeResult> {
   const isUpgrade = detectExistingInstall(repoRoot);
 
   if (!isUpgrade) {
@@ -107,9 +110,9 @@ export async function runUpgrade(repoRoot: string): Promise<UpgradeResult> {
     };
   }
 
-  const removedCommands = await removeDeprecatedCommands(repoRoot);
-  const strippedHeaders = await stripGeneratedHeaders(repoRoot);
-  const docVersionUpdated = await upgradeDocVersion(repoRoot, VERSION);
+  const removedCommands = await removeDeprecatedCommands(repoRoot, dryRun);
+  const strippedHeaders = await stripGeneratedHeaders(repoRoot, dryRun);
+  const docVersionUpdated = await upgradeDocVersion(repoRoot, VERSION, dryRun);
 
   const parts: string[] = [];
   if (removedCommands.length > 0) {

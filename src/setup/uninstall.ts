@@ -47,11 +47,18 @@ export async function runUninstall(repoRoot: string, dryRun: boolean): Promise<s
     }
   }
 
-  // Remove plugin.json
+  // Remove plugin.json (only if it belongs to compound-agent)
   const pluginPath = join(repoRoot, '.claude', 'plugin.json');
   if (existsSync(pluginPath)) {
-    if (!dryRun) await rm(pluginPath);
-    actions.push(`Removed ${pluginPath}`);
+    try {
+      const content = JSON.parse(await readFile(pluginPath, 'utf-8'));
+      if (content?.name === 'compound-agent') {
+        if (!dryRun) await rm(pluginPath);
+        actions.push(`Removed ${pluginPath}`);
+      }
+    } catch {
+      // Malformed JSON — not ours, skip
+    }
   }
 
   // Remove hooks from settings.json
