@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-02-21
+
+### Added
+
+- **Banner audio**: Pure TypeScript WAV synthesis plays a rising pentatonic melody during the tendril animation. Cross-platform: `afplay` (macOS), `aplay` (Linux), PowerShell (Windows). Silently skips if player unavailable. Zero dependencies.
+- **Test coverage**: 19 new tests for `ca about` command, changelog extraction/escaping, and `--update` doc migration path
+
+### Fixed
+
+- **`setup --update` doc migration**: `--update` now installs the 5 split docs before removing legacy `HOW_TO_COMPOUND.md`, preventing empty `docs/compound/`
+- **Fresh checkout type-check**: `src/changelog-data.ts` tracked in git so `tsc --noEmit` passes without a prior build
+- **Trailing status text**: Banner animation no longer leaves "al tendrils..." remnant from previous phase
+
+### Changed
+
+- **`ca about` command**: Renamed from `ca version-show` for brevity
+- **Changelog extraction**: Core parsing/escaping logic extracted to `scripts/changelog-utils.ts` (shared between prebuild script and tests)
+- **Narrowed `.gitignore`**: Setup-generated patterns scoped to `compound/` subdirectories to avoid hiding tracked TDD agent definitions
+
 ## [1.3.1] - 2026-02-21
 
 ### Added
