@@ -9,11 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-02-21
+
+### Changed
+
+- **Banner audio**: Rewritten as vaporwave composition with PolyBLEP anti-aliased sawtooth synthesis, biquad filters, Schroeder reverb, and delay. E minor ambiguity resolves to E major at bloom, synced 300ms ahead of the visual climax (neural brain lighting up). Post-animation reverb tail holds 1.8s for natural dissolution.
+
 ## [1.3.2] - 2026-02-21
 
 ### Added
 
-- **Banner audio rewrite**: Vaporwave composition with PolyBLEP anti-aliased sawtooth synthesis, biquad filters, Schroeder reverb, and delay. E minor ambiguity resolves to E major at bloom (synced 300ms ahead of visual climax). Cross-platform: `afplay` (macOS), `aplay` (Linux), PowerShell (Windows). Silently skips if player unavailable. Zero dependencies.
+- **Banner audio**: Pure TypeScript WAV synthesis during the tendril animation. Cross-platform: `afplay` (macOS), `aplay` (Linux), PowerShell (Windows). Silently skips if player unavailable. Zero dependencies.
 - **Test coverage**: 19 new tests for `ca about` command, changelog extraction/escaping, and `--update` doc migration path
 
 ### Fixed
