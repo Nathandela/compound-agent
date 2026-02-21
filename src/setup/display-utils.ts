@@ -5,7 +5,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { runFullBeadsCheck, type BeadsFullCheck } from './beads-check.js';
+import { checkBeadsAvailable } from './beads-check.js';
 import {
   getClaudeSettingsPath,
   hasAllCompoundAgentHooks,
@@ -14,7 +14,7 @@ import {
 import type { GitignoreResult } from './gitignore.js';
 import type { HookInstallResult } from './hooks.js';
 import type { PnpmConfigResult } from './primitives.js';
-import { checkUserScope, type ScopeCheckResult } from './scope-check.js';
+import { checkUserScope } from './scope-check.js';
 
 export function printGitignoreStatus(result: GitignoreResult): void {
   if (result.added.length > 0) {
@@ -53,24 +53,6 @@ export function printPnpmConfigStatus(result: PnpmConfigResult): void {
   }
 }
 
-export function printBeadsFullStatus(check: BeadsFullCheck): void {
-  console.log(`  Beads CLI:          ${check.cliAvailable ? 'OK' : 'not found'}`);
-  if (check.cliAvailable) {
-    console.log(`  Beads repo:         ${check.initialized ? 'OK' : 'not initialized (run: bd init)'}`);
-    if (check.initialized) {
-      console.log(`  Beads health:       ${check.healthy ? 'OK' : `issues found${check.healthMessage ? ` — ${check.healthMessage}` : ''}`}`);
-    }
-  }
-}
-
-export function printScopeStatus(scope: ScopeCheckResult): void {
-  if (scope.isUserScope) {
-    console.log('  Scope:              user-scope (reduced compounding value)');
-  } else {
-    console.log('  Scope:              OK (repository scope)');
-  }
-}
-
 /**
  * Show installation status (used by `ca setup --status`).
  */
@@ -96,8 +78,11 @@ export async function runStatus(repoRoot: string): Promise<void> {
   }
   console.log(`  Hooks:              ${hooksInstalled ? 'installed' : 'not installed'}`);
 
-  const fullBeads = runFullBeadsCheck(repoRoot);
-  printBeadsFullStatus(fullBeads);
+  const beads = checkBeadsAvailable();
+  console.log(`  Beads CLI:          ${beads.available ? 'available' : 'not found'}`);
+
   const scope = checkUserScope(repoRoot);
-  printScopeStatus(scope);
+  if (scope.isUserScope) {
+    console.log('  Scope:              user-scope (reduced compounding value)');
+  }
 }

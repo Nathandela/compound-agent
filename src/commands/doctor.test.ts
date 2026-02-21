@@ -190,9 +190,9 @@ describe('Doctor Command', () => {
   // Usage documentation check
   // ============================================================================
 
-  it('passes usage documentation check when README.md exists', async () => {
+  it('passes usage documentation check when HOW_TO_COMPOUND.md exists', async () => {
     await mkdir(join(tempDir, 'docs', 'compound'), { recursive: true });
-    await writeFile(join(tempDir, 'docs', 'compound', 'README.md'), '# Compound Agent', 'utf-8');
+    await writeFile(join(tempDir, 'docs', 'compound', 'HOW_TO_COMPOUND.md'), '# How to Compound', 'utf-8');
 
     const checks = await runDoctor(tempDir);
     const docCheck = checks.find(c => c.name === 'Usage documentation');
@@ -200,7 +200,7 @@ describe('Doctor Command', () => {
     expect(docCheck!.status).toBe('pass');
   });
 
-  it('warns usage documentation check when README.md is missing', async () => {
+  it('warns usage documentation check when HOW_TO_COMPOUND.md is missing', async () => {
     const checks = await runDoctor(tempDir);
     const docCheck = checks.find(c => c.name === 'Usage documentation');
     expect(docCheck).toBeDefined();

@@ -5,8 +5,7 @@
  */
 
 export { registerSetupAllCommand } from './all.js';
-export { playInstallBanner } from './banner.js';
-export { checkBeadsAvailable, checkBeadsInitialized, checkBeadsHealthy, runFullBeadsCheck, type BeadsCheckResult, type BeadsFullCheck } from './beads-check.js';
+export { checkBeadsAvailable, type BeadsCheckResult } from './beads-check.js';
 export { ensureGitignore, type GitignoreResult } from './gitignore.js';
 export { checkUserScope, type ScopeCheckResult } from './scope-check.js';
 export {
@@ -15,7 +14,6 @@ export {
   hasClaudeHook,
   readClaudeSettings,
 } from './claude-helpers.js';
-export { printBeadsFullStatus, printScopeStatus } from './display-utils.js';
 export { registerClaudeSubcommand } from './claude.js';
 export { registerDownloadModelCommand } from './download-model.js';
 export { processPhaseGuard } from './hooks-phase-guard.js';

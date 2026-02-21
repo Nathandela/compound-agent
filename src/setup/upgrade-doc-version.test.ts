@@ -26,15 +26,15 @@ describe('upgradeDocVersion', () => {
     const docsDir = join(tempDir, 'docs', 'compound');
     await mkdir(docsDir, { recursive: true });
     await writeFile(
-      join(docsDir, 'README.md'),
-      '---\nversion: "1.0.0"\nlast-updated: "2026-01-01"\n---\n\n# Compound Agent\n',
+      join(docsDir, 'HOW_TO_COMPOUND.md'),
+      '---\nversion: "1.0.0"\nlast-updated: "2026-01-01"\n---\n\n# How to Compound\n',
       'utf-8'
     );
 
     const updated = await upgradeDocVersion(tempDir, '2.0.0');
 
     expect(updated).toBe(true);
-    const content = await readFile(join(docsDir, 'README.md'), 'utf-8');
+    const content = await readFile(join(docsDir, 'HOW_TO_COMPOUND.md'), 'utf-8');
     expect(content).toContain('version: "2.0.0"');
     expect(content).not.toContain('version: "1.0.0"');
   });
@@ -49,8 +49,8 @@ describe('upgradeDocVersion', () => {
     const docsDir = join(tempDir, 'docs', 'compound');
     await mkdir(docsDir, { recursive: true });
     await writeFile(
-      join(docsDir, 'README.md'),
-      '---\nversion: "2.0.0"\nlast-updated: "2026-02-20"\n---\n\n# Compound Agent\n',
+      join(docsDir, 'HOW_TO_COMPOUND.md'),
+      '---\nversion: "2.0.0"\nlast-updated: "2026-02-20"\n---\n\n# How to Compound\n',
       'utf-8'
     );
 
@@ -62,14 +62,14 @@ describe('upgradeDocVersion', () => {
   it('preserves other content in the file', async () => {
     const docsDir = join(tempDir, 'docs', 'compound');
     await mkdir(docsDir, { recursive: true });
-    const original = '---\nversion: "1.0.0"\nlast-updated: "2026-01-01"\nsummary: "Test"\n---\n\n# Compound Agent\n\nBody content here.\n';
-    await writeFile(join(docsDir, 'README.md'), original, 'utf-8');
+    const original = '---\nversion: "1.0.0"\nlast-updated: "2026-01-01"\nsummary: "Test"\n---\n\n# How to Compound\n\nBody content here.\n';
+    await writeFile(join(docsDir, 'HOW_TO_COMPOUND.md'), original, 'utf-8');
 
     await upgradeDocVersion(tempDir, '2.0.0');
 
-    const content = await readFile(join(docsDir, 'README.md'), 'utf-8');
+    const content = await readFile(join(docsDir, 'HOW_TO_COMPOUND.md'), 'utf-8');
     expect(content).toContain('summary: "Test"');
     expect(content).toContain('Body content here.');
-    expect(content).toContain('# Compound Agent');
+    expect(content).toContain('# How to Compound');
   });
 });

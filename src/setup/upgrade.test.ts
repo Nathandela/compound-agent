@@ -285,7 +285,7 @@ describe('runUpgrade', () => {
     expect(result.message.length).toBeGreaterThan(0);
   });
 
-  it('updates doc version when README.md exists with old version', async () => {
+  it('updates doc version when HOW_TO_COMPOUND.md exists with old version', async () => {
     // Set up existing install
     const lessonsDir = join(tempDir, '.claude', 'lessons');
     await mkdir(lessonsDir, { recursive: true });
@@ -295,7 +295,7 @@ describe('runUpgrade', () => {
     const docDir = join(tempDir, 'docs', 'compound');
     await mkdir(docDir, { recursive: true });
     await writeFile(
-      join(docDir, 'README.md'),
+      join(docDir, 'HOW_TO_COMPOUND.md'),
       '---\nversion: "0.0.1"\n---\nContent here',
       'utf-8',
     );
@@ -367,13 +367,13 @@ describe('dryRun mode', () => {
       const docDir = join(tempDir, 'docs', 'compound');
       await mkdir(docDir, { recursive: true });
       const originalContent = '---\nversion: "0.0.1"\n---\nContent here';
-      await writeFile(join(docDir, 'README.md'), originalContent, 'utf-8');
+      await writeFile(join(docDir, 'HOW_TO_COMPOUND.md'), originalContent, 'utf-8');
 
       const result = await upgradeDocVersion(tempDir, '9.9.9', true);
 
       expect(result).toBe(true);
       // File must still have the old version
-      const content = await readFile(join(docDir, 'README.md'), 'utf-8');
+      const content = await readFile(join(docDir, 'HOW_TO_COMPOUND.md'), 'utf-8');
       expect(content).toBe(originalContent);
     });
   });
@@ -400,7 +400,7 @@ describe('dryRun mode', () => {
       const docDir = join(tempDir, 'docs', 'compound');
       await mkdir(docDir, { recursive: true });
       const docContent = '---\nversion: "0.0.1"\n---\nContent here';
-      await writeFile(join(docDir, 'README.md'), docContent, 'utf-8');
+      await writeFile(join(docDir, 'HOW_TO_COMPOUND.md'), docContent, 'utf-8');
 
       const result = await runUpgrade(tempDir, true);
 
@@ -414,7 +414,7 @@ describe('dryRun mode', () => {
       expect(existsSync(join(cmdDir, 'search.md'))).toBe(true);
       const agentContent = await readFile(join(agentDir, 'repo-analyst.md'), 'utf-8');
       expect(agentContent).toBe(headerContent);
-      const docOnDisk = await readFile(join(docDir, 'README.md'), 'utf-8');
+      const docOnDisk = await readFile(join(docDir, 'HOW_TO_COMPOUND.md'), 'utf-8');
       expect(docOnDisk).toBe(docContent);
     });
   });

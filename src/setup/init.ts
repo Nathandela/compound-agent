@@ -11,8 +11,8 @@ import { getRepoRoot } from '../cli-utils.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
 import { getGlobalOpts, out } from '../commands/index.js';
 import { playInstallBanner } from './banner.js';
-import { runFullBeadsCheck, type BeadsFullCheck } from './beads-check.js';
-import { printBeadsFullStatus, printGitignoreStatus, printScopeStatus } from './display-utils.js';
+import { checkBeadsAvailable } from './beads-check.js';
+import { printGitignoreStatus } from './display-utils.js';
 import { installClaudeHooksForInit } from './claude-helpers.js';
 import { ensureGitignore, type GitignoreResult } from './gitignore.js';
 import { installPreCommitHook, type HookInstallResult } from './hooks.js';
@@ -63,6 +63,14 @@ async function initAction(
 
   // Pre-flight checks
   const scopeResult = checkUserScope(repoRoot);
+  if (scopeResult.isUserScope && !quiet && !options.json) {
+    console.log(`  ${scopeResult.message}`);
+  }
+
+  const beadsResult = checkBeadsAvailable();
+  if (!beadsResult.available && !quiet && !options.json) {
+    console.log(`  ${beadsResult.message}`);
+  }
 
   // Upgrade detection
   let upgradeResult: UpgradeResult | null = null;
@@ -70,9 +78,6 @@ async function initAction(
     upgradeResult = await runUpgrade(repoRoot);
     if (!quiet && !options.json && upgradeResult.isUpgrade) {
       console.log(`  ${upgradeResult.message}`);
-      if (!options.update) {
-        console.log('  Tip: Run with --update to regenerate managed files with latest templates.');
-      }
     }
   }
 
@@ -118,10 +123,8 @@ async function initAction(
   // Ensure .gitignore has required patterns
   const gitignoreResult = await ensureGitignore(repoRoot);
 
-  const fullBeads = runFullBeadsCheck(repoRoot);
-
   if (options.json) {
-    printInitJson({ lessonsDir, agentsMdUpdated, hookResult, claudeHooksResult, pnpmConfig, fullBeads, scopeResult, upgradeResult, gitignoreResult });
+    printInitJson({ lessonsDir, agentsMdUpdated, hookResult, claudeHooksResult, pnpmConfig, beadsResult, scopeResult, upgradeResult, gitignoreResult });
     return;
   }
 
@@ -134,14 +137,12 @@ async function initAction(
   printClaudeHooksStatus(claudeHooksResult, options.skipClaude);
   printPnpmConfigStatus(pnpmConfig);
   printGitignoreStatus(gitignoreResult);
-  printBeadsFullStatus(fullBeads);
-  printScopeStatus(scopeResult);
 }
 
 function printInitJson(ctx: {
   lessonsDir: string; agentsMdUpdated: boolean; hookResult: HookInstallResult | null;
   claudeHooksResult: ClaudeHooksResult; pnpmConfig: PnpmConfigResult;
-  fullBeads: BeadsFullCheck; scopeResult: { isUserScope: boolean };
+  beadsResult: { available: boolean }; scopeResult: { isUserScope: boolean };
   upgradeResult: UpgradeResult | null; gitignoreResult: GitignoreResult;
 }): void {
   const claudeHooksInstalled = ctx.claudeHooksResult.action === 'installed';
@@ -151,8 +152,7 @@ function printInitJson(ctx: {
     hooks: hooksChanged, hookStatus: ctx.hookResult?.status ?? 'skipped',
     claudeHooks: claudeHooksInstalled,
     pnpmConfig: ctx.pnpmConfig.isPnpm ? { added: ctx.pnpmConfig.added, alreadyConfigured: ctx.pnpmConfig.alreadyConfigured } : null,
-    beadsAvailable: ctx.fullBeads.cliAvailable, beadsInitialized: ctx.fullBeads.initialized, beadsHealthy: ctx.fullBeads.healthy,
-    userScope: ctx.scopeResult.isUserScope,
+    beadsAvailable: ctx.beadsResult.available, userScope: ctx.scopeResult.isUserScope,
     upgrade: ctx.upgradeResult ? { isUpgrade: ctx.upgradeResult.isUpgrade, removedCommands: ctx.upgradeResult.removedCommands, strippedHeaders: ctx.upgradeResult.strippedHeaders } : null,
     gitignore: ctx.gitignoreResult.added,
   }));

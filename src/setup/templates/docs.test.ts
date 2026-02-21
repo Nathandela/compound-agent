@@ -7,32 +7,18 @@ import { describe, expect, it } from 'vitest';
 import { DOC_TEMPLATES } from './docs.js';
 
 describe('DOC_TEMPLATES', () => {
-  it('exports a README.md template as the main entry point', () => {
-    expect(DOC_TEMPLATES).toHaveProperty('README.md');
+  it('exports a HOW_TO_COMPOUND.md template', () => {
+    expect(DOC_TEMPLATES).toHaveProperty('HOW_TO_COMPOUND.md');
   });
 
-  it('exports all 5 split documentation templates', () => {
-    expect(Object.keys(DOC_TEMPLATES).sort()).toEqual([
-      'CLI_REFERENCE.md',
-      'INTEGRATION.md',
-      'README.md',
-      'SKILLS.md',
-      'WORKFLOW.md',
-    ]);
+  it('template contains a YAML frontmatter with a version placeholder', () => {
+    const content = DOC_TEMPLATES['HOW_TO_COMPOUND.md'];
+    expect(content).toMatch(/^---\n/);
+    expect(content).toContain('{{VERSION}}');
   });
 
-  it('each template contains YAML frontmatter with a version placeholder', () => {
-    for (const [name, content] of Object.entries(DOC_TEMPLATES)) {
-      expect(content, `${name} should start with frontmatter`).toMatch(/^---\n/);
-      expect(content, `${name} should have VERSION placeholder`).toContain('{{VERSION}}');
-    }
-  });
-
-  it('README.md contains links to all other docs', () => {
-    const readme = DOC_TEMPLATES['README.md'];
-    expect(readme).toContain('WORKFLOW.md');
-    expect(readme).toContain('CLI_REFERENCE.md');
-    expect(readme).toContain('SKILLS.md');
-    expect(readme).toContain('INTEGRATION.md');
+  it('template contains the main heading', () => {
+    const content = DOC_TEMPLATES['HOW_TO_COMPOUND.md'];
+    expect(content).toContain('# How to Compound');
   });
 });

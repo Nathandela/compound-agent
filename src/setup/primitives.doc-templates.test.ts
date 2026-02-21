@@ -22,16 +22,12 @@ describe('installDocTemplates', () => {
     await rm(tempDir, { recursive: true, force: true });
   });
 
-  it('creates all 5 doc files when they do not exist', async () => {
+  it('creates docs/compound/HOW_TO_COMPOUND.md when it does not exist', async () => {
     const created = await installDocTemplates(tempDir);
 
     expect(created).toBe(true);
-    const docsDir = join(tempDir, 'docs', 'compound');
-    expect(existsSync(join(docsDir, 'README.md'))).toBe(true);
-    expect(existsSync(join(docsDir, 'WORKFLOW.md'))).toBe(true);
-    expect(existsSync(join(docsDir, 'CLI_REFERENCE.md'))).toBe(true);
-    expect(existsSync(join(docsDir, 'SKILLS.md'))).toBe(true);
-    expect(existsSync(join(docsDir, 'INTEGRATION.md'))).toBe(true);
+    const filePath = join(tempDir, 'docs', 'compound', 'HOW_TO_COMPOUND.md');
+    expect(existsSync(filePath)).toBe(true);
   });
 
   it('creates the docs/compound/ directory if missing', async () => {
@@ -43,12 +39,12 @@ describe('installDocTemplates', () => {
   it('does not overwrite existing file (idempotent)', async () => {
     const docsDir = join(tempDir, 'docs', 'compound');
     await mkdir(docsDir, { recursive: true });
-    await writeFile(join(docsDir, 'README.md'), 'user content', 'utf-8');
+    await writeFile(join(docsDir, 'HOW_TO_COMPOUND.md'), 'user content', 'utf-8');
 
     const created = await installDocTemplates(tempDir);
 
-    // Returns true because other files were created, but README.md is untouched
-    const content = await readFile(join(docsDir, 'README.md'), 'utf-8');
+    expect(created).toBe(false);
+    const content = await readFile(join(docsDir, 'HOW_TO_COMPOUND.md'), 'utf-8');
     expect(content).toBe('user content');
   });
 
@@ -56,7 +52,7 @@ describe('installDocTemplates', () => {
     await installDocTemplates(tempDir);
 
     const content = await readFile(
-      join(tempDir, 'docs', 'compound', 'README.md'),
+      join(tempDir, 'docs', 'compound', 'HOW_TO_COMPOUND.md'),
       'utf-8'
     );
     expect(content).not.toContain('{{VERSION}}');
@@ -68,7 +64,7 @@ describe('installDocTemplates', () => {
     await installDocTemplates(tempDir);
 
     const content = await readFile(
-      join(tempDir, 'docs', 'compound', 'README.md'),
+      join(tempDir, 'docs', 'compound', 'HOW_TO_COMPOUND.md'),
       'utf-8'
     );
     expect(content).toMatch(/^---\n/);
