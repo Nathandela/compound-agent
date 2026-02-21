@@ -1,8 +1,12 @@
 /**
- * Banner audio — generates a short melodic sequence as a WAV buffer
- * and plays it via the platform's built-in audio player.
+ * Banner audio — "Entering the Cloud"
  *
- * Zero external dependencies. Pure sine-wave synthesis.
+ * Vaporwave-aesthetic startup sound. Two attacks, four pitch classes,
+ * one transformation: suspension to illumination.
+ *
+ * Audio climax at T=2.9s leads visual shimmer wave at T=3.2s by 300ms.
+ *
+ * Zero external dependencies. PolyBLEP anti-aliased synthesis.
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -10,149 +14,300 @@ import { writeFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
-// -- Audio constants --
-const SAMPLE_RATE = 22050;
-const BITS = 16;
-const MAX_AMP = 0x6000; // ~75% of int16 range to avoid clipping
+// ── Constants ──
+const SR = 44100;
+const MAX_AMP = 0x7000;
 
-// -- Note frequencies (Hz) --
-const NOTE: Record<string, number> = {
-  C3: 131, E3: 165, G3: 196,
-  C4: 262, D4: 294, E4: 330, G4: 392, A4: 440,
-  C5: 523, E5: 659, G5: 784,
-  C6: 1047,
-};
+// ── Pitch classes (Hz) ──
+const E2 = 82.41;
+const B2 = 123.47;
+const E3 = 164.81;
+const B3 = 246.94;
+const E4 = 329.63;
+const Fs4 = 369.99;
+const Gs4 = 415.30;
+const B4 = 493.88;
 
-// -- Envelope: smooth attack/release to avoid clicks --
-function envelope(i: number, total: number, attack: number, release: number): number {
-  if (i < attack) return i / attack;
-  if (i > total - release) return (total - i) / release;
-  return 1;
+// ── PolyBLEP anti-aliased sawtooth ──
+
+function polyBlep(phase: number, dt: number): number {
+  if (phase < dt) { const t = phase / dt; return t + t - t * t - 1; }
+  if (phase > 1 - dt) { const t = (phase - 1) / dt; return t * t + t + t + 1; }
+  return 0;
 }
 
-// -- Generate samples for a single tone --
-function tone(freq: number, durationMs: number, amp = 1.0): number[] {
-  const samples = Math.floor(SAMPLE_RATE * durationMs / 1000);
-  const attack = Math.min(Math.floor(samples * 0.05), 200);
-  const release = Math.min(Math.floor(samples * 0.15), 400);
-  const out: number[] = [];
-  for (let i = 0; i < samples; i++) {
-    const env = envelope(i, samples, attack, release);
-    out.push(Math.sin(2 * Math.PI * freq * i / SAMPLE_RATE) * env * amp);
+function sawBL(freq: number, t: number, offset = 0): number {
+  const dt = freq / SR;
+  const phase = ((freq * t + offset) % 1 + 1) % 1;
+  return (2 * phase - 1) - polyBlep(phase, dt);
+}
+
+function wideSaw(freq: number, t: number, cents = 10): number {
+  const r = Math.pow(2, cents / 1200);
+  return (sawBL(freq, t, 0) + sawBL(freq * r, t, 0.33) + sawBL(freq / r, t, 0.66)) / 3;
+}
+
+// ── Biquad low-pass filter ──
+
+class BiquadLPF {
+  private x1 = 0; private x2 = 0;
+  private y1 = 0; private y2 = 0;
+  private b0 = 0; private b1 = 0; private b2 = 0;
+  private a1 = 0; private a2 = 0;
+  private lastCut = -1;
+  constructor(private Q = 0.707) {}
+  process(x: number, cutoff: number): number {
+    if (cutoff !== this.lastCut) {
+      this.lastCut = cutoff;
+      const w0 = 2 * Math.PI * Math.min(cutoff, SR * 0.45) / SR;
+      const sin0 = Math.sin(w0), cos0 = Math.cos(w0);
+      const alpha = sin0 / (2 * this.Q);
+      const a0 = 1 + alpha;
+      this.b0 = ((1 - cos0) / 2) / a0;
+      this.b1 = (1 - cos0) / a0;
+      this.b2 = this.b0;
+      this.a1 = (-2 * cos0) / a0;
+      this.a2 = (1 - alpha) / a0;
+    }
+    const y = this.b0 * x + this.b1 * this.x1 + this.b2 * this.x2
+            - this.a1 * this.y1 - this.a2 * this.y2;
+    this.x2 = this.x1; this.x1 = x;
+    this.y2 = this.y1; this.y1 = y;
+    return y;
   }
-  return out;
 }
 
-// -- Mix multiple frequency arrays into one (for chords) --
-function chord(freqs: number[], durationMs: number, amp = 1.0): number[] {
-  const tones = freqs.map(f => tone(f, durationMs, 1.0));
-  const len = tones[0]!.length;
+// ── Effects ──
+
+function applyDelay(samples: number[], ms: number, fb: number, wet: number, lpHz = 3000): number[] {
+  const len = Math.floor(SR * ms / 1000);
+  const buf = new Float64Array(len);
+  const lpf = new BiquadLPF();
   const out: number[] = [];
-  const scale = amp / freqs.length;
-  for (let i = 0; i < len; i++) {
-    let sum = 0;
-    for (const t of tones) sum += t[i]!;
-    out.push(sum * scale);
-  }
-  return out;
-}
-
-// -- Silence --
-function silence(durationMs: number): number[] {
-  return new Array(Math.floor(SAMPLE_RATE * durationMs / 1000)).fill(0);
-}
-
-// -- Compose the banner melody --
-function composeMelody(): number[] {
-  const samples: number[] = [];
-
-  // Phase 1 — Seed pulse: low warm tones
-  samples.push(...tone(NOTE.C3!, 250, 0.3));
-  samples.push(...silence(150));
-  samples.push(...tone(NOTE.C3!, 250, 0.35));
-  samples.push(...silence(100));
-  samples.push(...tone(NOTE.E3!, 200, 0.3));
-
-  // Phase 2 — Growth: rising pentatonic arpeggio
-  samples.push(...silence(80));
-  samples.push(...tone(NOTE.C4!, 140, 0.45));
-  samples.push(...silence(30));
-  samples.push(...tone(NOTE.E4!, 140, 0.5));
-  samples.push(...silence(30));
-  samples.push(...tone(NOTE.G4!, 140, 0.5));
-  samples.push(...silence(30));
-  samples.push(...tone(NOTE.C5!, 160, 0.55));
-  samples.push(...silence(30));
-  samples.push(...tone(NOTE.E5!, 160, 0.55));
-  samples.push(...silence(30));
-  samples.push(...tone(NOTE.G5!, 180, 0.6));
-  samples.push(...silence(60));
-  // Second wave — faster
-  samples.push(...tone(NOTE.C4!, 100, 0.4));
-  samples.push(...tone(NOTE.E4!, 100, 0.45));
-  samples.push(...tone(NOTE.G4!, 100, 0.45));
-  samples.push(...tone(NOTE.C5!, 120, 0.5));
-  samples.push(...tone(NOTE.E5!, 120, 0.55));
-  samples.push(...tone(NOTE.G5!, 140, 0.6));
-
-  // Phase 3 — Shimmer: sparkly high tones
-  samples.push(...silence(60));
-  samples.push(...tone(NOTE.C6!, 80, 0.3));
-  samples.push(...silence(40));
-  samples.push(...tone(NOTE.G5!, 80, 0.35));
-  samples.push(...silence(40));
-  samples.push(...tone(NOTE.C6!, 80, 0.3));
-  samples.push(...silence(40));
-  samples.push(...tone(NOTE.E5!, 100, 0.35));
-  samples.push(...silence(60));
-
-  // Phase 4 — Title: triumphant major chord
-  samples.push(...chord([NOTE.C4!, NOTE.E4!, NOTE.G4!], 600, 0.7));
-  samples.push(...chord([NOTE.C4!, NOTE.E4!, NOTE.G4!, NOTE.C5!], 500, 0.6));
-
-  // Phase 5 — Hold: gentle fade
-  samples.push(...chord([NOTE.C3!, NOTE.G3!, NOTE.C4!], 1200, 0.35));
-
-  return samples;
-}
-
-// -- WAV file encoding --
-function encodeWav(samples: number[]): Buffer {
-  const dataSize = samples.length * (BITS / 8);
-  const fileSize = 44 + dataSize;
-  const buf = Buffer.alloc(fileSize);
-
-  // RIFF header
-  buf.write('RIFF', 0);
-  buf.writeUInt32LE(fileSize - 8, 4);
-  buf.write('WAVE', 8);
-
-  // fmt chunk
-  buf.write('fmt ', 12);
-  buf.writeUInt32LE(16, 16);           // chunk size
-  buf.writeUInt16LE(1, 20);            // PCM format
-  buf.writeUInt16LE(1, 22);            // mono
-  buf.writeUInt32LE(SAMPLE_RATE, 24);  // sample rate
-  buf.writeUInt32LE(SAMPLE_RATE * BITS / 8, 28); // byte rate
-  buf.writeUInt16LE(BITS / 8, 32);     // block align
-  buf.writeUInt16LE(BITS, 34);         // bits per sample
-
-  // data chunk
-  buf.write('data', 36);
-  buf.writeUInt32LE(dataSize, 40);
-
-  // PCM samples
-  let offset = 44;
+  let i = 0;
   for (const s of samples) {
-    const clamped = Math.max(-1, Math.min(1, s));
-    buf.writeInt16LE(Math.round(clamped * MAX_AMP), offset);
-    offset += 2;
+    const d = buf[i]!;
+    buf[i] = s + lpf.process(d, lpHz) * fb;
+    i = (i + 1) % len;
+    out.push(s + d * wet);
+  }
+  return out;
+}
+
+function applyReverb(samples: number[], decayMs: number, wet: number): number[] {
+  const combDs = [1116, 1188, 1277, 1356, 1422, 1491];
+  const apDs = [225, 341, 556];
+
+  function comb(input: number[], delay: number, decay: number): number[] {
+    const fb = Math.pow(0.001, delay / (decay * SR / 1000));
+    const buf = new Float64Array(delay);
+    const damp = new BiquadLPF(0.5);
+    const out: number[] = [];
+    let i = 0;
+    for (const s of input) {
+      const d = buf[i]!;
+      buf[i] = s + damp.process(d, 4500) * fb;
+      i = (i + 1) % delay;
+      out.push(d);
+    }
+    return out;
   }
 
+  function allpass(input: number[], delay: number, c = 0.5): number[] {
+    const buf = new Float64Array(delay);
+    const out: number[] = [];
+    let i = 0;
+    for (const s of input) {
+      const d = buf[i]!;
+      const v = s + d * c;
+      buf[i] = v;
+      i = (i + 1) % delay;
+      out.push(d - v * c);
+    }
+    return out;
+  }
+
+  const pre = Math.floor(SR * 0.04);
+  const delayed: number[] = new Array(pre).fill(0);
+  for (const s of samples) delayed.push(s);
+
+  const combs = combDs.map(d => comb(delayed, d, decayMs));
+  const sum: number[] = new Array(delayed.length).fill(0);
+  for (const c of combs)
+    for (let i = 0; i < sum.length; i++) sum[i]! += (c[i] ?? 0) / combDs.length;
+
+  let ap = sum;
+  for (const d of apDs) ap = allpass(ap, d);
+
+  let hpY = 0;
+  const hpAlpha = (1 / SR) / (1 / (2 * Math.PI * 120) + 1 / SR);
+  const clean: number[] = [];
+  for (const s of ap) { hpY += hpAlpha * (s - hpY); clean.push(s - hpY); }
+
+  const outLen = Math.max(samples.length, clean.length);
+  const out: number[] = [];
+  for (let i = 0; i < outLen; i++) {
+    const dry = i < samples.length ? samples[i]! : 0;
+    const w = i < clean.length ? clean[i]! : 0;
+    out.push(dry * (1 - wet * 0.3) + w * wet);
+  }
+  return out;
+}
+
+// ── Helpers ──
+
+function expCurve(x: number, pow = 2): number {
+  return Math.pow(Math.max(0, Math.min(1, x)), pow);
+}
+
+function saturate(x: number): number {
+  return Math.tanh(x * 1.15) / Math.tanh(1.15);
+}
+
+// ── Composition ──
+//
+//  T=0.0   ROOT     E2 strike. The seed.
+//  T=1.0   CLOUD    E-B pad fades in. Open 5th. Ambiguous.
+//  T=2.3            F#4 whispers in. Foreshadowing.
+//  T=2.7   BUILD    Crescendo + filter sweep accelerates.
+//  T=2.9   BLOOM    E major arrives. G#4 resolves everything.
+//  T=3.2            [Visual: shimmer wave — brain fully lit]
+//  T=3.5-6.0        Long sustain, slow decay.
+//  T=6.0-7.5        Reverb dissolution.
+
+// ── Voice: root strike (T=0) — E2 + hint of B2 ──
+function voiceRoot(i: number, t: number, f: BiquadLPF): number {
+  const atk = i < SR * 0.008 ? i / (SR * 0.008) : 1;
+  const dec = Math.exp(-t * 2.5);
+  const amp = atk * dec * 0.35;
+  if (amp < 0.001) return 0;
+  const s = wideSaw(E2, t, 6) * 0.7 + Math.sin(2 * Math.PI * B2 * t) * 0.3;
+  return f.process(s, 800 + dec * 1200) * amp;
+}
+
+// ── Voice: suspended pad (T=1.0) — E3-B3 open 5th ──
+function voicePad(t: number, fE: BiquadLPF, fB: BiquadLPF): number {
+  if (t < 1.0) return 0;
+  const padT = t - 1.0;
+  const fadeIn = expCurve(Math.min(1, padT / 1.8));
+  const fadeOut = t < 4.0 ? 1 : expCurve(1 - (t - 4.0) / 3.5, 1.5);
+  const amp = fadeIn * fadeOut * 0.20;
+  if (amp < 0.001) return 0;
+
+  let cutoff: number;
+  if (t < 2.7) cutoff = 350 + (padT / 1.7) * 850;
+  else if (t < 3.1) cutoff = 1200 + expCurve((t - 2.7) / 0.4) * 2800;
+  else cutoff = 4000 - expCurve((t - 3.1) / 4.0, 1.3) * 3200;
+  cutoff *= 1 + 0.04 * Math.sin(2 * Math.PI * 0.11 * t);
+
+  const dE = 1 + 0.0008 * Math.sin(2 * Math.PI * 0.09 * t);
+  const dB = 1 + 0.0007 * Math.sin(2 * Math.PI * 0.12 * t + 0.5);
+  const e3 = fE.process(wideSaw(E3 * dE, t, 12), cutoff);
+  const b3 = fB.process(wideSaw(B3 * dB, t, 12), cutoff);
+  return (e3 * 0.55 + b3 * 0.45) * amp;
+}
+
+// ── Voice: F#4 whisper (T=2.3) — foreshadowing 9th ──
+function voiceForeshadow(t: number, f: BiquadLPF): number {
+  if (t < 2.3 || t >= 3.5) return 0;
+  const fT = t - 2.3;
+  const fadeIn = expCurve(Math.min(1, fT / 0.7));
+  const fadeOut = fT > 0.7 ? expCurve((1.2 - fT) / 0.5) : 1;
+  const amp = fadeIn * fadeOut * 0.07;
+  if (amp < 0.001) return 0;
+  return f.process(Math.sin(2 * Math.PI * Fs4 * t), 3000) * amp;
+}
+
+// ── Voice: bloom chord (T=2.9) — E major, G#4 resolves ──
+function voiceBloom(t: number, fE: BiquadLPF, fG: BiquadLPF, fB: BiquadLPF): number {
+  if (t < 2.9) return 0;
+  const bT = t - 2.9;
+  const atk = Math.min(1, bT / 0.08);
+  const sus = bT < 1.5 ? 1 : Math.exp(-(bT - 1.5) * 0.8);
+  const amp = atk * sus;
+  if (amp < 0.002) return 0;
+
+  const bloomF = bT < 0.3
+    ? 1500 + expCurve(bT / 0.3) * 3500
+    : 5000 - expCurve(Math.min(1, (bT - 0.3) / 4.0), 1.2) * 3500;
+
+  const dE4 = 1 + 0.0005 * Math.sin(2 * Math.PI * 0.08 * t);
+  const e4 = fE.process(wideSaw(E4 * dE4, t, 8), bloomF);
+
+  let gs4 = 0;
+  if (bT > 0.03) {
+    const gsA = Math.min(1, (bT - 0.03) / 0.1);
+    const gsD = 1 + 0.0006 * Math.sin(2 * Math.PI * 0.1 * t + 1.0);
+    gs4 = fG.process(wideSaw(Gs4 * gsD, t, 9), bloomF) * gsA;
+  }
+
+  let b4 = 0;
+  if (bT > 0.05 && bT < 3.0) {
+    const bA = Math.min(1, (bT - 0.05) / 0.15)
+             * (bT > 2.0 ? expCurve(1 - (bT - 2.0)) : 1);
+    b4 = fB.process(
+      Math.sin(2 * Math.PI * B4 * t) * 0.5 + wideSaw(B4, t, 6) * 0.5,
+      bloomF,
+    ) * bA;
+  }
+
+  return (e4 * 0.35 + gs4 * 0.35 + b4 * 0.15) * amp * 0.28;
+}
+
+// ── Voice: sub drone (E2 sine, felt not heard) ──
+function voiceSub(t: number): number {
+  const subIn = expCurve(Math.min(1, t / 2.0));
+  const subOut = t < 4.5 ? 1 : expCurve(1 - (t - 4.5) / 2.5, 1.5);
+  return Math.sin(2 * Math.PI * E2 * t) * subIn * subOut * 0.08;
+}
+
+// ── Compose: mix all voices + master effects ──
+function compose(): number[] {
+  const TOTAL = Math.floor(SR * 7.5);
+  const out = new Float64Array(TOTAL);
+  const f: BiquadLPF[] = [];
+  for (let i = 0; i < 7; i++) f.push(new BiquadLPF(0.6));
+
+  for (let i = 0; i < TOTAL; i++) {
+    const t = i / SR;
+    out[i] = saturate(
+      voiceRoot(i, t, f[0]!) + voicePad(t, f[1]!, f[2]!)
+      + voiceForeshadow(t, f[3]!) + voiceBloom(t, f[4]!, f[5]!, f[6]!)
+      + voiceSub(t),
+    );
+  }
+
+  let result = Array.from(out);
+  result = applyDelay(result, 520, 0.22, 0.18, 2800);
+  result = applyReverb(result, 4800, 0.40);
+  return result;
+}
+
+// ── WAV encoding ──
+
+function encodeWav(raw: number[]): Buffer {
+  let peak = 0;
+  for (const s of raw) { const a = Math.abs(s); if (a > peak) peak = a; }
+  const scale = peak > 0 ? 0.92 / peak : 1;
+
+  const dataSize = raw.length * 2;
+  const buf = Buffer.alloc(44 + dataSize);
+  buf.write('RIFF', 0); buf.writeUInt32LE(36 + dataSize, 4);
+  buf.write('WAVE', 8); buf.write('fmt ', 12);
+  buf.writeUInt32LE(16, 16); buf.writeUInt16LE(1, 20); buf.writeUInt16LE(1, 22);
+  buf.writeUInt32LE(SR, 24); buf.writeUInt32LE(SR * 2, 28);
+  buf.writeUInt16LE(2, 32); buf.writeUInt16LE(16, 34);
+  buf.write('data', 36); buf.writeUInt32LE(dataSize, 40);
+  let off = 44;
+  for (const s of raw) {
+    buf.writeInt16LE(Math.round(Math.max(-1, Math.min(1, s * scale)) * MAX_AMP), off);
+    off += 2;
+  }
   return buf;
 }
 
-// -- Cross-platform playback --
+// ── Cross-platform playback ──
+
 function spawnPlayer(filePath: string): ChildProcess | null {
   try {
     switch (process.platform) {
@@ -168,14 +323,14 @@ function spawnPlayer(filePath: string): ChildProcess | null {
         return null;
     }
   } catch {
-    return null; // audio player not found — silent skip
+    return null;
   }
 }
 
-/** Start playing the banner melody. Returns a stop handle, or null if audio unavailable. */
+/** Start playing the banner audio. Returns a stop handle, or null if unavailable. */
 export function playBannerAudio(): { stop: () => void } | null {
   try {
-    const wav = encodeWav(composeMelody());
+    const wav = encodeWav(compose());
     const tmpPath = join(tmpdir(), `ca-banner-${process.pid}.wav`);
     writeFileSync(tmpPath, wav);
 
@@ -185,7 +340,6 @@ export function playBannerAudio(): { stop: () => void } | null {
       return null;
     }
 
-    // Unref so the player doesn't prevent Node from exiting
     proc.unref();
 
     const cleanup = () => {
@@ -199,6 +353,6 @@ export function playBannerAudio(): { stop: () => void } | null {
 
     return { stop: cleanup };
   } catch {
-    return null; // any failure — silent skip
+    return null;
   }
 }

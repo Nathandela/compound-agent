@@ -394,9 +394,15 @@ export async function playInstallBanner(): Promise<void> {
       await sleep(120);
     }
   } finally {
-    audio?.stop();
     process.removeListener('exit', restoreCursor);
     restoreCursor();
     write('\n');
+
+    // Let the audio reverb tail dissolve (~1.5s after animation ends).
+    // The player is detached+unref'd so it won't block if Node exits early.
+    if (audio) {
+      await sleep(1800);
+      audio.stop();
+    }
   }
 }

@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Banner audio**: Pure TypeScript WAV synthesis plays a rising pentatonic melody during the tendril animation. Cross-platform: `afplay` (macOS), `aplay` (Linux), PowerShell (Windows). Silently skips if player unavailable. Zero dependencies.
+- **Banner audio rewrite**: Vaporwave composition with PolyBLEP anti-aliased sawtooth synthesis, biquad filters, Schroeder reverb, and delay. E minor ambiguity resolves to E major at bloom (synced 300ms ahead of visual climax). Cross-platform: `afplay` (macOS), `aplay` (Linux), PowerShell (Windows). Silently skips if player unavailable. Zero dependencies.
 - **Test coverage**: 19 new tests for `ca about` command, changelog extraction/escaping, and `--update` doc migration path
 
 ### Fixed
