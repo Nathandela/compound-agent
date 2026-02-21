@@ -70,20 +70,22 @@ export function runWorktreeCreate(epicId: string): WorktreeCreateResult {
   // Run setup (pnpm exec guarantees the local installed binary)
   execFileSync('pnpm', ['exec', 'ca', 'setup', '--skip-model'], { cwd: worktreePath, encoding: 'utf-8' });
 
-  // Create Merge task
+  // Create Merge task (--silent outputs only the ID, BEADS_NO_DAEMON prevents daemon interference)
   const mergeTitle = `Merge: merge ${branch} to main`;
   const mergeDesc = `INSTRUCTIONS: This task merges the worktree branch back to main. Worktree path: ${worktreePath}. Run \`pnpm exec ca worktree merge ${epicId}\` when all other blocking tasks are resolved.`;
   const bdOutput = execFileSync('bd', [
     'create',
+    '--silent',
     `--title=${mergeTitle}`,
     '--type=task',
     '--priority=1',
     `--description=${mergeDesc}`,
-  ], { encoding: 'utf-8' });
+  ], {
+    encoding: 'utf-8',
+    env: { ...process.env, BEADS_NO_DAEMON: '1' },
+  });
 
-  // Parse merge task ID from bd output (e.g., "Created learning_agent-m001")
-  const idMatch = bdOutput.match(/(\S+)$/);
-  const mergeFullId = idMatch?.[1] ?? '';
+  const mergeFullId = bdOutput.trim();
   if (!mergeFullId) {
     throw new Error('bd create returned no task ID');
   }

@@ -87,9 +87,9 @@ describe('worktree create', () => {
       if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
         return 'worktree /fake/repo\nHEAD abc123\nbranch refs/heads/main\n';
       }
-      // bd create returns task ID
+      // bd create --silent returns just the ID
       if (cmd === 'bd' && args?.[0] === 'create') {
-        return 'Created learning_agent-m001';
+        return 'learning_agent-m001\n';
       }
       return '';
     });
@@ -159,14 +159,16 @@ describe('worktree create', () => {
     );
   });
 
-  it('creates Merge task and wires dependency', () => {
+  it('creates Merge task with --silent flag and BEADS_NO_DAEMON env', () => {
     runWorktreeCreate('epic1');
 
-    // Should create merge task
+    // Should create merge task with --silent for machine-readable output
     expect(mockExecFileSync).toHaveBeenCalledWith(
       'bd',
-      expect.arrayContaining(['create', '--title=Merge: merge epic/epic1 to main']),
-      expect.any(Object),
+      expect.arrayContaining(['create', '--silent', '--title=Merge: merge epic/epic1 to main']),
+      expect.objectContaining({
+        env: expect.objectContaining({ BEADS_NO_DAEMON: '1' }),
+      }),
     );
 
     // Should wire epic depends on merge
@@ -186,7 +188,7 @@ describe('worktree create', () => {
     expect(result.alreadyExists).toBe(false);
   });
 
-  it('throws when bd create returns empty ID', () => {
+  it('throws when bd create returns empty output', () => {
     mockExecFileSync.mockImplementation((cmd, args) => {
       if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
         return 'worktree /fake/repo\nHEAD abc123\nbranch refs/heads/main\n';
@@ -199,6 +201,53 @@ describe('worktree create', () => {
     mockExistsSync.mockReturnValue(true);
 
     expect(() => runWorktreeCreate('epic1')).toThrow(/no task id/i);
+  });
+
+  it('throws when bd create returns only whitespace', () => {
+    mockExecFileSync.mockImplementation((cmd, args) => {
+      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
+        return 'worktree /fake/repo\nHEAD abc123\nbranch refs/heads/main\n';
+      }
+      if (cmd === 'bd' && args?.[0] === 'create') {
+        return '  \n\n';
+      }
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+
+    expect(() => runWorktreeCreate('epic1')).toThrow(/no task id/i);
+  });
+
+  it('handles --silent output with trailing newline', () => {
+    mockExecFileSync.mockImplementation((cmd, args) => {
+      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
+        return 'worktree /fake/repo\nHEAD abc123\nbranch refs/heads/main\n';
+      }
+      if (cmd === 'bd' && args?.[0] === 'create') {
+        return 'learning_agent-m001\n';
+      }
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+
+    const result = runWorktreeCreate('epic1');
+    expect(result.mergeTaskId).toBe('m001');
+  });
+
+  it('handles --silent output with double trailing newline', () => {
+    mockExecFileSync.mockImplementation((cmd, args) => {
+      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
+        return 'worktree /fake/repo\nHEAD abc123\nbranch refs/heads/main\n';
+      }
+      if (cmd === 'bd' && args?.[0] === 'create') {
+        return 'learning_agent-m001\n\n';
+      }
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+
+    const result = runWorktreeCreate('epic1');
+    expect(result.mergeTaskId).toBe('m001');
   });
 });
 
