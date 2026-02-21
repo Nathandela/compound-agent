@@ -4,28 +4,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-// Replicate the core parsing/escaping logic from extract-changelog.ts
-// so we can test it without file I/O side effects.
-
-function extractSections(changelog: string, count = 3): string[] {
-  const sectionRegex = /^## \[\d+\.\d+\.\d+\]/gm;
-  const matches: number[] = [];
-  let match: RegExpExecArray | null;
-  while ((match = sectionRegex.exec(changelog)) !== null) {
-    matches.push(match.index);
-  }
-  return matches.slice(0, count).map((start, i) => {
-    const end = matches[i + 1] ?? changelog.length;
-    return changelog.slice(start, end).trimEnd();
-  });
-}
-
-function escapeForTemplateLiteral(content: string): string {
-  return content
-    .replace(/\\/g, '\\\\')
-    .replace(/`/g, '\\`')
-    .replace(/\$/g, '\\$');
-}
+import { extractSections, escapeForTemplateLiteral } from './changelog-utils.js';
 
 describe('extract-changelog', () => {
   // ==========================================================================

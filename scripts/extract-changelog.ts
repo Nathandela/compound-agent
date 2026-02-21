@@ -7,27 +7,15 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { extractSections, escapeForTemplateLiteral } from './changelog-utils.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
 const changelog = readFileSync(join(root, 'CHANGELOG.md'), 'utf-8');
-
-// Extract ## [x.y.z] sections (skip [Unreleased])
-const sectionRegex = /^## \[\d+\.\d+\.\d+\]/gm;
-const matches: number[] = [];
-let match: RegExpExecArray | null;
-while ((match = sectionRegex.exec(changelog)) !== null) {
-  matches.push(match.index);
-}
-
-// Take first 3 version sections
-const sections = matches.slice(0, 3).map((start, i) => {
-  const end = matches[i + 1] ?? changelog.length;
-  return changelog.slice(start, end).trimEnd();
-});
-
+const sections = extractSections(changelog);
 const content = sections.join('\n\n');
-const escaped = content.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$');
+const escaped = escapeForTemplateLiteral(content);
 
 const output = `/**
  * Auto-generated changelog data — do not edit.
