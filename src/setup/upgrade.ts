@@ -81,11 +81,11 @@ async function stripHeadersRecursive(dir: string, dryRun = false): Promise<numbe
 }
 
 /**
- * Update the version line in docs/compound/HOW_TO_COMPOUND.md during upgrade.
+ * Update the version line in docs/compound/README.md during upgrade.
  * Returns true if the file was updated, false if missing or already current.
  */
 export async function upgradeDocVersion(repoRoot: string, newVersion: string, dryRun = false): Promise<boolean> {
-  const docPath = join(repoRoot, 'docs', 'compound', 'HOW_TO_COMPOUND.md');
+  const docPath = join(repoRoot, 'docs', 'compound', 'README.md');
   if (!existsSync(docPath)) return false;
 
   const content = await readFile(docPath, 'utf-8');

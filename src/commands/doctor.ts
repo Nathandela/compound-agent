@@ -4,6 +4,7 @@
  * Usage: ca doctor
  */
 
+import { execSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
@@ -13,6 +14,7 @@ import { isModelAvailable } from '../memory/embeddings/index.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
 import {
   checkBeadsAvailable,
+  checkUserScope,
   getClaudeSettingsPath,
   hasAllCompoundAgentHooks,
   readClaudeSettings,
@@ -22,6 +24,18 @@ export interface DoctorCheck {
   name: string;
   status: 'pass' | 'fail' | 'warn';
   fix?: string;
+}
+
+function checkGitignoreHealth(repoRoot: string): boolean {
+  const gitignorePath = join(repoRoot, '.gitignore');
+  if (!existsSync(gitignorePath)) return false;
+  try {
+    const content = readFileSync(gitignorePath, 'utf-8');
+    const lines = new Set(content.split('\n').map(l => l.trim()));
+    return ['node_modules/', '.claude/.cache/'].every(p => lines.has(p));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -85,27 +99,37 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
     : { name: 'Beads CLI', status: 'warn', fix: 'Install beads: https://github.com/Nathandela/beads' });
 
   // 8. .gitignore health
-  const gitignorePath = join(repoRoot, '.gitignore');
-  const requiredPatterns = ['node_modules/', '.claude/.cache/'];
-  let gitignoreOk = false;
-  if (existsSync(gitignorePath)) {
-    try {
-      const content = readFileSync(gitignorePath, 'utf-8');
-      const lines = new Set(content.split('\n').map(l => l.trim()));
-      gitignoreOk = requiredPatterns.every(p => lines.has(p));
-    } catch {
-      // read may fail
-    }
-  }
-  checks.push(gitignoreOk
+  checks.push(checkGitignoreHealth(repoRoot)
     ? { name: '.gitignore health', status: 'pass' }
     : { name: '.gitignore health', status: 'warn', fix: 'Run: npx ca setup --update' });
 
   // 9. Usage documentation
-  const docPath = join(repoRoot, 'docs', 'compound', 'HOW_TO_COMPOUND.md');
+  const docPath = join(repoRoot, 'docs', 'compound', 'README.md');
   checks.push(existsSync(docPath)
     ? { name: 'Usage documentation', status: 'pass' }
     : { name: 'Usage documentation', status: 'warn', fix: 'Run: npx ca setup' });
+
+  // 10. Beads initialized
+  const beadsDir = join(repoRoot, '.beads');
+  checks.push(existsSync(beadsDir)
+    ? { name: 'Beads initialized', status: 'pass' }
+    : { name: 'Beads initialized', status: 'warn', fix: 'Run: bd init' });
+
+  // 11. Beads healthy
+  if (beadsResult.available && existsSync(beadsDir)) {
+    try {
+      execSync('bd doctor', { cwd: repoRoot, shell: '/bin/sh', stdio: 'pipe' });
+      checks.push({ name: 'Beads healthy', status: 'pass' });
+    } catch {
+      checks.push({ name: 'Beads healthy', status: 'warn', fix: 'Run: bd doctor' });
+    }
+  }
+
+  // 12. Codebase scope
+  const scope = checkUserScope(repoRoot);
+  checks.push(!scope.isUserScope
+    ? { name: 'Codebase scope', status: 'pass' }
+    : { name: 'Codebase scope', status: 'warn', fix: 'Install in a specific repository, not home directory' });
 
   return checks;
 }
