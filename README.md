@@ -210,7 +210,7 @@ Generated scripts detect three markers: `EPIC_COMPLETE` (success), `EPIC_FAILED`
 | `ca setup claude --status` | Check Claude Code integration health |
 | `ca setup claude --uninstall` | Remove Claude hooks only |
 | `ca download-model` | Download the embedding model |
-| `ca version-show` | Show version with animation and recent changelog |
+| `ca about` | Show version, animation, and recent changelog |
 | `ca doctor` | Verify external dependencies and project health |
 
 ## Workflow Commands

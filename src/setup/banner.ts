@@ -4,6 +4,7 @@
  */
 
 import { VERSION } from '../version.js';
+import { playBannerAudio } from './banner-audio.js';
 
 // -- Dimensions --
 const W = 62;
@@ -210,6 +211,9 @@ export async function playInstallBanner(): Promise<void> {
 
   write('\x1B[?25l\x1B[2J\x1B[H');
 
+  // Start background audio (silently skips if unavailable)
+  const audio = playBannerAudio();
+
   // Use 'exit' event (not SIGINT) so cursor restore runs reliably even when
   // cli.ts's own SIGINT handler calls process.exit() before us.
   const restoreCursor = () => process.stdout.write('\x1B[?25h\x1B[0m');
@@ -224,7 +228,7 @@ export async function playInstallBanner(): Promise<void> {
       renderBg(cvs, f);
       put(cvs, nx(CENTER), ny(CENTER), seedCh[f % 4 as 0 | 1 | 2 | 3], seedCo[f % 4 as 0 | 1 | 2 | 3]);
       write(flush(cvs));
-      write(`\n  ${CO.DIM}Seed detected...${CO.VOID}\n`);
+      write(`\n  ${CO.DIM}Seed detected...\x1B[K${CO.VOID}\n`);
       await sleep(60);
     }
     spawnParticles(ps, nx(CENTER), ny(CENTER), 5, 8);
@@ -274,7 +278,7 @@ export async function playInstallBanner(): Promise<void> {
       write(flush(cvs));
       let active = 0;
       for (let i = 0; i < nc; i++) if (isGrown[i]) active++;
-      write(`\n  \x1B[0;35mNodes \x1B[1;36m${active}\x1B[0;35m/${nc}\x1B[0m  \x1B[0;90mGrowing neural tendrils...\x1B[0m\n`);
+      write(`\n  \x1B[0;35mNodes \x1B[1;36m${active}\x1B[0;35m/${nc}\x1B[0m  \x1B[0;90mGrowing neural tendrils...\x1B[K\x1B[0m\n`);
       await sleep(40);
     }
 
@@ -300,7 +304,7 @@ export async function playInstallBanner(): Promise<void> {
 
       renderParticles(cvs, ps, f);
       write(flush(cvs));
-      write(`\n  ${CO.SETTLED}Crystallizing pathways...${CO.VOID}\n`);
+      write(`\n  ${CO.SETTLED}Crystallizing pathways...\x1B[K${CO.VOID}\n`);
       await sleep(60);
     }
 
@@ -390,6 +394,7 @@ export async function playInstallBanner(): Promise<void> {
       await sleep(120);
     }
   } finally {
+    audio?.stop();
     process.removeListener('exit', restoreCursor);
     restoreCursor();
     write('\n');

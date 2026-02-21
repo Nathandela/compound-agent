@@ -344,7 +344,7 @@ npx ca loop --force            # Overwrite existing script
 ## Health, audit, and verification commands
 
 \`\`\`bash
-npx ca version-show             # Show version with animation and recent changelog
+npx ca about                    # Show version, animation, and recent changelog
 npx ca doctor                  # Check external dependencies and project health
 npx ca audit                   # Run pattern, rule, and lesson quality checks
 npx ca rules check             # Check codebase against .claude/rules.json

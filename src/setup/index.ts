@@ -6,6 +6,7 @@
 
 export { registerSetupAllCommand } from './all.js';
 export { playInstallBanner } from './banner.js';
+export { playBannerAudio } from './banner-audio.js';
 export { checkBeadsAvailable, checkBeadsInitialized, checkBeadsHealthy, runFullBeadsCheck, type BeadsCheckResult, type BeadsFullCheck } from './beads-check.js';
 export { ensureGitignore, type GitignoreResult } from './gitignore.js';
 export { checkUserScope, type ScopeCheckResult } from './scope-check.js';

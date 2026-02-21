@@ -1,18 +1,18 @@
 /**
- * Tests for version-show command — version display and changelog output.
+ * Tests for about command — version display and changelog output.
  */
 
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { registerVersionShowCommand } from './version-show.js';
+import { registerAboutCommand } from './about.js';
 
 // Mock the banner module — we don't want real terminal animation in tests.
 vi.mock('../setup/index.js', () => ({
   playInstallBanner: vi.fn().mockResolvedValue(undefined),
 }));
 
-describe('version-show command', () => {
+describe('about command', () => {
   let program: Command;
   let logSpy: ReturnType<typeof vi.spyOn>;
 
@@ -30,9 +30,9 @@ describe('version-show command', () => {
   // Command registration
   // ==========================================================================
 
-  it('registers "version-show" command on the program', () => {
-    registerVersionShowCommand(program);
-    const cmd = program.commands.find((c) => c.name() === 'version-show');
+  it('registers "about" command on the program', () => {
+    registerAboutCommand(program);
+    const cmd = program.commands.find((c) => c.name() === 'about');
     expect(cmd).toBeDefined();
     expect(cmd!.description()).toContain('version');
   });
@@ -45,8 +45,8 @@ describe('version-show command', () => {
     const originalIsTTY = process.stdout.isTTY;
     Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
 
-    registerVersionShowCommand(program);
-    await program.parseAsync(['node', 'test', 'version-show']);
+    registerAboutCommand(program);
+    await program.parseAsync(['node', 'test', 'about']);
 
     const calls = logSpy.mock.calls.map((c) => c[0]);
     const versionLine = calls.find(
@@ -65,8 +65,8 @@ describe('version-show command', () => {
     const originalIsTTY = process.stdout.isTTY;
     Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
 
-    registerVersionShowCommand(program);
-    await program.parseAsync(['node', 'test', 'version-show']);
+    registerAboutCommand(program);
+    await program.parseAsync(['node', 'test', 'about']);
 
     const allOutput = logSpy.mock.calls.map((c) => c[0]).join('\n');
     // Changelog should contain version headers from the embedded data

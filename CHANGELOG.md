@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`ca version-show` command**: Displays version with terminal animation (tendril growth) and recent changelog entries. Non-TTY environments get plain text output. Changelog is embedded at build time from CHANGELOG.md.
+- **`ca about` command**: Displays version with terminal animation (tendril growth) and recent changelog entries. Non-TTY environments get plain text output. Changelog is embedded at build time from CHANGELOG.md.
 - **3 new doctor checks**: Beads initialized (`.beads/` dir), beads healthy (`bd doctor`), codebase scope (user-scope detection)
 - **Beads + scope status in init/setup output**: Full beads health display (CLI available, initialized, healthy) and scope status shown after `ca init`, `ca setup`, and `ca setup --update`
 - **Banner on `--update`**: Terminal art animation now plays during `ca setup --update` and `ca init --update` (same TTY/quiet guards as fresh install)
