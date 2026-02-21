@@ -40,7 +40,8 @@ import {
 } from './primitives.js';
 import { checkUserScope, type ScopeCheckResult } from './scope-check.js';
 import { LEGACY_ROOT_SLASH_COMMANDS } from './templates.js';
-import { AGENT_TEMPLATES, AGENT_ROLE_SKILLS, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
+import { AGENT_TEMPLATES, AGENT_ROLE_SKILLS, DOC_TEMPLATES, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
+import { VERSION } from '../version.js';
 import { runUninstall } from './uninstall.js';
 import { runUpgrade, detectExistingInstall, type UpgradeResult } from './upgrade.js';
 
@@ -233,6 +234,12 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
   }
   for (const [name, content] of Object.entries(AGENT_ROLE_SKILLS)) {
     await processFile(join(repoRoot, '.claude', 'skills', 'compound', 'agents', name, 'SKILL.md'), content);
+  }
+  for (const [filename, template] of Object.entries(DOC_TEMPLATES)) {
+    const content = template
+      .replace('{{VERSION}}', VERSION)
+      .replace('{{DATE}}', new Date().toISOString().slice(0, 10));
+    await processFile(join(repoRoot, 'docs', 'compound', filename), content);
   }
 
   // Migration: clean up legacy root-level slash commands from v1.0

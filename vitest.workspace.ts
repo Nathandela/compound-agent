@@ -6,7 +6,7 @@ export default defineWorkspace([
       name: 'unit',
       globals: true,
       environment: 'node',
-      include: ['src/**/*.test.ts', 'tools/**/*.test.js'],
+      include: ['src/**/*.test.ts', 'tools/**/*.test.js', 'scripts/**/*.test.ts'],
       exclude: ['src/memory/embeddings/**/*.test.ts'],
       pool: 'threads',
       poolOptions: {

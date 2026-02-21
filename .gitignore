@@ -3,12 +3,18 @@ node_modules/
 
 # Build output
 dist/
-src/changelog-data.ts
 
 # Cache
 .claude/.cache/
 .claude/.ca-failure-state.json
 .claude/.ca-phase-state.json
+
+# Setup-generated (ca setup dogfooding on source repo)
+.claude/agents/
+.claude/commands/
+.claude/skills/
+.claude/plugin.json
+.claude/settings.json
 
 # OS
 .DS_Store
