@@ -9,8 +9,9 @@ import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { isModelUsable, loadSessionLessons, retrieveForPlan } from '../index.js';
-import { incrementRetrievalCount, readLessons, readMemoryItems, searchKeyword, syncIfNeeded } from '../memory/storage/index.js';
+import { incrementRetrievalCount, readLessons, readMemoryItems, searchKeyword, searchKeywordScored, syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem } from '../memory/index.js';
+import { CANDIDATE_MULTIPLIER, mergeHybridResults, rankLessons, searchVector } from '../memory/search/index.js';
 
 import { formatError } from '../cli-error-format.js';
 
@@ -151,9 +152,23 @@ async function searchAction(cmd: Command, query: string, options: { limit: strin
 
   await syncIfNeeded(repoRoot);
 
-  let results;
+  let results: MemoryItem[];
   try {
-    results = await searchKeyword(repoRoot, query, limit);
+    const usability = await isModelUsable();
+    if (usability.usable) {
+      // Hybrid search: blend vector + keyword
+      const candidateLimit = limit * CANDIDATE_MULTIPLIER;
+      const [vectorResults, keywordResults] = await Promise.all([
+        searchVector(repoRoot, query, { limit: candidateLimit }),
+        searchKeywordScored(repoRoot, query, candidateLimit),
+      ]);
+      const merged = mergeHybridResults(vectorResults, keywordResults);
+      const ranked = rankLessons(merged);
+      results = ranked.slice(0, limit).map((r) => r.lesson);
+    } else {
+      // FTS-only fallback when embedding model unavailable
+      results = await searchKeyword(repoRoot, query, limit);
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Search failed';
     console.error(formatError('search', 'SEARCH_FAILED', message, 'Check your query syntax'));

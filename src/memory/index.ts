@@ -61,11 +61,14 @@ export {
 
 // Search API
 export {
+  CANDIDATE_MULTIPLIER,
   cosineSimilarity,
+  mergeHybridResults,
+  normalizeBm25Rank,
   rankLessons,
   searchVector,
 } from './search/index.js';
-export type { RankedLesson, ScoredLesson } from './search/index.js';
+export type { RankedLesson, ScoredKeywordResult, ScoredLesson } from './search/index.js';
 
 // Capture API
 export {

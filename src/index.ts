@@ -106,17 +106,22 @@ export {
 } from './memory/embeddings/index.js';
 export type { UsabilityResult } from './memory/embeddings/index.js';
 
-// Search API (vector similarity + ranking)
+// Search API (vector similarity + ranking + hybrid)
 export {
   calculateScore,
+  CANDIDATE_MULTIPLIER,
   confirmationBoost,
   cosineSimilarity,
+  DEFAULT_TEXT_WEIGHT,
+  DEFAULT_VECTOR_WEIGHT,
+  mergeHybridResults,
+  normalizeBm25Rank,
   rankLessons,
   recencyBoost,
   searchVector,
   severityBoost,
 } from './memory/search/index.js';
-export type { RankedLesson, ScoredLesson, SearchVectorOptions } from './memory/search/index.js';
+export type { HybridMergeOptions, RankedLesson, ScoredKeywordResult, ScoredLesson, SearchVectorOptions } from './memory/search/index.js';
 
 // Capture API (quality filters + trigger detection)
 export {

@@ -20,6 +20,7 @@ export {
   openDb,
   rebuildIndex,
   searchKeyword,
+  searchKeywordScored,
   setCachedEmbedding,
   syncIfNeeded,
 } from './sqlite/index.js';

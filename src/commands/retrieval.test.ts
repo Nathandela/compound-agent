@@ -18,6 +18,7 @@ import { createFullLesson, createQuickLesson, daysAgo, setupCliTestContext, shou
 const modelAvailable = isModelAvailable();
 const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
 const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
+const hybridEnabled = !skipEmbedding;
 
 describe('Retrieval Commands', () => {
   const { getTempDir, runCli } = setupCliTestContext();
@@ -91,9 +92,9 @@ describe('Retrieval Commands', () => {
       expect(combined).toContain('Polars');
     });
 
-    it('shows no results for non-matching query', () => {
+    // With hybrid search enabled, vector similarity returns results even for unrelated queries
+    it.skipIf(hybridEnabled)('shows no results for non-matching query (FTS-only)', () => {
       const { combined } = runCli('search "nonexistent"');
-      // Now shows user-friendly message with suggestions
       expect(combined.toLowerCase()).toMatch(/no lessons match|no.*found|0.*result/i);
     });
   });

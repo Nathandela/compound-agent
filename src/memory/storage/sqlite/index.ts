@@ -26,4 +26,5 @@ export {
   getRetrievalStats,
   incrementRetrievalCount,
   searchKeyword,
+  searchKeywordScored,
 } from './search.js';

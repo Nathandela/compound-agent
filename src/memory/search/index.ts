@@ -21,3 +21,13 @@ export {
   severityBoost,
 } from './ranking.js';
 export type { RankedLesson } from './ranking.js';
+
+// Hybrid search
+export {
+  CANDIDATE_MULTIPLIER,
+  DEFAULT_TEXT_WEIGHT,
+  DEFAULT_VECTOR_WEIGHT,
+  mergeHybridResults,
+  normalizeBm25Rank,
+} from './hybrid.js';
+export type { HybridMergeOptions, ScoredKeywordResult } from './hybrid.js';

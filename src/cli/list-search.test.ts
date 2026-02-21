@@ -6,9 +6,15 @@ import { appendFile, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { isModelUsable } from '../memory/embeddings/model.js';
+import { isModelAvailable } from '../memory/embeddings/nomic.js';
 import { appendLesson, LESSONS_PATH } from '../memory/storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
-import { cleanupCliTestDir, createQuickLesson, runCli, setupCliTestDir } from '../test-utils.js';
+import { cleanupCliTestDir, createQuickLesson, runCli, setupCliTestDir, shouldSkipEmbeddingTests } from '../test-utils.js';
+
+const modelAvailable = isModelAvailable();
+const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
+const hybridEnabled = !shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
 
 describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;
@@ -65,7 +71,8 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(combined).toContain('Polars');
     });
 
-    it('shows no results for non-matching query', () => {
+    // With hybrid search enabled, vector similarity returns results even for unrelated queries
+    it.skipIf(hybridEnabled)('shows no results for non-matching query (FTS-only)', () => {
       const { combined } = runCli('search "nonexistent"', tempDir);
       expect(combined.toLowerCase()).toMatch(/no lessons match|no.*found|0.*result/i);
     });
@@ -107,7 +114,8 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(combined).not.toContain('ENOENT');
     });
 
-    it('shows friendly message when no lessons match search', async () => {
+    // With hybrid search enabled, vector similarity returns results even for gibberish queries
+    it.skipIf(hybridEnabled)('shows friendly message when no lessons match search (FTS-only)', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
       await rebuildIndex(tempDir);
       closeDb();

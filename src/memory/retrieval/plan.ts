@@ -5,8 +5,8 @@
  * Uses vector search to find semantically similar lessons.
  */
 
-import { rankLessons, searchVector, type RankedLesson, type ScoredLesson } from '../search/index.js';
-import { incrementRetrievalCount } from '../storage/index.js';
+import { CANDIDATE_MULTIPLIER, mergeHybridResults, rankLessons, searchVector, type RankedLesson, type ScoredLesson } from '../search/index.js';
+import { incrementRetrievalCount, searchKeywordScored } from '../storage/index.js';
 
 /** Default number of lessons to retrieve */
 const DEFAULT_LIMIT = 5;
@@ -20,7 +20,7 @@ export interface PlanRetrievalResult {
 /**
  * Retrieve relevant lessons for a plan.
  *
- * Uses vector search to find semantically similar lessons,
+ * Uses hybrid search (vector similarity + FTS5 keyword matching)
  * then applies ranking boosts for severity, recency, and confirmation.
  *
  * Hard-fails if embeddings are unavailable (propagates error from embedText).
@@ -35,11 +35,16 @@ export async function retrieveForPlan(
   planText: string,
   limit: number = DEFAULT_LIMIT
 ): Promise<PlanRetrievalResult> {
-  // Get lessons by vector similarity (will throw if embeddings unavailable)
-  const scored = await searchVector(repoRoot, planText, { limit: limit * 2 });
+  // Hybrid search: blend vector similarity with keyword matching
+  const candidateLimit = limit * CANDIDATE_MULTIPLIER;
+  const [vectorResults, keywordResults] = await Promise.all([
+    searchVector(repoRoot, planText, { limit: candidateLimit }),
+    searchKeywordScored(repoRoot, planText, candidateLimit),
+  ]);
+  const merged = mergeHybridResults(vectorResults, keywordResults);
 
-  // Apply ranking boosts
-  const ranked = rankLessons(scored);
+  // Apply ranking boosts (severity, recency, confirmation)
+  const ranked = rankLessons(merged);
 
   // Take top N after ranking
   const topLessons = ranked.slice(0, limit);

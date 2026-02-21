@@ -12,7 +12,7 @@ import { appendMemoryItem } from '../jsonl.js';
 
 import { closeDb, openDb } from './connection.js';
 import { rebuildIndex } from './sync.js';
-import { searchKeyword, sanitizeFtsQuery } from './search.js';
+import { searchKeyword, searchKeywordScored, sanitizeFtsQuery } from './search.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -121,6 +121,86 @@ describe('searchKeyword FTS error handling', () => {
   it('sanitizes query before matching', async () => {
     const results = await searchKeyword(tempDir, '"tests"', 10);
     expect(results).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Schema validation on rowToMemoryItem
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// searchKeywordScored
+// ---------------------------------------------------------------------------
+
+describe('searchKeywordScored', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-scored-'));
+  });
+
+  afterEach(async () => {
+    closeDb();
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('returns scored results with BM25 scores in [0, 1]', async () => {
+    await appendMemoryItem(tempDir, createLesson('L001', 'always write tests'));
+    await appendMemoryItem(tempDir, createLesson('L002', 'test your code carefully'));
+    await rebuildIndex(tempDir);
+
+    const results = await searchKeywordScored(tempDir, 'tests', 10);
+    expect(results.length).toBeGreaterThan(0);
+    for (const r of results) {
+      expect(r.score).toBeGreaterThanOrEqual(0);
+      expect(r.score).toBeLessThanOrEqual(1);
+      expect(r.lesson).toBeDefined();
+      expect(r.lesson.id).toBeDefined();
+    }
+  });
+
+  it('returns empty array for empty database', async () => {
+    await rebuildIndex(tempDir);
+    const results = await searchKeywordScored(tempDir, 'anything', 10);
+    expect(results).toEqual([]);
+  });
+
+  it('filters invalidated items', async () => {
+    const invalidated = {
+      ...createLesson('L001', 'invalidated lesson about tests'),
+      invalidatedAt: '2026-01-01T00:00:00Z',
+      invalidationReason: 'outdated',
+    };
+    await appendMemoryItem(tempDir, invalidated);
+    await appendMemoryItem(tempDir, createLesson('L002', 'valid lesson about tests'));
+    await rebuildIndex(tempDir);
+
+    const results = await searchKeywordScored(tempDir, 'tests', 10);
+    const ids = results.map((r) => r.lesson.id);
+    expect(ids).not.toContain('L001');
+    expect(ids).toContain('L002');
+  });
+
+  it('respects type filter', async () => {
+    await appendMemoryItem(tempDir, createLesson('L001', 'lesson about tests'));
+    await appendMemoryItem(tempDir, {
+      ...createLesson('S001', 'solution about tests'),
+      type: 'solution',
+    });
+    await rebuildIndex(tempDir);
+
+    const results = await searchKeywordScored(tempDir, 'tests', 10, 'lesson');
+    const ids = results.map((r) => r.lesson.id);
+    expect(ids).toContain('L001');
+    expect(ids).not.toContain('S001');
+  });
+
+  it('returns empty for sanitized-away query', async () => {
+    await appendMemoryItem(tempDir, createLesson('L001', 'always write tests'));
+    await rebuildIndex(tempDir);
+
+    const results = await searchKeywordScored(tempDir, '"*^', 10);
+    expect(results).toEqual([]);
   });
 });
 
