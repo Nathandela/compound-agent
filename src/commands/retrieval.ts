@@ -11,7 +11,7 @@ import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { isModelUsable, loadSessionLessons, retrieveForPlan } from '../index.js';
 import { incrementRetrievalCount, readLessons, readMemoryItems, searchKeyword, searchKeywordScored, syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem } from '../memory/index.js';
-import { CANDIDATE_MULTIPLIER, mergeHybridResults, rankLessons, searchVector } from '../memory/search/index.js';
+import { CANDIDATE_MULTIPLIER, MIN_HYBRID_SCORE, mergeHybridResults, rankLessons, searchVector } from '../memory/search/index.js';
 
 import { formatError } from '../cli-error-format.js';
 
@@ -162,7 +162,7 @@ async function searchAction(cmd: Command, query: string, options: { limit: strin
         searchVector(repoRoot, query, { limit: candidateLimit }),
         searchKeywordScored(repoRoot, query, candidateLimit),
       ]);
-      const merged = mergeHybridResults(vectorResults, keywordResults);
+      const merged = mergeHybridResults(vectorResults, keywordResults, { minScore: MIN_HYBRID_SCORE });
       const ranked = rankLessons(merged);
       results = ranked.slice(0, limit).map((r) => r.lesson);
     } else {
@@ -313,6 +313,8 @@ async function checkPlanAction(cmd: Command, options: { plan?: string; json?: bo
     return;
   }
 
+  await syncIfNeeded(repoRoot);
+
   const usability = await isModelUsable();
   if (!usability.usable) {
     if (options.json) {
@@ -368,7 +370,7 @@ async function checkPlanAction(cmd: Command, options: { plan?: string; json?: bo
 export function registerRetrievalCommands(program: Command): void {
   program
     .command('search <query>')
-    .description('Search lessons by keyword')
+    .description('Search lessons')
     .option('-n, --limit <number>', 'Maximum results', DEFAULT_SEARCH_LIMIT)
     .action(async function (this: Command, query: string, options: { limit: string }) {
       await searchAction(this, query, options);

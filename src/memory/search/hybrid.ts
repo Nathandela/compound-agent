@@ -20,11 +20,14 @@ export interface HybridMergeOptions {
   vectorWeight?: number;
   textWeight?: number;
   limit?: number;
+  /** Filter results below this blended score */
+  minScore?: number;
 }
 
 export const DEFAULT_VECTOR_WEIGHT = 0.7;
 export const DEFAULT_TEXT_WEIGHT = 0.3;
 export const CANDIDATE_MULTIPLIER = 4;
+export const MIN_HYBRID_SCORE = 0.35;
 
 /**
  * Normalize FTS5 BM25 rank to a 0-1 score.
@@ -61,9 +64,11 @@ export function mergeHybridResults(
   const rawVecW = options?.vectorWeight ?? DEFAULT_VECTOR_WEIGHT;
   const rawTxtW = options?.textWeight ?? DEFAULT_TEXT_WEIGHT;
   const total = rawVecW + rawTxtW;
+  if (total <= 0) return [];
   const vecW = rawVecW / total;
   const txtW = rawTxtW / total;
   const limit = options?.limit;
+  const minScore = options?.minScore;
 
   // Union by lesson ID
   const merged = new Map<string, { lesson: MemoryItem; vecScore: number; txtScore: number }>();
@@ -92,5 +97,6 @@ export function mergeHybridResults(
 
   results.sort((a, b) => b.score - a.score);
 
-  return limit !== undefined ? results.slice(0, limit) : results;
+  const filtered = minScore !== undefined ? results.filter((r) => r.score >= minScore) : results;
+  return limit !== undefined ? filtered.slice(0, limit) : filtered;
 }

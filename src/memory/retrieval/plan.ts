@@ -5,7 +5,7 @@
  * Uses vector search to find semantically similar lessons.
  */
 
-import { CANDIDATE_MULTIPLIER, mergeHybridResults, rankLessons, searchVector, type RankedLesson, type ScoredLesson } from '../search/index.js';
+import { CANDIDATE_MULTIPLIER, MIN_HYBRID_SCORE, mergeHybridResults, rankLessons, searchVector, type RankedLesson, type ScoredLesson } from '../search/index.js';
 import { incrementRetrievalCount, searchKeywordScored } from '../storage/index.js';
 
 /** Default number of lessons to retrieve */
@@ -41,7 +41,7 @@ export async function retrieveForPlan(
     searchVector(repoRoot, planText, { limit: candidateLimit }),
     searchKeywordScored(repoRoot, planText, candidateLimit),
   ]);
-  const merged = mergeHybridResults(vectorResults, keywordResults);
+  const merged = mergeHybridResults(vectorResults, keywordResults, { minScore: MIN_HYBRID_SCORE });
 
   // Apply ranking boosts (severity, recency, confirmation)
   const ranked = rankLessons(merged);

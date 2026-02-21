@@ -27,6 +27,7 @@ export {
   CANDIDATE_MULTIPLIER,
   DEFAULT_TEXT_WEIGHT,
   DEFAULT_VECTOR_WEIGHT,
+  MIN_HYBRID_SCORE,
   mergeHybridResults,
   normalizeBm25Rank,
 } from './hybrid.js';

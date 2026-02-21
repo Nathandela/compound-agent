@@ -12,6 +12,7 @@ import {
   DEFAULT_TEXT_WEIGHT,
   DEFAULT_VECTOR_WEIGHT,
   CANDIDATE_MULTIPLIER,
+  MIN_HYBRID_SCORE,
   mergeHybridResults,
   normalizeBm25Rank,
   type ScoredKeywordResult,
@@ -162,6 +163,36 @@ describe('mergeHybridResults', () => {
     expect(result).toHaveLength(2);
   });
 
+  it('returns empty when both weights are zero', () => {
+    const vec = [vectorResult('L001', 0.8)];
+    const kw = [keywordResult('L001', 0.6)];
+    const result = mergeHybridResults(vec, kw, { vectorWeight: 0, textWeight: 0 });
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty when weights sum to negative', () => {
+    const vec = [vectorResult('L001', 0.8)];
+    const result = mergeHybridResults(vec, [], { vectorWeight: -1, textWeight: 0.5 });
+    expect(result).toEqual([]);
+  });
+
+  it('filters results below minScore', () => {
+    const vec = [vectorResult('A', 0.9), vectorResult('B', 0.2)];
+    const result = mergeHybridResults(vec, [], { minScore: 0.5 });
+    // A: 0.7 * 0.9 = 0.63 (above 0.5)
+    // B: 0.7 * 0.2 = 0.14 (below 0.5)
+    expect(result).toHaveLength(1);
+    expect(result[0]!.lesson.id).toBe('A');
+  });
+
+  it('minScore filters after blending', () => {
+    const vec = [vectorResult('L001', 0.4)];
+    const kw = [keywordResult('L001', 0.6)];
+    // Blended: 0.7*0.4 + 0.3*0.6 = 0.28 + 0.18 = 0.46
+    const result = mergeHybridResults(vec, kw, { minScore: 0.5 });
+    expect(result).toHaveLength(0);
+  });
+
   // Property-based tests
   describe('properties', () => {
     it('output scores in [0, 1] when input scores in [0, 1]', () => {
@@ -265,6 +296,10 @@ describe('hybrid constants', () => {
 
   it('CANDIDATE_MULTIPLIER is 4', () => {
     expect(CANDIDATE_MULTIPLIER).toBe(4);
+  });
+
+  it('MIN_HYBRID_SCORE is 0.35', () => {
+    expect(MIN_HYBRID_SCORE).toBe(0.35);
   });
 
   it('default weights sum to 1.0', () => {
