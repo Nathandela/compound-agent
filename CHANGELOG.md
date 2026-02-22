@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.7] - 2026-02-22
+
+### Fixed
+
+- **Flaky tests**: Hardened auto-sync, init, and stop-audit tests with proper subprocess timeouts, guard assertions, and path resolution fixes
+- **Conditional expects**: Replaced silent-pass `if (condition) { expect() }` patterns with explicit `it.runIf`/`it.skipIf` in model.test.ts
+- **Singleton test timing**: Replaced `setTimeout(50)` with deterministic microtask yield in nomic-singleton.test.ts
+
+### Changed
+
+- **Test pipeline**: Split vitest workspace into unit/integration/embedding projects; `test:fast` now runs in ~12s (was ~107s)
+- **Export tests**: Consolidated 27 individual export-existence tests into 7 grouped assertions in index.test.ts
+
+### Added
+
+- `pnpm test:unit` and `pnpm test:integration` scripts for targeted test execution
+- Integration tags on 8 CLI test files outside `src/cli/`
+
 ## [1.3.3] - 2026-02-21
 
 ### Changed
