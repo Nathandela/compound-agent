@@ -72,8 +72,11 @@ describe('Stop Audit Hook', () => {
     });
 
     it('never throws — returns {} on any error', () => {
-      expect(() => processStopAudit('')).not.toThrow();
-      const result = processStopAudit('');
+      // Use a path that cannot exist to test error handling
+      // (empty string resolves to cwd which may have valid state)
+      const bogusRoot = '/tmp/.ca-nonexistent-' + Date.now();
+      expect(() => processStopAudit(bogusRoot)).not.toThrow();
+      const result = processStopAudit(bogusRoot);
       expect(result).toEqual({});
     });
   });

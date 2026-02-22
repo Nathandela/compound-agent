@@ -168,7 +168,8 @@ describe('CLI', { tags: ['integration'] }, () => {
       const gitHooksDir = join(tempDir, '.git', 'hooks');
       await mkdir(gitHooksDir, { recursive: true });
 
-      runCli('init', tempDir);
+      const first = runCli('init', tempDir);
+      expect(existsSync(join(gitHooksDir, 'pre-commit'))).toBe(true);
       runCli('init', tempDir);
 
       const hookPath = join(gitHooksDir, 'pre-commit');
@@ -702,9 +703,10 @@ exit 0
         await mkdir(join(tempDir, '.claude'), { recursive: true });
 
         runCli('init', tempDir);
-        runCli('init', tempDir);
-
         const settingsPath = join(tempDir, '.claude', 'settings.json');
+        expect(existsSync(settingsPath)).toBe(true);
+
+        runCli('init', tempDir);
         const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
         const compoundAgentHooks = settings.hooks.SessionStart.filter((entry: { hooks: Array<{ command: string }> }) =>
