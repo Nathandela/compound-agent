@@ -422,7 +422,7 @@ describe('Prime Command', () => {
           phase_index: 3,
           skills_read: ['.claude/skills/compound/work/SKILL.md'],
           gates_passed: ['post-plan'],
-          started_at: '2026-02-18T21:00:00.000Z',
+          started_at: new Date().toISOString(),
         }),
         'utf-8'
       );
@@ -447,7 +447,7 @@ describe('Prime Command', () => {
           phase_index: 3,
           skills_read: [],
           gates_passed: [],
-          started_at: '2026-02-18T21:00:00.000Z',
+          started_at: new Date().toISOString(),
         }),
         'utf-8'
       );

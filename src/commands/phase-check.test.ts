@@ -119,7 +119,7 @@ describe('Phase Check State Machine', () => {
   });
 
   describe('getPhaseState TTL', () => {
-    it('returns null when state is older than 72 hours', () => {
+    it('returns null and deletes state file when state is older than 72 hours', () => {
       initPhaseState(repoRoot, 'test-epic');
 
       const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
@@ -128,6 +128,7 @@ describe('Phase Check State Machine', () => {
       writeFileSync(stateFile, JSON.stringify(state), 'utf-8');
 
       expect(getPhaseState(repoRoot)).toBeNull();
+      expect(existsSync(stateFile)).toBe(false);
     });
 
     it('returns state when within 72 hour window', () => {

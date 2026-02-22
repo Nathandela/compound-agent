@@ -32,7 +32,7 @@ vi.mock('../cli-utils.js', () => ({
   }),
   shortId: vi.fn((fullId: string) => fullId.replace(/^[^-]+-/, '')),
   validateEpicId: vi.fn((id: string) => {
-    if (!/^[a-zA-Z0-9._-]+$/.test(id)) {
+    if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
       throw new Error(`Invalid epic ID: "${id}"`);
     }
   }),

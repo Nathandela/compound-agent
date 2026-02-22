@@ -41,7 +41,7 @@ export function parseLimit(value: string, name: string): number {
  * @returns Repository root path for lesson storage
  */
 export function getRepoRoot(): string {
-  return process.env['COMPOUND_AGENT_ROOT'] ?? process.cwd();
+  return process.env['COMPOUND_AGENT_ROOT'] || process.cwd();
 }
 
 // ============================================================================
