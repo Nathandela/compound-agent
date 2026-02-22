@@ -230,8 +230,8 @@ This project uses compound-agent for session memory via **CLI commands**.
 
 | Command | Purpose |
 |---------|---------|
-| \`npx ca search "query"\` | Search lessons - use BEFORE architectural decisions |
-| \`npx ca knowledge "query"\` | Search docs knowledge - use BEFORE architectural decisions |
+| \`npx ca search "query"\` | Search lessons - MUST call before architectural decisions; use anytime you need context |
+| \`npx ca knowledge "query"\` | Ask the project docs any question - MUST call before architectural decisions; use freely |
 | \`npx ca learn "insight"\` | Capture lessons - use AFTER corrections or discoveries |
 | \`npx ca list\` | List all stored lessons |
 | \`npx ca show <id>\` | Show details of a specific lesson |
@@ -245,6 +245,8 @@ You MUST call \`npx ca search\` and \`npx ca knowledge\` BEFORE:
 - After user corrections ("actually...", "wrong", "use X instead")
 
 **NEVER skip search for complex decisions.** Past mistakes will repeat.
+
+Beyond mandatory triggers, use these commands freely — they are lightweight queries, not heavyweight operations. Uncertain about a pattern? \`ca search\`. Need a detail from the docs? \`ca knowledge\`. The cost of an unnecessary search is near-zero; the cost of a missed one can be hours.
 
 ### Capture Protocol
 

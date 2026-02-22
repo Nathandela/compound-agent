@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-02-22
+
+### Changed
+
+- **Broader retrieval messaging**: `ca search` and `ca knowledge` descriptions in prime output and AGENTS.md now encourage general-purpose use beyond mandatory architectural triggers
+
 ## [1.4.0] - 2026-02-22
 
 ### Fixed
@@ -701,7 +707,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/Nathandela/learning_agent/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/Nathandela/learning_agent/compare/v1.3.9...v1.4.0
 [1.3.9]: https://github.com/Nathandela/learning_agent/compare/v1.3.8...v1.3.9
 [1.3.8]: https://github.com/Nathandela/learning_agent/compare/v1.3.7...v1.3.8
