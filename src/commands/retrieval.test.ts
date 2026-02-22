@@ -20,7 +20,7 @@ const modelUsability = modelAvailable ? await isModelUsable() : { usable: false 
 const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
 const hybridEnabled = !skipEmbedding;
 
-describe('Retrieval Commands', () => {
+describe('Retrieval Commands', { tags: ['integration'] }, () => {
   const { getTempDir, runCli } = setupCliTestContext();
 
   describe('list command', () => {

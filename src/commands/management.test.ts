@@ -14,7 +14,7 @@ import { appendLesson, appendMemoryItem, LESSONS_PATH } from '../memory/storage/
 import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
 import { createFullLesson, createPattern, createPreference, createQuickLesson, createSolution, daysAgo, setupCliTestContext } from '../test-utils.js';
 
-describe('Management Commands', () => {
+describe('Management Commands', { tags: ['integration'] }, () => {
   const { getTempDir, runCli } = setupCliTestContext();
 
   describe('export command', () => {

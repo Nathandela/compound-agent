@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { LESSONS_PATH } from '../memory/storage/jsonl.js';
 import { setupCliTestContext } from '../test-utils.js';
 
-describe('Capture Commands', () => {
+describe('Capture Commands', { tags: ['integration'] }, () => {
   const { getTempDir, runCli } = setupCliTestContext();
 
   describe('learn command', () => {

@@ -196,14 +196,17 @@ pnpm lint      # Zero violations
 ## Build & Test Commands
 
 ```bash
-pnpm install       # Install dependencies
-pnpm build         # Build with tsup
-pnpm test          # Full suite
-pnpm test:fast     # Skip CLI integration tests
-pnpm test:changed  # Only tests affected by recent changes
-pnpm test:watch    # Watch mode
-pnpm test:all      # Full suite with model download
-pnpm dev           # Development mode (watch)
+pnpm install            # Install dependencies
+pnpm build              # Build with tsup
+pnpm test               # Full suite (unit + integration + embedding)
+pnpm test:fast          # Unit + embedding only (~12s)
+pnpm test:unit          # Unit tests only (~14s)
+pnpm test:integration   # CLI integration tests only (~100s)
+pnpm test:changed       # Only tests affected by recent changes
+pnpm test:watch         # Watch mode
+pnpm test:all           # Full suite with model download
+pnpm test:segment <mod> # Tests for one module (e.g., memory, commands)
+pnpm dev                # Development mode (watch)
 ```
 
 **Recommended**: `pnpm test:fast` during development, `pnpm test` before committing.

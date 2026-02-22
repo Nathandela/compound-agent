@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { cleanupCliTestDir, runCli, setupCliTestDir } from '../test-utils.js';
 
-describe('phase-check CLI', { tags: ['hooks'] }, () => {
+describe('phase-check CLI', { tags: ['hooks', 'integration'] }, () => {
   let tempDir: string;
 
   beforeEach(async () => {

@@ -18,7 +18,7 @@ import { describe, expect, it } from 'vitest';
 import { setupCliTestContext } from '../test-utils.js';
 import { AGENT_TEMPLATES, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
 
-describe('Setup Commands - Generated Content', () => {
+describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => {
   const { getTempDir, runCli } = setupCliTestContext();
 
   /**

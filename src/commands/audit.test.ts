@@ -11,7 +11,7 @@ import { createFullLesson } from '../test-utils.js';
 import { appendMemoryItem } from '../memory/storage/jsonl.js';
 import { setupCliTestContext } from '../test-utils.js';
 
-describe('Audit Command', () => {
+describe('Audit Command', { tags: ['integration'] }, () => {
   const { getTempDir, runCli } = setupCliTestContext();
 
   it('returns 0 findings on empty repo', () => {

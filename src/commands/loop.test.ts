@@ -225,7 +225,7 @@ describe('generateLoopScript', () => {
   });
 });
 
-describe('ca loop CLI', () => {
+describe('ca loop CLI', { tags: ['integration'] }, () => {
   const { getTempDir, runCli } = setupCliTestContext();
 
   it('writes script to default output path', () => {

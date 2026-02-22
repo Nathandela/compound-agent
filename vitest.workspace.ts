@@ -1,5 +1,20 @@
 import { defineWorkspace } from 'vitest/config';
 
+// Integration test files: tests that spawn real CLI subprocesses via runCli().
+// These are slow (each test = new Node process) and need a build step (globalSetup).
+// Maintained as explicit list; add new files here when they use runCli() from test-utils.
+const integrationFiles = [
+  'src/cli/**/*.test.ts',
+  'src/commands/audit.test.ts',
+  'src/commands/capture.test.ts',
+  'src/commands/compound.test.ts',
+  'src/commands/loop.test.ts',
+  'src/commands/management.test.ts',
+  'src/commands/phase-check.cli.test.ts',
+  'src/commands/retrieval.test.ts',
+  'src/setup/setup.test.ts',
+];
+
 export default defineWorkspace([
   {
     test: {
@@ -7,7 +22,21 @@ export default defineWorkspace([
       globals: true,
       environment: 'node',
       include: ['src/**/*.test.ts', 'tools/**/*.test.js', 'scripts/**/*.test.ts'],
-      exclude: ['src/memory/embeddings/**/*.test.ts'],
+      exclude: ['src/memory/embeddings/**/*.test.ts', ...integrationFiles],
+      pool: 'threads',
+      poolOptions: {
+        threads: { minThreads: 2, maxThreads: 4 },
+      },
+      isolate: true,
+    },
+    cacheDir: 'node_modules/.vitest',
+  },
+  {
+    test: {
+      name: 'integration',
+      globals: true,
+      environment: 'node',
+      include: integrationFiles,
       pool: 'threads',
       poolOptions: {
         threads: { minThreads: 2, maxThreads: 4 },
