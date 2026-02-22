@@ -219,11 +219,13 @@ export async function installDocTemplates(repoRoot: string): Promise<boolean> {
 
 /**
  * Install research docs from the package's docs/research/ to docs/compound/research/ in the user's project.
- * Idempotent: does not overwrite existing files.
  *
- * @returns true if any research docs were created
+ * @param force - When true, overwrites existing files if content differs (used by --update).
+ *                When false (default), skips existing files (idempotent fresh install).
+ * @returns true if any research docs were created or updated
  */
-export async function installResearchDocs(repoRoot: string): Promise<boolean> {
+export async function installResearchDocs(repoRoot: string, options?: { force?: boolean }): Promise<boolean> {
+  const force = options?.force ?? false;
   // Resolve the package's docs/research/ directory via import.meta.url
   // In the built bundle, import.meta.url points to dist/cli.js.
   // Go up one level from dist/ to reach the package root.
@@ -247,19 +249,25 @@ export async function installResearchDocs(repoRoot: string): Promise<boolean> {
       if (entry.isDirectory()) {
         await mkdir(destPath, { recursive: true });
         await copyDir(srcPath, destPath);
-      } else if (!existsSync(destPath) && entry.name.endsWith('.md')) {
-        let content = await readFile(srcPath, 'utf-8');
-        // Rewrite index.md header to note provenance
-        if (entry.name === 'index.md') {
-          const patched = content.replace(
-            /^# .*/m,
-            '$&\n\n> Shipped by compound-agent. Source: `docs/research/` in the compound-agent package.',
-          );
-          content = patched !== content ? patched : `> Shipped by compound-agent.\n\n${content}`;
-        }
-        await writeFile(destPath, content, 'utf-8');
-        created = true;
+        continue;
       }
+      if (!entry.name.endsWith('.md')) continue;
+      const exists = existsSync(destPath);
+      if (exists && !force) continue;
+
+      let content = await readFile(srcPath, 'utf-8');
+      // Rewrite index.md header to note provenance
+      if (entry.name === 'index.md') {
+        const patched = content.replace(
+          /^# .*/m,
+          '$&\n\n> Shipped by compound-agent. Source: `docs/research/` in the compound-agent package.',
+        );
+        content = patched !== content ? patched : `> Shipped by compound-agent.\n\n${content}`;
+      }
+      // In force mode, skip write if content is unchanged
+      if (exists && (await readFile(destPath, 'utf-8')) === content) continue;
+      await writeFile(destPath, content, 'utf-8');
+      created = true;
     }
   }
 

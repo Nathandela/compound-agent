@@ -34,6 +34,7 @@ import {
   installAgentTemplates,
   installDocTemplates,
   installPhaseSkills,
+  installResearchDocs,
   installWorkflowCommands,
   updateAgentsMd,
   type PnpmConfigResult,
@@ -144,6 +145,9 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   // 9. Install documentation templates
   await installDocTemplates(repoRoot);
 
+  // 9b. Install research docs
+  await installResearchDocs(repoRoot);
+
   // 10. Install pre-commit git hook
   let gitHooks: HookInstallResult['status'] | 'skipped' = 'skipped';
   if (!options.skipHooks) {
@@ -248,6 +252,11 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
       .replace('{{VERSION}}', VERSION)
       .replace('{{DATE}}', new Date().toISOString().slice(0, 10));
     await processFile(join(repoRoot, 'docs', 'compound', filename), content);
+  }
+
+  // Update research docs (overwrite with latest versions)
+  if (!dryRun) {
+    await installResearchDocs(repoRoot, { force: true });
   }
 
   // Migration: clean up legacy root-level slash commands from v1.0
