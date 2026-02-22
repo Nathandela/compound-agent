@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import type { Command } from 'commander';
 
 import { formatError } from '../cli-error-format.js';
+import { getRepoRoot } from '../cli-utils.js';
 import { processPhaseGuard } from './hooks-phase-guard.js';
 import { processReadTracker } from './hooks-read-tracker.js';
 import { processStopAudit } from './hooks-stop-audit.js';
@@ -546,7 +547,7 @@ async function runPostToolFailureHook(): Promise<void> {
       return;
     }
 
-    const stateDir = join(process.cwd(), '.claude');
+    const stateDir = join(getRepoRoot(), '.claude');
     const result = processToolFailure(data.tool_name, data.tool_input ?? {}, stateDir);
     console.log(JSON.stringify(result));
   } catch {
@@ -561,7 +562,7 @@ async function runPostToolFailureHook(): Promise<void> {
 async function runPostToolSuccessHook(): Promise<void> {
   try {
     await readStdin();
-    const stateDir = join(process.cwd(), '.claude');
+    const stateDir = join(getRepoRoot(), '.claude');
     processToolSuccess(stateDir);
     console.log(JSON.stringify({}));
   } catch {
@@ -577,7 +578,7 @@ async function runToolHook(
     const input = await readStdin();
     const data = JSON.parse(input) as { tool_name?: string; tool_input?: Record<string, unknown> };
     if (!data.tool_name) { console.log(JSON.stringify({})); return; }
-    console.log(JSON.stringify(processor(process.cwd(), data.tool_name, data.tool_input ?? {})));
+    console.log(JSON.stringify(processor(getRepoRoot(), data.tool_name, data.tool_input ?? {})));
   } catch { console.log(JSON.stringify({})); }
 }
 
@@ -586,7 +587,7 @@ async function runStopAuditHook(): Promise<void> {
   try {
     const input = await readStdin();
     const data = JSON.parse(input) as { stop_hook_active?: boolean };
-    console.log(JSON.stringify(processStopAudit(process.cwd(), data.stop_hook_active ?? false)));
+    console.log(JSON.stringify(processStopAudit(getRepoRoot(), data.stop_hook_active ?? false)));
   } catch { console.log(JSON.stringify({})); }
 }
 

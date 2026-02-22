@@ -8,9 +8,14 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
+import { getRepoRoot } from '../cli-utils.js';
+
 const STATE_DIR = '.claude';
 const STATE_FILE = '.ca-phase-state.json';
 const EPIC_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/** Max age for phase state before it's considered stale (72 hours). */
+export const PHASE_STATE_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 
 export const PHASES = ['brainstorm', 'plan', 'work', 'review', 'compound'] as const;
 export type PhaseName = (typeof PHASES)[number];
@@ -106,7 +111,11 @@ export function getPhaseState(repoRoot: string): PhaseState | null {
     if (!existsSync(path)) return null;
     const raw = readFileSync(path, 'utf-8');
     const parsed = JSON.parse(raw) as unknown;
-    return validatePhaseState(parsed) ? parsed : null;
+    if (!validatePhaseState(parsed)) return null;
+    // TTL check: discard stale state from abandoned LFG runs
+    const age = Date.now() - new Date(parsed.started_at).getTime();
+    if (age > PHASE_STATE_MAX_AGE_MS) return null;
+    return parsed;
   } catch {
     return null;
   }
@@ -264,7 +273,7 @@ export function registerPhaseCheckCommand(program: Command): void {
     .option('--dry-run', 'Show what would be done without making changes');
 
   const getDryRun = (): boolean => phaseCheck.opts<{ dryRun?: boolean }>().dryRun ?? false;
-  const repoRoot = (): string => process.cwd();
+  const repoRoot = (): string => getRepoRoot();
 
   registerPhaseSubcommands(phaseCheck, getDryRun, repoRoot);
 

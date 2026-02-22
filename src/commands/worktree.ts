@@ -353,12 +353,16 @@ function addCreateCommand(wt: Command): void {
         const result = runWorktreeCreate(epicId);
         if (result.alreadyExists) {
           console.log(`Worktree already exists at ${result.worktreePath}`);
+          console.log(`  To use: cd ${result.worktreePath} && claude`);
           return;
         }
         console.log(`Worktree created:`);
         console.log(`  Path:       ${result.worktreePath}`);
         console.log(`  Branch:     ${result.branch}`);
         console.log(`  Merge task: ${result.mergeTaskId}`);
+        console.log('');
+        console.log('Next step: open a NEW Claude session with the worktree as primary directory:');
+        console.log(`  cd ${result.worktreePath} && claude`);
       } catch (err) { handleError(err); }
     });
 }

@@ -47,7 +47,9 @@ import {
   runWorktreeMerge,
   runWorktreeList,
   runWorktreeCleanup,
+  registerWorktreeCommands,
 } from './worktree.js';
+import { Command } from 'commander';
 
 const mockExecFileSync = vi.mocked(execFileSync);
 const mockExistsSync = vi.mocked(existsSync);
@@ -635,5 +637,70 @@ describe('worktree cleanup', () => {
     );
     expect(result.removed).toBe(true);
     expect(result.mergeTaskClosed).toBe(true);
+  });
+});
+
+describe('worktree create CLI output', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetRepoRoot.mockReturnValue('/fake/repo');
+  });
+
+  it('prints next-step command for new worktrees', () => {
+    mockExecFileSync.mockImplementation((cmd, args) => {
+      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
+        return 'worktree /fake/repo\nHEAD abc123\nbranch refs/heads/main\n';
+      }
+      if (cmd === 'bd' && args?.[0] === 'create') {
+        return 'learning_agent-m001\n';
+      }
+      return '';
+    });
+    mockExistsSync.mockReturnValue(true);
+    mockReadFileSync.mockReturnValue('');
+
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const program = new Command();
+      program.exitOverride();
+      registerWorktreeCommands(program);
+      program.parse(['node', 'ca', 'worktree', 'create', 'epic1']);
+
+      const allOutput = spy.mock.calls.flat().join('\n');
+      expect(allOutput).toContain('Next step');
+      expect(allOutput).toContain('cd');
+      expect(allOutput).toContain('claude');
+      expect(allOutput).toContain('/fake/repo-wt-epic1');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('prints usage hint when worktree already exists', () => {
+    mockExecFileSync.mockImplementation((cmd, args) => {
+      if (cmd === 'git' && args?.[0] === 'worktree' && args?.[1] === 'list') {
+        return worktreeListPorcelain([
+          { path: '/fake/repo', branch: 'main' },
+          { path: '/fake/repo-wt-epic1', branch: 'epic/epic1' },
+        ]);
+      }
+      return '';
+    });
+
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const program = new Command();
+      program.exitOverride();
+      registerWorktreeCommands(program);
+      program.parse(['node', 'ca', 'worktree', 'create', 'epic1']);
+
+      const allOutput = spy.mock.calls.flat().join('\n');
+      expect(allOutput).toContain('already exists');
+      expect(allOutput).toContain('cd');
+      expect(allOutput).toContain('claude');
+      expect(allOutput).toContain('/fake/repo-wt-epic1');
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

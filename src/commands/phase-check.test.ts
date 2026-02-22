@@ -9,14 +9,18 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { Command } from 'commander';
 
 import {
   cleanPhaseState,
   expectedGateForPhase,
   getPhaseState,
   initPhaseState,
+  PHASE_STATE_MAX_AGE_MS,
   recordGatePassed,
+  registerPhaseCheckCommand,
   startPhase,
   updatePhaseState,
 } from './phase-check.js';
@@ -111,6 +115,42 @@ describe('Phase Check State Machine', () => {
 
       const state = getPhaseState(repoRoot);
       expect(state).toBeNull();
+    });
+  });
+
+  describe('getPhaseState TTL', () => {
+    it('returns null when state is older than 72 hours', () => {
+      initPhaseState(repoRoot, 'test-epic');
+
+      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+      const old = new Date(Date.now() - 73 * 60 * 60 * 1000).toISOString();
+      state.started_at = old;
+      writeFileSync(stateFile, JSON.stringify(state), 'utf-8');
+
+      expect(getPhaseState(repoRoot)).toBeNull();
+    });
+
+    it('returns state when within 72 hour window', () => {
+      initPhaseState(repoRoot, 'test-epic');
+
+      const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+      const recent = new Date(Date.now() - 71 * 60 * 60 * 1000).toISOString();
+      state.started_at = recent;
+      writeFileSync(stateFile, JSON.stringify(state), 'utf-8');
+
+      const result = getPhaseState(repoRoot);
+      expect(result).not.toBeNull();
+      expect(result!.epic_id).toBe('test-epic');
+    });
+
+    it('returns freshly initialized state (within TTL)', () => {
+      initPhaseState(repoRoot, 'test-epic');
+      const result = getPhaseState(repoRoot);
+      expect(result).not.toBeNull();
+    });
+
+    it('exports PHASE_STATE_MAX_AGE_MS as 72 hours in milliseconds', () => {
+      expect(PHASE_STATE_MAX_AGE_MS).toBe(72 * 60 * 60 * 1000);
     });
   });
 
@@ -216,5 +256,45 @@ describe('Phase Check State Machine', () => {
       expect(expectedGateForPhase(1)).toBeNull();
       expect(expectedGateForPhase(99)).toBeNull();
     });
+  });
+});
+
+describe('registerPhaseCheckCommand respects COMPOUND_AGENT_ROOT', () => {
+  let targetDir: string;
+  const originalEnv = process.env['COMPOUND_AGENT_ROOT'];
+
+  beforeEach(async () => {
+    targetDir = await mkdtemp(join(tmpdir(), 'phase-root-'));
+    process.env['COMPOUND_AGENT_ROOT'] = targetDir;
+  });
+
+  afterEach(async () => {
+    if (originalEnv === undefined) {
+      delete process.env['COMPOUND_AGENT_ROOT'];
+    } else {
+      process.env['COMPOUND_AGENT_ROOT'] = originalEnv;
+    }
+    await rm(targetDir, { recursive: true, force: true });
+  });
+
+  it('writes state file to COMPOUND_AGENT_ROOT, not process.cwd()', async () => {
+    const program = new Command();
+    program.exitOverride();
+    registerPhaseCheckCommand(program);
+
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      await program.parseAsync(['node', 'ca', 'phase-check', 'init', 'test-epic']);
+    } finally {
+      consoleSpy.mockRestore();
+    }
+
+    const stateFile = join(targetDir, '.claude', '.ca-phase-state.json');
+    expect(existsSync(stateFile)).toBe(true);
+
+    const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
+    expect(state.epic_id).toBe('test-epic');
+    expect(state.lfg_active).toBe(true);
   });
 });
