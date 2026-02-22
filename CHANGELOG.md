@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-02-22
+
+### Fixed
+
+- **Plugin manifest**: Corrected repository URL from `compound_agent` to `learning_agent`
+
+### Changed
+
+- **Version consolidation**: Roll-up release of v1.3.7–v1.3.9 production readiness fixes (test pipeline hardening, data integrity, two-phase vector search, FTS5 sanitization)
+
 ## [1.3.9] - 2026-02-22
 
 ### Fixed
@@ -691,7 +701,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/Nathandela/learning_agent/compare/v1.3.9...v1.4.0
+[1.3.9]: https://github.com/Nathandela/learning_agent/compare/v1.3.8...v1.3.9
+[1.3.8]: https://github.com/Nathandela/learning_agent/compare/v1.3.3...v1.3.8
+[1.3.7]: https://github.com/Nathandela/learning_agent/compare/v1.3.3...v1.3.7
+[1.3.3]: https://github.com/Nathandela/learning_agent/compare/v1.3.2...v1.3.3
+[1.3.2]: https://github.com/Nathandela/learning_agent/compare/v1.3.1...v1.3.2
+[1.3.1]: https://github.com/Nathandela/learning_agent/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/Nathandela/learning_agent/compare/v1.2.11...v1.3.0
 [1.2.11]: https://github.com/Nathandela/learning_agent/compare/v1.2.10...v1.2.11
 [1.2.10]: https://github.com/Nathandela/learning_agent/compare/v1.2.9...v1.2.10

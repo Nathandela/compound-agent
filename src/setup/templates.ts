@@ -296,7 +296,7 @@ export const PLUGIN_MANIFEST = {
     name: 'Nathan Delacrétaz',
     url: 'https://github.com/Nathandela',
   },
-  repository: 'https://github.com/Nathandela/compound_agent',
+  repository: 'https://github.com/Nathandela/learning_agent',
   license: 'MIT',
   hooks: {
     SessionStart: [
