@@ -269,7 +269,7 @@ Before capturing, verify the lesson is:
 The JSONL file requires proper ID generation, schema validation, and SQLite sync.
 Use CLI (\`npx ca learn\`) — never manual edits.
 
-See [documentation](https://github.com/Nathandela/compound_agent) for more details.
+See [documentation](https://github.com/Nathandela/learning_agent) for more details.
 ${AGENTS_SECTION_END_MARKER}
 `;
 

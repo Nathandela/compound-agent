@@ -704,7 +704,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.4.0...HEAD
 [1.4.0]: https://github.com/Nathandela/learning_agent/compare/v1.3.9...v1.4.0
 [1.3.9]: https://github.com/Nathandela/learning_agent/compare/v1.3.8...v1.3.9
-[1.3.8]: https://github.com/Nathandela/learning_agent/compare/v1.3.3...v1.3.8
+[1.3.8]: https://github.com/Nathandela/learning_agent/compare/v1.3.7...v1.3.8
 [1.3.7]: https://github.com/Nathandela/learning_agent/compare/v1.3.3...v1.3.7
 [1.3.3]: https://github.com/Nathandela/learning_agent/compare/v1.3.2...v1.3.3
 [1.3.2]: https://github.com/Nathandela/learning_agent/compare/v1.3.1...v1.3.2

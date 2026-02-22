@@ -1,7 +1,7 @@
 import { defineWorkspace } from 'vitest/config';
 
 // Integration test files: tests that spawn real CLI subprocesses via runCli().
-// These are slow (each test = new Node process) and need a build step (globalSetup).
+// These are slow (each test = new Node process) and need a prior build (pnpm test / pnpm test:integration build automatically).
 // Maintained as explicit list; add new files here when they use runCli() from test-utils.
 const integrationFiles = [
   'src/cli/**/*.test.ts',
