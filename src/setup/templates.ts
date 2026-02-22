@@ -40,6 +40,32 @@ npx ca hooks run pre-commit
 `;
 
 // ============================================================================
+// Post-Commit Hook Constants
+// ============================================================================
+
+/** Post-commit hook shell script template */
+export const POST_COMMIT_HOOK_TEMPLATE = `#!/bin/sh
+# Compound Agent post-commit hook
+# Auto-indexes docs/ when documentation files change
+
+# Check if any docs/ files were modified in this commit
+if git diff-tree --no-commit-id --name-only -r HEAD | grep -q '^docs/'; then
+  npx ca -q index-docs 2>/dev/null &
+fi
+`;
+
+/** Marker comment for post-commit hook idempotency */
+export const POST_COMMIT_HOOK_MARKER = '# Compound Agent post-commit hook';
+
+/** Block to insert into existing post-commit hooks */
+export const COMPOUND_AGENT_POST_COMMIT_BLOCK = `
+# Compound Agent post-commit hook (appended)
+if git diff-tree --no-commit-id --name-only -r HEAD | grep -q '^docs/'; then
+  npx ca -q index-docs 2>/dev/null &
+fi
+`;
+
+// ============================================================================
 // Claude Code Hooks Configuration
 // ============================================================================
 
@@ -57,6 +83,7 @@ export const CLAUDE_HOOK_MARKERS = [
   // v1.2.9 canonical names
   'ca hooks run post-read',
   'ca hooks run phase-audit',
+  'ca index-docs',
 ];
 
 /** Claude Code SessionStart hook configuration (v0.2.4: uses prime for trust language) */
@@ -204,6 +231,7 @@ This project uses compound-agent for session memory via **CLI commands**.
 | Command | Purpose |
 |---------|---------|
 | \`npx ca search "query"\` | Search lessons - use BEFORE architectural decisions |
+| \`npx ca knowledge "query"\` | Search docs knowledge - use BEFORE architectural decisions |
 | \`npx ca learn "insight"\` | Capture lessons - use AFTER corrections or discoveries |
 | \`npx ca list\` | List all stored lessons |
 | \`npx ca show <id>\` | Show details of a specific lesson |
@@ -211,7 +239,7 @@ This project uses compound-agent for session memory via **CLI commands**.
 
 ### Mandatory Recall
 
-You MUST call \`npx ca search\` BEFORE:
+You MUST call \`npx ca search\` and \`npx ca knowledge\` BEFORE:
 - Architectural decisions or complex planning
 - Patterns you've implemented before in this repo
 - After user corrections ("actually...", "wrong", "use X instead")

@@ -88,6 +88,7 @@ npx ca doctor
 |------|---------|
 | Capture a lesson | \`npx ca learn "insight" --trigger "what happened"\` |
 | Search memory | \`npx ca search "keywords"\` |
+| Search docs knowledge | \`npx ca knowledge "query"\` |
 | Check plan against memory | \`npx ca check-plan --plan "description"\` |
 | View stats | \`npx ca stats\` |
 | Run full workflow | \`/compound:lfg <epic-id>\` |
@@ -536,6 +537,7 @@ Compound-agent installs five hooks into \`.claude/settings.json\`:
 
 \`\`\`bash
 npx ca search "feature area keywords"
+npx ca knowledge "architecture topic"
 npx ca check-plan --plan "description of what you are about to implement"
 \`\`\`
 

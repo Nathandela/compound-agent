@@ -31,6 +31,7 @@ const TRUST_LANGUAGE_TEMPLATE = `# Compound Agent Active
 | Command | Purpose |
 |---------|---------|
 | \`npx ca search "query"\` | Search lessons - call BEFORE architectural decisions |
+| \`npx ca knowledge "query"\` | Search docs knowledge - use for architecture context |
 | \`npx ca learn "insight"\` | Capture lessons - call AFTER corrections or discoveries |
 
 ## Core Constraints
@@ -43,7 +44,7 @@ const TRUST_LANGUAGE_TEMPLATE = `# Compound Agent Active
 
 ## Retrieval Protocol
 
-You MUST call \`npx ca search\` BEFORE:
+You MUST call \`npx ca search\` and \`npx ca knowledge\` BEFORE:
 - Architectural decisions or complex planning
 - Implementing patterns you've done before in this repo
 

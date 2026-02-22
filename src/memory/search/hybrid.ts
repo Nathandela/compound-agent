@@ -8,6 +8,12 @@
 import type { MemoryItem } from '../types.js';
 import type { ScoredLesson } from './vector.js';
 
+/** Generic scored item for hybrid merge */
+export interface GenericScoredItem<T> {
+  item: T;
+  score: number;
+}
+
 /** Keyword search result with normalized BM25 score */
 export interface ScoredKeywordResult {
   lesson: MemoryItem;
@@ -46,19 +52,21 @@ export function normalizeBm25Rank(rank: number): number {
 }
 
 /**
- * Merge vector and keyword search results into a single ranked list.
+ * Generic hybrid merge that works with any item type.
+ * Requires an getId function to identify unique items for union.
  *
  * Algorithm:
  * 1. Normalize weights to sum to 1.0
- * 2. Union both result sets by lesson ID
+ * 2. Union both result sets by item ID
  * 3. Blend: score = vecW * vectorScore + txtW * textScore (missing source = 0)
  * 4. Sort descending by blended score
  */
-export function mergeHybridResults(
-  vectorResults: ScoredLesson[],
-  keywordResults: ScoredKeywordResult[],
+export function mergeHybridScores<T>(
+  vectorResults: GenericScoredItem<T>[],
+  keywordResults: GenericScoredItem<T>[],
+  getId: (item: T) => string,
   options?: HybridMergeOptions
-): ScoredLesson[] {
+): GenericScoredItem<T>[] {
   if (vectorResults.length === 0 && keywordResults.length === 0) return [];
 
   const rawVecW = options?.vectorWeight ?? DEFAULT_VECTOR_WEIGHT;
@@ -70,27 +78,28 @@ export function mergeHybridResults(
   const limit = options?.limit;
   const minScore = options?.minScore;
 
-  // Union by lesson ID
-  const merged = new Map<string, { lesson: MemoryItem; vecScore: number; txtScore: number }>();
+  // Union by item ID
+  const merged = new Map<string, { item: T; vecScore: number; txtScore: number }>();
 
   for (const v of vectorResults) {
-    merged.set(v.lesson.id, { lesson: v.lesson, vecScore: v.score, txtScore: 0 });
+    merged.set(getId(v.item), { item: v.item, vecScore: v.score, txtScore: 0 });
   }
 
   for (const k of keywordResults) {
-    const existing = merged.get(k.lesson.id);
+    const id = getId(k.item);
+    const existing = merged.get(id);
     if (existing) {
       existing.txtScore = k.score;
     } else {
-      merged.set(k.lesson.id, { lesson: k.lesson, vecScore: 0, txtScore: k.score });
+      merged.set(id, { item: k.item, vecScore: 0, txtScore: k.score });
     }
   }
 
   // Blend and sort
-  const results: ScoredLesson[] = [];
+  const results: GenericScoredItem<T>[] = [];
   for (const entry of merged.values()) {
     results.push({
-      lesson: entry.lesson,
+      item: entry.item,
       score: vecW * entry.vecScore + txtW * entry.txtScore,
     });
   }
@@ -99,4 +108,19 @@ export function mergeHybridResults(
 
   const filtered = minScore !== undefined ? results.filter((r) => r.score >= minScore) : results;
   return limit !== undefined ? filtered.slice(0, limit) : filtered;
+}
+
+/**
+ * Merge vector and keyword search results into a single ranked list.
+ * Delegates to the generic mergeHybridScores.
+ */
+export function mergeHybridResults(
+  vectorResults: ScoredLesson[],
+  keywordResults: ScoredKeywordResult[],
+  options?: HybridMergeOptions
+): ScoredLesson[] {
+  const genericVec = vectorResults.map((v) => ({ item: v.lesson, score: v.score }));
+  const genericKw = keywordResults.map((k) => ({ item: k.lesson, score: k.score }));
+  const merged = mergeHybridScores(genericVec, genericKw, (item) => item.id, options);
+  return merged.map((m) => ({ lesson: m.item, score: m.score }));
 }

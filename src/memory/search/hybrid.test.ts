@@ -14,7 +14,9 @@ import {
   CANDIDATE_MULTIPLIER,
   MIN_HYBRID_SCORE,
   mergeHybridResults,
+  mergeHybridScores,
   normalizeBm25Rank,
+  type GenericScoredItem,
   type ScoredKeywordResult,
 } from './hybrid.js';
 
@@ -274,6 +276,156 @@ describe('mergeHybridResults', () => {
             const r1 = mergeHybridResults(vec, kw, { vectorWeight: 2, textWeight: 6 });
             const r2 = mergeHybridResults(vec, kw, { vectorWeight: 0.25, textWeight: 0.75 });
             return Math.abs((r1[0]?.score ?? 0) - (r2[0]?.score ?? 0)) < 1e-10;
+          }
+        )
+      );
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 3: mergeHybridScores (generic)
+// ---------------------------------------------------------------------------
+
+interface TestItem {
+  id: string;
+  label: string;
+}
+
+describe('mergeHybridScores', () => {
+  function genericVec(id: string, label: string, score: number): GenericScoredItem<TestItem> {
+    return { item: { id, label }, score };
+  }
+
+  function genericKw(id: string, label: string, score: number): GenericScoredItem<TestItem> {
+    return { item: { id, label }, score };
+  }
+
+  const getId = (item: TestItem): string => item.id;
+
+  it('returns empty when both inputs are empty', () => {
+    expect(mergeHybridScores<TestItem>([], [], getId)).toEqual([]);
+  });
+
+  it('returns vector items with weighted scores when keyword is empty', () => {
+    const vec = [genericVec('X1', 'alpha', 0.8)];
+    const result = mergeHybridScores(vec, [], getId);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.item.id).toBe('X1');
+    expect(result[0]!.score).toBeCloseTo(DEFAULT_VECTOR_WEIGHT * 0.8, 5);
+  });
+
+  it('returns keyword items with weighted scores when vector is empty', () => {
+    const kw = [genericKw('X1', 'alpha', 0.9)];
+    const result = mergeHybridScores([], kw, getId);
+    expect(result).toHaveLength(1);
+    expect(result[0]!.item.id).toBe('X1');
+    expect(result[0]!.score).toBeCloseTo(DEFAULT_TEXT_WEIGHT * 0.9, 5);
+  });
+
+  it('overlapping item gets blended score', () => {
+    const vec = [genericVec('X1', 'alpha', 0.85)];
+    const kw = [genericKw('X1', 'alpha', 0.91)];
+    const result = mergeHybridScores(vec, kw, getId);
+    expect(result).toHaveLength(1);
+    const expected = DEFAULT_VECTOR_WEIGHT * 0.85 + DEFAULT_TEXT_WEIGHT * 0.91;
+    expect(result[0]!.score).toBeCloseTo(expected, 5);
+  });
+
+  it('sorts results descending by blended score', () => {
+    const vec = [genericVec('A', 'a', 0.85), genericVec('B', 'b', 0.62)];
+    const kw = [genericKw('B', 'b', 0.91), genericKw('C', 'c', 0.70)];
+    const result = mergeHybridScores(vec, kw, getId);
+    expect(result[0]!.item.id).toBe('B');
+    for (let i = 1; i < result.length; i++) {
+      expect(result[i]!.score).toBeLessThanOrEqual(result[i - 1]!.score);
+    }
+  });
+
+  it('respects limit option', () => {
+    const vec = [genericVec('A', 'a', 0.9), genericVec('B', 'b', 0.8), genericVec('C', 'c', 0.7)];
+    const result = mergeHybridScores(vec, [], getId, { limit: 2 });
+    expect(result).toHaveLength(2);
+  });
+
+  it('filters results below minScore', () => {
+    const vec = [genericVec('A', 'a', 0.9), genericVec('B', 'b', 0.2)];
+    const result = mergeHybridScores(vec, [], getId, { minScore: 0.5 });
+    expect(result).toHaveLength(1);
+    expect(result[0]!.item.id).toBe('A');
+  });
+
+  it('returns empty when both weights are zero', () => {
+    const vec = [genericVec('X1', 'a', 0.8)];
+    const result = mergeHybridScores(vec, [], getId, { vectorWeight: 0, textWeight: 0 });
+    expect(result).toEqual([]);
+  });
+
+  it('preserves item data from vector source for overlapping IDs', () => {
+    const vec = [genericVec('X1', 'from-vector', 0.85)];
+    const kw = [genericKw('X1', 'from-keyword', 0.91)];
+    const result = mergeHybridScores(vec, kw, getId);
+    // Vector source should be preserved (first seen)
+    expect(result[0]!.item.label).toBe('from-vector');
+  });
+
+  it('produces same scores as mergeHybridResults for equivalent inputs', () => {
+    const lessons = [
+      createQuickLesson('L001', 'insight A'),
+      createQuickLesson('L002', 'insight B'),
+      createQuickLesson('L003', 'insight C'),
+    ];
+
+    const vecLessons: ScoredLesson[] = [
+      { lesson: lessons[0]!, score: 0.9 },
+      { lesson: lessons[1]!, score: 0.6 },
+    ];
+    const kwLessons: ScoredKeywordResult[] = [
+      { lesson: lessons[1]!, score: 0.8 },
+      { lesson: lessons[2]!, score: 0.7 },
+    ];
+
+    const legacyResult = mergeHybridResults(vecLessons, kwLessons);
+
+    const genericVecItems = vecLessons.map((v) => ({ item: v.lesson, score: v.score }));
+    const genericKwItems = kwLessons.map((k) => ({ item: k.lesson, score: k.score }));
+    const genericResult = mergeHybridScores(genericVecItems, genericKwItems, (item) => item.id);
+
+    expect(genericResult).toHaveLength(legacyResult.length);
+    for (let i = 0; i < legacyResult.length; i++) {
+      expect(genericResult[i]!.item.id).toBe(legacyResult[i]!.lesson.id);
+      expect(genericResult[i]!.score).toBeCloseTo(legacyResult[i]!.score, 10);
+    }
+  });
+
+  // Property-based tests
+  describe('properties', () => {
+    it('output scores in [0, 1] when input scores in [0, 1]', () => {
+      fc.assert(
+        fc.property(
+          fc.array(fc.double({ min: 0, max: 1, noNaN: true }), { maxLength: 5 }),
+          fc.array(fc.double({ min: 0, max: 1, noNaN: true }), { maxLength: 5 }),
+          (vecScores, kwScores) => {
+            const vec = vecScores.map((s, i) => genericVec(`V${i}`, `v${i}`, s));
+            const kw = kwScores.map((s, i) => genericKw(`K${i}`, `k${i}`, s));
+            const result = mergeHybridScores(vec, kw, getId);
+            return result.every((r) => r.score >= 0 && r.score <= 1);
+          }
+        )
+      );
+    });
+
+    it('no duplicate item IDs', () => {
+      fc.assert(
+        fc.property(
+          fc.array(fc.double({ min: 0, max: 1, noNaN: true }), { maxLength: 5 }),
+          fc.array(fc.double({ min: 0, max: 1, noNaN: true }), { maxLength: 5 }),
+          (vecScores, kwScores) => {
+            const vec = vecScores.map((s, i) => genericVec(`V${i}`, `v${i}`, s));
+            const kw = kwScores.map((s, i) => genericKw(`K${i}`, `k${i}`, s));
+            const result = mergeHybridScores(vec, kw, getId);
+            const ids = result.map((r) => r.item.id);
+            return ids.length === new Set(ids).size;
           }
         )
       );

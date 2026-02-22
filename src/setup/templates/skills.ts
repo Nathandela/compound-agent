@@ -17,7 +17,7 @@ Explore the problem space before committing to a solution. This phase produces a
 
 ## Methodology
 1. Ask "why" before "how" -- understand the real problem
-2. Search memory with \`npx ca search\` for similar past features and known constraints
+2. Search memory with \`npx ca search\` and docs with \`npx ca knowledge "relevant topic"\` for similar past features and known constraints
 3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
    - Available agents: \`.claude/agents/compound/repo-analyst.md\`, \`memory-analyst.md\`
    - Or use \`subagent_type: Explore\` for ad-hoc research
@@ -31,7 +31,7 @@ Explore the problem space before committing to a solution. This phase produces a
 10. Auto-create ADR files in \`docs/decisions/\` for significant decisions (lightweight: Status, Context, Decision, Consequences)
 
 ## Memory Integration
-- Run \`npx ca search\` with relevant keywords before generating approaches
+- Run \`npx ca search\` and \`npx ca knowledge "relevant topic"\` with relevant keywords before generating approaches
 - Look for past architectural decisions, pitfalls, and preferences
 - If the problem domain matches past work, review those lessons first
 
@@ -74,7 +74,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 
 ## Methodology
 1. Review brainstorm output for decisions and open questions
-2. Search memory with \`npx ca search\` for architectural patterns and past mistakes
+2. Search memory with \`npx ca search\` and docs with \`npx ca knowledge "relevant topic"\` for architectural patterns and past mistakes
 3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
    - Available agents: \`.claude/agents/compound/repo-analyst.md\`, \`memory-analyst.md\`
    - For complex features, deploy MULTIPLE analysts per domain area
@@ -90,7 +90,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 12. Run \`npx ca worktree wire-deps <epic-id>\` to connect merge dependencies (graceful no-op if no worktree is active)
 
 ## Memory Integration
-- Run \`npx ca search\` for patterns related to the feature area
+- Run \`npx ca search\` and \`npx ca knowledge "relevant topic"\` for patterns related to the feature area
 - Look for past planning mistakes (missing dependencies, unclear criteria)
 - Check for preferred architectural patterns in this codebase
 
@@ -502,7 +502,7 @@ For each phase:
 1. Announce: "[Phase N/5] PHASE_NAME"
 2. Start state: \`npx ca phase-check start <phase>\`
 3. Read the phase skill file (see above)
-4. Run \`npx ca search\` with the current goal -- display results before proceeding
+4. Run \`npx ca search\` and \`npx ca knowledge\` with the current goal -- display results before proceeding
 5. Execute the phase following the skill instructions
 6. Update epic state: \`bd update <epic-id> --notes="Phase: NAME COMPLETE | Next: NEXT"\`
 7. Verify phase gate before proceeding to the next phase

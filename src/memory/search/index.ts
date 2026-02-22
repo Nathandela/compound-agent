@@ -29,6 +29,7 @@ export {
   DEFAULT_VECTOR_WEIGHT,
   MIN_HYBRID_SCORE,
   mergeHybridResults,
+  mergeHybridScores,
   normalizeBm25Rank,
 } from './hybrid.js';
-export type { HybridMergeOptions, ScoredKeywordResult } from './hybrid.js';
+export type { GenericScoredItem, HybridMergeOptions, ScoredKeywordResult } from './hybrid.js';

@@ -16,6 +16,9 @@ import {
   COMPOUND_AGENT_HOOK_BLOCK,
   PRE_COMMIT_HOOK_TEMPLATE,
   PRE_COMMIT_MESSAGE,
+  POST_COMMIT_HOOK_MARKER,
+  POST_COMMIT_HOOK_TEMPLATE,
+  COMPOUND_AGENT_POST_COMMIT_BLOCK,
 } from './templates.js';
 
 /** Make hook file executable (mode 0o755) */
@@ -440,6 +443,52 @@ export async function installPreCommitHook(repoRoot: string): Promise<HookInstal
 
   // Create new hook file with full template
   await writeFile(hookPath, PRE_COMMIT_HOOK_TEMPLATE, 'utf-8');
+  chmodSync(hookPath, HOOK_FILE_MODE);
+
+  return { status: 'installed' };
+}
+
+/**
+ * Install post-commit hook for auto-indexing docs/ on commit.
+ *
+ * Mirrors installPreCommitHook: respects core.hooksPath, appends to
+ * existing hooks, uses marker for idempotency.
+ */
+export async function installPostCommitHook(repoRoot: string): Promise<HookInstallResult> {
+  const gitHooksDir = await getGitHooksDir(repoRoot);
+
+  if (!gitHooksDir) {
+    return { status: 'not_git_repo' };
+  }
+
+  await mkdir(gitHooksDir, { recursive: true });
+
+  const hookPath = join(gitHooksDir, 'post-commit');
+
+  if (existsSync(hookPath)) {
+    const content = await readFile(hookPath, 'utf-8');
+    if (content.includes(POST_COMMIT_HOOK_MARKER)) {
+      return { status: 'already_installed' };
+    }
+
+    const lines = content.split('\n');
+    const exitLineIndex = findFirstTopLevelExitLine(lines);
+
+    let newContent: string;
+    if (exitLineIndex === -1) {
+      newContent = content.trimEnd() + '\n' + COMPOUND_AGENT_POST_COMMIT_BLOCK;
+    } else {
+      const before = lines.slice(0, exitLineIndex);
+      const after = lines.slice(exitLineIndex);
+      newContent = before.join('\n') + COMPOUND_AGENT_POST_COMMIT_BLOCK + after.join('\n');
+    }
+
+    await writeFile(hookPath, newContent, 'utf-8');
+    chmodSync(hookPath, HOOK_FILE_MODE);
+    return { status: 'appended' };
+  }
+
+  await writeFile(hookPath, POST_COMMIT_HOOK_TEMPLATE, 'utf-8');
   chmodSync(hookPath, HOOK_FILE_MODE);
 
   return { status: 'installed' };

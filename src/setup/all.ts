@@ -24,7 +24,7 @@ import {
   writeClaudeSettings,
 } from './claude-helpers.js';
 import { ensureGitignore, type GitignoreResult } from './gitignore.js';
-import { installPreCommitHook, type HookInstallResult } from './hooks.js';
+import { installPreCommitHook, installPostCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
   ensureClaudeMdReference,
@@ -51,6 +51,7 @@ interface SetupResult {
   agentsMd: boolean;
   hooks: boolean;
   gitHooks: HookInstallResult['status'] | 'skipped';
+  postCommitHook: HookInstallResult['status'] | 'skipped';
   model: 'downloaded' | 'already_exists' | 'failed' | 'skipped';
   pnpmConfig: PnpmConfigResult;
   beads: BeadsCheckResult;
@@ -149,6 +150,12 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
     gitHooks = (await installPreCommitHook(repoRoot)).status;
   }
 
+  // 10b. Install post-commit git hook (auto-indexes docs/)
+  let postCommitHook: HookInstallResult['status'] | 'skipped' = 'skipped';
+  if (!options.skipHooks) {
+    postCommitHook = (await installPostCommitHook(repoRoot)).status;
+  }
+
   // 11. Configure Claude settings (hooks in settings.json)
   const { hooks } = await configureClaudeSettings();
 
@@ -176,6 +183,7 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
     agentsMd: agentsMdUpdated,
     hooks,
     gitHooks,
+    postCommitHook,
     model: modelStatus,
     pnpmConfig,
     beads,
@@ -280,6 +288,18 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
 }
 
 
+const POST_COMMIT_STATUS_MSG: Record<string, string> = {
+  skipped: 'Skipped (--skip-hooks)',
+  not_git_repo: 'Skipped (not a git repository)',
+  installed: 'Installed (auto-indexes docs/ on commit)',
+  appended: 'Appended to existing post-commit hook',
+  already_installed: 'Already configured',
+};
+
+function printPostCommitHookStatus(status: HookInstallResult['status'] | 'skipped'): void {
+  console.log(`  Post-commit hook: ${POST_COMMIT_STATUS_MSG[status]}`);
+}
+
 const MODEL_STATUS_MSG: Record<string, string> = {
   skipped: 'Skipped (--skip-model)',
   downloaded: 'Downloaded',
@@ -300,6 +320,7 @@ async function printSetupResult(result: SetupResult, quiet: boolean, repoRoot: s
   console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
   console.log(`  Claude hooks: ${result.hooks ? 'Installed' : 'Already configured'}`);
   printSetupGitHooksStatus(result.gitHooks);
+  printPostCommitHookStatus(result.postCommitHook);
   printPnpmConfigStatus(result.pnpmConfig);
   printGitignoreStatus(result.gitignore);
   console.log(`  Model: ${MODEL_STATUS_MSG[result.model]}`);
