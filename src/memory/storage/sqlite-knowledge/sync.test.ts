@@ -35,7 +35,7 @@ describe('upsertChunks', () => {
 
   beforeEach(async () => {
     repo = await mkdtemp(join(tmpdir(), 'knowledge-upsert-'));
-    openKnowledgeDb(repo, { inMemory: true });
+    openKnowledgeDb(repo);
   });
 
   afterEach(async () => {
@@ -50,7 +50,7 @@ describe('upsertChunks', () => {
     ];
     upsertChunks(repo, chunks);
 
-    const db = openKnowledgeDb(repo, { inMemory: true });
+    const db = openKnowledgeDb(repo);
     const count = db.prepare('SELECT COUNT(*) as cnt FROM chunks').get() as { cnt: number };
     expect(count.cnt).toBe(2);
   });
@@ -59,7 +59,7 @@ describe('upsertChunks', () => {
     upsertChunks(repo, [makeChunk('C001', 'docs/api.md', 'old content')]);
     upsertChunks(repo, [makeChunk('C001', 'docs/api.md', 'new content')]);
 
-    const db = openKnowledgeDb(repo, { inMemory: true });
+    const db = openKnowledgeDb(repo);
     const row = db.prepare('SELECT text FROM chunks WHERE id = ?').get('C001') as { text: string };
     expect(row.text).toBe('new content');
   });
@@ -75,7 +75,7 @@ describe('upsertChunks', () => {
 
     upsertChunks(repo, chunks, embeddings);
 
-    const db = openKnowledgeDb(repo, { inMemory: true });
+    const db = openKnowledgeDb(repo);
     const row = db.prepare('SELECT embedding FROM chunks WHERE id = ?').get('C001') as {
       embedding: Buffer | null;
     };
@@ -85,10 +85,10 @@ describe('upsertChunks', () => {
   it('indexes text in FTS on upsert', () => {
     upsertChunks(repo, [makeChunk('C001', 'docs/api.md', 'authentication with JWT tokens')]);
 
-    const db = openKnowledgeDb(repo, { inMemory: true });
+    const db = openKnowledgeDb(repo);
     const results = db
-      .prepare("SELECT id FROM chunks_fts WHERE chunks_fts MATCH 'authentication'")
-      .all() as Array<{ id: string }>;
+      .prepare("SELECT rowid FROM chunks_fts WHERE chunks_fts MATCH 'authentication'")
+      .all() as Array<{ rowid: number }>;
     expect(results).toHaveLength(1);
   });
 });
@@ -98,7 +98,7 @@ describe('deleteChunksByFilePath', () => {
 
   beforeEach(async () => {
     repo = await mkdtemp(join(tmpdir(), 'knowledge-delete-'));
-    openKnowledgeDb(repo, { inMemory: true });
+    openKnowledgeDb(repo);
   });
 
   afterEach(async () => {
@@ -115,7 +115,7 @@ describe('deleteChunksByFilePath', () => {
 
     deleteChunksByFilePath(repo, ['docs/api.md']);
 
-    const db = openKnowledgeDb(repo, { inMemory: true });
+    const db = openKnowledgeDb(repo);
     const count = db.prepare('SELECT COUNT(*) as cnt FROM chunks').get() as { cnt: number };
     expect(count.cnt).toBe(1);
 
@@ -127,7 +127,7 @@ describe('deleteChunksByFilePath', () => {
     upsertChunks(repo, [makeChunk('C001', 'docs/api.md', 'content')]);
     expect(() => deleteChunksByFilePath(repo, [])).not.toThrow();
 
-    const db = openKnowledgeDb(repo, { inMemory: true });
+    const db = openKnowledgeDb(repo);
     const count = db.prepare('SELECT COUNT(*) as cnt FROM chunks').get() as { cnt: number };
     expect(count.cnt).toBe(1);
   });
@@ -136,10 +136,10 @@ describe('deleteChunksByFilePath', () => {
     upsertChunks(repo, [makeChunk('C001', 'docs/api.md', 'authentication tokens')]);
     deleteChunksByFilePath(repo, ['docs/api.md']);
 
-    const db = openKnowledgeDb(repo, { inMemory: true });
+    const db = openKnowledgeDb(repo);
     const results = db
-      .prepare("SELECT id FROM chunks_fts WHERE chunks_fts MATCH 'authentication'")
-      .all() as Array<{ id: string }>;
+      .prepare("SELECT rowid FROM chunks_fts WHERE chunks_fts MATCH 'authentication'")
+      .all() as Array<{ rowid: number }>;
     expect(results).toHaveLength(0);
   });
 });
@@ -149,7 +149,7 @@ describe('getIndexedFilePaths', () => {
 
   beforeEach(async () => {
     repo = await mkdtemp(join(tmpdir(), 'knowledge-paths-'));
-    openKnowledgeDb(repo, { inMemory: true });
+    openKnowledgeDb(repo);
   });
 
   afterEach(async () => {
@@ -181,7 +181,7 @@ describe('getLastIndexTime / setLastIndexTime', () => {
 
   beforeEach(async () => {
     repo = await mkdtemp(join(tmpdir(), 'knowledge-meta-'));
-    openKnowledgeDb(repo, { inMemory: true });
+    openKnowledgeDb(repo);
   });
 
   afterEach(async () => {

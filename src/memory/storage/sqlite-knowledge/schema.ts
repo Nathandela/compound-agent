@@ -11,7 +11,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
  * Schema version for the knowledge SQLite cache.
  * Bump this when making incompatible schema changes.
  */
-export const KNOWLEDGE_SCHEMA_VERSION = 1;
+export const KNOWLEDGE_SCHEMA_VERSION = 2;
 
 /** SQL schema for knowledge database with FTS5 full-text search */
 const SCHEMA_SQL = `
@@ -28,29 +28,28 @@ const SCHEMA_SQL = `
   );
 
   CREATE VIRTUAL TABLE IF NOT EXISTS chunks_fts USING fts5(
-    id, text,
+    text,
     content='chunks', content_rowid='rowid'
   );
 
   CREATE TRIGGER IF NOT EXISTS chunks_ai AFTER INSERT ON chunks BEGIN
-    INSERT INTO chunks_fts(rowid, id, text)
-    VALUES (new.rowid, new.id, new.text);
+    INSERT INTO chunks_fts(rowid, text)
+    VALUES (new.rowid, new.text);
   END;
 
   CREATE TRIGGER IF NOT EXISTS chunks_ad AFTER DELETE ON chunks BEGIN
-    INSERT INTO chunks_fts(chunks_fts, rowid, id, text)
-    VALUES ('delete', old.rowid, old.id, old.text);
+    INSERT INTO chunks_fts(chunks_fts, rowid, text)
+    VALUES ('delete', old.rowid, old.text);
   END;
 
   CREATE TRIGGER IF NOT EXISTS chunks_au AFTER UPDATE ON chunks BEGIN
-    INSERT INTO chunks_fts(chunks_fts, rowid, id, text)
-    VALUES ('delete', old.rowid, old.id, old.text);
-    INSERT INTO chunks_fts(rowid, id, text)
-    VALUES (new.rowid, new.id, new.text);
+    INSERT INTO chunks_fts(chunks_fts, rowid, text)
+    VALUES ('delete', old.rowid, old.text);
+    INSERT INTO chunks_fts(rowid, text)
+    VALUES (new.rowid, new.text);
   END;
 
   CREATE INDEX IF NOT EXISTS idx_chunks_file_path ON chunks(file_path);
-  CREATE INDEX IF NOT EXISTS idx_chunks_updated_at ON chunks(updated_at);
 
   CREATE TABLE IF NOT EXISTS metadata (
     key TEXT PRIMARY KEY,

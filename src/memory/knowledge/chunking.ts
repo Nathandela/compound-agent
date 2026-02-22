@@ -24,8 +24,11 @@ function splitIntoSections(
   fileLines: string[],
   ext: string,
 ): { lineNumber: number; text: string }[][] {
-  if (ext === '.md' || ext === '.rst') {
+  if (ext === '.md') {
     return splitMarkdown(fileLines);
+  }
+  if (ext === '.rst') {
+    return splitParagraphs(fileLines);
   }
   if (['.ts', '.tsx', '.js', '.jsx', '.py'].includes(ext)) {
     return splitCode(fileLines);
@@ -46,7 +49,7 @@ function splitMarkdown(
   let inCodeBlock = false;
 
   for (let i = 0; i < fileLines.length; i++) {
-    const line = fileLines[i];
+    const line = fileLines[i]!;
     const lineObj = { lineNumber: i + 1, text: line };
 
     // Track fenced code blocks
@@ -96,14 +99,19 @@ function splitCode(
   let current: { lineNumber: number; text: string }[] = [];
 
   for (let i = 0; i < fileLines.length; i++) {
-    const line = fileLines[i];
+    const line = fileLines[i]!;
     const lineObj = { lineNumber: i + 1, text: line };
 
     if (line.trim() === '' && current.length > 0) {
-      // Check if the previous non-blank line ended a block
-      // and the next non-blank line starts a new one
-      const nextNonBlank = fileLines.slice(i + 1).find((l) => l.trim() !== '');
-      if (nextNonBlank !== undefined) {
+      // Check if there's a next non-blank line (forward scan, no slice copy)
+      let hasNextNonBlank = false;
+      for (let j = i + 1; j < fileLines.length; j++) {
+        if (fileLines[j]!.trim() !== '') {
+          hasNextNonBlank = true;
+          break;
+        }
+      }
+      if (hasNextNonBlank) {
         sections.push(current);
         current = [lineObj];
         continue;
@@ -128,7 +136,7 @@ function splitParagraphs(
   let current: { lineNumber: number; text: string }[] = [];
 
   for (let i = 0; i < fileLines.length; i++) {
-    const line = fileLines[i];
+    const line = fileLines[i]!;
     const lineObj = { lineNumber: i + 1, text: line };
 
     if (line.trim() === '' && current.length > 0) {
@@ -192,8 +200,8 @@ export function chunkFile(
 
     const allLines = [...overlapLines, ...lines];
     const text = allLines.map((l) => l.text).join('\n');
-    const startLine = allLines[0].lineNumber;
-    const endLine = allLines[allLines.length - 1].lineNumber;
+    const startLine = allLines[0]!.lineNumber;
+    const endLine = allLines[allLines.length - 1]!.lineNumber;
 
     chunks.push({
       id: generateChunkId(filePath, startLine, endLine),
@@ -209,9 +217,9 @@ export function chunkFile(
     const overlapResult: { lineNumber: number; text: string }[] = [];
     let overlapLen = 0;
     for (let i = lines.length - 1; i >= 0; i--) {
-      const lineLen = lines[i].text.length + 1; // +1 for newline
+      const lineLen = lines[i]!.text.length + 1; // +1 for newline
       if (overlapLen + lineLen > overlapSize && overlapResult.length > 0) break;
-      overlapResult.unshift(lines[i]);
+      overlapResult.unshift(lines[i]!);
       overlapLen += lineLen;
     }
     return overlapResult;

@@ -152,6 +152,25 @@ export type {
 export { formatLessonsCheck, loadSessionLessons, retrieveForPlan } from './memory/retrieval/index.js';
 export type { PlanRetrievalResult } from './memory/retrieval/index.js';
 
+// Knowledge API (docs embeddings + search)
+export {
+  closeKnowledgeDb,
+  collectCachedChunkEmbeddings,
+  getCachedChunkEmbedding,
+  KNOWLEDGE_DB_PATH,
+  KNOWLEDGE_SCHEMA_VERSION,
+  openKnowledgeDb,
+  searchChunksKeywordScored,
+  setCachedChunkEmbedding,
+} from './memory/storage/sqlite-knowledge/index.js';
+export type { KnowledgeChunk, KnowledgeDbOptions, ScoredChunk } from './memory/storage/sqlite-knowledge/index.js';
+
+export { chunkFile } from './memory/knowledge/chunking.js';
+export { indexDocs } from './memory/knowledge/indexing.js';
+export type { IndexOptions, IndexResult } from './memory/knowledge/indexing.js';
+export { searchKnowledge, searchKnowledgeVector } from './memory/knowledge/search.js';
+export type { KnowledgeSearchOptions } from './memory/knowledge/search.js';
+
 // Context recovery API
 export { getPrimeContext } from './commands/index.js';
 

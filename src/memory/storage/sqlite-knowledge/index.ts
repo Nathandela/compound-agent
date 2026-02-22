@@ -14,12 +14,13 @@ export { KNOWLEDGE_SCHEMA_VERSION } from './schema.js';
 // Cache
 export {
   chunkContentHash,
+  collectCachedChunkEmbeddings,
   getCachedChunkEmbedding,
   setCachedChunkEmbedding,
 } from './cache.js';
 
 // Search
-export { searchChunksKeyword, searchChunksKeywordScored } from './search.js';
+export { searchChunksKeywordScored } from './search.js';
 
 // Sync
 export {

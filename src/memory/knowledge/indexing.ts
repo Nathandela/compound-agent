@@ -6,7 +6,7 @@
  */
 
 import { createHash } from 'node:crypto';
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { extname, join, relative } from 'node:path';
 
 import {
@@ -28,8 +28,6 @@ export interface IndexOptions {
   force?: boolean;
   /** Directory to index (default: 'docs') */
   docsDir?: string;
-  /** Show per-file details */
-  verbose?: boolean;
 }
 
 export interface IndexResult {
@@ -45,26 +43,31 @@ function fileHash(content: string): string {
   return createHash('sha256').update(content).digest('hex');
 }
 
+/** Build metadata key for file hash */
+function fileHashKey(relativePath: string): string {
+  return 'file_hash:' + relativePath;
+}
+
 /** Get stored file hash from metadata table */
 function getStoredFileHash(repoRoot: string, relativePath: string): string | null {
-  const db = openKnowledgeDb(repoRoot, { inMemory: true });
+  const db = openKnowledgeDb(repoRoot);
   const row = db
     .prepare('SELECT value FROM metadata WHERE key = ?')
-    .get(`file_hash:${relativePath}`) as { value: string } | undefined;
+    .get(fileHashKey(relativePath)) as { value: string } | undefined;
   return row?.value ?? null;
 }
 
 /** Store file hash in metadata table */
 function setFileHash(repoRoot: string, relativePath: string, hash: string): void {
-  const db = openKnowledgeDb(repoRoot, { inMemory: true });
+  const db = openKnowledgeDb(repoRoot);
   db.prepare('INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)')
-    .run(`file_hash:${relativePath}`, hash);
+    .run(fileHashKey(relativePath), hash);
 }
 
 /** Remove file hash from metadata table */
 function removeFileHash(repoRoot: string, relativePath: string): void {
-  const db = openKnowledgeDb(repoRoot, { inMemory: true });
-  db.prepare('DELETE FROM metadata WHERE key = ?').run(`file_hash:${relativePath}`);
+  const db = openKnowledgeDb(repoRoot);
+  db.prepare('DELETE FROM metadata WHERE key = ?').run(fileHashKey(relativePath));
 }
 
 /** Recursively walk directory and return relative paths of supported files */
@@ -154,6 +157,9 @@ export async function indexDocs(
       updatedAt: now,
     }));
 
+    // Delete stale chunks for this file before inserting new ones
+    deleteChunksByFilePath(repoRoot, [relPath]);
+
     // Upsert chunks (no embeddings for now -- embedding is slow and optional)
     if (knowledgeChunks.length > 0) {
       upsertChunks(repoRoot, knowledgeChunks);
@@ -173,7 +179,7 @@ export async function indexDocs(
 
   if (stalePaths.length > 0) {
     // Count chunks that will be deleted
-    const db = openKnowledgeDb(repoRoot, { inMemory: true });
+    const db = openKnowledgeDb(repoRoot);
     for (const path of stalePaths) {
       const row = db
         .prepare('SELECT COUNT(*) as cnt FROM chunks WHERE file_path = ?')

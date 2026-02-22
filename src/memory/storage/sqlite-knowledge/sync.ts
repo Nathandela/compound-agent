@@ -19,7 +19,7 @@ export function upsertChunks(
 ): void {
   if (chunks.length === 0) return;
 
-  const database = openKnowledgeDb(repoRoot, { inMemory: true });
+  const database = openKnowledgeDb(repoRoot);
 
   const insert = database.prepare(`
     INSERT OR REPLACE INTO chunks (id, file_path, start_line, end_line, content_hash, text, embedding, model, updated_at)
@@ -58,7 +58,7 @@ export function upsertChunks(
 export function deleteChunksByFilePath(repoRoot: string, filePaths: string[]): void {
   if (filePaths.length === 0) return;
 
-  const database = openKnowledgeDb(repoRoot, { inMemory: true });
+  const database = openKnowledgeDb(repoRoot);
 
   const del = database.prepare('DELETE FROM chunks WHERE file_path = ?');
 
@@ -77,7 +77,7 @@ export function deleteChunksByFilePath(repoRoot: string, filePaths: string[]): v
  * @returns Array of file paths
  */
 export function getIndexedFilePaths(repoRoot: string): string[] {
-  const database = openKnowledgeDb(repoRoot, { inMemory: true });
+  const database = openKnowledgeDb(repoRoot);
 
   const rows = database
     .prepare('SELECT DISTINCT file_path FROM chunks')
@@ -92,7 +92,7 @@ export function getIndexedFilePaths(repoRoot: string): string[] {
  * @returns ISO timestamp or null if never indexed
  */
 export function getLastIndexTime(repoRoot: string): string | null {
-  const database = openKnowledgeDb(repoRoot, { inMemory: true });
+  const database = openKnowledgeDb(repoRoot);
 
   const row = database
     .prepare("SELECT value FROM metadata WHERE key = 'last_index_time'")
@@ -107,7 +107,7 @@ export function getLastIndexTime(repoRoot: string): string | null {
  * @param time - ISO timestamp
  */
 export function setLastIndexTime(repoRoot: string, time: string): void {
-  const database = openKnowledgeDb(repoRoot, { inMemory: true });
+  const database = openKnowledgeDb(repoRoot);
 
   database
     .prepare("INSERT OR REPLACE INTO metadata (key, value) VALUES ('last_index_time', ?)")

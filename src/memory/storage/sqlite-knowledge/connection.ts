@@ -19,14 +19,6 @@ export const KNOWLEDGE_DB_PATH = '.claude/.cache/knowledge.sqlite';
 const knowledgeDbMap = new Map<string, DatabaseType>();
 
 /**
- * Check if the database has the expected schema version.
- */
-function hasExpectedVersion(database: DatabaseType): boolean {
-  const row = database.pragma('user_version', { simple: true }) as number;
-  return row === KNOWLEDGE_SCHEMA_VERSION;
-}
-
-/**
  * Open the knowledge SQLite database connection.
  * If the database has an older schema version, it is deleted and recreated.
  * @param repoRoot - Absolute path to repository root
@@ -56,9 +48,10 @@ export function openKnowledgeDb(
     mkdirSync(dir, { recursive: true });
     database = new Database(key);
 
-    if (!hasExpectedVersion(database)) {
+    const version = database.pragma('user_version', { simple: true }) as number;
+    if (version !== 0 && version !== KNOWLEDGE_SCHEMA_VERSION) {
       database.close();
-      unlinkSync(key);
+      try { unlinkSync(key); } catch { /* ENOENT is fine */ }
       database = new Database(key);
     }
 

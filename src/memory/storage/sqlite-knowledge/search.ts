@@ -41,47 +41,6 @@ function rowToChunk(row: ChunkRow): KnowledgeChunk {
 }
 
 /**
- * Search knowledge chunks using FTS5 full-text search.
- * @param repoRoot - Absolute path to repository root
- * @param query - Search query string
- * @param limit - Maximum number of results
- * @returns Matching chunks
- */
-export function searchChunksKeyword(
-  repoRoot: string,
-  query: string,
-  limit: number
-): KnowledgeChunk[] {
-  const database = openKnowledgeDb(repoRoot, { inMemory: true });
-
-  const countResult = database.prepare('SELECT COUNT(*) as cnt FROM chunks').get() as {
-    cnt: number;
-  };
-  if (countResult.cnt === 0) return [];
-
-  const sanitized = sanitizeFtsQuery(query);
-  if (sanitized === '') return [];
-
-  try {
-    const rows = database
-      .prepare(
-        `SELECT c.*
-         FROM chunks c
-         JOIN chunks_fts fts ON c.rowid = fts.rowid
-         WHERE chunks_fts MATCH ?
-         LIMIT ?`
-      )
-      .all(sanitized, limit) as ChunkRow[];
-
-    return rows.map(rowToChunk);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown FTS5 error';
-    console.error(`[compound-agent] knowledge search error: ${message}`);
-    return [];
-  }
-}
-
-/**
  * Search knowledge chunks with normalized BM25 scores.
  * @param repoRoot - Absolute path to repository root
  * @param query - Search query string
@@ -93,17 +52,13 @@ export function searchChunksKeywordScored(
   query: string,
   limit: number
 ): ScoredChunk[] {
-  const database = openKnowledgeDb(repoRoot, { inMemory: true });
-
-  const countResult = database.prepare('SELECT COUNT(*) as cnt FROM chunks').get() as {
-    cnt: number;
-  };
-  if (countResult.cnt === 0) return [];
+  const database = openKnowledgeDb(repoRoot);
 
   const sanitized = sanitizeFtsQuery(query);
   if (sanitized === '') return [];
 
   try {
+    // ORDER BY fts.rank: BM25 ranks are negative (lower = more relevant)
     const rows = database
       .prepare(
         `SELECT c.*, fts.rank

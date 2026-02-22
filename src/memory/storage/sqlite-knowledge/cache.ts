@@ -2,20 +2,13 @@
  * Embedding cache operations for knowledge chunks.
  */
 
-import { createHash } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
 
 import type { CachedEmbeddingData } from '../sqlite/types.js';
 import { openKnowledgeDb } from './connection.js';
+import { chunkContentHash } from '../../knowledge/types.js';
 
-/**
- * Compute content hash for a chunk's text.
- * @param text - The chunk text
- * @returns SHA-256 hex hash
- */
-export function chunkContentHash(text: string): string {
-  return createHash('sha256').update(text).digest('hex');
-}
+export { chunkContentHash };
 
 /**
  * Get cached embedding for a knowledge chunk.
@@ -29,7 +22,7 @@ export function getCachedChunkEmbedding(
   chunkId: string,
   expectedHash?: string
 ): Float32Array | null {
-  const database = openKnowledgeDb(repoRoot, { inMemory: true });
+  const database = openKnowledgeDb(repoRoot);
 
   const row = database
     .prepare('SELECT embedding, content_hash FROM chunks WHERE id = ?')
@@ -64,7 +57,7 @@ export function setCachedChunkEmbedding(
   embedding: Float32Array | number[],
   hash: string
 ): void {
-  const database = openKnowledgeDb(repoRoot, { inMemory: true });
+  const database = openKnowledgeDb(repoRoot);
 
   const float32 = embedding instanceof Float32Array ? embedding : new Float32Array(embedding);
   const buffer = Buffer.from(float32.buffer, float32.byteOffset, float32.byteLength);

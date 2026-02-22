@@ -27,7 +27,7 @@ export function clearCctEmbeddingCache(): void {
  * Calculate cosine similarity between two vectors.
  * Returns value between -1 (opposite) and 1 (identical).
  */
-export function cosineSimilarity(a: number[], b: number[]): number {
+export function cosineSimilarity(a: ArrayLike<number>, b: ArrayLike<number>): number {
   if (a.length !== b.length) {
     throw new Error('Vectors must have same length');
   }

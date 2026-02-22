@@ -8,8 +8,8 @@ import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { formatError } from '../cli-error-format.js';
-import { searchKnowledge } from '../memory/knowledge/search.js';
-import { openKnowledgeDb, closeKnowledgeDb } from '../memory/storage/sqlite-knowledge/connection.js';
+import { searchKnowledge } from '../memory/knowledge/index.js';
+import { openKnowledgeDb, closeKnowledgeDb } from '../memory/storage/sqlite-knowledge/index.js';
 import { getGlobalOpts, out } from './shared.js';
 
 const MAX_DISPLAY_TEXT = 200;
@@ -41,9 +41,14 @@ export function registerKnowledgeCommand(program: Command): void {
           try {
             const { indexDocs } = await import('../memory/knowledge/indexing.js');
             out.info('Knowledge base empty. Indexing docs...');
-            await indexDocs(repoRoot);
-          } catch {
-            out.info('No docs indexed yet. Run: npx ca index-docs');
+            const result = await indexDocs(repoRoot);
+            if (result.filesIndexed === 0) {
+              out.info('No docs found to index. Add docs/ directory or run: npx ca index-docs --help');
+              return;
+            }
+          } catch (indexErr) {
+            const msg = indexErr instanceof Error ? indexErr.message : 'Unknown error';
+            out.info(`Auto-index failed (${msg}). Run manually: npx ca index-docs`);
           }
         }
 

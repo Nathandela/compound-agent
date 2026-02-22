@@ -308,11 +308,10 @@ describe('chunkFile - overlap', () => {
       overlapSize: 50,
     });
 
-    if (chunks.length >= 2) {
-      // The end of chunk N should overlap with the start of chunk N+1
-      const endOfFirst = chunks[0].text.slice(-50);
-      expect(chunks[1].text).toContain(endOfFirst.trim());
-    }
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
+    // The end of chunk N should overlap with the start of chunk N+1
+    const endOfFirst = chunks[0]!.text.slice(-50);
+    expect(chunks[1]!.text).toContain(endOfFirst.trim());
   });
 
   it('does not create overlap for single-chunk files', () => {
@@ -337,18 +336,17 @@ describe('chunkFile - line tracking', () => {
     const content = lines(para1, '', para2, '', para3);
     const chunks = chunkFile('lines.txt', content, { targetSize: 20, overlapSize: 0 });
 
-    if (chunks.length >= 2) {
-      // First chunk starts at line 1
-      expect(chunks[0].startLine).toBe(1);
-      // Each chunk's endLine should be >= startLine
-      for (const chunk of chunks) {
-        expect(chunk.endLine).toBeGreaterThanOrEqual(chunk.startLine);
-      }
-      // No gap in lines (except overlap) -- last chunk ends at or near total lines
-      const totalLines = content.split('\n').length;
-      const lastChunk = chunks[chunks.length - 1];
-      expect(lastChunk.endLine).toBeLessThanOrEqual(totalLines);
+    expect(chunks.length).toBeGreaterThanOrEqual(2);
+    // First chunk starts at line 1
+    expect(chunks[0]!.startLine).toBe(1);
+    // Each chunk's endLine should be >= startLine
+    for (const chunk of chunks) {
+      expect(chunk.endLine).toBeGreaterThanOrEqual(chunk.startLine);
     }
+    // No gap in lines (except overlap) -- last chunk ends at or near total lines
+    const totalLines = content.split('\n').length;
+    const lastChunk = chunks[chunks.length - 1]!;
+    expect(lastChunk.endLine).toBeLessThanOrEqual(totalLines);
   });
 
   it('endLine is inclusive (contains the last line of text)', () => {

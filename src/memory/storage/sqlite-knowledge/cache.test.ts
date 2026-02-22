@@ -17,7 +17,7 @@ import {
 
 /** Insert a test chunk directly into the DB */
 function insertChunk(repo: string, id: string, text: string): void {
-  const db = openKnowledgeDb(repo, { inMemory: true });
+  const db = openKnowledgeDb(repo);
   db.prepare(
     `INSERT INTO chunks (id, file_path, start_line, end_line, content_hash, text, updated_at)
      VALUES (?, 'test.md', 1, 10, ?, ?, '2026-01-01T00:00:00Z')`
@@ -48,6 +48,7 @@ describe('getCachedChunkEmbedding / setCachedChunkEmbedding', () => {
 
   beforeEach(async () => {
     repo = await mkdtemp(join(tmpdir(), 'knowledge-cache-'));
+    openKnowledgeDb(repo);
   });
 
   afterEach(async () => {
@@ -62,7 +63,6 @@ describe('getCachedChunkEmbedding / setCachedChunkEmbedding', () => {
   });
 
   it('returns null for non-existent chunk', () => {
-    openKnowledgeDb(repo, { inMemory: true });
     const result = getCachedChunkEmbedding(repo, 'NONEXISTENT');
     expect(result).toBeNull();
   });
@@ -103,7 +103,6 @@ describe('getCachedChunkEmbedding / setCachedChunkEmbedding', () => {
   });
 
   it('UPDATE-only: does not insert new rows', () => {
-    openKnowledgeDb(repo, { inMemory: true });
     const embedding = new Float32Array([0.1, 0.2]);
 
     // No chunk row exists, so this should be a no-op
@@ -118,6 +117,7 @@ describe('collectCachedChunkEmbeddings', () => {
 
   beforeEach(async () => {
     repo = await mkdtemp(join(tmpdir(), 'knowledge-collect-'));
+    openKnowledgeDb(repo);
   });
 
   afterEach(async () => {
@@ -126,14 +126,14 @@ describe('collectCachedChunkEmbeddings', () => {
   });
 
   it('returns empty map when no embeddings cached', () => {
-    const db = openKnowledgeDb(repo, { inMemory: true });
+    const db = openKnowledgeDb(repo);
     insertChunk(repo, 'C001', 'test content');
     const cache = collectCachedChunkEmbeddings(db);
     expect(cache.size).toBe(0);
   });
 
   it('collects all cached embeddings', () => {
-    const db = openKnowledgeDb(repo, { inMemory: true });
+    const db = openKnowledgeDb(repo);
     insertChunk(repo, 'C001', 'content one');
     insertChunk(repo, 'C002', 'content two');
 

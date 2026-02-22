@@ -3,14 +3,14 @@
  *
  * Index docs/ directory into the knowledge base for retrieval.
  *
- * Usage: ca index-docs [--force] [-v|--verbose]
+ * Usage: ca index-docs [--force]
  */
 
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
-import { indexDocs } from '../memory/knowledge/indexing.js';
-import { closeKnowledgeDb } from '../memory/storage/sqlite-knowledge/connection.js';
+import { indexDocs } from '../memory/knowledge/index.js';
+import { closeKnowledgeDb } from '../memory/storage/sqlite-knowledge/index.js';
 import { out } from './shared.js';
 
 export function registerKnowledgeIndexCommand(program: Command): void {
@@ -18,8 +18,7 @@ export function registerKnowledgeIndexCommand(program: Command): void {
     .command('index-docs')
     .description('Index docs/ directory into knowledge base')
     .option('--force', 'Re-index all files (ignore cache)')
-    .option('-v, --verbose', 'Show per-file details')
-    .action(async function (this: Command, options: { force?: boolean; verbose?: boolean }) {
+    .action(async function (this: Command, options: { force?: boolean }) {
       const repoRoot = getRepoRoot();
 
       out.info('Indexing docs/ directory...');
@@ -27,7 +26,6 @@ export function registerKnowledgeIndexCommand(program: Command): void {
       try {
         const result = await indexDocs(repoRoot, {
           force: options.force,
-          verbose: options.verbose,
         });
 
         const skippedPart = result.filesSkipped > 0

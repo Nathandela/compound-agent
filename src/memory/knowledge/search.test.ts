@@ -5,11 +5,13 @@
  * when model is unavailable.
  */
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { closeKnowledgeDb, openKnowledgeDb, upsertChunks } from '../storage/sqlite-knowledge/index.js';
 import type { KnowledgeChunk } from '../storage/sqlite-knowledge/types.js';
-import type { GenericScoredItem } from '../search/hybrid.js';
 
 import { searchKnowledge, searchKnowledgeVector } from './search.js';
 
@@ -17,7 +19,7 @@ import { searchKnowledge, searchKnowledgeVector } from './search.js';
 // Helpers
 // ---------------------------------------------------------------------------
 
-const TEST_REPO = '/tmp/knowledge-search-test';
+let testRepo: string;
 
 function makeChunk(id: string, filePath: string, text: string, startLine = 1, endLine = 10): KnowledgeChunk {
   return {
@@ -32,13 +34,18 @@ function makeChunk(id: string, filePath: string, text: string, startLine = 1, en
 }
 
 function seedChunks(chunks: KnowledgeChunk[], embeddings?: Map<string, Float32Array>): void {
-  openKnowledgeDb(TEST_REPO, { inMemory: true });
-  upsertChunks(TEST_REPO, chunks, embeddings);
+  openKnowledgeDb(testRepo);
+  upsertChunks(testRepo, chunks, embeddings);
 }
 
-afterEach(() => {
+beforeEach(async () => {
+  testRepo = await mkdtemp(join(tmpdir(), 'knowledge-search-test-'));
+});
+
+afterEach(async () => {
   closeKnowledgeDb();
   vi.restoreAllMocks();
+  await rm(testRepo, { recursive: true, force: true });
 });
 
 // ---------------------------------------------------------------------------
@@ -47,15 +54,15 @@ afterEach(() => {
 
 describe('searchKnowledgeVector', () => {
   it('returns empty when DB has no chunks', async () => {
-    openKnowledgeDb(TEST_REPO, { inMemory: true });
-    const results = await searchKnowledgeVector(TEST_REPO, 'anything');
+    openKnowledgeDb(testRepo);
+    const results = await searchKnowledgeVector(testRepo, 'anything');
     expect(results).toEqual([]);
   });
 
   it('returns empty when no chunks have embeddings', async () => {
     seedChunks([makeChunk('C1', 'docs/a.md', 'some text about architecture')]);
     // No embeddings stored -- should return empty
-    const results = await searchKnowledgeVector(TEST_REPO, 'architecture');
+    const results = await searchKnowledgeVector(testRepo, 'architecture');
     expect(results).toEqual([]);
   });
 
@@ -79,7 +86,7 @@ describe('searchKnowledgeVector', () => {
     const embeddings = await import('../embeddings/nomic.js');
     vi.spyOn(embeddings, 'embedText').mockResolvedValue(Array.from(queryLike));
 
-    const results = await searchKnowledgeVector(TEST_REPO, 'close');
+    const results = await searchKnowledgeVector(testRepo, 'close');
     expect(results.length).toBe(2);
     // C1 should rank higher (closer to query vector)
     expect(results[0]!.item.id).toBe('C1');
@@ -104,7 +111,7 @@ describe('searchKnowledgeVector', () => {
     const embeddings = await import('../embeddings/nomic.js');
     vi.spyOn(embeddings, 'embedText').mockResolvedValue(Array.from(queryLike));
 
-    const results = await searchKnowledgeVector(TEST_REPO, 'test', { limit: 2 });
+    const results = await searchKnowledgeVector(testRepo, 'test', { limit: 2 });
     expect(results).toHaveLength(2);
   });
 
@@ -119,7 +126,7 @@ describe('searchKnowledgeVector', () => {
     const embeddings = await import('../embeddings/nomic.js');
     vi.spyOn(embeddings, 'embedText').mockResolvedValue(Array.from(queryLike));
 
-    const results = await searchKnowledgeVector(TEST_REPO, 'architecture');
+    const results = await searchKnowledgeVector(testRepo, 'architecture');
     expect(results[0]).toHaveProperty('item');
     expect(results[0]).toHaveProperty('score');
     expect(results[0]!.item).toHaveProperty('id', 'C1');
@@ -135,8 +142,17 @@ describe('searchKnowledgeVector', () => {
 
 describe('searchKnowledge', () => {
   it('returns empty when DB has no chunks', async () => {
-    openKnowledgeDb(TEST_REPO, { inMemory: true });
-    const results = await searchKnowledge(TEST_REPO, 'anything');
+    openKnowledgeDb(testRepo);
+
+    // Mock isModelUsable to avoid loading real model
+    const model = await import('../embeddings/model.js');
+    vi.spyOn(model, 'isModelUsable').mockResolvedValue({
+      usable: false,
+      reason: 'test',
+      action: 'test',
+    });
+
+    const results = await searchKnowledge(testRepo, 'anything');
     expect(results).toEqual([]);
   });
 
@@ -155,7 +171,7 @@ describe('searchKnowledge', () => {
       action: 'test',
     });
 
-    const results = await searchKnowledge(TEST_REPO, 'architecture');
+    const results = await searchKnowledge(testRepo, 'architecture');
     // Should find C1 via FTS
     expect(results.length).toBeGreaterThanOrEqual(1);
     expect(results[0]!.item.id).toBe('C1');
@@ -179,7 +195,7 @@ describe('searchKnowledge', () => {
     const embeddings = await import('../embeddings/nomic.js');
     vi.spyOn(embeddings, 'embedText').mockResolvedValue(Array.from(queryLike));
 
-    const results = await searchKnowledge(TEST_REPO, 'architecture');
+    const results = await searchKnowledge(testRepo, 'architecture');
     expect(results.length).toBeGreaterThanOrEqual(1);
     // C1 should rank high (matches both vector and keyword)
     expect(results[0]!.item.id).toBe('C1');
@@ -200,7 +216,7 @@ describe('searchKnowledge', () => {
       action: 'test',
     });
 
-    const results = await searchKnowledge(TEST_REPO, 'TypeScript', { limit: 1 });
+    const results = await searchKnowledge(testRepo, 'TypeScript', { limit: 1 });
     expect(results).toHaveLength(1);
   });
 
@@ -215,7 +231,7 @@ describe('searchKnowledge', () => {
       action: 'test',
     });
 
-    const results = await searchKnowledge(TEST_REPO, 'architecture');
+    const results = await searchKnowledge(testRepo, 'architecture');
     expect(results[0]).toHaveProperty('item');
     expect(results[0]).toHaveProperty('score');
     expect(results[0]!.score).toBeGreaterThan(0);

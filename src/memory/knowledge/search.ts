@@ -40,7 +40,7 @@ export async function searchKnowledgeVector(
   options?: KnowledgeSearchOptions
 ): Promise<GenericScoredItem<KnowledgeChunk>[]> {
   const limit = options?.limit ?? DEFAULT_KNOWLEDGE_LIMIT;
-  const database = openKnowledgeDb(repoRoot, { inMemory: true });
+  const database = openKnowledgeDb(repoRoot);
 
   // Get all chunks with embeddings
   const rows = database
@@ -59,7 +59,7 @@ export async function searchKnowledgeVector(
       row.embedding.byteLength / 4
     );
 
-    const score = cosineSimilarity(queryVector, Array.from(embFloat));
+    const score = cosineSimilarity(queryVector, embFloat);
     const chunk: KnowledgeChunk = {
       id: row.id,
       filePath: row.file_path,
@@ -101,6 +101,15 @@ export async function searchKnowledge(
       searchKnowledgeVector(repoRoot, query, { limit: candidateLimit }),
       Promise.resolve(searchChunksKeywordScored(repoRoot, query, candidateLimit)),
     ]);
+
+    // When no embeddings stored, vector results are empty and hybrid merge
+    // would suppress keyword-only results below MIN_HYBRID_SCORE. Fall back
+    // to keyword results directly.
+    if (vectorResults.length === 0) {
+      return keywordResults
+        .map((k) => ({ item: k.chunk, score: k.score }))
+        .slice(0, limit);
+    }
 
     const genericKw: GenericScoredItem<KnowledgeChunk>[] = keywordResults.map((k) => ({
       item: k.chunk,
