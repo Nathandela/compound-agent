@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.9] - 2026-02-22
+
+### Fixed
+
+- **Integration test pipeline reliability**: Moved `pnpm build` from vitest globalSetup to npm script pre-step, eliminating EPERM errors from tsx/IPC conflicts inside vitest's process
+- **Fail-fast globalSetup**: Missing `dist/cli.js` now throws a clear error instead of cascading 68+ test failures
+- **Integration pool isolation**: Changed from `threads` to `forks` for integration tests — proper process isolation for subprocess-spawning tests
+- **Timeout safety net**: Added `testTimeout: 30_000` to fallback vitest.config.ts, preventing 5s default under edge conditions
+
 ## [1.3.8] - 2026-02-22
 
 ### Fixed
