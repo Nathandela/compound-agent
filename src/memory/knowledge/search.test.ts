@@ -201,6 +201,28 @@ describe('searchKnowledge', () => {
     expect(results[0]!.item.id).toBe('C1');
   });
 
+  it('returns keyword results when model is usable but no embeddings stored', async () => {
+    const chunks = [
+      makeChunk('C1', 'docs/a.md', 'architecture patterns for TypeScript'),
+      makeChunk('C2', 'docs/b.md', 'database connection pooling'),
+    ];
+    // Seed chunks WITHOUT embeddings
+    seedChunks(chunks);
+
+    // Model reports usable, but chunks have no embedding vectors
+    const model = await import('../embeddings/model.js');
+    vi.spyOn(model, 'isModelUsable').mockResolvedValue({ usable: true });
+
+    const embeddings = await import('../embeddings/nomic.js');
+    vi.spyOn(embeddings, 'embedText').mockResolvedValue(Array.from(new Float32Array([1, 0, 0])));
+
+    const results = await searchKnowledge(testRepo, 'architecture');
+    // Should NOT be empty -- falls back to keyword results
+    expect(results.length).toBeGreaterThanOrEqual(1);
+    expect(results[0]!.item.id).toBe('C1');
+    expect(results[0]!.score).toBeGreaterThan(0);
+  });
+
   it('respects limit option', async () => {
     const chunks = [
       makeChunk('C1', 'docs/a.md', 'TypeScript patterns best practices'),

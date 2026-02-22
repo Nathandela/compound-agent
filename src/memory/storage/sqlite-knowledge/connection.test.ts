@@ -110,6 +110,77 @@ describe('closeKnowledgeDb', () => {
   });
 });
 
+describe('cross-process persistence', () => {
+  let repo: string;
+
+  beforeEach(async () => {
+    repo = await mkdtemp(join(tmpdir(), 'knowledge-persist-'));
+  });
+
+  afterEach(async () => {
+    closeKnowledgeDb();
+    await rm(repo, { recursive: true, force: true });
+  });
+
+  it('data written to file-based DB survives close + reopen', () => {
+    // "Process 1": write a chunk
+    const db1 = openKnowledgeDb(repo);
+    db1.prepare(
+      `INSERT INTO chunks (id, file_path, start_line, end_line, content_hash, text, updated_at)
+       VALUES ('P001', 'docs/persist.md', 1, 20, 'hashP', 'persistent content', '2026-01-01')`
+    ).run();
+
+    // Close all connections (simulates process exit)
+    closeKnowledgeDb();
+
+    // "Process 2": reopen and verify data persists
+    const db2 = openKnowledgeDb(repo);
+    const row = db2.prepare("SELECT id, text FROM chunks WHERE id = 'P001'").get() as { id: string; text: string } | undefined;
+    expect(row).toBeDefined();
+    expect(row!.id).toBe('P001');
+    expect(row!.text).toBe('persistent content');
+  });
+
+  it('FTS index persists across close + reopen', () => {
+    // "Process 1": insert chunk (FTS auto-indexed by trigger)
+    const db1 = openKnowledgeDb(repo);
+    db1.prepare(
+      `INSERT INTO chunks (id, file_path, start_line, end_line, content_hash, text, updated_at)
+       VALUES ('F001', 'docs/fts.md', 1, 10, 'hashF', 'TypeScript compiler architecture', '2026-01-01')`
+    ).run();
+    closeKnowledgeDb();
+
+    // "Process 2": reopen and search FTS
+    const db2 = openKnowledgeDb(repo);
+    const results = db2
+      .prepare("SELECT rowid FROM chunks_fts WHERE chunks_fts MATCH 'TypeScript'")
+      .all() as Array<{ rowid: number }>;
+    expect(results).toHaveLength(1);
+  });
+
+  it('embeddings persist across close + reopen', () => {
+    // "Process 1": insert chunk with embedding
+    const db1 = openKnowledgeDb(repo);
+    const embedding = new Float32Array([0.1, 0.2, 0.3]);
+    const embBuffer = Buffer.from(embedding.buffer);
+    db1.prepare(
+      `INSERT INTO chunks (id, file_path, start_line, end_line, content_hash, text, updated_at, embedding, model)
+       VALUES ('E001', 'docs/emb.md', 1, 5, 'hashE', 'embedding test', '2026-01-01', ?, 'test-model')`
+    ).run(embBuffer);
+    closeKnowledgeDb();
+
+    // "Process 2": reopen and verify embedding
+    const db2 = openKnowledgeDb(repo);
+    const row = db2.prepare("SELECT embedding, model FROM chunks WHERE id = 'E001'").get() as { embedding: Buffer; model: string } | undefined;
+    expect(row).toBeDefined();
+    expect(row!.model).toBe('test-model');
+    const recovered = new Float32Array(row!.embedding.buffer, row!.embedding.byteOffset, row!.embedding.byteLength / 4);
+    expect(recovered[0]).toBeCloseTo(0.1);
+    expect(recovered[1]).toBeCloseTo(0.2);
+    expect(recovered[2]).toBeCloseTo(0.3);
+  });
+});
+
 describe('WAL mode for file-based DB', () => {
   let repo: string;
 
