@@ -112,6 +112,20 @@ $ARGUMENTS
 **MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/test-cleaner/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
 `,
 
+  'get-a-phd.md': `---
+name: compound:get-a-phd
+description: Deep PhD-level research for working subagents
+argument-hint: "<focus area or epic ID>"
+---
+$ARGUMENTS
+
+# Get a PhD
+
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/researcher/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file.
+
+Then: scan docs/compound/research/ for gaps, propose topics via AskUserQuestion, spawn parallel researcher subagents.
+`,
+
   // =========================================================================
   // Utility commands (kept: learn, prime)
   // Removed in v1.3: search, list, show, wrong, stats (CLI wrappers)

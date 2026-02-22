@@ -28,6 +28,10 @@ Cluster similar lessons from memory and synthesize them into testable CCT (Compo
 6. Skip singleton lessons (not enough signal to form a pattern)
 7. For many clusters, spawn opus subagents to synthesize patterns from different clusters in parallel.
 
+## Literature
+- Consult \`docs/compound/research/learning-systems/\` for knowledge compounding theory and pattern synthesis
+- Run \`npx ca knowledge "lesson clustering compounding"\` for indexed knowledge on learning systems
+
 ## Collaboration
 Share synthesized patterns with the team lead via direct message for review.
 
@@ -123,6 +127,11 @@ invariant-designer -> **CCT Subagent** -> test-first-enforcer
    - Priority (REQUIRED vs SUGGESTED)
 5. Pass requirements to test-first-enforcer for inclusion
 
+## Literature
+- Consult \`docs/compound/research/tdd/\` for corrective testing theory and mistake-driven test design
+- Consult \`docs/compound/research/learning-systems/\` for pattern clustering and knowledge synthesis methodology
+- Run \`npx ca knowledge "corrective testing patterns"\` for indexed knowledge
+
 ## Deployment
 Subagent in the TDD pipeline. Return findings directly to the caller.
 
@@ -156,6 +165,10 @@ module-boundary-reviewer -> **Drift Detector** -> implementation-reviewer
    - Are naming conventions consistent?
 5. Use \`npx ca search\` for past architectural decisions that may apply
 6. Report any deviation, even if the implementation "works"
+
+## Literature
+- Consult \`docs/compound/research/property-testing/\` for invariant-driven development and constraint verification
+- Run \`npx ca knowledge "invariant drift detection"\` for indexed knowledge on drift patterns
 
 ## Deployment
 Subagent in the TDD pipeline. Return findings directly to the caller.

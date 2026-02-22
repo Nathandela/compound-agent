@@ -26,6 +26,10 @@ Analyze the current session's work context: what was accomplished, what problems
 7. Summarize the work context for lesson extraction
 8. For large diffs spanning multiple modules, spawn opus subagents to analyze each module in parallel. Merge findings before sharing.
 
+## Literature
+- Consult \`docs/compound/research/learning-systems/\` for knowledge compounding theory and context analysis methodology
+- Run \`npx ca knowledge "context analysis work review"\` for indexed knowledge
+
 ## Collaboration
 Share findings with lesson-extractor via direct message so it can extract actionable lessons from the context. Pass results to other compound agents as needed.
 
@@ -65,6 +69,10 @@ Share findings with pattern-matcher and solution-writer via direct message so th
 ## Deployment
 AgentTeam member in the **compound** phase. Spawned via TeamCreate. Communicate with teammates via SendMessage.
 
+## Literature
+- Consult \`docs/compound/research/learning-systems/\` for lesson extraction methodology and knowledge representation
+- Run \`npx ca knowledge "lesson extraction knowledge management"\` for indexed knowledge
+
 ## Output Format
 Per lesson:
 - **Insight**: The actionable directive
@@ -99,6 +107,10 @@ Share classifications with solution-writer via direct message so it knows which 
 ## Deployment
 AgentTeam member in the **compound** phase. Spawned via TeamCreate. Communicate with teammates via SendMessage.
 
+## Literature
+- Consult \`docs/compound/research/learning-systems/\` for deduplication strategies and knowledge graph methodology
+- Run \`npx ca knowledge "pattern matching deduplication"\` for indexed knowledge
+
 ## Output Format
 Per lesson:
 - **Classification**: New / Duplicate / Reinforcement / Contradiction
@@ -128,6 +140,10 @@ Transform approved lessons into properly formatted memory items that follow the 
 4. Assign severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
 5. Set supersedes or related links when the lesson updates existing knowledge
 6. Store via \`npx ca learn\`
+
+## Literature
+- Consult \`docs/compound/research/learning-systems/\` for knowledge representation and lesson schema design
+- Run \`npx ca knowledge "knowledge storage representation"\` for indexed knowledge
 
 ## Collaboration
 Share findings with other agents via direct message to communicate storage outcomes. Collaborate with pattern-matcher on borderline classifications.
@@ -163,6 +179,10 @@ Write comprehensive failing tests that define expected behavior before any imple
 7. Do NOT mock the thing being tested
 8. For multiple test files, spawn opus subagents to write tests in parallel (1 subagent per test file or module). Coordinate to avoid duplicate test setup.
 
+## Literature
+- Consult \`docs/compound/research/tdd/\` for test-first development evidence and methodology
+- Run \`npx ca knowledge "TDD test design"\` for indexed knowledge on testing patterns
+
 ## Memory Integration
 Run \`npx ca search\` with the task description before writing tests. Look for known patterns, edge cases, and past mistakes relevant to the feature area.
 
@@ -197,6 +217,10 @@ Write the minimum code necessary to make failing tests pass. Follow the TDD gree
 6. If a test seems wrong, stop and report it -- do not change it
 7. After all tests pass, look for obvious refactoring opportunities
 8. For multiple implementation files, spawn opus subagents to implement in parallel (1 subagent per module). Coordinate on shared interfaces via SendMessage.
+
+## Literature
+- Consult \`docs/compound/research/tdd/\` for TDD green-phase methodology and minimal implementation strategies
+- Run \`npx ca knowledge "TDD implementation"\` for indexed knowledge on implementation patterns
 
 ## Memory Integration
 Run \`npx ca search\` with the task description for known patterns, solutions, and implementation approaches relevant to the feature area.

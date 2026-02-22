@@ -28,7 +28,7 @@ For each proposed topic, define:
 ## Gap Analysis
 
 Before proposing topics, scan ALL of `docs/` for existing coverage:
-- `docs/research/` — existing research documents
+- `docs/research/` — existing research documents (dev repo) / `docs/compound/research/` (consumer repos)
 - `docs/standards/` — coding standards that may already cover the topic
 - `docs/adr/` — architecture decisions with rationale
 - `docs/invariants/` — formal invariants that document domain knowledge
@@ -55,7 +55,7 @@ For each confirmed topic, spawn a parallel research subagent:
   1. Web search for academic papers, blog posts, benchmarks, tools
   2. Scan existing `docs/` for prior knowledge
   3. Synthesize into the research template format (see researcher SKILL.md)
-- Store output at `docs/research/<general-topic>/<specific-slug>.md` (e.g., `docs/research/code-review/systematic-review-methodology.md`)
+- Store output at `docs/research/<general-topic>/<specific-slug>.md`
 - Create the topic subdirectory if it doesn't exist
 
 **Run research subagents in parallel** for maximum efficiency.
@@ -63,6 +63,6 @@ For each confirmed topic, spawn a parallel research subagent:
 ## Post-Research
 
 After all research subagents complete:
-1. Update `docs/research/index.md` with the new documents
+1. Update the research index with the new documents
 2. Run `npx ca learn` to capture key meta-insights about the research process (if any)
 3. Summarize findings to the user: what was produced, where it's stored, key takeaways

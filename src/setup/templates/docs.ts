@@ -78,6 +78,8 @@ npx ca doctor
     index.jsonl                # Memory items (git-tracked source of truth)
   .cache/
     lessons.sqlite             # Rebuildable search index (.gitignore)
+docs/compound/
+  research/                    # PhD-level research docs for agent knowledge
 \`\`\`
 
 ---
@@ -446,6 +448,14 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **What it does**: Validates the epic, runs \`npx ca worktree create <epic-id>\`, verifies output, and informs the user they can proceed with \`/compound:lfg\`.
 
+### \`/compound:get-a-phd\`
+
+**Purpose**: Conduct deep, PhD-level research to build knowledge for working subagents.
+
+**When invoked**: When agents need domain knowledge not yet covered in \`docs/compound/research/\`.
+
+**What it does**: Analyzes beads epics for knowledge gaps, checks existing docs coverage, proposes research topics for user confirmation, spawns parallel researcher subagents, and stores output at \`docs/compound/research/<topic>/<slug>.md\`.
+
 ---
 
 ## Skill invocation
@@ -460,6 +470,7 @@ Skills are invoked as Claude Code slash commands:
 /compound:compound         # Start compound phase
 /compound:lfg <epic-id>    # Run all phases end-to-end
 /compound:set-worktree <epic-id>  # Set up worktree before LFG
+/compound:get-a-phd <focus>       # Deep research for agent knowledge
 \`\`\`
 
 Each skill reads its SKILL.md file from \`.claude/skills/compound/<phase>/SKILL.md\` at invocation time. Skills are never executed from memory.

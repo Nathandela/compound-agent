@@ -90,6 +90,10 @@ Review code changes for security vulnerabilities including OWASP top 10, injecti
 7. Check dependency versions for known CVEs
 8. For large diffs, spawn opus subagents to review different file groups in parallel (e.g., 1 per module). Merge findings and deduplicate.
 
+## Literature
+- Consult \`docs/compound/research/code-review/\` for systematic review methodology and severity classification
+- Run \`npx ca knowledge "security review OWASP"\` for indexed security knowledge
+
 ## Collaboration
 Share cross-cutting findings via SendMessage: security issues impacting architecture go to architecture-reviewer; secrets in test fixtures go to test-coverage-reviewer.
 
@@ -122,6 +126,10 @@ Review code for architectural consistency, pattern compliance, module boundary i
 6. Check that dependencies flow in the correct direction
 7. For changes spanning multiple modules, spawn opus subagents to review each module boundary in parallel.
 
+## Literature
+- Consult \`docs/compound/research/code-review/\` for systematic review methodology and architectural assessment frameworks
+- Run \`npx ca knowledge "architecture module design"\` for indexed knowledge on design patterns
+
 ## Collaboration
 Share cross-cutting findings via SendMessage: architecture issues with performance implications go to performance-reviewer; structural violations creating security risks go to security-reviewer.
 
@@ -152,6 +160,10 @@ Review code for performance bottlenecks, algorithmic complexity issues, unnecess
 5. Check for missing indexes on database queries
 6. Verify resources are properly closed/released
 7. For multiple hot paths, spawn opus subagents to profile different modules in parallel.
+
+## Literature
+- Consult \`docs/compound/research/code-review/\` for systematic performance analysis frameworks
+- Run \`npx ca knowledge "performance review"\` for indexed knowledge on performance patterns
 
 ## Collaboration
 Share cross-cutting findings via SendMessage: performance issues needing test coverage go to test-coverage-reviewer; performance fixes requiring architectural changes go to architecture-reviewer.
@@ -185,6 +197,11 @@ Review tests for meaningful assertions, edge case coverage, and absence of cargo
 7. Ensure property-based tests exist for pure functions
 8. For many test files, spawn opus subagents to review test files in parallel (1 per test file).
 
+## Literature
+- Consult \`docs/compound/research/tdd/\` for test quality assessment and coverage methodology
+- Consult \`docs/compound/research/property-testing/\` for property-based testing theory
+- Run \`npx ca knowledge "test coverage quality"\` for indexed knowledge
+
 ## Collaboration
 Share cross-cutting findings via SendMessage: cargo-cult tests hiding security issues go to security-reviewer; unnecessary test complexity goes to simplicity-reviewer.
 
@@ -215,6 +232,10 @@ Review code for unnecessary complexity, over-engineering, premature abstraction,
 4. Flag unnecessary indirection or wrapper layers
 5. Flag feature flags or config for single-use cases
 6. Verify no "just in case" code exists
+
+## Literature
+- Consult \`docs/compound/research/code-review/\` for over-engineering detection and YAGNI assessment methodology
+- Run \`npx ca knowledge "simplicity over-engineering"\` for indexed knowledge
 
 ## Collaboration
 Share cross-cutting findings via SendMessage: over-engineering obscuring security concerns goes to security-reviewer; premature abstractions creating wrong module boundaries goes to architecture-reviewer.

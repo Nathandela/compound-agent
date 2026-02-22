@@ -24,6 +24,7 @@ import {
   installAgentTemplates,
   installDocTemplates,
   installPhaseSkills,
+  installResearchDocs,
   installWorkflowCommands,
   updateAgentsMd,
   type PnpmConfigResult,
@@ -103,6 +104,7 @@ async function initAction(
     await installPhaseSkills(repoRoot);
     await installAgentRoleSkills(repoRoot);
     await installDocTemplates(repoRoot);
+    await installResearchDocs(repoRoot);
   }
 
   let hookResult: HookInstallResult | null = null;

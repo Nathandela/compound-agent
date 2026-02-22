@@ -17,6 +17,7 @@
   },
   "files": [
     "dist",
+    "docs/research",
     "CHANGELOG.md"
   ],
   "repository": {

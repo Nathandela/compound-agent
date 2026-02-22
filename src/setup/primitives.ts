@@ -4,8 +4,9 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { VERSION } from '../version.js';
 import {
@@ -212,6 +213,61 @@ export async function installDocTemplates(repoRoot: string): Promise<boolean> {
       await writeFile(filePath, content, 'utf-8');
       created = true;
     }
+  }
+  return created;
+}
+
+/**
+ * Install research docs from the package's docs/research/ to docs/compound/research/ in the user's project.
+ * Idempotent: does not overwrite existing files.
+ *
+ * @returns true if any research docs were created
+ */
+export async function installResearchDocs(repoRoot: string): Promise<boolean> {
+  // Resolve the package's docs/research/ directory via import.meta.url
+  // In the built bundle, import.meta.url points to dist/cli.js.
+  // Go up one level from dist/ to reach the package root.
+  const pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const srcDir = join(pkgRoot, 'docs', 'research');
+
+  if (!existsSync(srcDir)) {
+    return false; // Package doesn't include research docs (dev-only)
+  }
+
+  const destDir = join(repoRoot, 'docs', 'compound', 'research');
+  await mkdir(destDir, { recursive: true });
+
+  let created = false;
+
+  async function copyDir(src: string, dest: string): Promise<void> {
+    const entries = await readdir(src, { withFileTypes: true });
+    for (const entry of entries) {
+      const srcPath = join(src, entry.name);
+      const destPath = join(dest, entry.name);
+      if (entry.isDirectory()) {
+        await mkdir(destPath, { recursive: true });
+        await copyDir(srcPath, destPath);
+      } else if (!existsSync(destPath) && entry.name.endsWith('.md')) {
+        let content = await readFile(srcPath, 'utf-8');
+        // Rewrite index.md header to note provenance
+        if (entry.name === 'index.md') {
+          const patched = content.replace(
+            /^# .*/m,
+            '$&\n\n> Shipped by compound-agent. Source: `docs/research/` in the compound-agent package.',
+          );
+          content = patched !== content ? patched : `> Shipped by compound-agent.\n\n${content}`;
+        }
+        await writeFile(destPath, content, 'utf-8');
+        created = true;
+      }
+    }
+  }
+
+  try {
+    await copyDir(srcDir, destDir);
+  } catch (err) {
+    console.error(`Warning: Could not install research docs: ${(err as Error).message}`);
+    return false;
   }
   return created;
 }
