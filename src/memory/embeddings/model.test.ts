@@ -86,14 +86,11 @@ describe('embedding model resolution', () => {
       expect(typeof result.usable).toBe('boolean');
     });
 
-    it('returns usable=false with reason when model file not present', async () => {
-      // When model is not available, it should fail fast
-      if (!isModelAvailable()) {
-        const result = await isModelUsable();
-        expect(result.usable).toBe(false);
-        expect(result.reason).toContain('not found');
-        expect(result.action).toContain('download-model');
-      }
+    it.runIf(!modelAvailable)('returns usable=false with reason when model file not present', async () => {
+      const result = await isModelUsable();
+      expect(result.usable).toBe(false);
+      expect(result.reason).toContain('not found');
+      expect(result.action).toContain('download-model');
     });
 
     it.skipIf(skipEmbedding)('returns usable=true when model can initialize', async () => {
@@ -111,14 +108,12 @@ describe('embedding model resolution', () => {
       expect(result2.usable).toBe(true);
     });
 
-    it('provides actionable error message on failure', async () => {
-      if (!isModelAvailable()) {
-        const result = await isModelUsable();
-        expect(result.usable).toBe(false);
-        // Should provide clear action to fix
-        expect(result.action).toBeDefined();
-        expect(result.action).toMatch(/download-model|npx ca/);
-      }
+    it.runIf(!modelAvailable)('provides actionable error message on failure', async () => {
+      const result = await isModelUsable();
+      expect(result.usable).toBe(false);
+      // Should provide clear action to fix
+      expect(result.action).toBeDefined();
+      expect(result.action).toMatch(/download-model|npx ca/);
     });
 
     it('caches result to avoid double initialization', async () => {

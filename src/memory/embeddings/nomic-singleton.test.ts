@@ -61,20 +61,18 @@ describe('embedding singleton coordination', () => {
     it('concurrent getEmbedding() calls create only one context', async () => {
       const { context } = setupMocks();
 
-      // Add delay to simulate slow model loading
-      vi.mocked(getLlama).mockImplementation(
-        () =>
-          new Promise((resolve) => {
-            const mockLlama = {
-              loadModel: vi.fn().mockResolvedValue({
-                createEmbeddingContext: vi.fn().mockResolvedValue(context),
-                dispose: vi.fn().mockResolvedValue(undefined),
-              }),
-              dispose: vi.fn().mockResolvedValue(undefined),
-            };
-            setTimeout(() => resolve(mockLlama as any), 50);
+      // Use microtask delay to simulate async model loading without real timers
+      vi.mocked(getLlama).mockImplementation(async () => {
+        // Yield to event loop so concurrent calls can race
+        await Promise.resolve();
+        return {
+          loadModel: vi.fn().mockResolvedValue({
+            createEmbeddingContext: vi.fn().mockResolvedValue(context),
+            dispose: vi.fn().mockResolvedValue(undefined),
           }),
-      );
+          dispose: vi.fn().mockResolvedValue(undefined),
+        } as any;
+      });
 
       // Launch 5 concurrent calls
       const results = await Promise.all([

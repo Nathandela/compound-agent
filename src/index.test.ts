@@ -46,126 +46,55 @@ import {
 } from './index.js';
 
 describe('public API exports', () => {
-  it('exports VERSION as semver string', () => {
+  it('exports VERSION as semver string matching package.json', () => {
     expect(VERSION).toMatch(/^\d+\.\d+\.\d+(-[\w.]+)?$/);
-  });
-
-  it('VERSION matches package.json version', () => {
     const pkgPath = join(dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as { version: string };
     expect(VERSION).toBe(pkg.version);
   });
 
-  describe('storage exports', () => {
-    it('exports appendLesson', () => {
-      expect(typeof appendLesson).toBe('function');
-    });
-
-    it('exports readLessons', () => {
-      expect(typeof readLessons).toBe('function');
-    });
-
-    it('exports rebuildIndex', () => {
-      expect(typeof rebuildIndex).toBe('function');
-    });
-
-    it('exports searchKeyword', () => {
-      expect(typeof searchKeyword).toBe('function');
-    });
-
-    it('exports closeDb', () => {
-      expect(typeof closeDb).toBe('function');
-    });
+  it('exports all storage functions', () => {
+    for (const fn of [appendLesson, readLessons, rebuildIndex, searchKeyword, closeDb]) {
+      expect(typeof fn).toBe('function');
+    }
   });
 
-  describe('embedding exports', () => {
-    it('exports embedText', () => {
-      expect(typeof embedText).toBe('function');
-    });
-
-    it('exports embedTexts', () => {
-      expect(typeof embedTexts).toBe('function');
-    });
-
-    it('exports isModelAvailable', () => {
-      expect(typeof isModelAvailable).toBe('function');
-    });
-
-    it('exports resolveModel', () => {
-      expect(typeof resolveModel).toBe('function');
-    });
-
-    it('exports MODEL_FILENAME', () => {
-      expect(typeof MODEL_FILENAME).toBe('string');
-      expect(MODEL_FILENAME).toContain('.gguf');
-    });
+  it('exports all embedding functions and constants', () => {
+    for (const fn of [embedText, embedTexts, isModelAvailable, resolveModel]) {
+      expect(typeof fn).toBe('function');
+    }
+    expect(typeof MODEL_FILENAME).toBe('string');
+    expect(MODEL_FILENAME).toContain('.gguf');
   });
 
-  describe('search exports', () => {
-    it('exports searchVector', () => {
-      expect(typeof searchVector).toBe('function');
-    });
-
-    it('exports cosineSimilarity', () => {
-      expect(typeof cosineSimilarity).toBe('function');
-    });
-
-    it('exports rankLessons', () => {
-      expect(typeof rankLessons).toBe('function');
-    });
+  it('exports all search functions', () => {
+    for (const fn of [searchVector, cosineSimilarity, rankLessons]) {
+      expect(typeof fn).toBe('function');
+    }
   });
 
-  describe('capture exports', () => {
-    it('exports shouldPropose', () => {
-      expect(typeof shouldPropose).toBe('function');
-    });
-
-    it('exports isNovel', () => {
-      expect(typeof isNovel).toBe('function');
-    });
-
-    it('exports isSpecific', () => {
-      expect(typeof isSpecific).toBe('function');
-    });
-
-    it('exports isActionable', () => {
-      expect(typeof isActionable).toBe('function');
-    });
-
-    it('exports detectUserCorrection', () => {
-      expect(typeof detectUserCorrection).toBe('function');
-    });
-
-    it('exports detectSelfCorrection', () => {
-      expect(typeof detectSelfCorrection).toBe('function');
-    });
-
-    it('exports detectTestFailure', () => {
-      expect(typeof detectTestFailure).toBe('function');
-    });
+  it('exports all capture functions', () => {
+    for (const fn of [
+      shouldPropose,
+      isNovel,
+      isSpecific,
+      isActionable,
+      detectUserCorrection,
+      detectSelfCorrection,
+      detectTestFailure,
+    ]) {
+      expect(typeof fn).toBe('function');
+    }
   });
 
-  describe('retrieval exports', () => {
-    it('exports loadSessionLessons', () => {
-      expect(typeof loadSessionLessons).toBe('function');
-    });
-
-    it('exports retrieveForPlan', () => {
-      expect(typeof retrieveForPlan).toBe('function');
-    });
-
-    it('exports formatLessonsCheck', () => {
-      expect(typeof formatLessonsCheck).toBe('function');
-    });
+  it('exports all retrieval functions', () => {
+    for (const fn of [loadSessionLessons, retrieveForPlan, formatLessonsCheck]) {
+      expect(typeof fn).toBe('function');
+    }
   });
 
-  describe('type exports', () => {
-    it('exports generateId', () => {
-      expect(typeof generateId).toBe('function');
-    });
-
-    it('exports LessonSchema', () => {
-      expect(LessonSchema).toBeDefined();
-    });
+  it('exports type utilities', () => {
+    expect(typeof generateId).toBe('function');
+    expect(LessonSchema).toBeDefined();
   });
 });
