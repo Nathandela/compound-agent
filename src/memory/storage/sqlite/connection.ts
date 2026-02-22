@@ -57,7 +57,7 @@ export function openDb(repoRoot: string, options: DbOptions = {}): DatabaseType 
 
     if (!hasExpectedVersion(database)) {
       database.close();
-      unlinkSync(key);
+      try { unlinkSync(key); } catch { /* ENOENT is fine */ }
       database = new Database(key);
     }
 

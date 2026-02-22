@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.8] - 2026-02-22
+
+### Fixed
+
+- **Integration test reliability**: Dynamic assertion on workflow command count instead of hardcoded magic number; 30s test timeout for integration suite; conditional build in global-setup; 30s timeout on all bare `execSync` calls in init tests
+- **Data integrity**: Indexing pipeline wraps delete/upsert/hash-set in a single transaction for atomic file re-indexing
+- **FTS5 sanitization**: Extended regex to strip parentheses, colons, and braces in addition to existing special chars
+- **Safe JSON.parse**: `rowToMemoryItem` now uses `safeJsonParse` with fallbacks instead of bare `JSON.parse`
+- **ENOENT on schema migration**: `unlinkSync` in lessons DB wrapped in try/catch (matches knowledge DB pattern)
+- **Worktree hook support**: `getGitHooksDir` resolves `.git` file (`gitdir:` reference) in worktrees
+
+### Changed
+
+- **Two-phase vector search**: Knowledge vector search loads only IDs + embeddings in phase 1, hydrates full text for top-k only in phase 2 (reduces memory from O(n * text) to O(n * embedding) + O(k * text))
+- **Deduplicated FTS5 search**: `searchKeyword` and `searchKeywordScored` share a single `executeFtsQuery` helper
+- **Removed redundant COUNT pre-checks**: FTS5 naturally returns empty on empty tables
+- **Extracted chunk count helpers**: `getChunkCount` / `getChunkCountByFilePath` replace raw SQL in `knowledge.ts` and `indexing.ts`
+- **Immutable extension sets**: `SUPPORTED_EXTENSIONS` typed as `ReadonlySet`; new `CODE_EXTENSIONS` constant replaces hardcoded array in chunking
+- **`test:all` builds first**: Script now runs `pnpm build` before model download and test run
+- **Test describe label**: Fixed misleading `'when stop_hook_active is false'` to match actual test condition
+
+### Added
+
+- `filesErrored` field in `IndexResult` to track file read failures during indexing
+- `tsx` added to devDependencies (was used but not declared)
+
 ## [1.3.7] - 2026-02-22
 
 ### Fixed

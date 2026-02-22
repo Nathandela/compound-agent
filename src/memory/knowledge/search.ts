@@ -17,8 +17,14 @@ export interface KnowledgeSearchOptions {
 
 const DEFAULT_KNOWLEDGE_LIMIT = 6;
 
-/** Internal row type for chunks with embeddings */
-interface ChunkWithEmbedding {
+/** Lightweight row for phase-1 similarity scoring (no text payload) */
+interface EmbeddingRow {
+  id: string;
+  embedding: Buffer;
+}
+
+/** Full row for phase-2 hydration of top-k results */
+interface ChunkDataRow {
   id: string;
   file_path: string;
   start_line: number;
@@ -27,12 +33,13 @@ interface ChunkWithEmbedding {
   text: string;
   model: string | null;
   updated_at: string;
-  embedding: Buffer;
 }
 
 /**
- * Vector search over knowledge chunks.
- * Embeds query, compares against all chunk embeddings.
+ * Vector search over knowledge chunks (two-phase for memory efficiency).
+ *
+ * Phase 1: Load only IDs + embeddings, compute similarity, select top-k.
+ * Phase 2: Hydrate full chunk data for top-k results only.
  */
 export async function searchKnowledgeVector(
   repoRoot: string,
@@ -42,24 +49,43 @@ export async function searchKnowledgeVector(
   const limit = options?.limit ?? DEFAULT_KNOWLEDGE_LIMIT;
   const database = openKnowledgeDb(repoRoot);
 
-  // Get all chunks with embeddings
-  const rows = database
-    .prepare('SELECT id, file_path, start_line, end_line, content_hash, text, model, updated_at, embedding FROM chunks WHERE embedding IS NOT NULL')
-    .all() as ChunkWithEmbedding[];
+  // Phase 1: IDs + embeddings only (avoids loading all text into memory)
+  const embRows = database
+    .prepare('SELECT id, embedding FROM chunks WHERE embedding IS NOT NULL')
+    .all() as EmbeddingRow[];
 
-  if (rows.length === 0) return [];
+  if (embRows.length === 0) return [];
 
   const queryVector = await embedText(query);
 
-  const scored: GenericScoredItem<KnowledgeChunk>[] = [];
-  for (const row of rows) {
+  const scored: { id: string; score: number }[] = [];
+  for (const row of embRows) {
     const embFloat = new Float32Array(
       row.embedding.buffer,
       row.embedding.byteOffset,
       row.embedding.byteLength / 4
     );
+    scored.push({ id: row.id, score: cosineSimilarity(queryVector, embFloat) });
+  }
 
-    const score = cosineSimilarity(queryVector, embFloat);
+  scored.sort((a, b) => b.score - a.score);
+  const topK = scored.slice(0, limit);
+  if (topK.length === 0) return [];
+
+  // Phase 2: Hydrate full data for top-k only
+  // Safe: placeholders is a string of '?' characters, not user input
+  const placeholders = topK.map(() => '?').join(',');
+  const sql = `SELECT id, file_path, start_line, end_line, content_hash, text, model, updated_at FROM chunks WHERE id IN (${placeholders})`;
+  const dataRows = database
+    .prepare(sql)
+    .all(...topK.map((r) => r.id)) as ChunkDataRow[];
+
+  const dataMap = new Map(dataRows.map((r) => [r.id, r]));
+  const results: GenericScoredItem<KnowledgeChunk>[] = [];
+
+  for (const { id, score } of topK) {
+    const row = dataMap.get(id);
+    if (!row) continue;
     const chunk: KnowledgeChunk = {
       id: row.id,
       filePath: row.file_path,
@@ -72,11 +98,10 @@ export async function searchKnowledgeVector(
     if (row.model !== null) {
       chunk.model = row.model;
     }
-    scored.push({ item: chunk, score });
+    results.push({ item: chunk, score });
   }
 
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, limit);
+  return results;
 }
 
 /**

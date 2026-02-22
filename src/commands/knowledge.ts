@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { formatError } from '../cli-error-format.js';
 import { searchKnowledge } from '../memory/knowledge/index.js';
-import { openKnowledgeDb, closeKnowledgeDb } from '../memory/storage/sqlite-knowledge/index.js';
+import { openKnowledgeDb, closeKnowledgeDb, getChunkCount } from '../memory/storage/sqlite-knowledge/index.js';
 import { getGlobalOpts, out } from './shared.js';
 
 const MAX_DISPLAY_TEXT = 200;
@@ -35,9 +35,8 @@ export function registerKnowledgeCommand(program: Command): void {
         const repoRoot = getRepoRoot();
 
         // Check if DB has chunks; auto-index if empty
-        const database = openKnowledgeDb(repoRoot);
-        const countResult = database.prepare('SELECT COUNT(*) as cnt FROM chunks').get() as { cnt: number };
-        if (countResult.cnt === 0) {
+        openKnowledgeDb(repoRoot);
+        if (getChunkCount(repoRoot) === 0) {
           try {
             const { indexDocs } = await import('../memory/knowledge/indexing.js');
             out.info('Knowledge base empty. Indexing docs...');

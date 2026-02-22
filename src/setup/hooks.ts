@@ -2,9 +2,9 @@
  * Hooks command - Git hooks management.
  */
 
-import { chmodSync, existsSync } from 'node:fs';
+import { chmodSync, existsSync, lstatSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import type { Command } from 'commander';
 
 import { formatError } from '../cli-error-format.js';
@@ -61,11 +61,19 @@ function hasCompoundAgentHook(content: string): boolean {
  * Get the git hooks directory, respecting core.hooksPath if set.
  */
 async function getGitHooksDir(repoRoot: string): Promise<string | null> {
-  const gitDir = join(repoRoot, '.git');
+  const gitPath = join(repoRoot, '.git');
 
-  // Check if .git directory exists
-  if (!existsSync(gitDir)) {
+  if (!existsSync(gitPath)) {
     return null;
+  }
+
+  // Resolve actual .git dir (may be a file in worktrees: "gitdir: ../../.git/worktrees/foo")
+  let gitDir = gitPath;
+  if (lstatSync(gitPath).isFile()) {
+    const content = readFileSync(gitPath, 'utf-8').trim();
+    const match = /^gitdir:\s*(.+)$/.exec(content);
+    if (!match?.[1]) return null;
+    gitDir = resolve(repoRoot, match[1]);
   }
 
   // Check for core.hooksPath in .git/config

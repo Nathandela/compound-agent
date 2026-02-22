@@ -102,6 +102,29 @@ export function getLastIndexTime(repoRoot: string): string | null {
 }
 
 /**
+ * Get total chunk count across all files.
+ * @param repoRoot - Absolute path to repository root
+ */
+export function getChunkCount(repoRoot: string): number {
+  const database = openKnowledgeDb(repoRoot);
+  const row = database.prepare('SELECT COUNT(*) as cnt FROM chunks').get() as { cnt: number };
+  return row.cnt;
+}
+
+/**
+ * Get chunk count for a specific file path.
+ * @param repoRoot - Absolute path to repository root
+ * @param filePath - Relative file path
+ */
+export function getChunkCountByFilePath(repoRoot: string, filePath: string): number {
+  const database = openKnowledgeDb(repoRoot);
+  const row = database
+    .prepare('SELECT COUNT(*) as cnt FROM chunks WHERE file_path = ?')
+    .get(filePath) as { cnt: number };
+  return row.cnt;
+}
+
+/**
  * Set the last index time in metadata.
  * @param repoRoot - Absolute path to repository root
  * @param time - ISO timestamp

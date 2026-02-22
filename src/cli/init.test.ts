@@ -525,6 +525,7 @@ exit 0
         execSync(`node ${cliPath} init 2>&1`, {
           cwd: tempDir,
           encoding: 'utf-8',
+          timeout: 30_000,
           env: { ...process.env, HOME: mockHome, COMPOUND_AGENT_ROOT: tempDir },
         });
 
@@ -723,6 +724,7 @@ exit 0
         execSync(`node ${cliPath} setup claude 2>&1`, {
           cwd: tempDir,
           encoding: 'utf-8',
+          timeout: 30_000,
           env: { ...process.env, COMPOUND_AGENT_ROOT: tempDir },
         });
 
@@ -747,6 +749,7 @@ exit 0
         execSync(`node ${cliPath} setup claude 2>&1`, {
           cwd: tempDir,
           encoding: 'utf-8',
+          timeout: 30_000,
           env: { ...process.env, COMPOUND_AGENT_ROOT: tempDir },
         });
 
@@ -899,6 +902,7 @@ exit 0
         execSync(`node ${cliPath} init 2>&1`, {
           cwd: tempDir,
           encoding: 'utf-8',
+          timeout: 30_000,
           env: { ...process.env, HOME: mockHome, COMPOUND_AGENT_ROOT: tempDir },
         });
 
@@ -975,12 +979,14 @@ exit 0
           execSync(`node ${cliPath} init 2>&1`, {
             cwd: dir1,
             encoding: 'utf-8',
+            timeout: 30_000,
             env: { ...process.env, COMPOUND_AGENT_ROOT: dir1 },
           });
 
           execSync(`node ${cliPath} setup claude 2>&1`, {
             cwd: dir2,
             encoding: 'utf-8',
+            timeout: 30_000,
             env: { ...process.env, COMPOUND_AGENT_ROOT: dir2 },
           });
 

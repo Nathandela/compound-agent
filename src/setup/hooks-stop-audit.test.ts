@@ -83,7 +83,7 @@ describe('Stop Audit Hook', () => {
 
   // ---- Behavior tests ----
 
-  describe('when stop_hook_active is false', () => {
+  describe('when stop_hook_active is true but no phase state exists', () => {
     it('returns {}', () => {
       writeState({});
 

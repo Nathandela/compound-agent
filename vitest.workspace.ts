@@ -41,6 +41,7 @@ export default defineWorkspace([
       poolOptions: {
         threads: { minThreads: 2, maxThreads: 4 },
       },
+      testTimeout: 30_000,
       isolate: true,
       globalSetup: ['./tests/global-setup.ts'],
     },

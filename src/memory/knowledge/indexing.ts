@@ -15,6 +15,7 @@ import {
 import {
   upsertChunks,
   deleteChunksByFilePath,
+  getChunkCountByFilePath,
   getIndexedFilePaths,
   setLastIndexTime,
 } from '../storage/sqlite-knowledge/sync.js';
@@ -33,6 +34,7 @@ export interface IndexOptions {
 export interface IndexResult {
   filesIndexed: number;
   filesSkipped: number;
+  filesErrored: number;
   chunksCreated: number;
   chunksDeleted: number;
   durationMs: number;
@@ -115,6 +117,7 @@ export async function indexDocs(
   const stats: IndexResult = {
     filesIndexed: 0,
     filesSkipped: 0,
+    filesErrored: 0,
     chunksCreated: 0,
     chunksDeleted: 0,
     durationMs: 0,
@@ -130,6 +133,7 @@ export async function indexDocs(
     try {
       content = await readFile(fullPath, 'utf-8');
     } catch {
+      stats.filesErrored++;
       continue;
     }
 
@@ -157,16 +161,15 @@ export async function indexDocs(
       updatedAt: now,
     }));
 
-    // Delete stale chunks for this file before inserting new ones
-    deleteChunksByFilePath(repoRoot, [relPath]);
-
-    // Upsert chunks (no embeddings for now -- embedding is slow and optional)
-    if (knowledgeChunks.length > 0) {
-      upsertChunks(repoRoot, knowledgeChunks);
-    }
-
-    // Update file hash
-    setFileHash(repoRoot, relPath, hash);
+    // Atomically replace chunks for this file
+    const db = openKnowledgeDb(repoRoot);
+    db.transaction(() => {
+      deleteChunksByFilePath(repoRoot, [relPath]);
+      if (knowledgeChunks.length > 0) {
+        upsertChunks(repoRoot, knowledgeChunks);
+      }
+      setFileHash(repoRoot, relPath, hash);
+    })();
 
     stats.filesIndexed++;
     stats.chunksCreated += knowledgeChunks.length;
@@ -179,12 +182,8 @@ export async function indexDocs(
 
   if (stalePaths.length > 0) {
     // Count chunks that will be deleted
-    const db = openKnowledgeDb(repoRoot);
     for (const path of stalePaths) {
-      const row = db
-        .prepare('SELECT COUNT(*) as cnt FROM chunks WHERE file_path = ?')
-        .get(path) as { cnt: number };
-      stats.chunksDeleted += row.cnt;
+      stats.chunksDeleted += getChunkCountByFilePath(repoRoot, path);
     }
 
     deleteChunksByFilePath(repoRoot, stalePaths);

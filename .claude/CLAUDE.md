@@ -199,7 +199,7 @@ pnpm lint      # Zero violations
 pnpm install            # Install dependencies
 pnpm build              # Build with tsup
 pnpm test               # Full suite (unit + integration + embedding)
-pnpm test:fast          # Unit + embedding only (~12s)
+pnpm test:fast          # Unit + embedding only (~15s)
 pnpm test:unit          # Unit tests only (~14s)
 pnpm test:integration   # CLI integration tests only (~100s)
 pnpm test:changed       # Only tests affected by recent changes

@@ -23,8 +23,13 @@ export interface ChunkOptions {
 }
 
 /** Supported file extensions for chunking */
-export const SUPPORTED_EXTENSIONS = new Set([
+export const SUPPORTED_EXTENSIONS: ReadonlySet<string> = new Set([
   '.md', '.txt', '.rst', '.ts', '.py', '.js', '.tsx', '.jsx',
+]);
+
+/** Code file extensions (subset of SUPPORTED_EXTENSIONS) */
+export const CODE_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.ts', '.tsx', '.js', '.jsx', '.py',
 ]);
 
 /** Generate chunk ID from file path and line range */

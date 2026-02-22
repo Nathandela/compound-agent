@@ -14,6 +14,14 @@ import { openDb } from './connection.js';
  * @param row - Database row
  * @returns MemoryItem object
  */
+function safeJsonParse<T>(value: string, fallback: T): T {
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return fallback;
+  }
+}
+
 function rowToMemoryItem(row: MemoryItemRow): MemoryItem | null {
   const item = {
     id: row.id,
@@ -22,9 +30,9 @@ function rowToMemoryItem(row: MemoryItemRow): MemoryItem | null {
     insight: row.insight,
     tags: row.tags ? row.tags.split(',').filter(Boolean) : [],
     source: row.source,
-    context: JSON.parse(row.context),
-    supersedes: JSON.parse(row.supersedes),
-    related: JSON.parse(row.related),
+    context: safeJsonParse(row.context, {}),
+    supersedes: safeJsonParse(row.supersedes, []),
+    related: safeJsonParse(row.related, []),
     created: row.created,
     confirmed: row.confirmed === 1,
   } as Record<string, unknown>;
@@ -67,8 +75,8 @@ const FTS_OPERATORS = new Set(['AND', 'OR', 'NOT', 'NEAR']);
  * @returns Sanitized query safe for FTS5
  */
 export function sanitizeFtsQuery(query: string): string {
-  // Strip FTS5 special chars: " * ^ - +
-  const stripped = query.replace(/["*^+-]/g, '');
+  // Strip FTS5 special chars: " * ^ + - ( ) : { }
+  const stripped = query.replace(/["*^+\-():{}]/g, '');
   // Tokenize by whitespace, remove FTS operators, filter empty
   const tokens = stripped
     .split(/\s+/)
@@ -105,6 +113,56 @@ export function incrementRetrievalCount(repoRoot: string, lessonIds: string[]): 
 }
 
 /**
+ * Row type for scored keyword query (includes FTS5 rank).
+ */
+interface ScoredRow extends MemoryItemRow {
+  rank: number;
+}
+
+/**
+ * Shared FTS5 query execution. Builds the SQL with optional rank column
+ * and ORDER BY, then runs the query with sanitization and error handling.
+ */
+function executeFtsQuery(
+  repoRoot: string,
+  query: string,
+  limit: number,
+  options: { includeRank: boolean; typeFilter?: MemoryItemType }
+): ScoredRow[] {
+  const database = openDb(repoRoot);
+
+  const sanitized = sanitizeFtsQuery(query);
+  if (sanitized === '') return [];
+
+  const selectCols = options.includeRank ? 'l.*, fts.rank' : 'l.*';
+  const orderClause = options.includeRank ? 'ORDER BY fts.rank' : '';
+  const typeClause = options.typeFilter ? 'AND l.type = ?' : '';
+
+  const sql = `
+    SELECT ${selectCols}
+    FROM lessons l
+    JOIN lessons_fts fts ON l.rowid = fts.rowid
+    WHERE lessons_fts MATCH ?
+      AND l.invalidated_at IS NULL
+      ${typeClause}
+    ${orderClause}
+    LIMIT ?
+  `;
+
+  const params = options.typeFilter
+    ? [sanitized, options.typeFilter, limit]
+    : [sanitized, limit];
+
+  try {
+    return database.prepare(sql).all(...params) as ScoredRow[];
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown FTS5 error';
+    console.error(`[compound-agent] search error: ${message}`);
+    return [];
+  }
+}
+
+/**
  * Search lessons using FTS5 full-text search.
  * @param repoRoot - Absolute path to repository root
  * @param query - FTS5 query string
@@ -118,69 +176,12 @@ export async function searchKeyword(
   limit: number,
   typeFilter?: MemoryItemType
 ): Promise<MemoryItem[]> {
-  const database = openDb(repoRoot);
-
-  const countResult = database.prepare('SELECT COUNT(*) as cnt FROM lessons').get() as {
-    cnt: number;
-  };
-  if (countResult.cnt === 0) return [];
-
-  const sanitized = sanitizeFtsQuery(query);
-  if (sanitized === '') return [];
-
-  try {
-    if (typeFilter) {
-      const rows = database
-        .prepare(
-          `
-          SELECT l.*
-          FROM lessons l
-          JOIN lessons_fts fts ON l.rowid = fts.rowid
-          WHERE lessons_fts MATCH ?
-            AND l.invalidated_at IS NULL
-            AND l.type = ?
-          LIMIT ?
-        `
-        )
-        .all(sanitized, typeFilter, limit) as MemoryItemRow[];
-      return rows.map(rowToMemoryItem).filter((x): x is MemoryItem => x !== null);
-    }
-
-    const rows = database
-      .prepare(
-        `
-        SELECT l.*
-        FROM lessons l
-        JOIN lessons_fts fts ON l.rowid = fts.rowid
-        WHERE lessons_fts MATCH ?
-          AND l.invalidated_at IS NULL
-        LIMIT ?
-      `
-      )
-      .all(sanitized, limit) as MemoryItemRow[];
-
-    return rows.map(rowToMemoryItem).filter((x): x is MemoryItem => x !== null);
-  } catch (err) {
-    // Log for debugging — sanitization should prevent most FTS5 errors,
-    // but real issues (e.g. DB corruption) should not be fully silent
-    const message = err instanceof Error ? err.message : 'Unknown FTS5 error';
-    console.error(`[compound-agent] search error: ${message}`);
-    return [];
-  }
-}
-
-/**
- * Row type for scored keyword query (includes FTS5 rank).
- */
-interface ScoredRow extends MemoryItemRow {
-  rank: number;
+  const rows = executeFtsQuery(repoRoot, query, limit, { includeRank: false, typeFilter });
+  return rows.map(rowToMemoryItem).filter((x): x is MemoryItem => x !== null);
 }
 
 /**
  * Search lessons using FTS5 with normalized BM25 scores.
- *
- * Parallel to searchKeyword() but returns scored results suitable
- * for hybrid search merging.
  *
  * @param repoRoot - Absolute path to repository root
  * @param query - FTS5 query string
@@ -194,57 +195,15 @@ export async function searchKeywordScored(
   limit: number,
   typeFilter?: MemoryItemType
 ): Promise<ScoredKeywordResult[]> {
-  const database = openDb(repoRoot);
-
-  const countResult = database.prepare('SELECT COUNT(*) as cnt FROM lessons').get() as {
-    cnt: number;
-  };
-  if (countResult.cnt === 0) return [];
-
-  const sanitized = sanitizeFtsQuery(query);
-  if (sanitized === '') return [];
-
-  try {
-    const sql = typeFilter
-      ? `
-        SELECT l.*, fts.rank
-        FROM lessons l
-        JOIN lessons_fts fts ON l.rowid = fts.rowid
-        WHERE lessons_fts MATCH ?
-          AND l.invalidated_at IS NULL
-          AND l.type = ?
-        ORDER BY fts.rank
-        LIMIT ?
-      `
-      : `
-        SELECT l.*, fts.rank
-        FROM lessons l
-        JOIN lessons_fts fts ON l.rowid = fts.rowid
-        WHERE lessons_fts MATCH ?
-          AND l.invalidated_at IS NULL
-        ORDER BY fts.rank
-        LIMIT ?
-      `;
-
-    const params = typeFilter
-      ? [sanitized, typeFilter, limit]
-      : [sanitized, limit];
-
-    const rows = database.prepare(sql).all(...params) as ScoredRow[];
-
-    const results: ScoredKeywordResult[] = [];
-    for (const row of rows) {
-      const lesson = rowToMemoryItem(row);
-      if (lesson) {
-        results.push({ lesson, score: normalizeBm25Rank(row.rank) });
-      }
+  const rows = executeFtsQuery(repoRoot, query, limit, { includeRank: true, typeFilter });
+  const results: ScoredKeywordResult[] = [];
+  for (const row of rows) {
+    const lesson = rowToMemoryItem(row);
+    if (lesson) {
+      results.push({ lesson, score: normalizeBm25Rank(row.rank) });
     }
-    return results;
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown FTS5 error';
-    console.error(`[compound-agent] scored search error: ${message}`);
-    return [];
   }
+  return results;
 }
 
 /**

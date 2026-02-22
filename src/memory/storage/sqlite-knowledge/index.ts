@@ -27,6 +27,8 @@ export {
   upsertChunks,
   deleteChunksByFilePath,
   getIndexedFilePaths,
+  getChunkCount,
+  getChunkCountByFilePath,
   getLastIndexTime,
   setLastIndexTime,
 } from './sync.js';

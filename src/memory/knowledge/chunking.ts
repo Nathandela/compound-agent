@@ -3,6 +3,7 @@ import { extname } from 'node:path';
 import {
   chunkContentHash,
   generateChunkId,
+  CODE_EXTENSIONS,
   type Chunk,
   type ChunkOptions,
 } from './types.js';
@@ -30,7 +31,7 @@ function splitIntoSections(
   if (ext === '.rst') {
     return splitParagraphs(fileLines);
   }
-  if (['.ts', '.tsx', '.js', '.jsx', '.py'].includes(ext)) {
+  if (CODE_EXTENSIONS.has(ext)) {
     return splitCode(fileLines);
   }
   // Plain text: split on double newlines (paragraph boundaries)
