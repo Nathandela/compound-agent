@@ -317,7 +317,7 @@ function spawnPlayer(filePath: string): ChildProcess | null {
         return spawn('aplay', ['-q', filePath], { stdio: 'ignore', detached: true });
       case 'win32':
         return spawn('powershell', ['-c',
-          `(New-Object Media.SoundPlayer '${filePath}').PlaySync()`
+          `(New-Object Media.SoundPlayer "${filePath.replace(/"/g, '`"')}").PlaySync()`
         ], { stdio: 'ignore', detached: true });
       default:
         return null;
@@ -346,6 +346,12 @@ export function playBannerAudio(): { stop: () => void } | null {
       try { proc.kill(); } catch { /* already dead */ }
       try { unlinkSync(tmpPath); } catch { /* already cleaned */ }
     };
+
+    proc.on('error', () => {
+      // Audio player not found (e.g. aplay missing on headless Linux).
+      // Silently clean up — audio is non-essential.
+      try { unlinkSync(tmpPath); } catch { /* ignore */ }
+    });
 
     proc.on('exit', () => {
       try { unlinkSync(tmpPath); } catch { /* ignore */ }
