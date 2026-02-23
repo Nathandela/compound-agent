@@ -136,4 +136,61 @@ describe('AGENT_ROLE_SKILLS', () => {
       expect(content.length, `${key} is ${content.length} chars`).toBeLessThanOrEqual(4000);
     }
   });
+
+  // --- Security arc escalation wiring ---
+
+  describe('security arc escalation wiring', () => {
+    const SPECIALIST_KEYS = [
+      'security-injection',
+      'security-secrets',
+      'security-auth',
+      'security-data',
+      'security-deps',
+    ] as const;
+
+    it('security-reviewer mentions all 5 specialist skill names', () => {
+      const reviewer = AGENT_ROLE_SKILLS['security-reviewer'];
+      for (const key of SPECIALIST_KEYS) {
+        expect(reviewer, `security-reviewer should mention ${key}`).toContain(
+          `/${key.replace('security-', 'security-')}`,
+        );
+      }
+    });
+
+    it('each specialist says "Spawned by security-reviewer"', () => {
+      for (const key of SPECIALIST_KEYS) {
+        expect(
+          AGENT_ROLE_SKILLS[key],
+          `${key} should say "Spawned by security-reviewer"`,
+        ).toMatch(/[Ss]pawned by security.reviewer/);
+      }
+    });
+
+    it('security-reviewer documents P0 as merge-blocking', () => {
+      const reviewer = AGENT_ROLE_SKILLS['security-reviewer'];
+      expect(reviewer).toMatch(/P0.*[Bb]lock/i);
+    });
+
+    it('each specialist has npx ca knowledge in Literature', () => {
+      for (const key of SPECIALIST_KEYS) {
+        expect(
+          AGENT_ROLE_SKILLS[key],
+          `${key} should have npx ca knowledge in Literature`,
+        ).toMatch(/npx ca knowledge/);
+      }
+    });
+
+    it('each specialist references its correct research doc filename', () => {
+      const expectedDocs: Record<string, string> = {
+        'security-injection': 'injection-patterns.md',
+        'security-secrets': 'secrets-checklist.md',
+        'security-auth': 'auth-patterns.md',
+        'security-data': 'data-exposure.md',
+        'security-deps': 'dependency-security.md',
+      };
+      for (const [key, doc] of Object.entries(expectedDocs)) {
+        expect(AGENT_ROLE_SKILLS[key], `${key} should reference ${doc}`).toContain(doc);
+      }
+    });
+  });
 });
