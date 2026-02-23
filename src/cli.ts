@@ -26,7 +26,10 @@ import {
   registerSetupCommands,
 } from './commands/index.js';
 import { VERSION } from './version.js';
-import { closeDb } from './memory/storage/index.js';
+import { getRepoRoot } from './cli-utils.js';
+import { commandNeedsSqlite } from './cli-preflight.js';
+import { closeDb, ensureSqliteAvailable } from './memory/storage/index.js';
+import { printNativeBuildDiagnostic } from './native-diagnostic.js';
 
 // ============================================================================
 // Resource Cleanup
@@ -86,6 +89,24 @@ registerSetupCommands(program);
 registerCompoundCommands(program);
 registerLoopCommands(program);
 registerPhaseCheckCommand(program);
+
+// ============================================================================
+// Native Module Preflight Check
+// ============================================================================
+
+program.hook('preAction', (_thisCommand, actionCommand) => {
+  if (!commandNeedsSqlite(actionCommand)) return;
+
+  try {
+    ensureSqliteAvailable();
+  } catch (err) {
+    // Pass repo root for accurate package manager detection from subdirectories
+    let root: string | undefined;
+    try { root = getRepoRoot(); } catch { /* fallback to cwd via default param */ }
+    printNativeBuildDiagnostic(err, root);
+    process.exit(1);
+  }
+});
 
 // ============================================================================
 // Parse and Execute

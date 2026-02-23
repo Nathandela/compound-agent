@@ -18,6 +18,7 @@
   "files": [
     "dist",
     "docs/research",
+    "scripts/postinstall.mjs",
     "CHANGELOG.md"
   ],
   "repository": {
@@ -29,6 +30,7 @@
   },
   "homepage": "https://github.com/Nathandela/learning_agent#readme",
   "scripts": {
+    "postinstall": "node scripts/postinstall.mjs",
     "prebuild": "tsx scripts/extract-changelog.ts",
     "build": "tsup",
     "dev": "tsup --watch",

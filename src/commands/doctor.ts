@@ -83,50 +83,41 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
     : { name: 'Claude hooks', status: 'fail', fix: 'Run: npx ca setup' });
 
   // 6. Embedding model
-  let modelOk = false;
-  try {
-    modelOk = isModelAvailable();
-  } catch {
-    // model check may fail
-  }
-  checks.push(modelOk
-    ? { name: 'Embedding model', status: 'pass' }
-    : { name: 'Embedding model', status: 'warn', fix: 'Run: npx ca download-model' });
+  checks.push(checkEmbeddingModel());
 
   // 7. SQLite (better-sqlite3)
-  let sqliteOk = false;
-  try {
-    ensureSqliteAvailable();
-    sqliteOk = true;
-  } catch { /* not loadable */ }
-  checks.push(sqliteOk
-    ? { name: 'SQLite (better-sqlite3)', status: 'pass' }
-    : { name: 'SQLite (better-sqlite3)', status: 'fail', fix: 'Run: pnpm rebuild better-sqlite3 (or npm rebuild better-sqlite3)' });
+  checks.push(checkSqliteHealth());
 
-  // 8. Beads CLI available
+  // 8. pnpm onlyBuiltDependencies config
+  const pnpmCheck = checkPnpmBuildConfig(repoRoot);
+  if (pnpmCheck !== null) {
+    checks.push(pnpmCheck);
+  }
+
+  // 9. Beads CLI available
   const beadsResult = checkBeadsAvailable();
   checks.push(beadsResult.available
     ? { name: 'Beads CLI', status: 'pass' }
     : { name: 'Beads CLI', status: 'warn', fix: 'Install beads: https://github.com/Nathandela/beads' });
 
-  // 8. .gitignore health
+  // 10. .gitignore health
   checks.push(checkGitignoreHealth(repoRoot)
     ? { name: '.gitignore health', status: 'pass' }
     : { name: '.gitignore health', status: 'warn', fix: 'Run: npx ca setup --update' });
 
-  // 9. Usage documentation
+  // 11. Usage documentation
   const docPath = join(repoRoot, 'docs', 'compound', 'README.md');
   checks.push(existsSync(docPath)
     ? { name: 'Usage documentation', status: 'pass' }
     : { name: 'Usage documentation', status: 'warn', fix: 'Run: npx ca setup' });
 
-  // 10. Beads initialized
+  // 12. Beads initialized
   const beadsDir = join(repoRoot, '.beads');
   checks.push(existsSync(beadsDir)
     ? { name: 'Beads initialized', status: 'pass' }
     : { name: 'Beads initialized', status: 'warn', fix: 'Run: bd init' });
 
-  // 11. Beads healthy
+  // 13. Beads healthy
   if (beadsResult.available && existsSync(beadsDir)) {
     try {
       execSync('bd doctor', { cwd: repoRoot, shell: '/bin/sh', stdio: 'pipe' });
@@ -136,13 +127,66 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
     }
   }
 
-  // 12. Codebase scope
+  // 14. Codebase scope
   const scope = checkUserScope(repoRoot);
   checks.push(!scope.isUserScope
     ? { name: 'Codebase scope', status: 'pass' }
     : { name: 'Codebase scope', status: 'warn', fix: 'Install in a specific repository, not home directory' });
 
   return checks;
+}
+
+function checkEmbeddingModel(): DoctorCheck {
+  try {
+    return isModelAvailable()
+      ? { name: 'Embedding model', status: 'pass' }
+      : { name: 'Embedding model', status: 'warn', fix: 'Run: npx ca download-model' };
+  } catch {
+    return { name: 'Embedding model', status: 'warn', fix: 'Run: npx ca download-model' };
+  }
+}
+
+function checkSqliteHealth(): DoctorCheck {
+  try {
+    ensureSqliteAvailable();
+    return { name: 'SQLite (better-sqlite3)', status: 'pass' };
+  } catch {
+    return { name: 'SQLite (better-sqlite3)', status: 'fail', fix: 'Run: pnpm rebuild better-sqlite3 (or npm rebuild better-sqlite3)' };
+  }
+}
+
+/**
+ * Check if a pnpm project has onlyBuiltDependencies configured for native addons.
+ * Returns null for non-pnpm projects (check is irrelevant).
+ *
+ * NOTE: The required deps list must stay in sync with
+ * src/setup/primitives.ts REQUIRED_BUILD_DEPS and scripts/postinstall.mjs.
+ */
+export function checkPnpmBuildConfig(repoRoot: string): DoctorCheck | null {
+  const lockPath = join(repoRoot, 'pnpm-lock.yaml');
+  const pkgPath = join(repoRoot, 'package.json');
+
+  // Single read of package.json, reused for both pnpm detection and config check
+  let pkg: Record<string, unknown>;
+  try {
+    pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>;
+  } catch { return null; }
+
+  const hasLockfile = existsSync(lockPath);
+  const hasPmField = typeof pkg.packageManager === 'string' && pkg.packageManager.startsWith('pnpm');
+  if (!hasLockfile && !hasPmField) return null;
+
+  const pnpmConfig = pkg.pnpm as Record<string, unknown> | undefined;
+  const deps = pnpmConfig?.onlyBuiltDependencies;
+  if (!Array.isArray(deps)) {
+    return { name: 'pnpm build config', status: 'fail', fix: 'Run: npx ca setup (or add "pnpm.onlyBuiltDependencies" to package.json)' };
+  }
+  const required = ['better-sqlite3', 'node-llama-cpp'];
+  const missing = required.filter(d => !deps.includes(d));
+  if (missing.length > 0) {
+    return { name: 'pnpm build config', status: 'fail', fix: `Missing from onlyBuiltDependencies: [${missing.join(', ')}]. Run: npx ca setup` };
+  }
+  return { name: 'pnpm build config', status: 'pass' };
 }
 
 const STATUS_ICONS: Record<string, string> = {
