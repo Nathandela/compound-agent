@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-02-23
+
+### Fixed
+
+- **Banner audio crash on headless Linux**: Async `ENOENT` error from missing `aplay` no longer crashes `ca setup --update`
+- **PowerShell path injection on Windows**: Temp paths containing apostrophes no longer break or inject commands in `banner-audio.ts`
+- **Banner audio test coverage**: Rewrote tests with proper mock isolation (`vi.spyOn` + file-scope `vi.mock`), covering async ENOENT, sync throw, stop() idempotency, and normal exit cleanup
+
 ## [1.4.1] - 2026-02-22
 
 ### Changed
