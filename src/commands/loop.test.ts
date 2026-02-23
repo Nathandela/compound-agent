@@ -152,8 +152,8 @@ describe('generateLoopScript', () => {
 
   it('main loop detects HUMAN_REQUIRED and skips epic', () => {
     const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
-    // Should grep for HUMAN_REQUIRED in log and not retry
-    expect(script).toMatch(/grep.*HUMAN_REQUIRED/);
+    // Should grep for anchored HUMAN_REQUIRED in log and not retry
+    expect(script).toMatch(/grep.*\^HUMAN_REQUIRED/);
   });
 
   it('main loop logs human-required reason to beads', () => {
@@ -222,6 +222,34 @@ describe('generateLoopScript', () => {
       maxRetries: 1,
       model: 'claude-opus-4-6',
     })).not.toThrow();
+  });
+
+  it('rejects model with shell metacharacters', () => {
+    expect(() => generateLoopScript({
+      maxRetries: 1,
+      model: '"; rm -rf /; echo "',
+    })).toThrow(/model/i);
+  });
+
+  it('accepts valid model names', () => {
+    expect(() => generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' })).not.toThrow();
+    expect(() => generateLoopScript({ maxRetries: 1, model: 'claude-sonnet-4-6' })).not.toThrow();
+    expect(() => generateLoopScript({ maxRetries: 1, model: 'org/model:latest' })).not.toThrow();
+  });
+
+  it('anchors EPIC_COMPLETE grep to line boundaries', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('grep -q "^EPIC_COMPLETE$"');
+  });
+
+  it('anchors EPIC_FAILED grep to line boundaries', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('grep -q "^EPIC_FAILED$"');
+  });
+
+  it('anchors HUMAN_REQUIRED grep to line start', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('grep -q "^HUMAN_REQUIRED:"');
   });
 });
 

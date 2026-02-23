@@ -20,6 +20,9 @@ import { out } from './shared.js';
 /** Safe pattern for epic IDs: alphanumeric, hyphens, underscores, dots */
 const EPIC_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 
+/** Safe pattern for model names: alphanumeric, hyphens, underscores, dots, colons */
+const MODEL_PATTERN = /^[a-zA-Z0-9_.:/-]+$/;
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -245,18 +248,18 @@ while true; do
            -p "$PROMPT" \\
            &> "$LOGFILE" || true
 
-    if grep -q "EPIC_COMPLETE" "$LOGFILE"; then
+    if grep -q "^EPIC_COMPLETE$" "$LOGFILE"; then
       log "Epic $EPIC_ID completed successfully"
       SUCCESS=true
       break
-    elif grep -q "HUMAN_REQUIRED" "$LOGFILE"; then
-      REASON=$(grep "HUMAN_REQUIRED:" "$LOGFILE" | head -1 | sed 's/.*HUMAN_REQUIRED: *//')
+    elif grep -q "^HUMAN_REQUIRED:" "$LOGFILE"; then
+      REASON=$(grep "^HUMAN_REQUIRED:" "$LOGFILE" | head -1 | sed 's/^HUMAN_REQUIRED: *//')
       log "Epic $EPIC_ID needs human action: $REASON"
       bd update "$EPIC_ID" --notes "Human required: $REASON" 2>/dev/null || true
       SKIPPED=$((SKIPPED + 1))
       SUCCESS=skip
       break
-    elif grep -q "EPIC_FAILED" "$LOGFILE"; then
+    elif grep -q "^EPIC_FAILED$" "$LOGFILE"; then
       log "Epic $EPIC_ID reported failure (attempt $ATTEMPT)"
     else
       log "Epic $EPIC_ID session ended without marker (attempt $ATTEMPT)"
@@ -293,6 +296,9 @@ log "Loop finished. Completed: $COMPLETED, Failed: $FAILED, Skipped: $SKIPPED"
 function validateOptions(options: LoopScriptOptions): void {
   if (!Number.isInteger(options.maxRetries) || options.maxRetries < 0) {
     throw new Error(`Invalid maxRetries: must be a non-negative integer, got ${options.maxRetries}`);
+  }
+  if (!MODEL_PATTERN.test(options.model)) {
+    throw new Error(`Invalid model "${options.model}": must match ${MODEL_PATTERN}`);
   }
   if (options.epics) {
     for (const id of options.epics) {
