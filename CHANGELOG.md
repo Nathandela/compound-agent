@@ -11,14 +11,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.4] - 2026-02-23
 
+### Added
+
+- **Security arc with P0-P3 severity model**: Security-reviewer promoted from generic OWASP checker to mandatory core-4 reviewer with P0 (blocks merge), P1 (requires ack), P2 (should fix), P3 (nice to have) classification
+- **5 on-demand security specialist skills**: `/security-injection`, `/security-secrets`, `/security-auth`, `/security-data`, `/security-deps` -- spawned by security-reviewer via SendMessage within the review AgentTeam for deep trace analysis
+- **6 security reference docs** (`docs/research/security/`): overview, injection-patterns, secrets-checklist, auth-patterns, data-exposure, dependency-security -- distilled from the secure-coding-failure PhD survey into actionable agent guides
+- **Native addon build injection** (`scripts/postinstall.mjs`): Postinstall script auto-patches consumer `package.json` with `pnpm.onlyBuiltDependencies` config for `better-sqlite3` and `node-llama-cpp`. Handles indent preservation, BOM stripping, atomic writes
+- **CLI preflight diagnostics** (`src/cli-preflight.ts`): Catches native module load failures before commands run, prints PM-specific fix instructions (pnpm: 3 options; npm/yarn: rebuild + build tool hints)
+- **`ca doctor` pnpm check**: Verifies `onlyBuiltDependencies` is configured correctly for pnpm projects, recognizes wildcard `["*"]` as valid
+- **Escalation-wiring tests**: 7 new tests verifying security-reviewer mentions all 5 specialists, each specialist declares "Spawned by security-reviewer", P0 documented as merge-blocking, each specialist has `npx ca knowledge` and references correct research doc
+- **better-sqlite3 injection patterns**: Added project-specific `db.exec()` vs `db.prepare().run()` examples to `injection-patterns.md`
+
 ### Fixed
 
-- **Noisy `node-llama-cpp` warnings on headless Linux**: Vulkan binary fallback and `special_eos_id` tokenizer warnings no longer print during `ca search` / `ca knowledge` — GPU auto-detection preserved via `progressLogs: false` + `logLevel: error`
+- **Noisy `node-llama-cpp` warnings on headless Linux**: Vulkan binary fallback and `special_eos_id` tokenizer warnings no longer print during `ca search` / `ca knowledge` -- GPU auto-detection preserved via `progressLogs: false` + `logLevel: error`
 - **Resource leak in `isModelUsable()`**: `Llama` and `LlamaModel` instances are now properly disposed after the preflight usability check
+- **Wildcard `onlyBuiltDependencies`**: Doctor and postinstall now recognize `["*"]` as fully configured (no false positive)
+- **Infinity loop marker injection**: `--model` validated against shell metacharacters; grep patterns anchored (`^EPIC_COMPLETE`, `^EPIC_FAILED`) to prevent false-positive matches from prompt echo in logs
+- **Template-to-deployed SKILL.md drift**: Backported all deployed specialist improvements (output fields, collaboration notes, `npx ca knowledge` lines) into source templates so `ca setup --update` no longer regresses
+- **SSRF citations**: 3 OWASP references in `secure-coding-failure.md` corrected from A01 (Broken Access Control) to A10 (SSRF)
+- **Stale verification docs**: Exit criteria updated from 6 to 8 categories (added Security Clear + Workflow Gates); closed-loop review process updated with security check in Stage 4 flowchart
+- **Broken dual-path reference** in `subagent-pipeline.md`: Now documents both `docs/research/security/` (source repo) and `docs/compound/research/security/` (consumer repos)
+- **Incomplete OWASP mapping** in `overview.md`: Completed from 5/10 to 10/10 (added A04, A05, A07, A08, A09)
 
 ### Changed
 
 - **`getLlama()` initialization hardened**: Both call sites (`nomic.ts`, `model.ts`) now pass `build: 'never'` to prevent silent compilation from source on exotic platforms; set `NODE_LLAMA_CPP_DEBUG=true` to re-enable verbose output
+- **Review skill wired to security arc**: P0 added to severity overview, security specialist skills listed as on-demand members, quality criteria include P0/P1 checks
+- **WORKFLOW template**: Severity classification updated from P1/P2/P3 to P0-P3 with "Fix all P0/P1 findings"
+- **Zero-findings instruction**: All 6 security templates (reviewer + 5 specialists) now include "return CLEAR" instruction when no findings detected
+- **Scope-limiting instruction**: `security-injection` prioritizes files with interpreter sinks over pure data/config for large diffs (500+ lines)
+- **Non-web context**: `security-auth` includes step for CLI/API-only projects without web routes
+- **Graceful audit skip**: `security-deps` handles missing `pnpm audit` / `pip-audit` gracefully instead of failing
 
 ## [1.4.3] - 2026-02-23
 
@@ -739,7 +763,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/Nathandela/learning_agent/compare/v1.4.4...HEAD
+[1.4.4]: https://github.com/Nathandela/learning_agent/compare/v1.4.3...v1.4.4
+[1.4.3]: https://github.com/Nathandela/learning_agent/compare/v1.4.2...v1.4.3
+[1.4.2]: https://github.com/Nathandela/learning_agent/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/Nathandela/learning_agent/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/Nathandela/learning_agent/compare/v1.3.9...v1.4.0
 [1.3.9]: https://github.com/Nathandela/learning_agent/compare/v1.3.8...v1.3.9
