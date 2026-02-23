@@ -40,6 +40,18 @@ Deep research produced via `/compound:get-a-phd` for agent domain knowledge. Eac
 |----------|---------------|
 | [property-testing/property-based-testing-and-invariants.md](property-testing/property-based-testing-and-invariants.md) | invariant-designer, property-test-generator, anti-cargo-cult-reviewer, module-boundary-reviewer, drift-detector |
 
+### Security
+
+| Document | Target Agents |
+|----------|---------------|
+| [security/secure-coding-failure.md](security/secure-coding-failure.md) | security-reviewer, security-injection, security-secrets, security-auth, security-data, security-deps |
+| [security/overview.md](security/overview.md) | security-reviewer |
+| [security/injection-patterns.md](security/injection-patterns.md) | security-reviewer, security-injection |
+| [security/secrets-checklist.md](security/secrets-checklist.md) | security-reviewer, security-secrets |
+| [security/auth-patterns.md](security/auth-patterns.md) | security-reviewer, security-auth |
+| [security/data-exposure.md](security/data-exposure.md) | security-reviewer, security-data |
+| [security/dependency-security.md](security/dependency-security.md) | security-reviewer, security-deps |
+
 ## Existing Analysis
 
 | Document | Description |

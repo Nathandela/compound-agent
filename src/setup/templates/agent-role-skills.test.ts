@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { AGENT_ROLE_SKILLS } from './agent-role-skills.js';
 
-/** All 18 expected agent role skill keys (kebab-case name used as directory). */
+/** All 23 expected agent role skill keys (kebab-case name used as directory). */
 const EXPECTED_KEYS = [
   // Workflow agents (compound + work phases)
   'context-analyzer',
@@ -18,6 +18,12 @@ const EXPECTED_KEYS = [
   'performance-reviewer',
   'test-coverage-reviewer',
   'simplicity-reviewer',
+  // Security specialist agents
+  'security-injection',
+  'security-secrets',
+  'security-auth',
+  'security-data',
+  'security-deps',
   // Phase 11 agents
   'compounding',
   'audit',
@@ -39,6 +45,11 @@ const TEAM_MEMBER_KEYS = [
   'performance-reviewer',
   'test-coverage-reviewer',
   'simplicity-reviewer',
+  'security-injection',
+  'security-secrets',
+  'security-auth',
+  'security-data',
+  'security-deps',
   'compounding',
 ];
 
@@ -53,8 +64,8 @@ const SUBAGENT_KEYS = [
 ];
 
 describe('AGENT_ROLE_SKILLS', () => {
-  it('has exactly 18 entries', () => {
-    expect(Object.keys(AGENT_ROLE_SKILLS)).toHaveLength(18);
+  it('has exactly 23 entries', () => {
+    expect(Object.keys(AGENT_ROLE_SKILLS)).toHaveLength(23);
   });
 
   it('has all expected keys', () => {

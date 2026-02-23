@@ -101,6 +101,8 @@ Every implementation MUST follow this subagent sequence:
 
 **Inviolable rules**: Tests before implementation. Real data, no mocked business logic. ALL subagents in sequence. On rejection, fix ALL issues before resubmitting.
 
+**Security arc**: security-reviewer (core 4) escalates to `/security-injection`, `/security-secrets`, `/security-auth`, `/security-data`, `/security-deps` on demand. P0 findings block merge.
+
 **External reviewers (optional)**: If `.claude/compound-agent.json` has `"externalReviewers"` configured, Gemini/Codex run after step 8 as advisory (non-blocking) reviewers. Enable with `npx ca reviewer enable gemini`.
 
 > **Full pipeline details**: See `docs/verification/subagent-pipeline.md`

@@ -43,7 +43,14 @@ The `/implementation-reviewer` validates ALL categories below. **Every checkbox 
 - [ ] Original requirements fulfilled
 - [ ] Invariants documented and tested
 
-### 7. Workflow Gates (for `/compound:lfg` epic work)
+### 7. Security Clear
+- [ ] No P0 security findings from security-reviewer
+- [ ] All P1 security findings acknowledged or resolved
+- [ ] No hardcoded secrets or credentials
+- [ ] No string interpolation in SQL queries
+- [ ] Error messages do not leak sensitive data
+
+### 8. Workflow Gates (for `/compound:lfg` epic work)
 - [ ] `ca verify-gates <epic-id>` passes (review + compound tasks exist and are closed)
 - [ ] All phase gates passed (PHASE GATE 3, PHASE GATE 4, FINAL GATE)
 

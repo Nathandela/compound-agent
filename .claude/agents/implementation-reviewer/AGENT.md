@@ -56,6 +56,13 @@ pnpm lint
 ### 7. Standards Compliance
 - [ ] Code follows all standards defined in `docs/standards/`
 
+### 8. Security
+- [ ] No P0 security findings from security-reviewer
+- [ ] All P1 security findings acknowledged or resolved
+- [ ] No hardcoded secrets or credentials
+- [ ] No string interpolation in SQL queries
+- [ ] Error messages do not leak sensitive data
+
 ## Your Review Process
 
 1. **Run All Tests**: `pnpm test`
@@ -65,6 +72,7 @@ pnpm lint
 5. **Logical Review**: Trace critical paths
 6. **Verify Specification Met**: Requirements addressed?
 7. **Check Standards**: Read `docs/standards/` and verify compliance
+8. **Check Security**: Verify no P0/P1 security findings
 
 ## Response Format
 
@@ -82,6 +90,7 @@ Verified:
 ✅ No bugs detected
 ✅ Specification met
 ✅ Standards compliance
+✅ Security clear
 
 Implementation is APPROVED for completion.
 ```

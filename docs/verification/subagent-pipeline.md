@@ -115,6 +115,24 @@ Use `/drift-detector` to verify implementation alignment:
 - If **APPROVED**: Work is complete
 - **Do NOT argue** -- criteria are objective
 
+## Security Arc
+
+The security-reviewer (core 4) can escalate to 5 on-demand specialist skills for deep analysis.
+
+| Specialist | Trigger | Reference Doc |
+|-----------|---------|---------------|
+| `/security-injection` | SQL/cmd concat, template interpolation in queries | `injection-patterns.md` |
+| `/security-secrets` | Hardcoded strings matching key patterns, committed .env | `secrets-checklist.md` |
+| `/security-auth` | Route handlers missing middleware, IDOR patterns | `auth-patterns.md` |
+| `/security-data` | Logging calls with request objects, verbose errors | `data-exposure.md` |
+| `/security-deps` | Lockfile changes, new deps, postinstall scripts | `dependency-security.md` |
+
+**Escalation flow**: security-reviewer detects suspicious pattern -> spawns specialist via SendMessage within the review AgentTeam -> specialist performs deep trace analysis -> reports findings back with P0-P3 severity.
+
+**P0 findings block merge.** No exceptions. P1 findings require explicit acknowledgment.
+
+All reference docs are at `docs/compound/research/security/`.
+
 ## Inviolable TDD Rules
 
 - Tests must exist BEFORE implementation
