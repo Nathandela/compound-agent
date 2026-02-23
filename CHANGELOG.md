@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.3] - 2026-02-23
+
+### Fixed
+
+- **Setup reports success when SQLite is broken**: `npx ca setup` now verifies that `better-sqlite3` actually loads after configuring `pnpm.onlyBuiltDependencies`, and auto-rebuilds if needed (escalates from `pnpm rebuild` to `pnpm install + rebuild`)
+- **Misleading error message**: `ensureSqliteAvailable()` no longer suggests "Run: npx ca setup" (which didn't fix the problem); now provides per-package-manager rebuild instructions and build tools hint
+
+### Added
+
+- **SQLite health check in `ca doctor`**: New check reports `[FAIL]` with fix hint when `better-sqlite3` cannot load
+- **SQLite status in `ca setup --status`**: Shows "OK" or "not available" alongside other status checks
+- **`resetSqliteAvailability()` export**: Allows re-probing SQLite after native module rebuild
+
 ## [1.4.2] - 2026-02-23
 
 ### Fixed

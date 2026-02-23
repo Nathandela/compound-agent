@@ -11,9 +11,10 @@ import {
   hasAllCompoundAgentHooks,
   readClaudeSettings,
 } from './claude-helpers.js';
+import { ensureSqliteAvailable } from '../memory/storage/index.js';
 import type { GitignoreResult } from './gitignore.js';
 import type { HookInstallResult } from './hooks.js';
-import type { PnpmConfigResult } from './primitives.js';
+import type { PnpmConfigResult, SqliteVerifyResult } from './primitives.js';
 import { checkUserScope, type ScopeCheckResult } from './scope-check.js';
 
 export function printGitignoreStatus(result: GitignoreResult): void {
@@ -50,6 +51,21 @@ export function printPnpmConfigStatus(result: PnpmConfigResult): void {
     console.log('  pnpm config: onlyBuiltDependencies already configured');
   } else if (result.added.length > 0) {
     console.log(`  pnpm config: Added onlyBuiltDependencies [${result.added.join(', ')}]`);
+  }
+}
+
+const SQLITE_STATUS_MSG: Record<SqliteVerifyResult['action'], string> = {
+  already_ok: 'OK',
+  rebuilt: 'OK (rebuilt native module)',
+  installed_and_rebuilt: 'OK (installed + rebuilt native module)',
+  failed: 'FAILED',
+};
+
+export function printSqliteStatus(result: SqliteVerifyResult): void {
+  const msg = SQLITE_STATUS_MSG[result.action];
+  console.log(`  SQLite:             ${msg}`);
+  if (result.error) {
+    console.log(`                      ${result.error}`);
   }
 }
 
@@ -95,6 +111,13 @@ export async function runStatus(repoRoot: string): Promise<void> {
     // No settings
   }
   console.log(`  Hooks:              ${hooksInstalled ? 'installed' : 'not installed'}`);
+
+  let sqliteOk = false;
+  try {
+    ensureSqliteAvailable();
+    sqliteOk = true;
+  } catch { /* not loadable */ }
+  console.log(`  SQLite:             ${sqliteOk ? 'OK' : 'not available (run: pnpm rebuild better-sqlite3)'}`);
 
   const fullBeads = runFullBeadsCheck(repoRoot);
   printBeadsFullStatus(fullBeads);

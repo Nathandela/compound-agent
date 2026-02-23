@@ -207,4 +207,31 @@ describe('Doctor Command', () => {
     expect(docCheck!.status).toBe('warn');
     expect(docCheck!.fix).toContain('npx ca setup');
   });
+
+  // ============================================================================
+  // SQLite (better-sqlite3) check
+  // ============================================================================
+
+  it('includes SQLite check in results', async () => {
+    const checks = await runDoctor(tempDir);
+    const sqliteCheck = checks.find(c => c.name === 'SQLite (better-sqlite3)');
+    expect(sqliteCheck).toBeDefined();
+  });
+
+  it('SQLite check is pass or fail (never warn)', async () => {
+    const checks = await runDoctor(tempDir);
+    const sqliteCheck = checks.find(c => c.name === 'SQLite (better-sqlite3)');
+    expect(sqliteCheck).toBeDefined();
+    expect(['pass', 'fail']).toContain(sqliteCheck!.status);
+  });
+
+  it('SQLite check provides fix hint on failure', async () => {
+    const checks = await runDoctor(tempDir);
+    const sqliteCheck = checks.find(c => c.name === 'SQLite (better-sqlite3)');
+    expect(sqliteCheck).toBeDefined();
+    if (sqliteCheck!.status === 'fail') {
+      expect(sqliteCheck!.fix).toBeDefined();
+      expect(sqliteCheck!.fix).toContain('rebuild better-sqlite3');
+    }
+  });
 });

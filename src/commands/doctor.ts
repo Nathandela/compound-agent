@@ -11,6 +11,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { isModelAvailable } from '../memory/embeddings/index.js';
+import { ensureSqliteAvailable } from '../memory/storage/index.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
 import {
   checkBeadsAvailable,
@@ -92,7 +93,17 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
     ? { name: 'Embedding model', status: 'pass' }
     : { name: 'Embedding model', status: 'warn', fix: 'Run: npx ca download-model' });
 
-  // 7. Beads CLI available
+  // 7. SQLite (better-sqlite3)
+  let sqliteOk = false;
+  try {
+    ensureSqliteAvailable();
+    sqliteOk = true;
+  } catch { /* not loadable */ }
+  checks.push(sqliteOk
+    ? { name: 'SQLite (better-sqlite3)', status: 'pass' }
+    : { name: 'SQLite (better-sqlite3)', status: 'fail', fix: 'Run: pnpm rebuild better-sqlite3 (or npm rebuild better-sqlite3)' });
+
+  // 8. Beads CLI available
   const beadsResult = checkBeadsAvailable();
   checks.push(beadsResult.available
     ? { name: 'Beads CLI', status: 'pass' }

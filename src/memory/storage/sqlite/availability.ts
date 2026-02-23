@@ -32,11 +32,12 @@ export function ensureSqliteAvailable(): void {
   } catch (cause) {
     throw new Error(
       'better-sqlite3 failed to load.\n' +
-        'Run: npx ca setup (auto-configures pnpm native builds)\n' +
-        'Or manually add to your package.json:\n' +
-        '  "pnpm": { "onlyBuiltDependencies": ["better-sqlite3", "node-llama-cpp"] }\n' +
-        'Then run: pnpm install && pnpm rebuild better-sqlite3\n' +
-        'For npm/yarn, run: npm rebuild better-sqlite3',
+        'For pnpm projects:\n' +
+        '  1. Ensure package.json has: "pnpm": { "onlyBuiltDependencies": ["better-sqlite3"] }\n' +
+        '  2. Run: pnpm install && pnpm rebuild better-sqlite3\n' +
+        'For npm/yarn projects:\n' +
+        '  Run: npm rebuild better-sqlite3\n' +
+        'If the error persists, check that build tools (python3, make, g++) are installed.',
       { cause }
     );
   }
@@ -49,4 +50,13 @@ export function ensureSqliteAvailable(): void {
 export function getDatabaseConstructor(): new (path: string) => DatabaseType {
   ensureSqliteAvailable();
   return DatabaseConstructor!;
+}
+
+/**
+ * Reset the cached SQLite availability state.
+ * Used after rebuilding native modules to force a fresh check.
+ */
+export function resetSqliteAvailability(): void {
+  checked = false;
+  DatabaseConstructor = null;
 }

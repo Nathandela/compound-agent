@@ -15,7 +15,7 @@ import { LESSONS_PATH } from '../memory/storage/index.js';
 import { getGlobalOpts, out } from '../commands/index.js';
 import { playInstallBanner } from './banner.js';
 import { checkBeadsAvailable, runFullBeadsCheck, type BeadsCheckResult } from './beads-check.js';
-import { printBeadsFullStatus, printGitignoreStatus, printPnpmConfigStatus, printScopeStatus, printSetupGitHooksStatus, runStatus } from './display-utils.js';
+import { printBeadsFullStatus, printGitignoreStatus, printPnpmConfigStatus, printScopeStatus, printSetupGitHooksStatus, printSqliteStatus, runStatus } from './display-utils.js';
 import {
   addAllCompoundAgentHooks,
   getClaudeSettingsPath,
@@ -37,7 +37,9 @@ import {
   installResearchDocs,
   installWorkflowCommands,
   updateAgentsMd,
+  verifySqlite,
   type PnpmConfigResult,
+  type SqliteVerifyResult,
 } from './primitives.js';
 import { checkUserScope, type ScopeCheckResult } from './scope-check.js';
 import { LEGACY_ROOT_SLASH_COMMANDS } from './templates.js';
@@ -55,6 +57,7 @@ interface SetupResult {
   postCommitHook: HookInstallResult['status'] | 'skipped';
   model: 'downloaded' | 'already_exists' | 'failed' | 'skipped';
   pnpmConfig: PnpmConfigResult;
+  sqlite: SqliteVerifyResult;
   beads: BeadsCheckResult;
   scope: ScopeCheckResult;
   upgrade: UpgradeResult | null;
@@ -117,6 +120,9 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
 
   // 0. Ensure pnpm native build config (before anything that needs native addons)
   const pnpmConfig = await ensurePnpmBuildConfig(repoRoot);
+
+  // 0b. Verify SQLite loads (auto-rebuild if needed for pnpm)
+  const sqlite = verifySqlite(repoRoot, pnpmConfig);
 
   // 1. Initialize lessons directory
   const lessonsDir = await ensureLessonsDirectory(repoRoot);
@@ -190,6 +196,7 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
     postCommitHook,
     model: modelStatus,
     pnpmConfig,
+    sqlite,
     beads,
     scope,
     upgrade,
@@ -331,6 +338,7 @@ async function printSetupResult(result: SetupResult, quiet: boolean, repoRoot: s
   printSetupGitHooksStatus(result.gitHooks);
   printPostCommitHookStatus(result.postCommitHook);
   printPnpmConfigStatus(result.pnpmConfig);
+  printSqliteStatus(result.sqlite);
   printGitignoreStatus(result.gitignore);
   console.log(`  Model: ${MODEL_STATUS_MSG[result.model]}`);
   const fullBeads = runFullBeadsCheck(repoRoot);

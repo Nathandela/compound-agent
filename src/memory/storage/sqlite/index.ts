@@ -21,6 +21,9 @@ export {
 // Sync
 export { rebuildIndex, syncIfNeeded } from './sync.js';
 
+// Availability
+export { ensureSqliteAvailable, resetSqliteAvailability } from './availability.js';
+
 // Search
 export {
   getRetrievalStats,

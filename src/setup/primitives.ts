@@ -3,6 +3,7 @@
  * Used by both init.ts and setup-all.ts to avoid duplication.
  */
 
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -371,4 +372,103 @@ async function mergePnpmConfig(pkgPath: string, pkg: Record<string, unknown>): P
 
   await writeFile(pkgPath, JSON.stringify(pkg, null, 2) + '\n', 'utf-8');
   return { isPnpm: true, alreadyConfigured: false, added };
+}
+
+// ============================================================================
+// SQLite verification + auto-rebuild
+// ============================================================================
+
+import { ensureSqliteAvailable, resetSqliteAvailability } from '../memory/storage/index.js';
+
+/** Result of post-setup SQLite verification. */
+export interface SqliteVerifyResult {
+  /** Whether SQLite (better-sqlite3) is currently loadable. */
+  available: boolean;
+  /** What action was taken (or attempted). */
+  action: 'already_ok' | 'rebuilt' | 'installed_and_rebuilt' | 'failed';
+  /** Error message if action is 'failed'. */
+  error?: string;
+}
+
+/**
+ * Try loading SQLite, returning true on success, false on failure.
+ */
+function trySqliteLoad(): boolean {
+  try {
+    ensureSqliteAvailable();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Verify SQLite availability and attempt auto-rebuild if needed.
+ *
+ * Strategy:
+ *  1. Try ensureSqliteAvailable() — if works, fast path (zero overhead)
+ *  2. If non-pnpm: report failure with npm rebuild suggestion
+ *  3. If pnpm: try `pnpm rebuild better-sqlite3`, re-check
+ *  4. If still fails: try `pnpm install` then rebuild, re-check
+ *  5. All attempts fail: report with manual instructions
+ *
+ * Non-blocking: never throws. Reports result honestly.
+ */
+export function verifySqlite(repoRoot: string, pnpmConfig: PnpmConfigResult): SqliteVerifyResult {
+  // Fast path: already works
+  if (trySqliteLoad()) {
+    return { available: true, action: 'already_ok' };
+  }
+
+  // Non-pnpm: can't auto-fix (npm/yarn build native modules by default)
+  if (!pnpmConfig.isPnpm) {
+    return {
+      available: false,
+      action: 'failed',
+      error: 'better-sqlite3 failed to load. Run: npm rebuild better-sqlite3',
+    };
+  }
+
+  // Attempt 1: pnpm rebuild better-sqlite3
+  try {
+    execFileSync('pnpm', ['rebuild', 'better-sqlite3'], {
+      cwd: repoRoot,
+      stdio: 'pipe',
+      timeout: 60_000,
+    });
+  } catch {
+    // rebuild failed, will try install next
+  }
+
+  resetSqliteAvailability();
+  if (trySqliteLoad()) {
+    return { available: true, action: 'rebuilt' };
+  }
+
+  // Attempt 2: pnpm install + rebuild (escalation)
+  try {
+    execFileSync('pnpm', ['install'], {
+      cwd: repoRoot,
+      stdio: 'pipe',
+      timeout: 120_000,
+    });
+    execFileSync('pnpm', ['rebuild', 'better-sqlite3'], {
+      cwd: repoRoot,
+      stdio: 'pipe',
+      timeout: 60_000,
+    });
+  } catch {
+    // install or rebuild failed
+  }
+
+  resetSqliteAvailability();
+  if (trySqliteLoad()) {
+    return { available: true, action: 'installed_and_rebuilt' };
+  }
+
+  return {
+    available: false,
+    action: 'failed',
+    error: 'Auto-rebuild failed. Run manually: pnpm install && pnpm rebuild better-sqlite3',
+  };
 }
