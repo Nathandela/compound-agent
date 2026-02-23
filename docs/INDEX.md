@@ -66,6 +66,7 @@ The following documents have been moved to `archive/` and are preserved for hist
 - **Starting a new feature?** Read [ARCHITECTURE-V2.md](ARCHITECTURE-V2.md) then check [invariants/](invariants/) for the relevant module
 - **Understanding a past decision?** Check [adr/](adr/) for architectural choices
 - **Setting up review?** See [verification/](verification/) for the subagent pipeline and exit criteria
+- **Setting up security review?** See [research/security/overview.md](research/security/overview.md) for severity classification and [verification/subagent-pipeline.md](verification/subagent-pipeline.md) for the security arc
 - **Enabling external reviewers?** Run `npx ca reviewer enable gemini` — see [verification/subagent-pipeline.md](verification/subagent-pipeline.md)
 - **Writing code?** Consult [standards/](standards/) for conventions and anti-patterns
 - **Planning a release?** Review [archive/](archive/) for historical context

@@ -8,7 +8,7 @@ This directory contains documentation for the systematic code verification pract
 |----------|---------|
 | [closed-loop-review-process.md](closed-loop-review-process.md) | Mandatory review workflow with exit criteria |
 | [subagent-pipeline.md](subagent-pipeline.md) | Full 8-step pipeline + optional external reviewers |
-| [exit-criteria.md](exit-criteria.md) | Exit criteria checklists for all 6 categories |
+| [exit-criteria.md](exit-criteria.md) | Exit criteria checklists for all 8 categories |
 
 ## Quick Reference
 
@@ -32,4 +32,6 @@ Work is complete when ALL are true:
 - Code quality perfect
 - Professional standards met
 - No bugs detected
+- Specification met
+- Security clear (no P0/P1 findings)
 - `/implementation-reviewer` approves

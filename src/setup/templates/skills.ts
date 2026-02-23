@@ -204,7 +204,7 @@ description: Multi-agent review with parallel specialized reviewers and severity
 # Review Skill
 
 ## Overview
-Perform thorough code review by spawning specialized reviewers in parallel, consolidating findings with severity classification (P1/P2/P3), and gating completion on implementation-reviewer approval.
+Perform thorough code review by spawning specialized reviewers in parallel, consolidating findings with severity classification (P0/P1/P2/P3), and gating completion on implementation-reviewer approval.
 
 ## Methodology
 1. Run quality gates first: \`pnpm test && pnpm lint\`
@@ -215,10 +215,11 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    - **Large** (500+): all 11 reviewers including docs, consistency, error-handling, pattern-matcher
 4. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with \`team_name\`):
    - Role skills: \`.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer}/SKILL.md\`
+   - Security specialist skills (on-demand, spawned by security-reviewer): \`.claude/skills/compound/agents/{security-injection,security-secrets,security-auth,security-data,security-deps}/SKILL.md\`
    - For large diffs (500+), deploy MULTIPLE instances; split files across instances, coordinate via SendMessage
 5. Reviewers communicate findings to each other via \`SendMessage\`
 6. Collect, consolidate, and deduplicate all findings
-7. Classify by severity: P1 (critical/blocking), P2 (important), P3 (minor)
+7. Classify by severity: P0 (blocks merge), P1 (critical/blocking), P2 (important), P3 (minor)
 8. Use \`AskUserQuestion\` when severity is ambiguous or fix has multiple valid options
 9. Create beads issues for P1 findings: \`bd create --title="P1: ..."\`
 10. Fix all P1 findings before proceeding
@@ -247,10 +248,12 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 ## Quality Criteria
 - All quality gates pass (\`pnpm test\`, lint)
 - All 11 reviewer perspectives were applied in parallel
-- Findings are classified P1/P2/P3 and deduplicated
+- Findings are classified P0/P1/P2/P3 and deduplicated
 - pattern-matcher checked memory and reinforced recurring issues
 - cct-reviewer checked against known Claude failure patterns
 - docs-reviewer confirmed docs/ADR alignment
+- security-reviewer P0 findings: none (blocks merge)
+- security-reviewer P1 findings: all acknowledged or resolved
 - All P1 findings fixed before \`/implementation-reviewer\` approval
 - \`/implementation-reviewer\` approved as mandatory gate
 

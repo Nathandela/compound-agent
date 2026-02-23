@@ -21,7 +21,12 @@ Distilled from [secure-coding-failure.md](secure-coding-failure.md) (survey sect
 | A01 Broken Access Control | P1 | Escalate to P0 if unauthenticated access to admin or sensitive data |
 | A02 Cryptographic Failures | P1 | Escalate to P0 if plaintext credentials stored or transmitted |
 | A03 Injection (SQL/Cmd/XSS/SSTI) | P0 (RCE) or P1 (data-only) | P0 if command/template injection yields RCE; P1 if SQLi yields data leak only |
+| A04 Insecure Design | P2 | Escalate to P1 if missing security controls enable auth bypass |
+| A05 Security Misconfiguration | P2 | Escalate to P1 if default credentials or debug mode exposed in production |
 | A06 Vulnerable Components | P2 | Escalate to P0/P1 if CVE is actively exploited or yields RCE |
+| A07 Auth Failures | P1 | Escalate to P0 if credential stuffing or brute force is trivially possible |
+| A08 Software/Data Integrity Failures | P2 | Escalate to P0 if CI/CD pipeline compromise or unsigned updates possible |
+| A09 Security Logging Failures | P3 | Escalate to P2 if no logging on auth events or admin actions |
 | A10 SSRF | P1 | Escalate to P0 if cloud metadata endpoint (169.254.169.254) is reachable |
 
 ## Escalation Triggers

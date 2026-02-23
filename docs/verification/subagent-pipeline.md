@@ -131,7 +131,7 @@ The security-reviewer (core 4) can escalate to 5 on-demand specialist skills for
 
 **P0 findings block merge.** No exceptions. P1 findings require explicit acknowledgment.
 
-All reference docs are at `docs/compound/research/security/`.
+All reference docs are at `docs/research/security/` (source repo) or `docs/compound/research/security/` (consumer repos after `npx ca setup`).
 
 ## Inviolable TDD Rules
 

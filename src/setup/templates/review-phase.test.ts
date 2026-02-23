@@ -94,10 +94,20 @@ describe('Review Phase Integration', () => {
     });
 
     // --- Absorbed from command: Severity classification ---
-    it('describes P1/P2/P3 finding classification', () => {
+    it('describes P0/P1/P2/P3 finding classification', () => {
+      expect(reviewSkill).toMatch(/P0/);
       expect(reviewSkill).toMatch(/P1/);
       expect(reviewSkill).toMatch(/P2/);
       expect(reviewSkill).toMatch(/P3/);
+    });
+
+    // --- Security arc integration ---
+    it('references security specialist skills as on-demand members', () => {
+      expect(reviewSkill).toMatch(/security.*specialist|specialist.*security/i);
+    });
+
+    it('documents P0 findings as merge-blocking', () => {
+      expect(reviewSkill).toMatch(/P0.*block|block.*P0/i);
     });
 
     // --- Absorbed from command: Implementation-reviewer gate ---

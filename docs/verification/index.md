@@ -7,7 +7,7 @@ TDD subagent pipeline, exit criteria, and review process documentation. This dir
 | Document | Description |
 |----------|-------------|
 | [subagent-pipeline.md](subagent-pipeline.md) | Full 8-step subagent sequence with flowchart and phase details |
-| [exit-criteria.md](exit-criteria.md) | 6-category exit criteria checklist and rejection protocol |
+| [exit-criteria.md](exit-criteria.md) | 8-category exit criteria checklist and rejection protocol |
 | [closed-loop-review-process.md](closed-loop-review-process.md) | Complete closed-loop review workflow with communication protocol |
 | [README.md](README.md) | Quick reference for TDD workflow and exit criteria summary |
 

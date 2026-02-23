@@ -151,8 +151,8 @@ Multi-agent code review with severity classification.
 
 - Run quality gates: \`pnpm test && pnpm lint\`
 - Spawn specialized reviewers (security, architecture, performance, etc.)
-- Classify findings as P1/P2/P3
-- Fix all P1 findings before proceeding
+- Classify findings as P0 (blocks merge) / P1/P2/P3
+- Fix all P0/P1 findings before proceeding
 
 ## Phase 5: Compound
 

@@ -28,6 +28,15 @@ db.query('SELECT * FROM users WHERE id = $1', [req.query.id]);
 knex('users').where({ id: req.query.id });
 ```
 
+### better-sqlite3 (project-specific)
+```typescript
+// UNSAFE: db.exec() has NO parameterization support
+db.exec(`INSERT INTO items VALUES ('${userInput}')`);  // P0
+
+// SAFE: Use db.prepare().run() with bound parameters
+db.prepare('INSERT INTO items VALUES (?)').run(userInput);
+```
+
 ### Unsafe -- Python
 ```python
 # f-string in SQL
