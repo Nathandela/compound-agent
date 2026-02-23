@@ -51,6 +51,8 @@ export function patchPnpmConfig(consumerRoot) {
   if (!Array.isArray(pkg.pnpm.onlyBuiltDependencies)) pkg.pnpm.onlyBuiltDependencies = [];
 
   const existing = pkg.pnpm.onlyBuiltDependencies;
+  // Wildcard "*" means all builds are allowed — nothing to add
+  if (existing.includes('*')) return null;
   const added = [];
   for (const dep of REQUIRED_BUILD_DEPS) {
     if (!existing.includes(dep)) {

@@ -27,33 +27,24 @@ describe('commandNeedsSqlite', () => {
   // Commands that need SQLite
   // ============================================================================
 
-  it('returns true for "search" command', () => {
-    expect(commandNeedsSqlite(makeCommand('search'))).toBe(true);
-  });
+  // Exhaustive: every command in NEEDS_SQLITE must return true.
+  // This catches typos in the set.
+  const sqliteCommands = [
+    'learn', 'capture', 'detect',
+    'search', 'list', 'load-session', 'check-plan',
+    'knowledge', 'index-docs',
+    'show', 'update', 'delete',
+    'wrong', 'validate',
+    'compact', 'rebuild', 'stats', 'prime',
+    'export', 'import',
+    'audit', 'compound',
+  ];
 
-  it('returns true for "learn" command', () => {
-    expect(commandNeedsSqlite(makeCommand('learn'))).toBe(true);
-  });
-
-  it('returns true for "compact" command', () => {
-    expect(commandNeedsSqlite(makeCommand('compact'))).toBe(true);
-  });
-
-  it('returns true for "knowledge" command', () => {
-    expect(commandNeedsSqlite(makeCommand('knowledge'))).toBe(true);
-  });
-
-  it('returns true for "audit" command', () => {
-    expect(commandNeedsSqlite(makeCommand('audit'))).toBe(true);
-  });
-
-  it('returns true for "compound" command', () => {
-    expect(commandNeedsSqlite(makeCommand('compound'))).toBe(true);
-  });
-
-  it('returns true for "prime" command', () => {
-    expect(commandNeedsSqlite(makeCommand('prime'))).toBe(true);
-  });
+  for (const cmd of sqliteCommands) {
+    it(`returns true for "${cmd}" command`, () => {
+      expect(commandNeedsSqlite(makeCommand(cmd))).toBe(true);
+    });
+  }
 
   // ============================================================================
   // Commands that do NOT need SQLite

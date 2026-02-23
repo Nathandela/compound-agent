@@ -181,6 +181,8 @@ export function checkPnpmBuildConfig(repoRoot: string): DoctorCheck | null {
   if (!Array.isArray(deps)) {
     return { name: 'pnpm build config', status: 'fail', fix: 'Run: npx ca setup (or add "pnpm.onlyBuiltDependencies" to package.json)' };
   }
+  // Wildcard "*" means all builds are allowed
+  if (deps.includes('*')) return { name: 'pnpm build config', status: 'pass' };
   const required = ['better-sqlite3', 'node-llama-cpp'];
   const missing = required.filter(d => !deps.includes(d));
   if (missing.length > 0) {

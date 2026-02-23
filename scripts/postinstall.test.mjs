@@ -154,6 +154,16 @@ describe('patchPnpmConfig', () => {
     assert.deepEqual(pkg.pnpm.onlyBuiltDependencies, ['better-sqlite3', 'node-llama-cpp']);
   });
 
+  it('returns null when wildcard "*" is already configured', () => {
+    writeFileSync(join(tempDir, 'package.json'), JSON.stringify({
+      name: 'test',
+      pnpm: { onlyBuiltDependencies: ['*'] },
+    }));
+    writeFileSync(join(tempDir, 'pnpm-lock.yaml'), '');
+    const result = patchPnpmConfig(tempDir);
+    assert.equal(result, null);
+  });
+
   it('ignores yarn projects', () => {
     writeFileSync(join(tempDir, 'package.json'), JSON.stringify({
       name: 'test',

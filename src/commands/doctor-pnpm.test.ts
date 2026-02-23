@@ -100,6 +100,20 @@ describe('checkPnpmBuildConfig', () => {
     expect(result).toBeNull();
   });
 
+  it('returns pass when wildcard "*" is configured', () => {
+    mockedExistsSync.mockImplementation((p: unknown) =>
+      String(p).endsWith('pnpm-lock.yaml'),
+    );
+    mockedReadFileSync.mockReturnValue(JSON.stringify({
+      pnpm: { onlyBuiltDependencies: ['*'] },
+    }));
+
+    const result = checkPnpmBuildConfig('/repo');
+
+    expect(result).not.toBeNull();
+    expect(result!.status).toBe('pass');
+  });
+
   it('includes fix instruction mentioning npx ca setup', () => {
     mockedExistsSync.mockImplementation((p: unknown) =>
       String(p).endsWith('pnpm-lock.yaml'),
