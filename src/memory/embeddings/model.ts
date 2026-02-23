@@ -8,7 +8,7 @@
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { getLlama, resolveModelFile } from 'node-llama-cpp';
+import { getLlama, LlamaLogLevel, resolveModelFile } from 'node-llama-cpp';
 
 /**
  * HuggingFace URI for EmbeddingGemma-300M (Q4_0 quantization).
@@ -88,7 +88,12 @@ export async function isModelUsable(): Promise<UsabilityResult> {
     const modelPath = join(DEFAULT_MODEL_DIR, MODEL_FILENAME);
 
     // Step 1: Get llama runtime
-    llama = await getLlama();
+    llama = await getLlama({
+      build: 'never',                  // Never compile from source in a deployed tool
+      progressLogs: false,             // Suppress prebuilt binary fallback warnings
+      logLevel: LlamaLogLevel.error,   // Only surface real errors from C++ backend
+      // Set NODE_LLAMA_CPP_DEBUG=true to re-enable all output for troubleshooting
+    });
 
     // Step 2: Load model
     model = await llama.loadModel({ modelPath });
@@ -110,14 +115,14 @@ export async function isModelUsable(): Promise<UsabilityResult> {
   } finally {
     // Clean up resources in reverse order
     if (context) {
-      try {
-        context.dispose();
-      } catch {
-        // Ignore cleanup errors
-      }
+      try { await context.dispose(); } catch { /* ignore cleanup errors */ }
     }
-    // Note: model and llama don't have explicit dispose methods in node-llama-cpp
-    // The GC will handle them when references are released
+    if (model) {
+      try { await model.dispose(); } catch { /* ignore cleanup errors */ }
+    }
+    if (llama) {
+      try { await llama.dispose(); } catch { /* ignore cleanup errors */ }
+    }
   }
 }
 
@@ -143,7 +148,7 @@ export function clearUsabilityCache(): void {
  * @example
  * ```typescript
  * const modelPath = await resolveModel();
- * const llama = await getLlama();
+ * const llama = await getLlama({ build: 'never', logLevel: LlamaLogLevel.error });
  * const model = await llama.loadModel({ modelPath });
  * ```
  */

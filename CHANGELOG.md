@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.4] - 2026-02-23
+
+### Fixed
+
+- **Noisy `node-llama-cpp` warnings on headless Linux**: Vulkan binary fallback and `special_eos_id` tokenizer warnings no longer print during `ca search` / `ca knowledge` — GPU auto-detection preserved via `progressLogs: false` + `logLevel: error`
+- **Resource leak in `isModelUsable()`**: `Llama` and `LlamaModel` instances are now properly disposed after the preflight usability check
+
+### Changed
+
+- **`getLlama()` initialization hardened**: Both call sites (`nomic.ts`, `model.ts`) now pass `build: 'never'` to prevent silent compilation from source on exotic platforms; set `NODE_LLAMA_CPP_DEBUG=true` to re-enable verbose output
+
 ## [1.4.3] - 2026-02-23
 
 ### Fixed

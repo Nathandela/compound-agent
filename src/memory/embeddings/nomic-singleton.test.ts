@@ -11,6 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 vi.mock('node-llama-cpp', () => ({
   getLlama: vi.fn(),
   LlamaEmbeddingContext: class {},
+  LlamaLogLevel: { disabled: 'disabled', fatal: 'fatal', error: 'error', warn: 'warn', info: 'info', log: 'log', debug: 'debug' },
 }));
 
 vi.mock('./model.js', () => ({
@@ -23,7 +24,7 @@ import { resolveModel } from './model.js';
 import { getEmbedding, unloadEmbedding } from './nomic.js';
 
 function createMockContext() {
-  return { dispose: vi.fn(), getEmbeddingFor: vi.fn() };
+  return { dispose: vi.fn().mockResolvedValue(undefined), getEmbeddingFor: vi.fn() };
 }
 
 function createMockModel(context: ReturnType<typeof createMockContext>) {
@@ -160,6 +161,39 @@ describe('embedding singleton coordination', () => {
     it('unloadEmbedding() is safe to call when not initialized', () => {
       // Should not throw
       expect(() => unloadEmbedding()).not.toThrow();
+    });
+  });
+
+  describe('getLlama() initialization options', () => {
+    it('passes build: "never" to prevent compilation from source', async () => {
+      setupMocks();
+      await getEmbedding();
+      expect(getLlama).toHaveBeenCalledWith(
+        expect.objectContaining({ build: 'never' }),
+      );
+    });
+
+    it('passes progressLogs: false to suppress binary fallback warnings', async () => {
+      setupMocks();
+      await getEmbedding();
+      expect(getLlama).toHaveBeenCalledWith(
+        expect.objectContaining({ progressLogs: false }),
+      );
+    });
+
+    it('passes logLevel: error to suppress C++ backend warn-level noise', async () => {
+      setupMocks();
+      await getEmbedding();
+      expect(getLlama).toHaveBeenCalledWith(
+        expect.objectContaining({ logLevel: 'error' }),
+      );
+    });
+
+    it('does not set gpu option (preserves default auto-detection)', async () => {
+      setupMocks();
+      await getEmbedding();
+      const callArgs = vi.mocked(getLlama).mock.calls[0]![0] as Record<string, unknown>;
+      expect(callArgs).not.toHaveProperty('gpu');
     });
   });
 });

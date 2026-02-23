@@ -15,7 +15,7 @@
  */
 
 import type { Llama, LlamaModel } from 'node-llama-cpp';
-import { getLlama, LlamaEmbeddingContext } from 'node-llama-cpp';
+import { getLlama, LlamaEmbeddingContext, LlamaLogLevel } from 'node-llama-cpp';
 
 import { isModelAvailable, resolveModel } from './model.js';
 
@@ -64,7 +64,12 @@ export async function getEmbedding(): Promise<LlamaEmbeddingContext> {
   pendingInit = (async () => {
     try {
       const modelPath = await resolveModel({ cli: true });
-      llamaInstance = await getLlama();
+      llamaInstance = await getLlama({
+        build: 'never',                  // Never compile from source in a deployed tool
+        progressLogs: false,             // Suppress prebuilt binary fallback warnings
+        logLevel: LlamaLogLevel.error,   // Only surface real errors from C++ backend
+        // Set NODE_LLAMA_CPP_DEBUG=true to re-enable all output for troubleshooting
+      });
       modelInstance = await llamaInstance.loadModel({ modelPath });
       embeddingContext = await modelInstance.createEmbeddingContext();
       return embeddingContext;
@@ -120,7 +125,7 @@ export async function getEmbedding(): Promise<LlamaEmbeddingContext> {
  */
 export function unloadEmbedding(): void {
   if (embeddingContext) {
-    embeddingContext.dispose();
+    embeddingContext.dispose().catch(() => {});
     embeddingContext = null;
   }
   if (modelInstance) {
