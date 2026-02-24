@@ -2,6 +2,7 @@
  * Tests for the `ca loop` command (infinity loop script generator).
  */
 
+import { execSync } from 'node:child_process';
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -128,6 +129,60 @@ describe('generateLoopScript', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
     // Should set a variable indicating which parser to use
     expect(script).toMatch(/JSON_PARSER|HAS_JQ/);
+  });
+
+  // P0: parse_json must auto-unwrap single-element arrays (bd show --json returns [...])
+  it('parse_json jq path auto-unwraps arrays before applying filter', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // jq should conditionally unwrap arrays: if type == \"array\" then .[0] else . end
+    // The \" are bash-escaped quotes inside the template output
+    expect(script).toMatch(/if type\s*==\s*\\"array\\"\s*then\s*\.\[0\]\s*else\s*\.\s*end/);
+  });
+
+  it('parse_json python3 fallback auto-unwraps lists before field access', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // python3 fallback should check isinstance(data, list) and unwrap
+    expect(script).toContain('isinstance(data, list)');
+  });
+
+  // P0 behavioral: verify parse_json actually works on real array input
+  it('python3 fallback extracts field from array-wrapped object', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Extract the python3 snippet from the generated script
+    const pyMatch = script.match(/python3 -c "\n([\s\S]*?)"\n/);
+    expect(pyMatch).toBeTruthy();
+    const pyCode = pyMatch![1].replace(/\$filter/g, '.status');
+    const result = execSync(
+      `echo '[{"status":"open"}]' | python3 -c "${pyCode}"`,
+      { encoding: 'utf-8', shell: '/bin/bash' },
+    ).trim();
+    expect(result).toBe('open');
+  });
+
+  it('python3 fallback exits cleanly on empty array input', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    const pyMatch = script.match(/python3 -c "\n([\s\S]*?)"\n/);
+    expect(pyMatch).toBeTruthy();
+    const pyCode = pyMatch![1].replace(/\$filter/g, '.status');
+    // Must exit 0 (no crash). Without try/except, empty array causes KeyError → exit 1.
+    expect(() => {
+      execSync(`echo '[]' | python3 -c "${pyCode}"`, {
+        encoding: 'utf-8',
+        shell: '/bin/bash',
+      });
+    }).not.toThrow();
+  });
+
+  it('python3 fallback handles plain object input (regression)', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    const pyMatch = script.match(/python3 -c "\n([\s\S]*?)"\n/);
+    expect(pyMatch).toBeTruthy();
+    const pyCode = pyMatch![1].replace(/\$filter/g, '.status');
+    const result = execSync(
+      `echo '{"status":"closed"}' | python3 -c "${pyCode}"`,
+      { encoding: 'utf-8', shell: '/bin/bash' },
+    ).trim();
+    expect(result).toBe('closed');
   });
 
   it('supports dry run mode', () => {

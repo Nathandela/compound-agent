@@ -80,21 +80,27 @@ fi
 
 # parse_json() - extract a value from JSON stdin
 # Uses jq (primary) with python3 fallback
-# Usage: echo '{"status":"open"}' | parse_json '.status'
+# Auto-unwraps single-element arrays (bd show --json returns [...])
+# Usage: echo '[{"status":"open"}]' | parse_json '.status'
 parse_json() {
   local filter="$1"
   if [ "$HAS_JQ" = true ]; then
-    jq -r "$filter"
+    jq -r "if type == \\"array\\" then .[0] else . end | $filter"
   else
     python3 -c "
 import sys, json
 data = json.load(sys.stdin)
+if isinstance(data, list):
+    data = data[0] if data else {}
 f = '$filter'.strip('.')
 parts = [p for p in f.split('.') if p]
 v = data
-for p in parts:
-    v = v[p]
-print(v)
+try:
+    for p in parts:
+        v = v[p]
+except (KeyError, IndexError, TypeError):
+    v = None
+print('' if v is None else v)
 "
   fi
 }
