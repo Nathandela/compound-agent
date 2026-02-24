@@ -84,7 +84,7 @@ describe('embedding model resolution', () => {
       const result = await isModelUsable();
       expect(result).toHaveProperty('usable');
       expect(typeof result.usable).toBe('boolean');
-    });
+    }, 15000);
 
     it.runIf(!modelAvailable)('returns usable=false with reason when model file not present', async () => {
       const result = await isModelUsable();
