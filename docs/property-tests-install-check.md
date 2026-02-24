@@ -208,14 +208,14 @@ fc.integer({ min: 1, max: 5 })  // Symlink test repetitions
 
 ## Files Modified
 
-- `/Users/Nathan/Documents/Code/compound_agent/src/install-check.test.ts`
+- `<project-root>/src/install-check.test.ts`
   - Added 20 property-based tests
   - Adjusted performance threshold from 50ms → 100ms
   - Organized into property test suites
 
 ## References
 
-- Implementation: `/Users/Nathan/Documents/Code/compound_agent/src/install-check.ts`
-- Invariants: `/Users/Nathan/Documents/Code/compound_agent/docs/invariants/install-check.md`
+- Implementation: `<project-root>/src/install-check.ts`
+- Invariants: `<project-root>/docs/invariants/install-check.md`
 - fast-check: https://fast-check.dev/
 - Property-based testing guide: https://fast-check.dev/docs/introduction/getting-started/

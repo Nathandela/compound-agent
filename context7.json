@@ -1,0 +1,21 @@
+{
+  "name": "Compound Agent",
+  "description": "Semantic memory plugin for Claude Code that captures lessons from mistakes and retrieves them with local embeddings and hybrid search",
+  "include": [
+    "README.md",
+    "AGENTS.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "docs/ARCHITECTURE-V2.md",
+    "docs/MIGRATION.md",
+    "docs/RESOURCE_LIFECYCLE.md",
+    "docs/LANDSCAPE.md",
+    "docs/adr/ADR-001-jsonl-with-sqlite-index.md",
+    "docs/adr/ADR-002-local-embeddings.md",
+    "docs/adr/ADR-003-zod-schema-validation.md",
+    "docs/adr/ADR-004-hybrid-search.md",
+    "src/index.ts",
+    "src/memory/types.ts"
+  ],
+  "versions": []
+}

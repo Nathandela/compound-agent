@@ -78,7 +78,7 @@ export function parseBdShowDeps(raw: string): BeadsDep[] {
 }
 
 /**
- * Extract short ID from full beads ID (e.g., "learning_agent-m001" -> "m001").
+ * Extract short ID from full beads ID (e.g., "my-project-m001" -> "m001").
  * Assumes beads short IDs are the last hyphen-delimited segment.
  */
 export function shortId(fullId: string): string {

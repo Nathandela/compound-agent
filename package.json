@@ -19,16 +19,19 @@
     "dist",
     "docs/research",
     "scripts/postinstall.mjs",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "llms.txt",
+    "context7.json"
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Nathandela/learning_agent.git"
+    "url": "git+https://github.com/Nathandela/compound-agent.git"
   },
   "bugs": {
-    "url": "https://github.com/Nathandela/learning_agent/issues"
+    "url": "https://github.com/Nathandela/compound-agent/issues"
   },
-  "homepage": "https://github.com/Nathandela/learning_agent#readme",
+  "homepage": "https://github.com/Nathandela/compound-agent#readme",
+  "llms": "https://raw.githubusercontent.com/Nathandela/compound-agent/main/llms.txt",
   "scripts": {
     "postinstall": "node scripts/postinstall.mjs",
     "prebuild": "tsx scripts/extract-changelog.ts",
@@ -50,11 +53,22 @@
   },
   "keywords": [
     "claude",
-    "compound",
-    "workflow",
+    "claude-code",
+    "compound-agent",
+    "semantic-memory",
     "memory",
+    "embeddings",
+    "vector-search",
     "ai",
-    "agent"
+    "agent",
+    "llm",
+    "plugin",
+    "cli",
+    "developer-tools",
+    "workflow",
+    "tdd",
+    "sqlite",
+    "knowledge-management"
   ],
   "author": "Nathan Delacrétaz",
   "license": "MIT",

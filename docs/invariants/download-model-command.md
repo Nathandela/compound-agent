@@ -181,14 +181,14 @@ D5: Downloaded model file is a valid GGUF format file
 Downloading embedding model (278MB)...
 [progress bar or percentage]
 Model downloaded successfully
-  Path: /Users/nathan/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf
+  Path: ~/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf
   Size: 278MB
 ```
 
 ### Already exists (idempotent)
 ```
 Embedding model already downloaded
-  Path: /Users/nathan/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf
+  Path: ~/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf
   Size: 278MB
 ```
 
@@ -210,7 +210,7 @@ Embedding model already downloaded
 ```json
 {
   "success": true,
-  "path": "/Users/nathan/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf",
+  "path": "~/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf",
   "size": 291782368,
   "alreadyExisted": false
 }
@@ -220,7 +220,7 @@ Embedding model already downloaded
 ```json
 {
   "success": true,
-  "path": "/Users/nathan/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf",
+  "path": "~/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf",
   "size": 291782368,
   "alreadyExisted": true
 }

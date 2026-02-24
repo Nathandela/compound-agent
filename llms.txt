@@ -1,0 +1,31 @@
+# Compound Agent
+
+> Semantic memory plugin for Claude Code. Captures lessons from mistakes, corrections, and discoveries. Stores them in git-tracked JSONL with SQLite FTS5 indexing and local vector embeddings (EmbeddingGemma-300M via node-llama-cpp). Retrieves relevant knowledge at session start, during planning, and before architectural decisions. Install as a dev dependency, run `npx ca setup`, and every work cycle compounds -- mistakes become searchable lessons that prevent recurrence.
+
+Compound Agent is a TypeScript CLI tool (`ca`) installable via npm/pnpm. It integrates with Claude Code through hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse) and slash commands (/compound:brainstorm, /compound:plan, /compound:work, /compound:review, /compound:compound, /compound:lfg). Storage uses a three-layer architecture: Beads for issue tracking, Semantic Memory for knowledge, and Workflows for structured development phases.
+
+## Core Documentation
+
+- [README](https://github.com/Nathandela/compound-agent/blob/main/README.md): Installation, quick start, CLI reference, memory schema
+- [Architecture](https://github.com/Nathandela/compound-agent/blob/main/docs/ARCHITECTURE-V2.md): Three-layer architecture (Beads + Semantic Memory + Workflows)
+- [AGENTS.md](https://github.com/Nathandela/compound-agent/blob/main/AGENTS.md): Agent workflow instructions and phase contracts
+- [CHANGELOG](https://github.com/Nathandela/compound-agent/blob/main/CHANGELOG.md): Version history and migration notes
+
+## API and Schema
+
+- [Public API](https://github.com/Nathandela/compound-agent/blob/main/src/index.ts): Exported functions and types
+- [Memory types](https://github.com/Nathandela/compound-agent/blob/main/src/memory/types.ts): Zod schemas for lesson, solution, pattern, preference
+- [Migration guide](https://github.com/Nathandela/compound-agent/blob/main/docs/MIGRATION.md): Migrating from learning-agent to compound-agent
+
+## Design Decisions
+
+- [ADR-001](https://github.com/Nathandela/compound-agent/blob/main/docs/adr/ADR-001-jsonl-with-sqlite-index.md): JSONL with SQLite FTS5 index (git-friendly source of truth)
+- [ADR-002](https://github.com/Nathandela/compound-agent/blob/main/docs/adr/ADR-002-local-embeddings.md): Local embeddings via node-llama-cpp (no cloud dependency)
+- [ADR-003](https://github.com/Nathandela/compound-agent/blob/main/docs/adr/ADR-003-zod-schema-validation.md): Zod schema validation (runtime type safety)
+- [ADR-004](https://github.com/Nathandela/compound-agent/blob/main/docs/adr/ADR-004-hybrid-search.md): Hybrid search (70% vector + 30% BM25)
+
+## Optional
+
+- [Competitive landscape](https://github.com/Nathandela/compound-agent/blob/main/docs/LANDSCAPE.md): Comparison with mem0, Letta, Claude Reflect, GitHub Copilot Memory
+- [Contributing](https://github.com/Nathandela/compound-agent/blob/main/CONTRIBUTING.md): Development setup and TDD workflow
+- [Resource lifecycle](https://github.com/Nathandela/compound-agent/blob/main/docs/RESOURCE_LIFECYCLE.md): Singleton management for SQLite and embeddings

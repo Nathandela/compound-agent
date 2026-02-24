@@ -13,8 +13,8 @@ Thank you for your interest in contributing to Compound Agent! This document out
 
 ```bash
 # Clone the repository
-git clone https://github.com/Nathandela/learning_agent.git
-cd learning_agent
+git clone https://github.com/Nathandela/compound-agent.git
+cd compound-agent
 
 # Install dependencies
 pnpm install
@@ -279,6 +279,7 @@ git push && git push --tags
 
 ## Questions?
 
-- Check [docs/SPEC.md](docs/SPEC.md) for the full specification
-- Check [docs/CONTEXT.md](docs/CONTEXT.md) for design decisions
+- Check [docs/archive/SPEC-v1.md](docs/archive/SPEC-v1.md) for the original specification
+- Check [docs/archive/CONTEXT-v1.md](docs/archive/CONTEXT-v1.md) for design decisions
+- Check [docs/INDEX.md](docs/INDEX.md) for the full documentation map
 - Open an issue for questions or clarifications

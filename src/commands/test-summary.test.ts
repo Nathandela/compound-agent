@@ -14,7 +14,7 @@ import type { TestSummary } from './test-summary.js';
 // ============================================================================
 
 const ALL_PASSING = `\
- RUN  v2.1.9 /Users/Nathan/Documents/Code/learning_agent
+ RUN  v2.1.9 /tmp/test-project
 
  ✓ src/cli-utils.test.ts (12 tests) 3ms
  ✓ src/memory/storage/jsonl.test.ts (45 tests) 120ms
@@ -26,7 +26,7 @@ const ALL_PASSING = `\
    Duration  1.23s (transform 100ms, setup 0ms, collect 200ms, tests 923ms, environment 0ms, prepare 35ms)`;
 
 const WITH_FAILURES = `\
- RUN  v2.1.9 /Users/Nathan/Documents/Code/learning_agent
+ RUN  v2.1.9 /tmp/test-project
 
  ✓ src/cli-utils.test.ts (12 tests) 3ms
  ❯ src/rules/engine.test.ts (3 tests | 1 failed) 15ms
@@ -63,7 +63,7 @@ TypeError: Cannot read properties of undefined (reading 'parse')
    Duration  1.23s (transform 100ms, setup 0ms, collect 200ms, tests 923ms, environment 0ms, prepare 35ms)`;
 
 const WITH_SKIPS = `\
- RUN  v2.1.9 /Users/Nathan/Documents/Code/learning_agent
+ RUN  v2.1.9 /tmp/test-project
 
  ✓ src/cli-utils.test.ts (12 tests) 3ms
  ✓ src/embeddings/model.test.ts (5 tests | 2 skipped) 200ms
@@ -74,14 +74,14 @@ const WITH_SKIPS = `\
    Duration  500ms`;
 
 const FAILED_SUITE = `\
- RUN  v2.1.9 /Users/Nathan/Documents/Code/learning_agent
+ RUN  v2.1.9 /tmp/test-project
 
  ❯ src/cli-error-format.test.ts (0 test)
 
 ⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
 
  FAIL  src/cli-error-format.test.ts [ src/cli-error-format.test.ts ]
-Error: Failed to load url ./cli-error-format.js (resolved id: ./cli-error-format.js) in /Users/Nathan/Documents/Code/learning_agent/src/cli-error-format.test.ts. Does the file exist?
+Error: Failed to load url ./cli-error-format.js (resolved id: ./cli-error-format.js) in /tmp/test-project/src/cli-error-format.test.ts. Does the file exist?
  ❯ loadAndTransform node_modules/.pnpm/vite@5.4.21/node_modules/vite/dist/node/chunks/dep-BK3b2jBa.js:51969:17
 
 ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯

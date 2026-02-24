@@ -60,7 +60,7 @@ describe('runScriptCheck', () => {
   it('runs command in the specified baseDir', () => {
     const violations = runScriptCheck(
       { type: 'script', command: 'test -f package.json' },
-      '/Users/Nathan/Documents/Code/learning_agent',
+      process.cwd(),
     );
 
     // package.json exists at the repo root, so this should pass

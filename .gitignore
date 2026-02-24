@@ -6,8 +6,7 @@ dist/
 
 # Cache
 .claude/.cache/
-.claude/.ca-failure-state.json
-.claude/.ca-phase-state.json
+.claude/.ca-*.json
 
 # Setup-generated (ca setup dogfooding on source repo)
 .claude/agents/compound/
@@ -15,6 +14,7 @@ dist/
 .claude/skills/compound/
 .claude/plugin.json
 .claude/settings.json
+.claude/settings.local.json
 
 # OS
 .DS_Store
@@ -34,4 +34,4 @@ npm-debug.log*
 
 # Environment
 .env
-.env.local
+.env.*

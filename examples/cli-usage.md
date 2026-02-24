@@ -9,7 +9,7 @@ The compound-agent CLI provides commands for managing lessons from the terminal.
 pnpm add -D compound-agent
 
 # Or link locally during development
-pnpm add -D ../learning_agent
+pnpm add -D compound-agent
 ```
 
 ## Commands

@@ -1,64 +1,61 @@
 # Compound Agent
 
-Semantically-intelligent workflow plugin for Claude Code. Every unit of work compounds -- mistakes become lessons, solutions become searchable knowledge, and each cycle makes subsequent work smarter.
+**Semantic memory for Claude Code -- capture mistakes once, never repeat them.**
+
+[![npm version](https://img.shields.io/npm/v/compound-agent)](https://www.npmjs.com/package/compound-agent)
+[![license](https://img.shields.io/npm/l/compound-agent)](LICENSE)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue)](https://www.typescriptlang.org/)
 
 ## Overview
 
-Claude Code forgets everything between sessions. Compound Agent fixes this with a three-layer system: issue tracking (Beads) at the foundation, semantic memory with vector search in the middle, and structured workflow phases on top. It captures knowledge from corrections, discoveries, and completed work, then retrieves it precisely when relevant -- at session start, during planning, and before architectural decisions.
+Claude Code forgets everything between sessions. Compound Agent fixes this with a three-layer system: issue tracking (Beads) at the foundation, semantic memory with vector search in the middle, and structured workflow phases on top. It captures knowledge from corrections, discoveries, and completed work, then retrieves it precisely when relevant -- at session start, during planning, and before architectural decisions. Every cycle through the loop makes subsequent cycles smarter.
+
+## The Compound Loop
+
+```mermaid
+graph LR
+    B[BRAINSTORM] --> P[PLAN]
+    P --> W[WORK]
+    W --> R[REVIEW]
+    R --> C[COMPOUND]
+    C --> M[(MEMORY)]
+    M --> P
+```
+
+A bug found in review becomes a lesson. That lesson surfaces during planning of similar work. The plan accounts for the known issue. Work avoids the mistake.
 
 ## Architecture
 
-```
-LAYER 3: WORKFLOWS
-  /compound:brainstorm, /compound:plan, /compound:work,
-  /compound:review, /compound:compound, /compound:lfg
-  Agent teams at each phase with inter-communication
+```mermaid
+block-beta
+    columns 1
+    block:L3["Layer 3: Workflows"]
+        A["Slash commands"] B["Agent teams"] C["5-phase cycle"]
+    end
+    block:L2["Layer 2: Semantic Memory"]
+        D["JSONL source of truth"] E["SQLite FTS5 index"] F["Vector embeddings"]
+    end
+    block:L1["Layer 1: Beads"]
+        G["Issue tracking"] H["Git-backed sync"] I["Dependency graph"]
+    end
 
-LAYER 2: SEMANTIC MEMORY
-  4 types: lesson | solution | pattern | preference
-  JSONL source of truth + SQLite FTS5 index + vector embeddings
-  Ranked retrieval: similarity * severity * recency * confirmation
-
-LAYER 1: BEADS (Foundation)
-  Issue tracking + dependency graph
-  Git-backed persistence + distributed sync
-```
-
-### Storage Layout
-
-```
-project_root/
-+-- AGENTS.md                    <- Workflow instructions for Claude
-+-- .claude/
-    +-- settings.json            <- Claude Code hooks
-    +-- .ca-phase-state.json     <- LFG phase tracking (generated)
-    +-- .ca-failure-state.json   <- Hook failure counters (generated)
-    +-- lessons/
-    |   +-- index.jsonl          <- Source of truth (git-tracked)
-    |   +-- archive/             <- Compacted old items
-    +-- .cache/
-        +-- lessons.sqlite       <- Rebuildable index (.gitignore)
+    L3 --> L2
+    L2 --> L1
 ```
 
-### The Compound Loop
+Four memory types -- `lesson`, `solution`, `pattern`, `preference` -- share one store, one schema, and one ranked retrieval mechanism combining vector similarity, severity, recency, and confirmation status.
 
-```
-COMPOUND --> writes to --> MEMORY
-                             |
-                      searched by
-                             |
-                           PLAN --> creates context for --> WORK
-                                                             |
-                                                      produces for
-                                                             |
-                                                          REVIEW
-                                                             |
-                                                    generates for
-                                                             |
-                                                         COMPOUND
-```
+## Why Not Just X?
 
-Every cycle through the loop makes subsequent cycles smarter. A bug found in review becomes a lesson. That lesson surfaces during planning of similar work. The plan accounts for the known issue. Work avoids the mistake.
+| Feature | `.claude/CLAUDE.md` | Claude Reflect | mem0 | Compound Agent |
+|---------|---------------------|----------------|------|----------------|
+| Persists across sessions | Manual edits | Yes | Yes | Yes |
+| Semantic search | No | No (regex) | Yes (cloud) | Yes (local) |
+| Quality gate on capture | No | No | No | Yes (novelty + specificity) |
+| Runs fully offline | Yes | Yes | No (API) | Yes |
+| Git-tracked knowledge | Yes | No | No | Yes (JSONL) |
+| Structured workflow phases | No | No | No | Yes (5 phases) |
+| Claude Code native integration | N/A | Yes | No | Yes (hooks + commands) |
 
 ## Installation
 
@@ -76,7 +73,7 @@ npx ca setup --skip-model
 ### Requirements
 
 - Node.js >= 20
-- ~278MB disk space for the embedding model
+- ~278MB disk space for the embedding model (one-time download, shared across projects)
 - ~150MB RAM during embedding operations
 
 ### pnpm Users
@@ -94,19 +91,6 @@ If you prefer to configure manually, add to your `package.json`:
 ```
 
 Then run `pnpm install`.
-
-### What `setup` Does
-
-| Action | Location | Purpose |
-|--------|----------|---------|
-| Create lessons store | `.claude/lessons/` | JSONL + cache directory |
-| Install AGENTS.md | project root | Workflow instructions for Claude |
-| Configure hooks | `.claude/settings.json` | SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse hooks |
-| Install git pre-commit hook | `.git/hooks/pre-commit` | Lesson capture reminder before commits |
-| Install workflow commands | `.claude/commands/compound/` | Slash commands for each phase |
-| Install agent definitions | `.claude/agents/compound/` | Specialized agent roles |
-| Install phase skills | `.claude/skills/compound/` | Process instructions per phase |
-| Download embedding model | `~/.node-llama-cpp/models/` | First-use only, ~278MB |
 
 ## Quick Start
 
@@ -195,8 +179,6 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca loop --max-retries <n>` | Max retries per epic on failure (default: 1) |
 | `ca loop --force` | Overwrite existing script |
 
-Generated scripts detect three markers: `EPIC_COMPLETE` (success), `EPIC_FAILED` (retry then stop), `HUMAN_REQUIRED: <reason>` (skip and continue). Run with `LOOP_DRY_RUN=1` to preview.
-
 ### Setup
 
 | Command | Description |
@@ -213,23 +195,7 @@ Generated scripts detect three markers: `EPIC_COMPLETE` (success), `EPIC_FAILED`
 | `ca about` | Show version, animation, and recent changelog |
 | `ca doctor` | Verify external dependencies and project health |
 
-## Workflow Commands
-
-Installed to `.claude/commands/compound/` during setup. Invoked as slash commands in Claude Code.
-
-| Command | Phase | Description |
-|---------|-------|-------------|
-| `/compound:brainstorm` | Brainstorm | Explore the problem, iterate with user, create beads epic |
-| `/compound:plan` | Plan | Create detailed plan with memory retrieval + research agents |
-| `/compound:work` | Work | Execute with agent teams, adaptive TDD per task complexity |
-| `/compound:review` | Review | Multi-agent review (security, architecture, performance, tests, simplicity) |
-| `/compound:compound` | Compound | Capture lessons, solutions, patterns into memory |
-| `/compound:lfg` | All | Chain all phases sequentially |
-| `/compound:set-worktree` | Setup | Create isolated git worktree for an epic |
-
 ## Memory Types
-
-All types share one store, one schema, one search mechanism. A query returns the most relevant items regardless of type.
 
 | Type | Trigger means | Insight means | Example |
 |------|---------------|---------------|---------|
@@ -237,35 +203,6 @@ All types share one store, one schema, one search mechanism. A query returns the
 | `solution` | The problem | The resolution | "Auth 401 fix: add X-Request-ID header" |
 | `pattern` | When it applies | Why it matters | `{ bad: "await in loop", good: "Promise.all" }` |
 | `preference` | The context | The preference | "Use uv over pip in this project" |
-
-## Memory Item Schema
-
-All memory items share a common schema with a discriminated union on the `type` field.
-
-### Required Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | string | Hash-based unique identifier |
-| `type` | `"lesson"` \| `"solution"` \| `"pattern"` \| `"preference"` | Item type |
-| `trigger` | string | What caused/prompted this |
-| `insight` | string | What was learned |
-| `tags` | string[] | Categorization tags |
-| `source` | string | How captured: `user_correction`, `self_correction`, `test_failure`, `manual` |
-| `context` | `{ tool, intent }` | Capture context |
-| `created` | ISO string | Creation timestamp |
-| `confirmed` | boolean | Whether user confirmed |
-| `supersedes` | string[] | IDs of items this replaces |
-| `related` | string[] | IDs of related items |
-
-### Optional Fields
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `evidence` | string | Supporting evidence |
-| `severity` | `"high"` \| `"medium"` \| `"low"` | Importance level |
-| `citation` | `{ file, line?, commit? }` | File/line provenance |
-| `pattern` | `{ bad, good }` | Code pattern (required for `pattern` type) |
 
 ### Retrieval Ranking
 
@@ -279,26 +216,22 @@ recency_boost:      last 30d=1.2, older=1.0
 confirmation_boost: confirmed=1.3, unconfirmed=1.0
 ```
 
-### Example
+## FAQ
 
-```json
-{
-  "id": "Sa1b2c3d4",
-  "type": "solution",
-  "trigger": "API returned 401 despite valid JWT token",
-  "insight": "Auth API requires X-Request-ID header in all requests",
-  "evidence": "Traced in network tab, discovered missing header requirement",
-  "severity": "high",
-  "tags": ["api", "auth", "headers"],
-  "source": "test_failure",
-  "context": { "tool": "fetch", "intent": "API authentication" },
-  "created": "2026-01-15T10:30:00.000Z",
-  "confirmed": true,
-  "supersedes": [],
-  "related": [],
-  "citation": { "file": "src/api/client.ts", "line": 42 }
-}
-```
+**Q: How is this different from mem0?**
+A: mem0 is a cloud memory layer for general AI agents. Compound Agent is local-first, designed specifically for Claude Code, with git-tracked storage and local embeddings -- no API keys or cloud services needed.
+
+**Q: Does this work offline?**
+A: Yes, completely. Embeddings run locally via node-llama-cpp. No network requests after the initial model download.
+
+**Q: How much disk space does it need?**
+A: ~278MB for the embedding model (one-time download, shared across projects) plus negligible space for lessons.
+
+**Q: Can I use it with other AI coding tools?**
+A: The CLI (`ca`) works standalone, but hooks and slash commands are Claude Code specific. The TypeScript API can be integrated into other tools.
+
+**Q: What happens if the embedding model isn't available?**
+A: Compound Agent hard-fails rather than silently degrading. Run `npx ca doctor` to diagnose issues.
 
 ## Development
 
@@ -309,17 +242,13 @@ pnpm dev              # Watch mode (rebuild on changes)
 pnpm lint             # Type check + ESLint
 ```
 
-### Test Scripts
-
 | Script | Duration | Use Case |
 |--------|----------|----------|
-| `pnpm test:fast` | ~6s | Rapid feedback during development (skips CLI integration tests) |
+| `pnpm test:fast` | ~6s | Rapid feedback during development |
 | `pnpm test` | ~60s | Full suite before committing |
 | `pnpm test:changed` | varies | Only tests affected by recent changes |
 | `pnpm test:watch` | - | Watch mode for TDD workflow |
 | `pnpm test:all` | ~60s | Full suite with model download |
-
-**Recommended**: Use `pnpm test:fast` while coding, `pnpm test` before committing.
 
 ## Technology Stack
 
@@ -339,12 +268,25 @@ pnpm lint             # Type check + ESLint
 
 | Document | Purpose |
 |----------|---------|
-| [docs/ARCHITECTURE-V2.md](docs/ARCHITECTURE-V2.md) | Three-layer architecture design |
-| [docs/MIGRATION.md](docs/MIGRATION.md) | Migration guide from learning-agent |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
-| [AGENTS.md](AGENTS.md) | Agent workflow instructions |
-| [.claude/CLAUDE.md](.claude/CLAUDE.md) | Claude Code project instructions |
+| [docs/ARCHITECTURE-V2.md](https://github.com/Nathandela/compound-agent/blob/main/docs/ARCHITECTURE-V2.md) | Three-layer architecture design |
+| [docs/MIGRATION.md](https://github.com/Nathandela/compound-agent/blob/main/docs/MIGRATION.md) | Migration guide from learning-agent |
+| [CHANGELOG.md](https://github.com/Nathandela/compound-agent/blob/main/CHANGELOG.md) | Version history |
+| [AGENTS.md](https://github.com/Nathandela/compound-agent/blob/main/AGENTS.md) | Agent workflow instructions |
+
+## Acknowledgments
+
+Compound Agent builds on ideas and patterns from these projects:
+
+| Project | Influence |
+|---------|-----------|
+| [Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin) | The "compound" philosophy -- each unit of work makes subsequent units easier. Multi-agent review workflows and skills as encoded knowledge. |
+| [Beads](https://github.com/steveyegge/beads) | Git-backed JSONL + SQLite hybrid storage model, hash-based conflict-free IDs, dependency graphs |
+| [OpenClaw](https://github.com/openclaw/openclaw) | Claude Code integration patterns and hook-based workflow architecture |
+
+Also informed by research into [Reflexion](https://arxiv.org/abs/2303.11366) (verbal reinforcement learning), [Voyager](https://github.com/MineDojo/Voyager) (executable skill libraries), and production systems from mem0, Letta, and GitHub Copilot Memory.
 
 ## License
 
-MIT
+MIT -- see [LICENSE](LICENSE) for details.
+
+> The embedding model (EmbeddingGemma-300M) is downloaded on-demand and subject to Google's [Gemma Terms of Use](https://ai.google.dev/gemma/terms). See [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for full dependency license information.

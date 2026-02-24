@@ -4,7 +4,7 @@
 
 A learning system that helps Claude Code avoid repeating mistakes across sessions. Captures lessons from corrections and retrieves them when relevant.
 
-**Location**: `/Users/Nathan/Documents/Code/compound_agent/`
+**Location**: `<project-root>/`
 **Timeline**: 2.5-3 weeks
 **Status**: Spec finalized, ready to implement
 **Stack**: TypeScript + pnpm (deployable as dev dependency to any repo)

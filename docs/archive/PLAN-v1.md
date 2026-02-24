@@ -4,7 +4,7 @@
 
 Build a learning loop for Claude Code as a TypeScript pnpm package, deployable as a dev dependency to any repo.
 
-**Project**: `/Users/Nathan/Documents/Code/compound_agent/`
+**Project**: `<project-root>/`
 **Timeline**: 2.5-3 weeks
 **Stack**: TypeScript, pnpm, better-sqlite3, node-llama-cpp
 
@@ -23,7 +23,7 @@ Build a learning loop for Claude Code as a TypeScript pnpm package, deployable a
 
 **Commands**:
 ```bash
-cd /Users/Nathan/Documents/Code/compound_agent
+cd <project-root>
 pnpm init
 pnpm add -D typescript tsup vitest @types/node
 pnpm add zod commander
@@ -802,7 +802,7 @@ pnpm test
 ## Next Action
 
 ```bash
-cd /Users/Nathan/Documents/Code/compound_agent
+cd <project-root>
 pnpm init
 pnpm add -D typescript tsup vitest @types/node
 pnpm add zod commander better-sqlite3 node-llama-cpp
