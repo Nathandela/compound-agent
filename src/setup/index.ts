@@ -18,6 +18,7 @@ export {
 } from './claude-helpers.js';
 export { printBeadsFullStatus, printScopeStatus } from './display-utils.js';
 export { registerClaudeSubcommand } from './claude.js';
+export { registerGeminiSubcommand, installGeminiAdapter } from './gemini.js';
 export { registerDownloadModelCommand } from './download-model.js';
 export { processPhaseGuard } from './hooks-phase-guard.js';
 export { processReadTracker } from './hooks-read-tracker.js';

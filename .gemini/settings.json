@@ -1,0 +1,52 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "name": "ca-prime",
+            "type": "command",
+            "command": "bash .gemini/hooks/ca-prime.sh"
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "name": "ca-user-prompt",
+            "type": "command",
+            "command": "bash .gemini/hooks/ca-user-prompt.sh"
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "matcher": "replace|write_file|create_file",
+        "hooks": [
+          {
+            "name": "ca-phase-guard",
+            "type": "command",
+            "command": "bash .gemini/hooks/ca-phase-guard.sh"
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "matcher": "run_shell_command|replace|write_file|create_file",
+        "hooks": [
+          {
+            "name": "ca-post-tool",
+            "type": "command",
+            "command": "bash .gemini/hooks/ca-post-tool.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,6 @@
+description = "Multi-phase test suite optimization with adversarial review"
+prompt = """
+@{.claude/commands/compound/test-clean.md}
+
+{{args}}
+"""

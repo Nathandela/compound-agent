@@ -1,0 +1,6 @@
+description = "Capture high-quality lessons from completed work into the memory system"
+prompt = """
+@{.claude/commands/compound/compound.md}
+
+{{args}}
+"""

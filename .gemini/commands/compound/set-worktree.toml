@@ -1,0 +1,6 @@
+description = "Set up a git worktree for isolated epic execution"
+prompt = """
+@{.claude/commands/compound/set-worktree.md}
+
+{{args}}
+"""

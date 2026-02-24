@@ -8,6 +8,7 @@ import type { Command } from 'commander';
 
 import {
   registerClaudeSubcommand,
+  registerGeminiSubcommand,
   registerDownloadModelCommand,
   registerHooksCommand,
   registerInitCommand,
@@ -58,6 +59,7 @@ export function registerSetupCommands(program: Command): void {
 
   // Add subcommands to setup
   registerClaudeSubcommand(setupCommand);
+  registerGeminiSubcommand(setupCommand);
 
   registerDownloadModelCommand(program);
 }

@@ -1,0 +1,6 @@
+description = "Create a structured implementation plan with concrete tasks and dependencies"
+prompt = """
+@{.claude/commands/compound/plan.md}
+
+{{args}}
+"""

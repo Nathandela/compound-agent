@@ -1,0 +1,6 @@
+description = "Explore requirements through collaborative dialogue before committing to a plan"
+prompt = """
+@{.claude/commands/compound/brainstorm.md}
+
+{{args}}
+"""

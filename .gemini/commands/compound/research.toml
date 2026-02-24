@@ -1,0 +1,6 @@
+description = "Deep research on a topic producing a structured survey document"
+prompt = """
+@{.claude/commands/compound/research.md}
+
+{{args}}
+"""

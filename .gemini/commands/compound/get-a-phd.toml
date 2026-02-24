@@ -1,0 +1,6 @@
+description = "Deep PhD-level research for working subagents"
+prompt = """
+@{.claude/commands/compound/get-a-phd.md}
+
+{{args}}
+"""

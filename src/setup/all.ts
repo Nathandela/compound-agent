@@ -24,6 +24,7 @@ import {
   writeClaudeSettings,
 } from './claude-helpers.js';
 import { ensureGitignore, type GitignoreResult } from './gitignore.js';
+import { installGeminiAdapter } from './gemini.js';
 import { installPreCommitHook, installPostCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
@@ -169,6 +170,9 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   // 11. Configure Claude settings (hooks in settings.json)
   const { hooks } = await configureClaudeSettings();
 
+  // 11b. Install Gemini CLI compatibility hooks
+  await installGeminiAdapter({ dryRun: false, json: true });
+
   // 12. Ensure .gitignore has required patterns
   const gitignore = await ensureGitignore(repoRoot);
 
@@ -294,6 +298,7 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
   let configUpdated = false;
   if (!dryRun) {
     const { hooks } = await configureClaudeSettings();
+    await installGeminiAdapter({ dryRun: false, json: true });
     configUpdated = hooks;
   }
 

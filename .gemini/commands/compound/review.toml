@@ -1,0 +1,6 @@
+description = "Multi-agent code review with severity classification and mandatory gate"
+prompt = """
+@{.claude/commands/compound/review.md}
+
+{{args}}
+"""

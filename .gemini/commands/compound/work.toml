@@ -1,0 +1,6 @@
+description = "Execute implementation by delegating to an agent team"
+prompt = """
+@{.claude/commands/compound/work.md}
+
+{{args}}
+"""

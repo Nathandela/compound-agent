@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-02-24
+
+### Added
+
+- **Gemini CLI compatibility adapter**: `ca setup gemini` scaffolds `.gemini/` directory with hook scripts, TOML slash commands, and inlined skills -- bridging compound-agent to work with Google's Gemini CLI via the Adapter Pattern
+- **Gemini hooks**: Maps SessionStart, BeforeAgent, BeforeTool, AfterTool to compound-agent's existing hook pipeline (`ca prime`, `ca hooks run user-prompt`, `ca hooks run phase-guard`, `ca hooks run post-tool-success`)
+- **Gemini TOML commands**: Auto-generates `.gemini/commands/compound/*.toml` using `@{path}` file injection to maintain a single source of truth with Claude commands
+- **Gemini skills proxying**: Inlines phase and agent role skill content into `.gemini/skills/` with YAML frontmatter
+- **23 integration tests** for the Gemini adapter covering hooks, settings.json, TOML commands, skills, and dry-run mode
+
+### Fixed
+
+- **Gemini hook stderr leak**: Corrected `2>&1 > /dev/null` (leaks stderr to stdout, corrupting JSON) to `> /dev/null 2>&1`
+- **Gemini TOML file injection syntax**: Changed `@path` to `@{path}` (Gemini CLI requires curly braces)
+- **Gemini skill file injection**: Skills now inline content instead of using `@{path}` which only works in TOML prompt fields, not SKILL.md
+- **Gemini phase guard always allowing**: Hook now checks `ca hooks run phase-guard` exit code and returns structured `{"decision": "deny"}` on failure (exit 0, not exit 2, so Gemini parses the reason from stdout)
+- **Gemini BeforeTool matcher incomplete**: Added `create_file` to BeforeTool and AfterTool matchers alongside `replace` and `write_file`
+- **TOML description escaping**: `parseDescription` now escapes `\` and `"` to prevent malformed TOML output
+- **Flaky embedding test**: Added 15s timeout to `isModelUsable` test
+
 ## [1.4.4] - 2026-02-23
 
 ### Added
