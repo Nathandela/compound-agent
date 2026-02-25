@@ -1,16 +1,21 @@
 # Compound Agent
 
-**Semantic memory for Claude Code -- capture mistakes once, never repeat them.**
+**Memory. Knowledge. Structure. Accountability. For AI coding agents.**
 
 [![npm version](https://img.shields.io/npm/v/compound-agent)](https://www.npmjs.com/package/compound-agent)
 [![license](https://img.shields.io/npm/l/compound-agent)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue)](https://www.typescriptlang.org/)
 
+- **Memory** -- capture mistakes once, surface them forever
+- **Knowledge** -- hybrid vector search over your project docs
+- **Structure** -- 5-phase workflows with 35+ specialized agents
+- **Accountability** -- git-tracked issues, multi-agent reviews, quality gates
+
+Fully local. Fully offline. Everything in git.
+
 ## Overview
 
-Claude Code forgets everything between sessions. Compound Agent fixes this with a three-layer system: issue tracking (Beads) at the foundation, semantic memory with vector search in the middle, and structured workflow phases on top. It captures knowledge from corrections, discoveries, and completed work, then retrieves it precisely when relevant -- at session start, during planning, and before architectural decisions. Every cycle through the loop makes subsequent cycles smarter.
-
-## The Compound Loop
+AI coding agents forget everything between sessions. Compound Agent fixes this with a three-layer system: issue tracking at the foundation, semantic memory with vector search in the middle, and structured workflows with multi-agent review on top. It captures knowledge from corrections, discoveries, and completed work, then retrieves it precisely when relevant. Every cycle through the loop makes subsequent cycles smarter.
 
 ```mermaid
 graph LR
@@ -20,42 +25,52 @@ graph LR
     R --> C[COMPOUND]
     C --> M[(MEMORY)]
     M --> P
+
+    style M fill:#f9f,stroke:#333
 ```
-
-A bug found in review becomes a lesson. That lesson surfaces during planning of similar work. The plan accounts for the known issue. Work avoids the mistake.
-
-## Architecture
 
 ```mermaid
 block-beta
     columns 1
-    block:L3["Layer 3: Workflows"]
-        A["Slash commands"] B["Agent teams"] C["5-phase cycle"]
+    block:L3["Workflows"]
+        A["5-phase cycle"] B["35+ specialized agents"] C["Multi-model review"]
     end
-    block:L2["Layer 2: Semantic Memory"]
-        D["JSONL source of truth"] E["SQLite FTS5 index"] F["Vector embeddings"]
+    block:L2["Semantic Memory"]
+        D["Vector search"] E["Hybrid retrieval"] F["Cross-cutting patterns"]
     end
-    block:L1["Layer 1: Beads"]
-        G["Issue tracking"] H["Git-backed sync"] I["Dependency graph"]
+    block:L1["Foundation"]
+        G["Issue tracking"] H["Git-backed sync"] I["Worktree isolation"]
     end
 
     L3 --> L2
     L2 --> L1
 ```
 
-Four memory types -- `lesson`, `solution`, `pattern`, `preference` -- share one store, one schema, and one ranked retrieval mechanism combining vector similarity, severity, recency, and confirmation status.
+## Is this for you?
 
-## Why Not Just X?
+**"It keeps making the same mistake every session."**
+Capture it once. Compound Agent surfaces it automatically before the agent repeats it.
 
-| Feature | `.claude/CLAUDE.md` | Claude Reflect | mem0 | Compound Agent |
-|---------|---------------------|----------------|------|----------------|
-| Persists across sessions | Manual edits | Yes | Yes | Yes |
-| Semantic search | No | No (regex) | Yes (cloud) | Yes (local) |
-| Quality gate on capture | No | No | No | Yes (novelty + specificity) |
-| Runs fully offline | Yes | Yes | No (API) | Yes |
-| Git-tracked knowledge | Yes | No | No | Yes (JSONL) |
-| Structured workflow phases | No | No | No | Yes (5 phases) |
-| Claude Code native integration | N/A | Yes | No | Yes (hooks + commands) |
+**"I explained our auth pattern three sessions ago. Now it's reimplementing from scratch."**
+Architectural decisions persist as searchable lessons. Next session, they inject into context before planning starts.
+
+**"My agent uses pandas when we standardized on Polars months ago."**
+Preferences survive across sessions and projects. Once captured, they appear at the right moment.
+
+**"Code reviews keep catching the same class of bugs."**
+35+ specialized review agents (security, performance, architecture, test coverage) run in parallel. Findings feed back as lessons that become test requirements in future work.
+
+**"I have no idea what my agent actually learned or if it's reliable."**
+`ca list` shows all captured knowledge. `ca stats` shows health. `ca wrong <id>` invalidates bad lessons. Everything is git-tracked JSONL -- you can read, diff, and audit it.
+
+**"I need to work on multiple features without them stepping on each other."**
+`ca worktree create <epic>` gives each feature an isolated git worktree with its own branch, lessons, and merge-blocking quality gates.
+
+**"I want structured phases, not just 'go build this'."**
+Five workflow phases (brainstorm, plan, work, review, compound) with mandatory gates between them. Each phase searches memory and docs for relevant context before starting.
+
+**"My agent doesn't read the project docs before making decisions."**
+`ca knowledge "auth flow"` runs hybrid search (vector + keyword) over your indexed docs. Agents query it automatically during planning -- ADRs, specs, and standards surface before code gets written.
 
 ## Installation
 
@@ -179,6 +194,13 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca loop --max-retries <n>` | Max retries per epic on failure (default: 1) |
 | `ca loop --force` | Overwrite existing script |
 
+### Knowledge
+
+| Command | Description |
+|---------|-------------|
+| `ca knowledge "<query>"` | Hybrid search over indexed project docs |
+| `ca index-docs` | Index docs/ directory into knowledge base |
+
 ### Setup
 
 | Command | Description |
@@ -219,7 +241,7 @@ confirmation_boost: confirmed=1.3, unconfirmed=1.0
 ## FAQ
 
 **Q: How is this different from mem0?**
-A: mem0 is a cloud memory layer for general AI agents. Compound Agent is local-first, designed specifically for Claude Code, with git-tracked storage and local embeddings -- no API keys or cloud services needed.
+A: mem0 is a cloud memory layer for general AI agents. Compound Agent is local-first with git-tracked storage and local embeddings -- no API keys or cloud services needed. It also goes beyond memory with structured workflows, multi-agent review, and issue tracking.
 
 **Q: Does this work offline?**
 A: Yes, completely. Embeddings run locally via node-llama-cpp. No network requests after the initial model download.
@@ -228,7 +250,7 @@ A: Yes, completely. Embeddings run locally via node-llama-cpp. No network reques
 A: ~278MB for the embedding model (one-time download, shared across projects) plus negligible space for lessons.
 
 **Q: Can I use it with other AI coding tools?**
-A: The CLI (`ca`) works standalone, but hooks and slash commands are Claude Code specific. The TypeScript API can be integrated into other tools.
+A: The CLI (`ca`) works standalone with any tool. Full hook integration is available for Claude Code and Gemini CLI. The TypeScript API can be integrated into other tools.
 
 **Q: What happens if the embedding model isn't available?**
 A: Compound Agent hard-fails rather than silently degrading. Run `npx ca doctor` to diagnose issues.
@@ -284,6 +306,10 @@ Compound Agent builds on ideas and patterns from these projects:
 | [OpenClaw](https://github.com/openclaw/openclaw) | Claude Code integration patterns and hook-based workflow architecture |
 
 Also informed by research into [Reflexion](https://arxiv.org/abs/2303.11366) (verbal reinforcement learning), [Voyager](https://github.com/MineDojo/Voyager) (executable skill libraries), and production systems from mem0, Letta, and GitHub Copilot Memory.
+
+## Contributing
+
+Bug reports and feature requests are welcome via [Issues](https://github.com/Nathandela/compound-agent/issues). Pull requests are not accepted at this time -- see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## License
 

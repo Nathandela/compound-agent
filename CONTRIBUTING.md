@@ -1,6 +1,12 @@
 # Contributing to Compound Agent
 
-Thank you for your interest in contributing to Compound Agent! This document outlines the development workflow and standards for the project.
+Thank you for your interest in Compound Agent!
+
+**This project is open-source for transparency and learning, but we are not accepting pull requests at this time.** If you find a bug or have a feature idea, please open an [issue](https://github.com/Nathandela/compound-agent/issues) -- we read every one.
+
+The rest of this document is for maintainers and documents internal development standards.
+
+---
 
 ## Development Setup
 
