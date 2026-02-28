@@ -887,6 +887,63 @@ exit 0
       });
     });
 
+    describe('post-commit hook installation', () => {
+      it('installs post-commit hook in .git/hooks', async () => {
+        const gitHooksDir = join(tempDir, '.git', 'hooks');
+        await mkdir(gitHooksDir, { recursive: true });
+
+        runCli('init', tempDir);
+
+        const hookPath = join(gitHooksDir, 'post-commit');
+        expect(existsSync(hookPath)).toBe(true);
+      });
+
+      it('post-commit hook calls index-docs', async () => {
+        const gitHooksDir = join(tempDir, '.git', 'hooks');
+        await mkdir(gitHooksDir, { recursive: true });
+
+        runCli('init', tempDir);
+
+        const hookPath = join(gitHooksDir, 'post-commit');
+        const content = await readFile(hookPath, 'utf-8');
+        expect(content).toContain('index-docs');
+      });
+
+      it('--skip-hooks skips post-commit hook too', async () => {
+        const gitHooksDir = join(tempDir, '.git', 'hooks');
+        await mkdir(gitHooksDir, { recursive: true });
+
+        runCli('init --skip-hooks', tempDir);
+
+        const hookPath = join(gitHooksDir, 'post-commit');
+        expect(existsSync(hookPath)).toBe(false);
+      });
+    });
+
+    describe('model download', () => {
+      it('accepts --skip-model flag without error', () => {
+        const { combined } = runCli('init --skip-model', tempDir);
+        expect(combined).toMatch(/initialized|created|success/i);
+      });
+
+      it('output includes embedding model status', () => {
+        const { combined } = runCli('init', tempDir);
+        expect(combined.toLowerCase()).toContain('embedding model');
+      });
+
+      it('JSON output includes model field', () => {
+        const { stdout } = runCli('init --json', tempDir);
+        const result = JSON.parse(stdout) as Record<string, unknown>;
+        expect(result).toHaveProperty('model');
+      });
+
+      it('--skip-model suppresses model download', () => {
+        const { stdout } = runCli('init --skip-model --json', tempDir);
+        const result = JSON.parse(stdout) as { model: unknown };
+        expect(result.model).toBe('skipped');
+      });
+    });
+
     describe('safety: no global side effects', () => {
       it('init NEVER modifies global Claude settings', async () => {
         const mockHome = join(tempDir, 'mock-home');

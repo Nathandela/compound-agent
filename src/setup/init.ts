@@ -15,7 +15,7 @@ import { runFullBeadsCheck, type BeadsFullCheck } from './beads-check.js';
 import { printBeadsFullStatus, printGitignoreStatus, printScopeStatus } from './display-utils.js';
 import { installClaudeHooksForInit } from './claude-helpers.js';
 import { ensureGitignore, type GitignoreResult } from './gitignore.js';
-import { installPreCommitHook, type HookInstallResult } from './hooks.js';
+import { installPreCommitHook, installPostCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
   ensureClaudeMdReference,
@@ -57,7 +57,7 @@ async function createIndexFile(repoRoot: string): Promise<void> {
 
 async function initAction(
   cmd: Command,
-  options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; json?: boolean; update?: boolean }
+  options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; skipModel?: boolean; json?: boolean; update?: boolean }
 ): Promise<void> {
   const repoRoot = getRepoRoot();
   const { quiet } = getGlobalOpts(cmd);
@@ -108,8 +108,10 @@ async function initAction(
   }
 
   let hookResult: HookInstallResult | null = null;
+  let postCommitResult: HookInstallResult | null = null;
   if (!options.skipHooks) {
     hookResult = await installPreCommitHook(repoRoot);
+    postCommitResult = await installPostCommitHook(repoRoot);
   }
 
   let claudeHooksResult: ClaudeHooksResult = { installed: false, action: 'error', error: 'skipped' };
@@ -120,10 +122,32 @@ async function initAction(
   // Ensure .gitignore has required patterns
   const gitignoreResult = await ensureGitignore(repoRoot);
 
+  // Download embedding model (unless --skip-model)
+  let modelStatus: 'downloaded' | 'exists' | 'failed' | 'skipped' = 'skipped';
+  if (!options.skipModel) {
+    try {
+      const { isModelAvailable, resolveModel } = await import('../memory/embeddings/index.js');
+      if (isModelAvailable()) {
+        modelStatus = 'exists';
+        if (!quiet && !options.json) console.log('  Embedding model: already exists');
+      } else {
+        if (!quiet && !options.json) out.info('Downloading embedding model...');
+        await resolveModel({ cli: !options.json });
+        modelStatus = 'downloaded';
+        if (!quiet && !options.json) out.info('Embedding model downloaded.');
+      }
+    } catch (err) {
+      modelStatus = 'failed';
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[compound-agent] Embedding model download failed: ' + msg);
+      console.error('[compound-agent] Run `npx ca download-model` manually.');
+    }
+  }
+
   const fullBeads = runFullBeadsCheck(repoRoot);
 
   if (options.json) {
-    printInitJson({ lessonsDir, agentsMdUpdated, hookResult, claudeHooksResult, pnpmConfig, fullBeads, scopeResult, upgradeResult, gitignoreResult });
+    printInitJson({ lessonsDir, agentsMdUpdated, hookResult, claudeHooksResult, pnpmConfig, fullBeads, scopeResult, upgradeResult, gitignoreResult, modelStatus });
     return;
   }
 
@@ -134,6 +158,7 @@ async function initAction(
   printAgentsMdStatus(agentsMdUpdated, options.skipAgents);
   printHookStatus(hookResult, options.skipHooks);
   printClaudeHooksStatus(claudeHooksResult, options.skipClaude);
+  printModelStatus(modelStatus, options.skipModel);
   printPnpmConfigStatus(pnpmConfig);
   printGitignoreStatus(gitignoreResult);
   printBeadsFullStatus(fullBeads);
@@ -145,6 +170,7 @@ function printInitJson(ctx: {
   claudeHooksResult: ClaudeHooksResult; pnpmConfig: PnpmConfigResult;
   fullBeads: BeadsFullCheck; scopeResult: { isUserScope: boolean };
   upgradeResult: UpgradeResult | null; gitignoreResult: GitignoreResult;
+  modelStatus: string;
 }): void {
   const claudeHooksInstalled = ctx.claudeHooksResult.action === 'installed';
   const hooksChanged = ctx.hookResult?.status === 'installed' || ctx.hookResult?.status === 'appended';
@@ -152,6 +178,7 @@ function printInitJson(ctx: {
     initialized: true, lessonsDir: ctx.lessonsDir, agentsMd: ctx.agentsMdUpdated,
     hooks: hooksChanged, hookStatus: ctx.hookResult?.status ?? 'skipped',
     claudeHooks: claudeHooksInstalled,
+    model: ctx.modelStatus,
     pnpmConfig: ctx.pnpmConfig.isPnpm ? { added: ctx.pnpmConfig.added, alreadyConfigured: ctx.pnpmConfig.alreadyConfigured } : null,
     beadsAvailable: ctx.fullBeads.cliAvailable, beadsInitialized: ctx.fullBeads.initialized, beadsHealthy: ctx.fullBeads.healthy,
     userScope: ctx.scopeResult.isUserScope,
@@ -196,6 +223,18 @@ function printClaudeHooksStatus(result: ClaudeHooksResult, skipped?: boolean): v
   }
 }
 
+function printModelStatus(status: string, skipped?: boolean): void {
+  if (skipped) {
+    console.log('  Embedding model: Skipped (--skip-model)');
+  } else if (status === 'exists') {
+    // Already printed inline during download check
+  } else if (status === 'downloaded') {
+    // Already printed inline during download
+  } else if (status === 'failed') {
+    // Already printed inline via console.error
+  }
+}
+
 function printPnpmConfigStatus(result: PnpmConfigResult): void {
   if (!result.isPnpm) return;
   if (result.alreadyConfigured) {
@@ -219,9 +258,10 @@ export function registerInitCommand(program: Command): void {
     .option('--skip-agents', 'Skip AGENTS.md modification')
     .option('--skip-hooks', 'Skip git hooks installation')
     .option('--skip-claude', 'Skip Claude Code hooks installation')
+    .option('--skip-model', 'Skip embedding model download')
     .option('--json', 'Output result as JSON')
     .option('--update', 'Run upgrade logic on existing install')
-    .action(async function (this: Command, options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; json?: boolean; update?: boolean }) {
+    .action(async function (this: Command, options: { skipAgents?: boolean; skipHooks?: boolean; skipClaude?: boolean; skipModel?: boolean; json?: boolean; update?: boolean }) {
       await initAction(this, options);
     });
 }
