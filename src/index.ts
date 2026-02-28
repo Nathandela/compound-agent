@@ -171,6 +171,15 @@ export type { IndexOptions, IndexResult } from './memory/knowledge/indexing.js';
 export { searchKnowledge, searchKnowledgeVector } from './memory/knowledge/search.js';
 export type { KnowledgeSearchOptions } from './memory/knowledge/search.js';
 
+export { embedChunks, getUnembeddedChunkCount } from './memory/knowledge/embed-chunks.js';
+export type { EmbedChunksOptions, EmbedChunksResult } from './memory/knowledge/embed-chunks.js';
+export { acquireEmbedLock, isEmbedLocked } from './memory/knowledge/embed-lock.js';
+export type { LockResult } from './memory/knowledge/embed-lock.js';
+export { writeEmbedStatus, readEmbedStatus } from './memory/knowledge/embed-status.js';
+export type { EmbedStatus } from './memory/knowledge/embed-status.js';
+export { spawnBackgroundEmbed, runBackgroundEmbed } from './memory/knowledge/embed-background.js';
+export type { SpawnEmbedResult } from './memory/knowledge/embed-background.js';
+
 // Context recovery API
 export { getPrimeContext } from './commands/index.js';
 
