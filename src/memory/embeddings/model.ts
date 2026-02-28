@@ -61,6 +61,12 @@ export type UsabilityResult =
  * 4. Attempts to create embedding context
  * 5. Cleans up all resources after check
  *
+ * WARNING: This function allocates ~150MB of native C++ memory for the probe.
+ * NEVER call at module top-level in test files. When dispose() SIGABRTs in
+ * vitest workers, that memory is permanently leaked. For test skip-gating,
+ * use isModelAvailable() instead (zero native allocation). Reserve this
+ * function for production code paths where runtime verification is needed.
+ *
  * @returns UsabilityResult with usable status and actionable error if failed
  */
 export async function isModelUsable(): Promise<UsabilityResult> {

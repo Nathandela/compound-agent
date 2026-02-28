@@ -5,16 +5,14 @@
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { isModelUsable } from '../memory/embeddings/model.js';
 import { isModelAvailable } from '../memory/embeddings/nomic.js';
 import { appendLesson } from '../memory/storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
 import { cleanupCliTestDir, createQuickLesson, runCli, setupCliTestDir, shouldSkipEmbeddingTests } from '../test-utils.js';
 
-// Check if embedding runtime is usable for success-path assertions
+// SAFETY: Never call isModelUsable() at module top-level — causes ~150MB native memory leak.
 const modelAvailable = isModelAvailable();
-const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
-const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
+const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
 
 describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;

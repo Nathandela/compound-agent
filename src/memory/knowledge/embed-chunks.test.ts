@@ -12,7 +12,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { isModelUsable } from '../embeddings/model.js';
 import { isModelAvailable, unloadEmbedding } from '../embeddings/nomic.js';
 import { getCachedChunkEmbedding } from '../storage/sqlite-knowledge/cache.js';
 import { closeKnowledgeDb, openKnowledgeDb } from '../storage/sqlite-knowledge/connection.js';
@@ -25,11 +24,13 @@ import { embedChunks, getUnembeddedChunkCount } from './embed-chunks.js';
 
 // ---------------------------------------------------------------------------
 // Skip logic for embedding tests
+// SAFETY: Never call isModelUsable() at module top-level — it loads ~150MB
+// of native memory that leaks when vitest workers SIGABRT during disposal.
+// Use isModelAvailable() (fs check only, zero native allocation) for skip guards.
 // ---------------------------------------------------------------------------
 
 const modelAvailable = isModelAvailable();
-const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
-const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
+const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -11,14 +11,13 @@ import { describe, expect, it } from 'vitest';
 
 import { CCT_PATTERNS_PATH } from '../compound/types.js';
 import { isModelAvailable } from '../memory/embeddings/model.js';
-import { isModelUsable } from '../memory/embeddings/index.js';
 import { appendLesson } from '../memory/storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
 import { createQuickLesson, setupCliTestContext, shouldSkipEmbeddingTests } from '../test-utils.js';
 
+// SAFETY: Never call isModelUsable() at module top-level — causes ~150MB native memory leak.
 const modelAvailable = isModelAvailable();
-const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
-const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
+const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
 
 describe('compound command', { timeout: 30_000, tags: ['integration'] }, () => {
   const { getTempDir, runCli } = setupCliTestContext();
@@ -36,7 +35,7 @@ describe('compound command', { timeout: 30_000, tags: ['integration'] }, () => {
   it('exits with error when embedding model is unavailable', () => {
     // When model is unavailable and there are lessons, should show actionable error
     // This test works regardless of model availability since it checks the error path
-    if (modelUsability.usable) {
+    if (modelAvailable) {
       // Model is available — can't test the error path without mocking
       // Just verify the command doesn't crash
       return;

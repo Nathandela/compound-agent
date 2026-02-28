@@ -8,16 +8,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { isModelUsable } from '../memory/embeddings/model.js';
 import { isModelAvailable } from '../memory/embeddings/nomic.js';
 import { appendLesson, LESSONS_PATH } from '../memory/storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
 import { createFullLesson, createQuickLesson, daysAgo, setupCliTestContext, shouldSkipEmbeddingTests } from '../test-utils.js';
 
-// Check if embedding tests should be skipped (env var, model unavailable, or runtime unusable)
+// SAFETY: Never call isModelUsable() at module top-level — causes ~150MB native memory leak.
 const modelAvailable = isModelAvailable();
-const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
-const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
+const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
 const hybridEnabled = !skipEmbedding;
 
 describe('Retrieval Commands', { tags: ['integration'] }, () => {

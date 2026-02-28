@@ -303,10 +303,13 @@ export function daysAgo(days: number): string {
  *
  * @example
  * ```ts
+ * // PREFERRED: use isModelAvailable() only (zero native memory allocation)
  * const modelAvailable = isModelAvailable();
- * it.skipIf(shouldSkipEmbeddingTests(modelAvailable))('test...', async () => {
- *   // This test requires embedding model
- * });
+ * const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
+ * it.skipIf(skipEmbedding)('test...', async () => { ... });
+ *
+ * // NEVER call isModelUsable() at module top-level — it loads ~150MB
+ * // of native memory that leaks when vitest workers SIGABRT during disposal.
  * ```
  */
 export function shouldSkipEmbeddingTests(

@@ -11,7 +11,6 @@ import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
 import { isModelAvailable, unloadEmbedding } from '../embeddings/nomic.js';
-import { isModelUsable } from '../embeddings/model.js';
 import { openKnowledgeDb, closeKnowledgeDb } from '../storage/sqlite-knowledge/connection.js';
 import { getIndexedFilePaths, getLastIndexTime } from '../storage/sqlite-knowledge/sync.js';
 import { shouldSkipEmbeddingTests } from '../../test-utils.js';
@@ -19,9 +18,9 @@ import { getUnembeddedChunkCount } from './embed-chunks.js';
 import { indexDocs } from './indexing.js';
 import type { IndexResult } from './indexing.js';
 
+// SAFETY: Never call isModelUsable() at module top-level — causes ~150MB native memory leak.
 const modelAvailable = isModelAvailable();
-const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
-const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
+const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
 
 // ---------------------------------------------------------------------------
 // Test setup: temp dir with docs/ subdirectory
