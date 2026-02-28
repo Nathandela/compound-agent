@@ -10,10 +10,18 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 
+import { isModelAvailable, unloadEmbedding } from '../embeddings/nomic.js';
+import { isModelUsable } from '../embeddings/model.js';
 import { openKnowledgeDb, closeKnowledgeDb } from '../storage/sqlite-knowledge/connection.js';
 import { getIndexedFilePaths, getLastIndexTime } from '../storage/sqlite-knowledge/sync.js';
+import { shouldSkipEmbeddingTests } from '../../test-utils.js';
+import { getUnembeddedChunkCount } from './embed-chunks.js';
 import { indexDocs } from './indexing.js';
 import type { IndexResult } from './indexing.js';
+
+const modelAvailable = isModelAvailable();
+const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
+const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
 
 // ---------------------------------------------------------------------------
 // Test setup: temp dir with docs/ subdirectory
@@ -243,6 +251,41 @@ describe('IndexResult shape', () => {
     expect(typeof result.filesSkipped).toBe('number');
     expect(typeof result.chunksCreated).toBe('number');
     expect(typeof result.chunksDeleted).toBe('number');
+    expect(typeof result.chunksEmbedded).toBe('number');
     expect(typeof result.durationMs).toBe('number');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Embed option
+// ---------------------------------------------------------------------------
+
+describe('indexDocs - embed option', () => {
+  afterEach(() => {
+    if (modelAvailable) {
+      unloadEmbedding();
+    }
+  });
+
+  it('returns chunksEmbedded: 0 when embed option is absent', async () => {
+    await createDocFile('docs/readme.md', '# Hello\n\nSome content.');
+    const result = await indexDocs(repoRoot);
+    expect(result.chunksEmbedded).toBe(0);
+  });
+
+  it('returns chunksEmbedded: 0 when embed option is false', async () => {
+    await createDocFile('docs/readme.md', '# Hello\n\nSome content.');
+    const result = await indexDocs(repoRoot, { embed: false });
+    expect(result.chunksEmbedded).toBe(0);
+  });
+
+  it.skipIf(skipEmbedding)('embeds chunks when embed: true and model available', async () => {
+    await createDocFile('docs/guide.md', '# Guide\n\nA helpful guide with enough content to chunk.');
+    await createDocFile('docs/api.md', '# API\n\nEndpoint documentation.');
+
+    const result = await indexDocs(repoRoot, { embed: true });
+
+    expect(result.chunksEmbedded).toBeGreaterThan(0);
+    expect(getUnembeddedChunkCount(repoRoot)).toBe(0);
   });
 });

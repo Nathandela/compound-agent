@@ -29,6 +29,8 @@ export interface IndexOptions {
   force?: boolean;
   /** Directory to index (default: 'docs') */
   docsDir?: string;
+  /** Embed chunks after indexing (default: false) */
+  embed?: boolean;
 }
 
 export interface IndexResult {
@@ -37,6 +39,7 @@ export interface IndexResult {
   filesErrored: number;
   chunksCreated: number;
   chunksDeleted: number;
+  chunksEmbedded: number;
   durationMs: number;
 }
 
@@ -100,6 +103,24 @@ async function walkSupportedFiles(baseDir: string, repoRoot: string): Promise<st
 }
 
 /**
+ * Embed indexed chunks if model is available.
+ * Uses dynamic imports to avoid loading llama-cpp when not needed.
+ *
+ * @returns Number of chunks embedded (0 if model unavailable)
+ */
+async function tryEmbedChunks(repoRoot: string): Promise<number> {
+  const { isModelUsable } = await import('../embeddings/model.js');
+  const usability = await isModelUsable();
+  if (usability.usable) {
+    const { embedChunks } = await import('./embed-chunks.js');
+    const embedResult = await embedChunks(repoRoot);
+    return embedResult.chunksEmbedded;
+  }
+  console.warn(`Warning: Embedding skipped — ${usability.reason}. ${usability.action}`);
+  return 0;
+}
+
+/**
  * Index documentation files into the knowledge database.
  *
  * @param repoRoot - Absolute path to repository root
@@ -120,6 +141,7 @@ export async function indexDocs(
     filesErrored: 0,
     chunksCreated: 0,
     chunksDeleted: 0,
+    chunksEmbedded: 0,
     durationMs: 0,
   };
 
@@ -196,6 +218,11 @@ export async function indexDocs(
 
   // Update last index time
   setLastIndexTime(repoRoot, new Date().toISOString());
+
+  // Embed chunks if requested
+  if (options.embed) {
+    stats.chunksEmbedded = await tryEmbedChunks(repoRoot);
+  }
 
   stats.durationMs = Date.now() - start;
   return stats;
