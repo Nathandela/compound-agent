@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Eager knowledge embedding**: Knowledge chunks from `docs/` are now embedded for semantic search when the model is available
+  - `ca index-docs --embed` embeds chunks after indexing
+  - `ca init` now downloads the embedding model (with `--skip-model` opt-out) and installs the post-commit hook
+  - Background embedding spawns after `ca init`/`ca setup` so users can start working immediately
+  - PID-based lock file prevents concurrent embedding processes
+  - Status file (`embed-status.json`) tracks background embedding progress
+- **New modules**: `embed-chunks.ts`, `embed-lock.ts`, `embed-status.ts`, `embed-background.ts` with full test coverage
+
 ### Removed
 
 - **`ca worktree` command family**: All five subcommands (`create`, `merge`, `list`, `cleanup`, `wire-deps`) removed. Claude Code now provides native `EnterWorktree` support. Running `ca worktree` prints a deprecation notice.
