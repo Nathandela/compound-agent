@@ -1,0 +1,114 @@
+/**
+ * PID-based lock file for embedding processes.
+ *
+ * Prevents concurrent embedding when background embed (ca init/setup)
+ * and post-commit hook run simultaneously.
+ *
+ * Lock file: {repoRoot}/.claude/.cache/embed.lock
+ * Content: { pid: number, startedAt: string } (ISO timestamp)
+ */
+
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
+import { join } from 'node:path';
+
+interface LockAcquired {
+  acquired: true;
+  release: () => void;
+}
+
+interface LockBusy {
+  acquired: false;
+  holder: number;
+}
+
+export type LockResult = LockAcquired | LockBusy;
+
+interface LockContent {
+  pid: number;
+  startedAt: string;
+}
+
+function lockPath(repoRoot: string): string {
+  return join(repoRoot, '.claude', '.cache', 'embed.lock');
+}
+
+function lockDir(repoRoot: string): string {
+  return join(repoRoot, '.claude', '.cache');
+}
+
+/** Check if a process is alive via kill(pid, 0). */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Read and parse lock file. Returns null on any error. */
+function readLock(filePath: string): LockContent | null {
+  try {
+    const raw = readFileSync(filePath, 'utf-8');
+    return JSON.parse(raw) as LockContent;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Acquire the embed lock for this process.
+ *
+ * Uses writeFileSync with 'wx' flag for atomic exclusive creation.
+ * On EEXIST: reads holder PID and checks staleness via process.kill(pid, 0).
+ * If stale (holder dead): overwrites lock. If alive: returns acquired: false.
+ */
+export function acquireEmbedLock(repoRoot: string): LockResult {
+  const dir = lockDir(repoRoot);
+  const file = lockPath(repoRoot);
+  const content: LockContent = { pid: process.pid, startedAt: new Date().toISOString() };
+
+  mkdirSync(dir, { recursive: true });
+
+  try {
+    writeFileSync(file, JSON.stringify(content), { flag: 'wx' });
+    return { acquired: true, release: () => releaseLock(file) };
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+
+    // Lock file exists -- check if holder is alive
+    const existing = readLock(file);
+    if (existing && isProcessAlive(existing.pid)) {
+      return { acquired: false, holder: existing.pid };
+    }
+
+    // Stale lock -- overwrite
+    writeFileSync(file, JSON.stringify(content));
+    return { acquired: true, release: () => releaseLock(file) };
+  }
+}
+
+/** Check if an embed lock is currently held by a live process. */
+export function isEmbedLocked(repoRoot: string): boolean {
+  const file = lockPath(repoRoot);
+  if (!existsSync(file)) return false;
+
+  const content = readLock(file);
+  if (!content) return false;
+
+  return isProcessAlive(content.pid);
+}
+
+function releaseLock(file: string): void {
+  try {
+    unlinkSync(file);
+  } catch {
+    // Silently ignore -- lock may already be removed
+  }
+}
