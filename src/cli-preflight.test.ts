@@ -70,10 +70,6 @@ describe('commandNeedsSqlite', () => {
     expect(commandNeedsSqlite(makeCommand('reviewer'))).toBe(false);
   });
 
-  it('returns false for "worktree" command', () => {
-    expect(commandNeedsSqlite(makeCommand('worktree'))).toBe(false);
-  });
-
   it('returns false for "rules" command', () => {
     expect(commandNeedsSqlite(makeCommand('rules'))).toBe(false);
   });
@@ -112,10 +108,6 @@ describe('commandNeedsSqlite', () => {
 
   it('returns false for "enable" subcommand under "reviewer"', () => {
     expect(commandNeedsSqlite(makeCommand('enable', 'reviewer'))).toBe(false);
-  });
-
-  it('returns false for "create" subcommand under "worktree"', () => {
-    expect(commandNeedsSqlite(makeCommand('create', 'worktree'))).toBe(false);
   });
 
   it('returns true for a subcommand when parent is in NEEDS_SQLITE', () => {

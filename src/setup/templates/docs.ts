@@ -134,7 +134,6 @@ Decompose work into small, testable tasks with dependencies.
 - Review brainstorm output
 - Create beads tasks: \`bd create --title="..." --type=task\`
 - Create Review and Compound blocking tasks (these survive compaction)
-- Run \`npx ca worktree wire-deps <epic-id>\` if using worktrees
 
 ## Phase 3: Work
 
@@ -276,7 +275,7 @@ npx ca search "security" --limit 5
 npx ca list                                  # List all memory items
 npx ca list --limit 20
 npx ca list --invalidated                    # Show only invalidated items
-npx ca check-plan --plan "Implement git worktree integration"
+npx ca check-plan --plan "Implement caching layer for API responses"
 echo "Add caching layer" | npx ca check-plan # Semantic search against a plan
 npx ca load-session                          # Load high-severity lessons
 npx ca load-session --json
@@ -360,17 +359,6 @@ npx ca phase-check gate <gate-name>   # post-plan, gate-3, gate-4, final
 npx ca phase-check clean
 \`\`\`
 
-## Worktree commands
-
-\`\`\`bash
-npx ca worktree create <epic-id>              # Create isolated worktree
-npx ca worktree wire-deps <epic-id>           # Connect merge dependencies
-npx ca worktree merge <epic-id>               # Merge worktree back to main
-npx ca worktree list                          # List active worktrees
-npx ca worktree cleanup <epic-id>             # Remove worktree and clean up
-npx ca worktree cleanup <epic-id> --force     # Force cleanup of dirty worktrees
-\`\`\`
-
 ## Compound command
 
 \`\`\`bash
@@ -406,7 +394,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: After brainstorm, before any implementation.
 
-**What it does**: Reviews brainstorm output, spawns analysts, decomposes into tasks with acceptance criteria, creates beads issues, and creates Review + Compound blocking tasks. Runs \`npx ca worktree wire-deps\` if a worktree is active.
+**What it does**: Reviews brainstorm output, spawns analysts, decomposes into tasks with acceptance criteria, creates beads issues, and creates Review + Compound blocking tasks.
 
 ### \`/compound:work\`
 
@@ -440,14 +428,6 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **What it does**: Sequences all 5 phases with mandatory gates between them, tracks progress in beads notes, handles resumption after interruption. See [WORKFLOW.md](WORKFLOW.md) for full details.
 
-### \`/compound:set-worktree\`
-
-**Purpose**: Set up an isolated git worktree before running LFG.
-
-**When invoked**: Before \`/compound:lfg\` when you want parallel epic execution.
-
-**What it does**: Validates the epic, runs \`npx ca worktree create <epic-id>\`, verifies output, and informs the user they can proceed with \`/compound:lfg\`.
-
 ### \`/compound:get-a-phd\`
 
 **Purpose**: Conduct deep, PhD-level research to build knowledge for working subagents.
@@ -469,7 +449,6 @@ Skills are invoked as Claude Code slash commands:
 /compound:review           # Start review phase
 /compound:compound         # Start compound phase
 /compound:lfg <epic-id>    # Run all phases end-to-end
-/compound:set-worktree <epic-id>  # Set up worktree before LFG
 /compound:get-a-phd <focus>       # Deep research for agent knowledge
 \`\`\`
 
@@ -484,7 +463,7 @@ summary: "Memory system, hooks, beads integration, and agent guidance"
 
 # Integration
 
-Deep integration topics for compound-agent: memory system internals, Claude Code hooks, beads workflow, worktree integration, and agent guidance.
+Deep integration topics for compound-agent: memory system internals, Claude Code hooks, beads workflow, and agent guidance.
 
 ---
 
@@ -589,22 +568,7 @@ Before closing an epic, verify all gates pass:
 npx ca verify-gates <epic-id>
 \`\`\`
 
-This checks that a Review task, Compound task, and (if applicable) Merge task all exist and are closed.
-
----
-
-## Worktree integration
-
-Worktrees let you run epics in isolation, enabling parallel execution across multiple Claude Code sessions.
-
-\`\`\`bash
-npx ca worktree create <epic-id>   # Creates worktree + installs deps + copies lessons
-npx ca worktree merge <epic-id>    # Two-phase merge back to main
-npx ca worktree cleanup <epic-id>  # Remove worktree, delete branch, close Merge task
-npx ca worktree list               # Show active worktrees
-\`\`\`
-
-See [CLI_REFERENCE.md](CLI_REFERENCE.md) for full worktree command details.
+This checks that a Review task and Compound task both exist and are closed.
 
 ---
 

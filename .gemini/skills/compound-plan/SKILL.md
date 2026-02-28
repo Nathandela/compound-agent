@@ -28,7 +28,6 @@ Create a concrete implementation plan by decomposing work into small, testable t
 9. Map dependencies between tasks
 10. Create beads issues: `bd create --title="..." --type=task`
 11. Create review and compound blocking tasks (`bd create` + `bd dep add`) that depend on work tasks — these survive compaction and surface via `bd ready` after work completes
-12. Run `npx ca worktree wire-deps <epic-id>` to connect merge dependencies (graceful no-op if no worktree is active)
 
 ## Memory Integration
 - Run `npx ca search` and `npx ca knowledge "relevant topic"` for patterns related to the feature area
@@ -62,5 +61,4 @@ Create a concrete implementation plan by decomposing work into small, testable t
 After creating all tasks, verify review and compound tasks exist:
 - Run `bd list --status=open` and check for a "Review:" task and a "Compound:" task
 - If either is missing, CREATE THEM NOW. The plan is NOT complete without these gates.
-- If a Merge: task exists in the dependency graph, verify it has Review and Compound as blockers (run `bd show <merge-id>` to confirm)
 

@@ -76,18 +76,6 @@ $ARGUMENTS
 **MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/lfg/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full orchestration workflow you must follow.
 `,
 
-  'set-worktree.md': `---
-name: compound:set-worktree
-description: Set up a git worktree for isolated epic execution
-argument-hint: "<epic-id>"
----
-$ARGUMENTS
-
-# Set Worktree
-
-**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/set-worktree/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
-`,
-
   'research.md': `---
 name: compound:research
 description: Deep research on a topic producing a structured survey document

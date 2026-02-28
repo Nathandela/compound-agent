@@ -29,7 +29,7 @@ import { registerVerifyGatesCommand } from './verify-gates.js';
 import { registerAboutCommand } from './about.js';
 import { registerKnowledgeCommand } from './knowledge.js';
 import { registerKnowledgeIndexCommand } from './knowledge-index.js';
-import { registerWorktreeCommands } from './worktree.js';
+
 
 export { registerCaptureCommands } from './capture.js';
 export { registerLoopCommands } from './loop.js';
@@ -82,5 +82,5 @@ export function registerManagementCommands(program: Command): void {
   registerAboutCommand(program);
   registerKnowledgeCommand(program);
   registerKnowledgeIndexCommand(program);
-  registerWorktreeCommands(program);
+
 }

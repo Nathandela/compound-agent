@@ -39,7 +39,7 @@ block-beta
         D["Vector search"] E["Hybrid retrieval"] F["Cross-cutting patterns"]
     end
     block:L1["Foundation"]
-        G["Issue tracking"] H["Git-backed sync"] I["Worktree isolation"]
+        G["Issue tracking"] H["Git-backed sync"] I["Quality gates"]
     end
 
     L3 --> L2
@@ -62,9 +62,6 @@ Preferences survive across sessions and projects. Once captured, they appear at 
 
 **"I have no idea what my agent actually learned or if it's reliable."**
 `ca list` shows all captured knowledge. `ca stats` shows health. `ca wrong <id>` invalidates bad lessons. Everything is git-tracked JSONL -- you can read, diff, and audit it.
-
-**"I need to work on multiple features without them stepping on each other."**
-`ca worktree create <epic>` gives each feature an isolated git worktree with its own branch, lessons, and merge-blocking quality gates.
 
 **"I want structured phases, not just 'go build this'."**
 Five workflow phases (brainstorm, plan, work, review, compound) with mandatory gates between them. Each phase searches memory and docs for relevant context before starting.
@@ -173,16 +170,6 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca audit` | Run audit checks against the codebase |
 | `ca rules check` | Run repository-defined rule checks |
 | `ca test-summary` | Run tests and output a compact summary |
-
-### Worktree
-
-| Command | Description |
-|---------|-------------|
-| `ca worktree create <epic-id>` | Create isolated worktree for an epic |
-| `ca worktree wire-deps <epic-id>` | Wire Review/Compound as merge blockers |
-| `ca worktree merge <epic-id>` | Two-phase merge back to main |
-| `ca worktree list` | List active worktrees with status |
-| `ca worktree cleanup <epic-id>` | Remove worktree and clean up (--force for dirty) |
 
 ### Automation
 

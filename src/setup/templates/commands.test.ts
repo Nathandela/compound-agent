@@ -8,7 +8,6 @@ const PHASE_FILENAMES = [
   'review.md',
   'compound.md',
   'lfg.md',
-  'set-worktree.md',
   'research.md',
   'test-clean.md',
   'get-a-phd.md',
@@ -29,8 +28,8 @@ const REMOVED_CLI_WRAPPERS = [
 ];
 
 describe('WORKFLOW_COMMANDS', () => {
-  it('has exactly 12 entries (10 phase + 2 utility)', () => {
-    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(12);
+  it('has exactly 11 entries (9 phase + 2 utility)', () => {
+    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(11);
   });
 
   it('has all expected filenames', () => {

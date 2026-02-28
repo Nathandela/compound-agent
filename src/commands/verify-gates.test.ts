@@ -273,68 +273,6 @@ describe('verify-gates', () => {
     expect(checks.every(c => c.status === 'pass')).toBe(true);
   });
 
-  // ==========================================================================
-  // Conditional Merge gate
-  // ==========================================================================
-
-  it('passes merge gate when merge task is closed', async () => {
-    mockExecFileSync.mockReturnValue(bdShowJson({
-      deps: [
-        { closed: true, title: 'Review: check', id: 'r1' },
-        { closed: true, title: 'Compound: capture', id: 'c1' },
-        { closed: true, title: 'Merge: merge epic/test to main', id: 'm1' },
-      ],
-    }));
-    const checks = await runVerifyGates('test1');
-    expect(checks).toHaveLength(3);
-    expect(checks.every(c => c.status === 'pass')).toBe(true);
-    const mergeCheck = checks.find(c => c.name === 'Merge task');
-    expect(mergeCheck).toBeDefined();
-  });
-
-  it('fails merge gate when merge task is open', async () => {
-    mockExecFileSync.mockReturnValue(bdShowJson({
-      deps: [
-        { closed: true, title: 'Review: check', id: 'r1' },
-        { closed: true, title: 'Compound: capture', id: 'c1' },
-        { closed: false, title: 'Merge: merge epic/test to main', id: 'm1' },
-      ],
-    }));
-    const checks = await runVerifyGates('test1');
-    const mergeCheck = checks.find(c => c.name === 'Merge task');
-    expect(mergeCheck).toBeDefined();
-    expect(mergeCheck!.status).toBe('fail');
-    expect(mergeCheck!.detail).toMatch(/not closed/i);
-  });
-
-  it('skips merge gate when no merge task exists', async () => {
-    mockExecFileSync.mockReturnValue(bdShowJson({
-      deps: [
-        { closed: true, title: 'Review: check', id: 'r1' },
-        { closed: true, title: 'Compound: capture', id: 'c1' },
-      ],
-    }));
-    const checks = await runVerifyGates('test1');
-    expect(checks).toHaveLength(2);
-    expect(checks.every(c => c.status === 'pass')).toBe(true);
-  });
-
-  it('fails review and compound but passes merge when only merge is closed', async () => {
-    mockExecFileSync.mockReturnValue(bdShowJson({
-      deps: [
-        { closed: true, title: 'Merge: merge epic/test to main', id: 'm1' },
-      ],
-    }));
-    const checks = await runVerifyGates('test1');
-    expect(checks).toHaveLength(3);
-    const reviewCheck = checks.find(c => c.name === 'Review task');
-    const compoundCheck = checks.find(c => c.name === 'Compound task');
-    const mergeCheck = checks.find(c => c.name === 'Merge task');
-    expect(reviewCheck!.status).toBe('fail');
-    expect(compoundCheck!.status).toBe('fail');
-    expect(mergeCheck!.status).toBe('pass');
-  });
-
   describe('phase-state cleanup', () => {
     async function writePhaseState(repoRoot: string, gatesPassed: string[]): Promise<string> {
       const stateDir = join(repoRoot, '.claude');

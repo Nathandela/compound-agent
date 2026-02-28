@@ -102,11 +102,6 @@ export async function runVerifyGates(
     checkGate(deps, 'Compound:', 'Compound task'),
   ];
 
-  const mergeTask = deps.find(d => d.title.startsWith('Merge:'));
-  if (mergeTask) {
-    checks.push(checkGate(deps, 'Merge:', 'Merge task'));
-  }
-
   const allPassed = checks.every((check) => check.status === 'pass');
   if (allPassed) {
     const state = getPhaseState(repoRoot);
