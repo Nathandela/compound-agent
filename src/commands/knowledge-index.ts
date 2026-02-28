@@ -52,4 +52,13 @@ export function registerKnowledgeIndexCommand(program: Command): void {
         closeKnowledgeDb();
       }
     });
+
+  // Internal worker command for background embedding (spawned by init/setup)
+  program
+    .command('embed-worker <repoRoot>')
+    .description('Internal: background embedding worker')
+    .action(async (repoRoot: string) => {
+      const { runBackgroundEmbed } = await import('../memory/knowledge/embed-background.js');
+      await runBackgroundEmbed(repoRoot);
+    });
 }

@@ -52,6 +52,59 @@ async function createIndexFile(repoRoot: string): Promise<void> {
 }
 
 // ============================================================================
+// Model & Background Embedding Helpers
+// ============================================================================
+
+type ModelStatus = 'downloaded' | 'exists' | 'failed' | 'skipped';
+
+/** Download embedding model and optionally trigger background embedding. */
+async function handleModelAndEmbed(
+  repoRoot: string,
+  opts: { skipModel?: boolean; quiet: boolean; json?: boolean },
+): Promise<ModelStatus> {
+  if (opts.skipModel) return 'skipped';
+
+  let status: ModelStatus = 'skipped';
+  try {
+    const { isModelAvailable, resolveModel } = await import('../memory/embeddings/index.js');
+    if (isModelAvailable()) {
+      status = 'exists';
+      if (!opts.quiet && !opts.json) console.log('  Embedding model: already exists');
+    } else {
+      if (!opts.quiet && !opts.json) out.info('Downloading embedding model...');
+      await resolveModel({ cli: !opts.json });
+      status = 'downloaded';
+      if (!opts.quiet && !opts.json) out.info('Embedding model downloaded.');
+    }
+  } catch (err) {
+    status = 'failed';
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('[compound-agent] Embedding model download failed: ' + msg);
+    console.error('[compound-agent] Run `npx ca download-model` manually.');
+  }
+
+  // Trigger background embedding if docs/ exists and model available
+  if (status !== 'failed') {
+    try {
+      const docsPath = join(repoRoot, 'docs');
+      if (existsSync(docsPath)) {
+        const { indexDocs } = await import('../memory/knowledge/indexing.js');
+        await indexDocs(repoRoot);
+        const { spawnBackgroundEmbed } = await import('../memory/knowledge/embed-background.js');
+        const spawnResult = spawnBackgroundEmbed(repoRoot);
+        if (spawnResult.spawned && !opts.quiet && !opts.json) {
+          out.info('Embedding in progress (background). You can start working.');
+        }
+      }
+    } catch {
+      // Non-fatal: don't break init if background embedding fails to spawn
+    }
+  }
+
+  return status;
+}
+
+// ============================================================================
 // Action Handler
 // ============================================================================
 
@@ -91,13 +144,7 @@ async function initAction(
   let agentsMdUpdated = false;
   if (!options.skipAgents) {
     agentsMdUpdated = await updateAgentsMd(repoRoot);
-  }
-
-  if (!options.skipAgents) {
     await ensureClaudeMdReference(repoRoot);
-  }
-
-  if (!options.skipAgents) {
     await createPluginManifest(repoRoot);
     await installAgentTemplates(repoRoot);
     await installWorkflowCommands(repoRoot);
@@ -108,10 +155,9 @@ async function initAction(
   }
 
   let hookResult: HookInstallResult | null = null;
-  let postCommitResult: HookInstallResult | null = null;
   if (!options.skipHooks) {
     hookResult = await installPreCommitHook(repoRoot);
-    postCommitResult = await installPostCommitHook(repoRoot);
+    await installPostCommitHook(repoRoot);
   }
 
   let claudeHooksResult: ClaudeHooksResult = { installed: false, action: 'error', error: 'skipped' };
@@ -119,31 +165,8 @@ async function initAction(
     claudeHooksResult = await installClaudeHooksForInit(repoRoot);
   }
 
-  // Ensure .gitignore has required patterns
   const gitignoreResult = await ensureGitignore(repoRoot);
-
-  // Download embedding model (unless --skip-model)
-  let modelStatus: 'downloaded' | 'exists' | 'failed' | 'skipped' = 'skipped';
-  if (!options.skipModel) {
-    try {
-      const { isModelAvailable, resolveModel } = await import('../memory/embeddings/index.js');
-      if (isModelAvailable()) {
-        modelStatus = 'exists';
-        if (!quiet && !options.json) console.log('  Embedding model: already exists');
-      } else {
-        if (!quiet && !options.json) out.info('Downloading embedding model...');
-        await resolveModel({ cli: !options.json });
-        modelStatus = 'downloaded';
-        if (!quiet && !options.json) out.info('Embedding model downloaded.');
-      }
-    } catch (err) {
-      modelStatus = 'failed';
-      const msg = err instanceof Error ? err.message : 'Unknown error';
-      console.error('[compound-agent] Embedding model download failed: ' + msg);
-      console.error('[compound-agent] Run `npx ca download-model` manually.');
-    }
-  }
-
+  const modelStatus = await handleModelAndEmbed(repoRoot, { skipModel: options.skipModel, quiet, json: options.json });
   const fullBeads = runFullBeadsCheck(repoRoot);
 
   if (options.json) {
