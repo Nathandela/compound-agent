@@ -83,4 +83,9 @@ export function registerManagementCommands(program: Command): void {
   registerKnowledgeCommand(program);
   registerKnowledgeIndexCommand(program);
 
+  // Deprecation stub: worktree feature removed (superseded by Claude Code native EnterWorktree)
+  program.command('worktree').description('(removed) Use Claude Code native worktree support').action(() => {
+    console.error('ca worktree has been removed. Use Claude Code\'s native EnterWorktree support instead.');
+    process.exitCode = 1;
+  });
 }

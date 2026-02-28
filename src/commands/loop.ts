@@ -17,8 +17,8 @@ import { out } from './shared.js';
 // Constants
 // ============================================================================
 
-/** Safe pattern for epic IDs: alphanumeric, hyphens, underscores, dots */
-const EPIC_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+/** Safe pattern for epic IDs in loop scripts: extends cli-utils EPIC_ID_PATTERN with dots for version-like IDs */
+const LOOP_EPIC_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 
 /** Safe pattern for model names: alphanumeric, hyphens, underscores, dots, colons */
 const MODEL_PATTERN = /^[a-zA-Z0-9_.:/-]+$/;
@@ -308,8 +308,8 @@ function validateOptions(options: LoopScriptOptions): void {
   }
   if (options.epics) {
     for (const id of options.epics) {
-      if (!EPIC_ID_PATTERN.test(id)) {
-        throw new Error(`Invalid epic ID "${id}": must match ${EPIC_ID_PATTERN}`);
+      if (!LOOP_EPIC_ID_PATTERN.test(id)) {
+        throw new Error(`Invalid epic ID "${id}": must match ${LOOP_EPIC_ID_PATTERN}`);
       }
     }
   }

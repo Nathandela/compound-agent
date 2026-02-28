@@ -12,7 +12,6 @@ import {
   getRepoRoot,
   parseLimit,
   parseBdShowDeps,
-  shortId,
   validateEpicId,
 } from './cli-utils.js';
 
@@ -177,17 +176,4 @@ describe('CLI utilities', () => {
     });
   });
 
-  describe('shortId', () => {
-    it('extracts last segment after hyphen', () => {
-      expect(shortId('learning_agent-m001')).toBe('m001');
-    });
-
-    it('returns full ID when no hyphens', () => {
-      expect(shortId('abc123')).toBe('abc123');
-    });
-
-    it('handles multiple hyphens', () => {
-      expect(shortId('my-project-abc-def')).toBe('def');
-    });
-  });
 });

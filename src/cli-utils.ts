@@ -76,12 +76,3 @@ export function parseBdShowDeps(raw: string): BeadsDep[] {
     status: dep.status ?? 'open',
   }));
 }
-
-/**
- * Extract short ID from full beads ID (e.g., "my-project-m001" -> "m001").
- * Assumes beads short IDs are the last hyphen-delimited segment.
- */
-export function shortId(fullId: string): string {
-  const parts = fullId.split('-');
-  return parts[parts.length - 1] ?? fullId;
-}

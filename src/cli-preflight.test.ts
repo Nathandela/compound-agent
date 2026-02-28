@@ -94,6 +94,10 @@ describe('commandNeedsSqlite', () => {
     expect(commandNeedsSqlite(makeCommand('download-model'))).toBe(false);
   });
 
+  it('returns false for "worktree" deprecation stub', () => {
+    expect(commandNeedsSqlite(makeCommand('worktree'))).toBe(false);
+  });
+
   // ============================================================================
   // Subcommand hierarchy
   // ============================================================================

@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **`ca worktree` command family**: All five subcommands (`create`, `merge`, `list`, `cleanup`, `wire-deps`) removed. Claude Code now provides native `EnterWorktree` support. Running `ca worktree` prints a deprecation notice.
+- **`/compound:set-worktree` slash command**: Use Claude Code's native worktree workflow instead.
+- **Conditional Merge gate in `verify-gates`**: Only Review and Compound gates remain.
+- **`shortId` utility**: Dead code after worktree removal, cleaned up.
+
+### Changed
+
+- **`ca setup --update` now cleans deprecated paths**: Automatically removes stale worktree skill/command files from `.claude/` and `.gemini/` directories.
+- **`ca setup` also cleans deprecated paths**: Fresh setup runs now remove stale files from prior versions.
+- **SKILLS.md template**: Command inventory now lists all 11 slash commands (was 7).
+
+### Fixed
+
+- **`EPIC_ID_PATTERN` duplication**: `loop.ts` now uses distinctly named `LOOP_EPIC_ID_PATTERN` to avoid confusion with the canonical pattern in `cli-utils.ts`.
+- **Stale worktree lesson invalidated**: Memory item `Ld204372e` marked invalid to prevent irrelevant context injection.
+
 ## [1.5.0] - 2026-02-24
 
 ### Added
@@ -783,7 +801,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/compound-agent/compare/v1.4.4...HEAD
+[Unreleased]: https://github.com/Nathandela/compound-agent/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/Nathandela/compound-agent/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/Nathandela/compound-agent/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/Nathandela/compound-agent/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/Nathandela/compound-agent/compare/v1.4.1...v1.4.2

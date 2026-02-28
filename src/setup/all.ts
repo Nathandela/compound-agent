@@ -155,6 +155,9 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   // 9b. Install research docs
   await installResearchDocs(repoRoot);
 
+  // 9c. Clean deprecated paths from prior versions
+  await cleanDeprecatedPaths(repoRoot, false);
+
   // 10. Install pre-commit git hook
   let gitHooks: HookInstallResult['status'] | 'skipped' = 'skipped';
   if (!options.skipHooks) {
@@ -209,10 +212,12 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
 }
 
 
-/** Paths deprecated in v1.6 (worktree feature removed). */
+/** Paths deprecated since v1.5 (worktree feature removed — superseded by Claude Code native worktrees). */
 const DEPRECATED_PATHS = [
   ['.claude', 'skills', 'compound', 'set-worktree'],
   ['.claude', 'commands', 'compound', 'set-worktree.md'],
+  ['.gemini', 'skills', 'compound-set-worktree'],
+  ['.gemini', 'commands', 'compound', 'set-worktree.toml'],
 ];
 
 async function cleanDeprecatedPaths(repoRoot: string, dryRun: boolean): Promise<number> {
@@ -220,7 +225,13 @@ async function cleanDeprecatedPaths(repoRoot: string, dryRun: boolean): Promise<
   for (const segments of DEPRECATED_PATHS) {
     const fullPath = join(repoRoot, ...segments);
     if (existsSync(fullPath)) {
-      if (!dryRun) await rm(fullPath, { recursive: true });
+      const rel = segments.join('/');
+      if (!dryRun) {
+        await rm(fullPath, { recursive: true, force: true });
+        console.log(`  Removed deprecated: ${rel}`);
+      } else {
+        console.log(`  [dry-run] Would remove deprecated: ${rel}`);
+      }
       count++;
     }
   }

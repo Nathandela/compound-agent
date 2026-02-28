@@ -449,7 +449,11 @@ Skills are invoked as Claude Code slash commands:
 /compound:review           # Start review phase
 /compound:compound         # Start compound phase
 /compound:lfg <epic-id>    # Run all phases end-to-end
+/compound:research         # Spawn research subagent
+/compound:test-clean       # Clean test artifacts
 /compound:get-a-phd <focus>       # Deep research for agent knowledge
+/compound:learn            # Capture a lesson from context
+/compound:prime            # Prime session with workflow context
 \`\`\`
 
 Each skill reads its SKILL.md file from \`.claude/skills/compound/<phase>/SKILL.md\` at invocation time. Skills are never executed from memory.

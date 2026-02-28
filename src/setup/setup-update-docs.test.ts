@@ -1,6 +1,7 @@
 /**
- * Regression test: runUpdate() must process DOC_TEMPLATES.
- * Ensures --update installs split docs AND removes legacy HOW_TO_COMPOUND.md.
+ * Regression test: runUpdate() must process DOC_TEMPLATES and clean deprecated paths.
+ * Ensures --update installs split docs, removes legacy HOW_TO_COMPOUND.md,
+ * and cleans deprecated worktree files.
  */
 
 import { existsSync } from 'node:fs';
@@ -85,5 +86,68 @@ describe('runUpdate doc templates', () => {
     for (const filename of DOC_FILENAMES) {
       expect(existsSync(join(tempDir, 'docs', 'compound', filename))).toBe(false);
     }
+  });
+});
+
+describe('runUpdate deprecated path cleanup', () => {
+  let tempDir: string;
+
+  beforeEach(async () => {
+    tempDir = await mkdtemp(join(tmpdir(), 'deprecated-paths-test-'));
+    const lessonsDir = join(tempDir, '.claude', 'lessons');
+    await mkdir(lessonsDir, { recursive: true });
+    await writeFile(join(lessonsDir, 'index.jsonl'), '', 'utf-8');
+  });
+
+  afterEach(async () => {
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('removes deprecated .claude worktree paths', async () => {
+    const skillDir = join(tempDir, '.claude', 'skills', 'compound', 'set-worktree');
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(join(skillDir, 'SKILL.md'), 'old skill', 'utf-8');
+
+    const cmdPath = join(tempDir, '.claude', 'commands', 'compound', 'set-worktree.md');
+    await mkdir(join(tempDir, '.claude', 'commands', 'compound'), { recursive: true });
+    await writeFile(cmdPath, 'old command', 'utf-8');
+
+    const result = await runUpdate(tempDir, false);
+
+    expect(existsSync(skillDir)).toBe(false);
+    expect(existsSync(cmdPath)).toBe(false);
+    expect(result.updated).toBeGreaterThanOrEqual(2);
+  });
+
+  it('removes deprecated .gemini worktree paths', async () => {
+    const geminiSkill = join(tempDir, '.gemini', 'skills', 'compound-set-worktree');
+    await mkdir(geminiSkill, { recursive: true });
+    await writeFile(join(geminiSkill, 'SKILL.md'), 'old gemini skill', 'utf-8');
+
+    const geminiCmd = join(tempDir, '.gemini', 'commands', 'compound', 'set-worktree.toml');
+    await mkdir(join(tempDir, '.gemini', 'commands', 'compound'), { recursive: true });
+    await writeFile(geminiCmd, 'old toml', 'utf-8');
+
+    const result = await runUpdate(tempDir, false);
+
+    expect(existsSync(geminiSkill)).toBe(false);
+    expect(existsSync(geminiCmd)).toBe(false);
+    expect(result.updated).toBeGreaterThanOrEqual(2);
+  });
+
+  it('no-ops when deprecated paths do not exist', async () => {
+    const result = await runUpdate(tempDir, false);
+    // Should still succeed; updated count comes from template changes only
+    expect(result).toBeDefined();
+  });
+
+  it('dry-run counts but does not delete deprecated paths', async () => {
+    const skillDir = join(tempDir, '.claude', 'skills', 'compound', 'set-worktree');
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(join(skillDir, 'SKILL.md'), 'old skill', 'utf-8');
+
+    await runUpdate(tempDir, true);
+
+    expect(existsSync(skillDir)).toBe(true);
   });
 });
