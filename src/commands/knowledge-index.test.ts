@@ -9,6 +9,7 @@ import { join } from 'node:path';
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { unloadEmbedding } from '../memory/embeddings/index.js';
 import { openKnowledgeDb, closeKnowledgeDb } from '../memory/storage/sqlite-knowledge/connection.js';
 import { registerKnowledgeIndexCommand } from './knowledge-index.js';
 
@@ -39,6 +40,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  unloadEmbedding();
   closeKnowledgeDb();
   vi.restoreAllMocks();
   const { rm } = await import('node:fs/promises');
@@ -98,5 +100,36 @@ describe('index-docs command', () => {
     const allOutput = logSpy.mock.calls.map((c) => String(c.join(' '))).join('\n');
     // Should complete without errors, showing 0 files
     expect(allOutput).toMatch(/0 file/);
+  });
+
+  it('accepts --embed flag without error', async () => {
+    await createDocFile('docs/test.md', '# Test\n\nContent.');
+    registerKnowledgeIndexCommand(program);
+    // Should not throw
+    await program.parseAsync(['node', 'test', 'index-docs', '--embed']);
+  });
+
+  it('displays embedding count when chunks are embedded', async () => {
+    // Mock indexDocs to return a result with chunksEmbedded > 0
+    const indexingModule = await import('../memory/knowledge/index.js');
+    vi.spyOn(indexingModule, 'indexDocs').mockResolvedValueOnce({
+      filesIndexed: 1, filesSkipped: 0, filesErrored: 0,
+      chunksCreated: 2, chunksDeleted: 0, chunksEmbedded: 5, durationMs: 100,
+    });
+
+    registerKnowledgeIndexCommand(program);
+    await program.parseAsync(['node', 'test', 'index-docs', '--embed']);
+
+    const allOutput = logSpy.mock.calls.map((c) => String(c.join(' '))).join('\n');
+    expect(allOutput).toContain('embedded');
+  });
+
+  it('does not display embedding count when zero', async () => {
+    await createDocFile('docs/test.md', '# Test');
+    registerKnowledgeIndexCommand(program);
+    await program.parseAsync(['node', 'test', 'index-docs']);  // no --embed
+
+    const allOutput = logSpy.mock.calls.map((c) => String(c.join(' '))).join('\n');
+    expect(allOutput).not.toContain('embedded');
   });
 });

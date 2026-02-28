@@ -3,13 +3,14 @@
  *
  * Index docs/ directory into the knowledge base for retrieval.
  *
- * Usage: ca index-docs [--force]
+ * Usage: ca index-docs [--force] [--embed]
  */
 
 import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { indexDocs } from '../memory/knowledge/index.js';
+import { unloadEmbedding } from '../memory/embeddings/index.js';
 import { closeKnowledgeDb } from '../memory/storage/sqlite-knowledge/index.js';
 import { out } from './shared.js';
 
@@ -18,7 +19,8 @@ export function registerKnowledgeIndexCommand(program: Command): void {
     .command('index-docs')
     .description('Index docs/ directory into knowledge base')
     .option('--force', 'Re-index all files (ignore cache)')
-    .action(async function (this: Command, options: { force?: boolean }) {
+    .option('--embed', 'Embed chunks for semantic search')
+    .action(async function (this: Command, options: { force?: boolean; embed?: boolean }) {
       const repoRoot = getRepoRoot();
 
       out.info('Indexing docs/ directory...');
@@ -26,6 +28,7 @@ export function registerKnowledgeIndexCommand(program: Command): void {
       try {
         const result = await indexDocs(repoRoot, {
           force: options.force,
+          embed: options.embed,
         });
 
         const skippedPart = result.filesSkipped > 0
@@ -40,8 +43,12 @@ export function registerKnowledgeIndexCommand(program: Command): void {
           `Indexed ${result.filesIndexed} file${result.filesIndexed !== 1 ? 's' : ''}${skippedPart}, ` +
           `${result.chunksCreated} chunk${result.chunksCreated !== 1 ? 's' : ''} created${deletedPart}`
         );
+        if (result.chunksEmbedded > 0) {
+          out.info(`${result.chunksEmbedded} chunk${result.chunksEmbedded !== 1 ? 's' : ''} embedded`);
+        }
         out.info(`Duration: ${duration}s`);
       } finally {
+        unloadEmbedding();
         closeKnowledgeDb();
       }
     });
