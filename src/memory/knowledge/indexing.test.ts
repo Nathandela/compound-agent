@@ -265,7 +265,7 @@ describe('indexDocs - embed option', () => {
     expect(result.chunksEmbedded).toBe(0);
   });
 
-  it('returns chunksEmbedded: 0 when embed requested but model unavailable', async () => {
+  it('throws when embed requested but model unavailable', async () => {
     // Mock isModelUsable to return unavailable
     const modelModule = await import('../embeddings/model.js');
     const spy = vi.spyOn(modelModule, 'isModelUsable').mockResolvedValue({
@@ -273,17 +273,10 @@ describe('indexDocs - embed option', () => {
       reason: 'Model file not found',
       action: 'Run ca download-model',
     });
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
     await createDocFile('docs/readme.md', '# Hello\n\nSome content.');
-    const result = await indexDocs(repoRoot, { embed: true });
-
-    expect(result.chunksEmbedded).toBe(0);
-    expect(warnSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Embedding skipped'),
-    );
+    await expect(indexDocs(repoRoot, { embed: true })).rejects.toThrow('Embedding failed');
 
     spy.mockRestore();
-    warnSpy.mockRestore();
   });
 });

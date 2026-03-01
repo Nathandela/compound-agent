@@ -79,6 +79,9 @@ export async function embedChunks(
     const batch = rows.slice(i, i + BATCH_SIZE);
     const texts = batch.map(r => r.text);
     const vectors = await embedTexts(texts);
+    if (vectors.length !== texts.length) {
+      throw new Error(`embedTexts returned ${vectors.length} vectors for ${texts.length} inputs`);
+    }
     const enriched = batch.map((r, j) => ({ ...r, vector: vectors[j]! }));
     writeBatch(enriched);
     chunksEmbedded += batch.length;

@@ -84,7 +84,7 @@ async function handleModelAndEmbed(
   }
 
   // Trigger background embedding if docs/ exists and model available
-  if (status !== 'failed') {
+  if (status === 'exists' || status === 'downloaded') {
     try {
       const { indexAndSpawnEmbed } = await import('../memory/knowledge/embed-background.js');
       const spawnResult = await indexAndSpawnEmbed(repoRoot);

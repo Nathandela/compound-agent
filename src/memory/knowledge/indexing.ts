@@ -103,21 +103,21 @@ async function walkSupportedFiles(baseDir: string, repoRoot: string): Promise<st
 }
 
 /**
- * Embed indexed chunks if model is available.
+ * Embed indexed chunks using the local model.
  * Uses dynamic imports to avoid loading llama-cpp when not needed.
  *
- * @returns Number of chunks embedded (0 if model unavailable)
+ * @throws Error if model is not usable (caller explicitly requested --embed)
+ * @returns Number of chunks embedded
  */
 async function tryEmbedChunks(repoRoot: string): Promise<number> {
   const { isModelUsable } = await import('../embeddings/model.js');
   const usability = await isModelUsable();
-  if (usability.usable) {
-    const { embedChunks } = await import('./embed-chunks.js');
-    const embedResult = await embedChunks(repoRoot);
-    return embedResult.chunksEmbedded;
+  if (!usability.usable) {
+    throw new Error(`Embedding failed: ${usability.reason}. ${usability.action}`);
   }
-  console.warn(`[compound-agent] Embedding skipped: ${usability.reason}. ${usability.action}`);
-  return 0;
+  const { embedChunks } = await import('./embed-chunks.js');
+  const embedResult = await embedChunks(repoRoot);
+  return embedResult.chunksEmbedded;
 }
 
 /**

@@ -131,7 +131,7 @@ describe('spawnBackgroundEmbed', () => {
     expect(result.reason).toBe('Model not available');
   });
 
-  it('spawns npx ca embed-worker and returns pid on happy path', async () => {
+  it('spawns embed-worker process and returns pid on happy path', async () => {
     const { spawnBackgroundEmbed } = await import('./embed-background.js');
 
     // Insert chunks so count > 0
@@ -141,12 +141,13 @@ describe('spawnBackgroundEmbed', () => {
     expect(result.spawned).toBe(true);
     expect(result.pid).toBe(12345);
 
-    // Verify spawn was called with correct args
-    expect(spawn).toHaveBeenCalledWith(
-      'npx',
-      ['ca', 'embed-worker', repoRoot],
-      { detached: true, stdio: 'ignore' },
-    );
+    // Verify spawn was called with embed-worker args and detached options.
+    // CLI resolution may use process.execPath + dist/cli.js or npx ca,
+    // so we check the args array ends with ['embed-worker', repoRoot].
+    const call = vi.mocked(spawn).mock.calls[0]!;
+    const args = call[1] as string[];
+    expect(args.slice(-2)).toEqual(['embed-worker', repoRoot]);
+    expect(call[2]).toEqual({ detached: true, stdio: 'ignore' });
   });
 });
 

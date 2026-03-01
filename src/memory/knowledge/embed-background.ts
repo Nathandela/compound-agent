@@ -7,7 +7,8 @@
 
 import { spawn } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { isModelAvailable, unloadEmbedding } from '../embeddings/index.js';
 import { closeKnowledgeDb } from '../storage/sqlite-knowledge/index.js';
@@ -19,6 +20,26 @@ export interface SpawnEmbedResult {
   spawned: boolean;
   reason?: string;
   pid?: number;
+}
+
+/**
+ * Resolve the CLI entry point for spawning the embed-worker subprocess.
+ *
+ * Strategy: walk up from this module to find dist/cli.js (works in both
+ * bundled output and dev). Falls back to npx ca if not found.
+ */
+function resolveCliInvocation(): { command: string; args: string[] } {
+  let dir = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 10; i++) {
+    const candidate = join(dir, 'dist', 'cli.js');
+    if (existsSync(candidate)) {
+      return { command: process.execPath, args: [candidate] };
+    }
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return { command: 'npx', args: ['ca'] };
 }
 
 /**
@@ -40,8 +61,8 @@ export function spawnBackgroundEmbed(repoRoot: string): SpawnEmbedResult {
     return { spawned: false, reason: 'All chunks already embedded' };
   }
 
-  // Use npx to resolve the CLI -- works in dev, built, and installed contexts
-  const child = spawn('npx', ['ca', 'embed-worker', repoRoot], {
+  const cli = resolveCliInvocation();
+  const child = spawn(cli.command, [...cli.args, 'embed-worker', repoRoot], {
     detached: true,
     stdio: 'ignore',
   });
