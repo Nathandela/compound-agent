@@ -53,6 +53,10 @@ export async function embedChunks(
     .prepare(query)
     .all() as Array<{ id: string; text: string; content_hash: string }>;
 
+  // Count already-embedded chunks for reporting
+  const totalRow = db.prepare('SELECT COUNT(*) as count FROM chunks').get() as { count: number };
+  const chunksSkipped = totalRow.count - rows.length;
+
   let chunksEmbedded = 0;
 
   for (const row of rows) {
@@ -63,7 +67,7 @@ export async function embedChunks(
 
   return {
     chunksEmbedded,
-    chunksSkipped: 0,
+    chunksSkipped,
     durationMs: Date.now() - start,
   };
 }

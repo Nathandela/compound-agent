@@ -103,7 +103,13 @@ describe('index-docs command', () => {
   });
 
   it('accepts --embed flag without error', async () => {
-    await createDocFile('docs/test.md', '# Test\n\nContent.');
+    // Mock indexDocs to avoid loading native embedding model in thread pool
+    const indexingModule = await import('../memory/knowledge/index.js');
+    vi.spyOn(indexingModule, 'indexDocs').mockResolvedValueOnce({
+      filesIndexed: 1, filesSkipped: 0, filesErrored: 0,
+      chunksCreated: 2, chunksDeleted: 0, chunksEmbedded: 0, durationMs: 50,
+    });
+
     registerKnowledgeIndexCommand(program);
     // Should not throw
     await program.parseAsync(['node', 'test', 'index-docs', '--embed']);
