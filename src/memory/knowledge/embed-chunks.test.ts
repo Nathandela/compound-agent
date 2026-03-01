@@ -1,36 +1,23 @@
 /**
- * Tests for embed-chunks module.
+ * Unit tests for embed-chunks module (no embedding model needed).
  *
  * Written BEFORE implementation (TDD).
  *
- * Unit tests run without the embedding model.
- * Embedding tests are conditionally skipped when the model is unavailable.
+ * Embedding-dependent tests live in src/memory/embeddings/embed-chunks.integration.test.ts
+ * so they run in the singleFork pool (safe native memory isolation).
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { isModelAvailable, unloadEmbedding } from '../embeddings/nomic.js';
-import { getCachedChunkEmbedding } from '../storage/sqlite-knowledge/cache.js';
 import { closeKnowledgeDb, openKnowledgeDb } from '../storage/sqlite-knowledge/connection.js';
 import { upsertChunks } from '../storage/sqlite-knowledge/sync.js';
 import type { KnowledgeChunk } from '../storage/sqlite-knowledge/types.js';
-import { shouldSkipEmbeddingTests } from '../../test-utils.js';
 import { chunkContentHash } from './types.js';
 
-import { embedChunks, getUnembeddedChunkCount } from './embed-chunks.js';
-
-// ---------------------------------------------------------------------------
-// Skip logic for embedding tests
-// SAFETY: Never call isModelUsable() at module top-level — it loads ~150MB
-// of native memory that leaks when vitest workers SIGABRT during disposal.
-// Use isModelAvailable() (fs check only, zero native allocation) for skip guards.
-// ---------------------------------------------------------------------------
-
-const modelAvailable = isModelAvailable();
-const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
+import { getUnembeddedChunkCount } from './embed-chunks.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -98,73 +85,3 @@ describe('getUnembeddedChunkCount', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Embedding tests (conditional skip)
-// ---------------------------------------------------------------------------
-
-describe('embedChunks', () => {
-  afterAll(() => {
-    unloadEmbedding();
-  });
-
-  it.skipIf(skipEmbedding)('embeds all unembedded chunks and returns correct stats', async () => {
-    const chunks = [
-      makeChunk('C1', 'TypeScript error handling patterns'),
-      makeChunk('C2', 'Database connection pooling strategies'),
-    ];
-    upsertChunks(repoRoot, chunks);
-
-    const result = await embedChunks(repoRoot);
-
-    expect(result.chunksEmbedded).toBe(2);
-    expect(result.chunksSkipped).toBe(0);
-    expect(result.durationMs).toBeGreaterThanOrEqual(0);
-  });
-
-  it.skipIf(skipEmbedding)('after embedChunks, getUnembeddedChunkCount returns 0', async () => {
-    const chunks = [
-      makeChunk('C1', 'Architecture design principles'),
-      makeChunk('C2', 'Testing best practices'),
-    ];
-    upsertChunks(repoRoot, chunks);
-
-    expect(getUnembeddedChunkCount(repoRoot)).toBe(2);
-    await embedChunks(repoRoot);
-    expect(getUnembeddedChunkCount(repoRoot)).toBe(0);
-  });
-
-  it.skipIf(skipEmbedding)('with onlyMissing:true skips already-embedded chunks', async () => {
-    // Pre-embed C1 by upserting with an embedding
-    const c1 = makeChunk('C1', 'Already embedded chunk');
-    const embeddings = new Map<string, Float32Array>([
-      ['C1', new Float32Array(768).fill(0.1)],
-    ]);
-    upsertChunks(repoRoot, [c1], embeddings);
-
-    // Add C2 without embedding
-    const c2 = makeChunk('C2', 'Newly added chunk without embedding');
-    upsertChunks(repoRoot, [c2]);
-
-    const result = await embedChunks(repoRoot, { onlyMissing: true });
-
-    // Only C2 should have been embedded
-    expect(result.chunksEmbedded).toBe(1);
-    expect(result.chunksSkipped).toBe(0);
-  });
-
-  it.skipIf(skipEmbedding)('stored embedding is valid Float32Array of 768 dimensions', async () => {
-    const chunk = makeChunk('C1', 'Validate embedding dimensions');
-    upsertChunks(repoRoot, [chunk]);
-
-    await embedChunks(repoRoot);
-
-    const embedding = getCachedChunkEmbedding(repoRoot, 'C1');
-    expect(embedding).not.toBeNull();
-    expect(embedding).toBeInstanceOf(Float32Array);
-    expect(embedding!.length).toBe(768);
-    // Verify values are finite numbers
-    for (const val of embedding!) {
-      expect(Number.isFinite(val)).toBe(true);
-    }
-  });
-});

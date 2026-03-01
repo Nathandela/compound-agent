@@ -48,6 +48,11 @@ export function getRepoRoot(): string {
 // Beads shared utilities
 // ============================================================================
 
+/** Extract the short suffix from a full beads ID (e.g., 'learning_agent-b8c' → 'b8c'). */
+export function shortId(fullId: string): string {
+  return fullId.replace(/^[^-]+-/, '');
+}
+
 /** Strict pattern for valid beads epic/task IDs. */
 export const EPIC_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
 
