@@ -106,9 +106,9 @@ describe('embedChunks', () => {
 
     const result = await embedChunks(repoRoot, { onlyMissing: true });
 
-    // Only C2 should have been embedded
+    // Only C2 should have been embedded; C1 was already embedded and skipped
     expect(result.chunksEmbedded).toBe(1);
-    expect(result.chunksSkipped).toBe(0);
+    expect(result.chunksSkipped).toBe(1);
   });
 
   it.skipIf(skipEmbedding)('stored embedding is valid Float32Array of 768 dimensions', async () => {
