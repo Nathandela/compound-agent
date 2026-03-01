@@ -34,6 +34,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Eager embedding hardening** (production readiness fixes from triple review):
+  - **P0**: Background worker spawn now resolves `dist/cli.js` deterministically instead of relying on `npx ca` (which failed silently in dev/built contexts)
+  - **P0**: `embed-worker` command hidden from `ca --help` output
+  - **P1**: Stale lock recovery uses atomic delete-then-`wx` to prevent two processes both reclaiming
+  - **P1**: DB connection opened after lock acquisition to prevent leak on contention
+  - **P1**: `--embed` now throws when model unavailable (was silently returning 0)
+  - **P2**: Batch embedding (16 chunks per call) with per-batch SQLite transactions (was 1 fsync per row)
+  - **P2**: `EmbedStatus` rewritten as discriminated union; removed dead `chunksTotal` field
+  - **P2**: `readLock` validates JSON shape instead of blind `as` cast
+  - **P2**: Vector batch length assertion guards against short responses from embedding backend
+  - **P3**: Extracted `indexAndSpawnEmbed()` shared helper — `init.ts` and `all.ts` no longer duplicate logic
+  - **P3**: `ca setup` now prints feedback when background embedding spawns
+  - **P3**: `filesErrored` count shown in `ca index-docs` output
+  - **P3**: Barrel re-exports consolidated through `./memory/knowledge/index.js`
 - **`EPIC_ID_PATTERN` duplication**: `loop.ts` now uses distinctly named `LOOP_EPIC_ID_PATTERN` to avoid confusion with the canonical pattern in `cli-utils.ts`.
 - **Stale worktree lesson invalidated**: Memory item `Ld204372e` marked invalid to prevent irrelevant context injection.
 
