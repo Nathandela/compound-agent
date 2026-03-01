@@ -7,15 +7,11 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
-export interface EmbedStatus {
-  state: 'idle' | 'running' | 'completed' | 'failed';
-  chunksTotal?: number;
-  chunksEmbedded?: number;
-  startedAt?: string;
-  completedAt?: string;
-  error?: string;
-  durationMs?: number;
-}
+export type EmbedStatus =
+  | { state: 'idle' }
+  | { state: 'running'; startedAt: string }
+  | { state: 'completed'; chunksEmbedded: number; completedAt: string; durationMs: number }
+  | { state: 'failed'; error: string; durationMs: number };
 
 const STATUS_FILE = '.claude/.cache/embed-status.json';
 

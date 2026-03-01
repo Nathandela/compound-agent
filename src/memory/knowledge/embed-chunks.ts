@@ -2,11 +2,13 @@
  * Core embedding function for knowledge chunks.
  *
  * Embeds unembedded (or all) knowledge chunks using the local embedding model.
+ * Uses batch embedding and transactional writes for performance.
  */
 
-import { embedText } from '../embeddings/nomic.js';
-import { setCachedChunkEmbedding } from '../storage/sqlite-knowledge/cache.js';
+import { embedTexts } from '../embeddings/nomic.js';
 import { openKnowledgeDb } from '../storage/sqlite-knowledge/connection.js';
+
+const BATCH_SIZE = 16;
 
 export interface EmbedChunksOptions {
   /** Only embed chunks with no embedding (default: true) */
@@ -34,6 +36,9 @@ export function getUnembeddedChunkCount(repoRoot: string): number {
 /**
  * Embed knowledge chunks using the local embedding model.
  *
+ * Processes chunks in batches of BATCH_SIZE for efficient embedding and
+ * wraps each batch's DB writes in a transaction (1 fsync per batch).
+ *
  * @param repoRoot - Absolute path to repository root
  * @param options - Embedding options
  * @returns Stats about the embedding run
@@ -59,10 +64,24 @@ export async function embedChunks(
 
   let chunksEmbedded = 0;
 
-  for (const row of rows) {
-    const vector = await embedText(row.text);
-    setCachedChunkEmbedding(repoRoot, row.id, new Float32Array(vector), row.content_hash);
-    chunksEmbedded++;
+  const updateStmt = db.prepare(
+    'UPDATE chunks SET embedding = ?, content_hash = ? WHERE id = ?'
+  );
+  const writeBatch = db.transaction((batch: Array<{ id: string; content_hash: string; vector: number[] }>) => {
+    for (const item of batch) {
+      const float32 = new Float32Array(item.vector);
+      const buffer = Buffer.from(float32.buffer, float32.byteOffset, float32.byteLength);
+      updateStmt.run(buffer, item.content_hash, item.id);
+    }
+  });
+
+  for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+    const batch = rows.slice(i, i + BATCH_SIZE);
+    const texts = batch.map(r => r.text);
+    const vectors = await embedTexts(texts);
+    const enriched = batch.map((r, j) => ({ ...r, vector: vectors[j]! }));
+    writeBatch(enriched);
+    chunksEmbedded += batch.length;
   }
 
   return {

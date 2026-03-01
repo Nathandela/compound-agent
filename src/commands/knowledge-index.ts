@@ -46,6 +46,9 @@ export function registerKnowledgeIndexCommand(program: Command): void {
         if (result.chunksEmbedded > 0) {
           out.info(`${result.chunksEmbedded} chunk${result.chunksEmbedded !== 1 ? 's' : ''} embedded`);
         }
+        if (result.filesErrored > 0) {
+          out.warn(`${result.filesErrored} file(s) had errors during indexing`);
+        }
         out.info(`Duration: ${duration}s`);
       } finally {
         unloadEmbedding();
@@ -55,7 +58,7 @@ export function registerKnowledgeIndexCommand(program: Command): void {
 
   // Internal worker command for background embedding (spawned by init/setup)
   program
-    .command('embed-worker <repoRoot>')
+    .command('embed-worker <repoRoot>', { hidden: true })
     .description('Internal: background embedding worker')
     .action(async (repoRoot: string) => {
       const { runBackgroundEmbed } = await import('../memory/knowledge/embed-background.js');

@@ -6,8 +6,8 @@
  */
 
 import { spawn } from 'node:child_process';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { isModelAvailable, unloadEmbedding } from '../embeddings/index.js';
 import { closeKnowledgeDb } from '../storage/sqlite-knowledge/index.js';
@@ -24,6 +24,10 @@ export interface SpawnEmbedResult {
 /**
  * Spawn a detached background process to embed chunks.
  * Synchronous -- fires and forgets.
+ *
+ * Pre-flight checks (lock, model, count) are advisory only. The worker
+ * acquires its own lock, so TOCTOU here cannot cause double-embedding --
+ * at worst we spawn a worker that exits immediately.
  */
 export function spawnBackgroundEmbed(repoRoot: string): SpawnEmbedResult {
   if (isEmbedLocked(repoRoot)) {
@@ -36,11 +40,8 @@ export function spawnBackgroundEmbed(repoRoot: string): SpawnEmbedResult {
     return { spawned: false, reason: 'All chunks already embedded' };
   }
 
-  // Resolve CLI path relative to this module
-  const thisDir = dirname(fileURLToPath(import.meta.url));
-  const cliPath = join(thisDir, '..', '..', 'cli.js');
-
-  const child = spawn('node', [cliPath, 'embed-worker', repoRoot], {
+  // Use npx to resolve the CLI -- works in dev, built, and installed contexts
+  const child = spawn('npx', ['ca', 'embed-worker', repoRoot], {
     detached: true,
     stdio: 'ignore',
   });
@@ -53,12 +54,12 @@ export function spawnBackgroundEmbed(repoRoot: string): SpawnEmbedResult {
  * Worker entry point: acquire lock, embed chunks, write status, clean up.
  */
 export async function runBackgroundEmbed(repoRoot: string): Promise<void> {
-  // Open DB first so lock/status/embed all work
-  const { openKnowledgeDb } = await import('../storage/sqlite-knowledge/index.js');
-  openKnowledgeDb(repoRoot);
-
   const lock = acquireEmbedLock(repoRoot);
   if (!lock.acquired) return;
+
+  // Open DB after lock to avoid leaking connection on contention
+  const { openKnowledgeDb } = await import('../storage/sqlite-knowledge/index.js');
+  openKnowledgeDb(repoRoot);
 
   const start = Date.now();
   writeEmbedStatus(repoRoot, { state: 'running', startedAt: new Date().toISOString() });
@@ -83,4 +84,18 @@ export async function runBackgroundEmbed(repoRoot: string): Promise<void> {
     closeKnowledgeDb();
     lock.release();
   }
+}
+
+/**
+ * Index docs/ and spawn background embedding if docs/ exists.
+ * Shared helper for init and setup commands.
+ *
+ * @returns SpawnEmbedResult or null if docs/ doesn't exist
+ */
+export async function indexAndSpawnEmbed(repoRoot: string): Promise<SpawnEmbedResult | null> {
+  const docsPath = join(repoRoot, 'docs');
+  if (!existsSync(docsPath)) return null;
+  const { indexDocs } = await import('./indexing.js');
+  await indexDocs(repoRoot);
+  return spawnBackgroundEmbed(repoRoot);
 }

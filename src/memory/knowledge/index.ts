@@ -21,5 +21,5 @@ export type { LockResult } from './embed-lock.js';
 export { writeEmbedStatus, readEmbedStatus } from './embed-status.js';
 export type { EmbedStatus } from './embed-status.js';
 
-export { spawnBackgroundEmbed, runBackgroundEmbed } from './embed-background.js';
+export { spawnBackgroundEmbed, runBackgroundEmbed, indexAndSpawnEmbed } from './embed-background.js';
 export type { SpawnEmbedResult } from './embed-background.js';

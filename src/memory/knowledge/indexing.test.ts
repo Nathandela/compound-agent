@@ -8,7 +8,7 @@
 import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 import { openKnowledgeDb, closeKnowledgeDb } from '../storage/sqlite-knowledge/connection.js';
 import { getIndexedFilePaths, getLastIndexTime } from '../storage/sqlite-knowledge/sync.js';
@@ -263,5 +263,27 @@ describe('indexDocs - embed option', () => {
     await createDocFile('docs/readme.md', '# Hello\n\nSome content.');
     const result = await indexDocs(repoRoot, { embed: false });
     expect(result.chunksEmbedded).toBe(0);
+  });
+
+  it('returns chunksEmbedded: 0 when embed requested but model unavailable', async () => {
+    // Mock isModelUsable to return unavailable
+    const modelModule = await import('../embeddings/model.js');
+    const spy = vi.spyOn(modelModule, 'isModelUsable').mockResolvedValue({
+      usable: false,
+      reason: 'Model file not found',
+      action: 'Run ca download-model',
+    });
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    await createDocFile('docs/readme.md', '# Hello\n\nSome content.');
+    const result = await indexDocs(repoRoot, { embed: true });
+
+    expect(result.chunksEmbedded).toBe(0);
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Embedding skipped'),
+    );
+
+    spy.mockRestore();
+    warnSpy.mockRestore();
   });
 });

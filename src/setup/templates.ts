@@ -43,10 +43,16 @@ npx ca hooks run pre-commit
 // Post-Commit Hook Constants
 // ============================================================================
 
-/** Post-commit hook shell script template */
+/**
+ * Post-commit hook shell script template.
+ *
+ * Design: indexes only (no --embed). Embedding happens lazily via
+ * background embed during init/setup. This keeps commits fast.
+ */
 export const POST_COMMIT_HOOK_TEMPLATE = `#!/bin/sh
 # Compound Agent post-commit hook
 # Auto-indexes docs/ when documentation files change
+# Note: indexes only (no --embed) -- embedding runs lazily via init/setup
 
 # Check if any docs/ files were modified in this commit
 if git diff-tree --no-commit-id --name-only -r HEAD | grep -q '^docs/'; then

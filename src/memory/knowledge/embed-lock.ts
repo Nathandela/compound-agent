@@ -52,11 +52,19 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-/** Read and parse lock file. Returns null on any error. */
+/** Read and parse lock file. Returns null on any error or invalid shape. */
 function readLock(filePath: string): LockContent | null {
   try {
     const raw = readFileSync(filePath, 'utf-8');
-    return JSON.parse(raw) as LockContent;
+    const parsed: unknown = JSON.parse(raw);
+    if (
+      typeof parsed === 'object' && parsed !== null &&
+      typeof (parsed as Record<string, unknown>).pid === 'number' &&
+      typeof (parsed as Record<string, unknown>).startedAt === 'string'
+    ) {
+      return parsed as LockContent;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -88,9 +96,16 @@ export function acquireEmbedLock(repoRoot: string): LockResult {
       return { acquired: false, holder: existing.pid };
     }
 
-    // Stale lock -- overwrite
-    writeFileSync(file, JSON.stringify(content));
-    return { acquired: true, release: () => releaseLock(file) };
+    // Stale lock -- delete then re-create atomically with 'wx'
+    try { unlinkSync(file); } catch { /* already gone */ }
+    try {
+      writeFileSync(file, JSON.stringify(content), { flag: 'wx' });
+      return { acquired: true, release: () => releaseLock(file) };
+    } catch {
+      // Another process won the race
+      const winner = readLock(file);
+      return { acquired: false, holder: winner?.pid ?? -1 };
+    }
   }
 }
 

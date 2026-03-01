@@ -86,15 +86,10 @@ async function handleModelAndEmbed(
   // Trigger background embedding if docs/ exists and model available
   if (status !== 'failed') {
     try {
-      const docsPath = join(repoRoot, 'docs');
-      if (existsSync(docsPath)) {
-        const { indexDocs } = await import('../memory/knowledge/indexing.js');
-        await indexDocs(repoRoot);
-        const { spawnBackgroundEmbed } = await import('../memory/knowledge/embed-background.js');
-        const spawnResult = spawnBackgroundEmbed(repoRoot);
-        if (spawnResult.spawned && !opts.quiet && !opts.json) {
-          out.info('Embedding in progress (background). You can start working.');
-        }
+      const { indexAndSpawnEmbed } = await import('../memory/knowledge/embed-background.js');
+      const spawnResult = await indexAndSpawnEmbed(repoRoot);
+      if (spawnResult?.spawned && !opts.quiet && !opts.json) {
+        out.info('Embedding in progress (background). You can start working.');
       }
     } catch {
       // Non-fatal: don't break init if background embedding fails to spawn

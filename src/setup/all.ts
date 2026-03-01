@@ -198,13 +198,8 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   // 14. Trigger background embedding if docs/ exists and model available
   if (!options.skipModel && modelStatus !== 'failed') {
     try {
-      const docsPath = join(repoRoot, 'docs');
-      if (existsSync(docsPath)) {
-        const { indexDocs } = await import('../memory/knowledge/indexing.js');
-        await indexDocs(repoRoot);
-        const { spawnBackgroundEmbed } = await import('../memory/knowledge/embed-background.js');
-        spawnBackgroundEmbed(repoRoot);
-      }
+      const { indexAndSpawnEmbed } = await import('../memory/knowledge/embed-background.js');
+      await indexAndSpawnEmbed(repoRoot);
     } catch {
       // Non-fatal: don't break setup if background embedding fails to spawn
     }

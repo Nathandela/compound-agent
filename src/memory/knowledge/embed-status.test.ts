@@ -38,11 +38,9 @@ describe('writeEmbedStatus / readEmbedStatus roundtrip', () => {
     expect(result).toEqual(status);
   });
 
-  it('roundtrips correctly for running state with all fields', () => {
+  it('roundtrips correctly for running state', () => {
     const status: EmbedStatus = {
       state: 'running',
-      chunksTotal: 100,
-      chunksEmbedded: 42,
       startedAt: '2026-02-28T12:00:00.000Z',
     };
     writeEmbedStatus(tempDir, status);
@@ -50,12 +48,10 @@ describe('writeEmbedStatus / readEmbedStatus roundtrip', () => {
     expect(result).toEqual(status);
   });
 
-  it('roundtrips correctly for completed state with all fields', () => {
+  it('roundtrips correctly for completed state', () => {
     const status: EmbedStatus = {
       state: 'completed',
-      chunksTotal: 100,
       chunksEmbedded: 100,
-      startedAt: '2026-02-28T12:00:00.000Z',
       completedAt: '2026-02-28T12:01:30.000Z',
       durationMs: 90000,
     };
@@ -67,9 +63,6 @@ describe('writeEmbedStatus / readEmbedStatus roundtrip', () => {
   it('roundtrips correctly for failed state with error', () => {
     const status: EmbedStatus = {
       state: 'failed',
-      chunksTotal: 100,
-      chunksEmbedded: 50,
-      startedAt: '2026-02-28T12:00:00.000Z',
       error: 'Out of memory',
       durationMs: 45000,
     };

@@ -41,7 +41,16 @@ vi.mock('../embeddings/index.js', async (importOriginal) => {
   };
 });
 
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>();
+  return {
+    ...actual,
+    spawn: vi.fn().mockReturnValue({ unref: vi.fn(), pid: 12345 }),
+  };
+});
+
 // Import after mocks are set up
+import { spawn } from 'node:child_process';
 import { isModelAvailable } from '../embeddings/index.js';
 import { embedChunks } from './embed-chunks.js';
 
@@ -120,6 +129,24 @@ describe('spawnBackgroundEmbed', () => {
     const result = spawnBackgroundEmbed(repoRoot);
     expect(result.spawned).toBe(false);
     expect(result.reason).toBe('Model not available');
+  });
+
+  it('spawns npx ca embed-worker and returns pid on happy path', async () => {
+    const { spawnBackgroundEmbed } = await import('./embed-background.js');
+
+    // Insert chunks so count > 0
+    upsertChunks(repoRoot, [makeChunk('C1', 'test chunk')]);
+
+    const result = spawnBackgroundEmbed(repoRoot);
+    expect(result.spawned).toBe(true);
+    expect(result.pid).toBe(12345);
+
+    // Verify spawn was called with correct args
+    expect(spawn).toHaveBeenCalledWith(
+      'npx',
+      ['ca', 'embed-worker', repoRoot],
+      { detached: true, stdio: 'ignore' },
+    );
   });
 });
 

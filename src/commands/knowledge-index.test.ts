@@ -55,6 +55,26 @@ async function createDocFile(relativePath: string, content: string): Promise<voi
   await writeFile(fullPath, content, 'utf-8');
 }
 
+describe('embed-worker command', () => {
+  it('registers hidden embed-worker command that calls runBackgroundEmbed', async () => {
+    // Mock runBackgroundEmbed to avoid actual embedding
+    const embedBgModule = await import('../memory/knowledge/embed-background.js');
+    const runBgSpy = vi.spyOn(embedBgModule, 'runBackgroundEmbed').mockResolvedValue();
+
+    registerKnowledgeIndexCommand(program);
+
+    // Command should exist but be hidden
+    const cmd = program.commands.find((c) => c.name() === 'embed-worker');
+    expect(cmd).toBeDefined();
+
+    // Parse and invoke
+    await program.parseAsync(['node', 'test', 'embed-worker', '/tmp/test-repo']);
+    expect(runBgSpy).toHaveBeenCalledWith('/tmp/test-repo');
+
+    runBgSpy.mockRestore();
+  });
+});
+
 describe('index-docs command', () => {
   it('registers the index-docs command', () => {
     registerKnowledgeIndexCommand(program);

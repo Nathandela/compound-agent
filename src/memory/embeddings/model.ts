@@ -32,7 +32,11 @@ const DEFAULT_MODEL_DIR = join(homedir(), '.node-llama-cpp', 'models');
 let cachedUsability: UsabilityResult | null = null;
 
 /**
- * Check if the embedding model is available locally.
+ * Check if the embedding model is available locally (fs existence only).
+ *
+ * Use this for cheap pre-flight checks (e.g. spawnBackgroundEmbed) where
+ * failure is handled gracefully. Use {@link isModelUsable} when you need
+ * runtime verification that the model can actually initialize.
  *
  * @returns true if model file exists
  */

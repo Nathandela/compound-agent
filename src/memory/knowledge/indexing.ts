@@ -116,7 +116,7 @@ async function tryEmbedChunks(repoRoot: string): Promise<number> {
     const embedResult = await embedChunks(repoRoot);
     return embedResult.chunksEmbedded;
   }
-  console.warn(`Warning: Embedding skipped — ${usability.reason}. ${usability.action}`);
+  console.warn(`[compound-agent] Embedding skipped: ${usability.reason}. ${usability.action}`);
   return 0;
 }
 
