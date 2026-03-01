@@ -1,14 +1,8 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-import { appendLesson } from '../storage/jsonl.js';
-import {
-  closeDb,
-  getRetrievalStats,
-  rebuildIndex,
-} from '../storage/sqlite/index.js';
 import { createQuickLesson } from '../../test-utils.js';
 
 import {
@@ -18,102 +12,100 @@ import {
   shouldPropose,
 } from './quality.js';
 
+vi.mock('../embeddings/model.js', () => ({
+  isModelAvailable: vi.fn(() => true),
+}));
+
+vi.mock('../search/index.js', () => ({
+  findSimilarLessons: vi.fn(async () => []),
+}));
+
+vi.mock('../storage/index.js', () => ({
+  syncIfNeeded: vi.fn(async () => false),
+}));
+
+import { isModelAvailable } from '../embeddings/model.js';
+import { findSimilarLessons } from '../search/index.js';
+
+const mockIsModelAvailable = vi.mocked(isModelAvailable);
+const mockFindSimilarLessons = vi.mocked(findSimilarLessons);
+
 describe('quality filters', () => {
   let tempDir: string;
 
   beforeEach(async () => {
     tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-quality-'));
+    mockIsModelAvailable.mockReturnValue(true);
+    mockFindSimilarLessons.mockResolvedValue([]);
   });
 
   afterEach(async () => {
-    closeDb();
+    vi.restoreAllMocks();
     await rm(tempDir, { recursive: true, force: true });
   });
 
   describe('isNovel', () => {
-    it('returns true for empty database', async () => {
+    it('returns novel: true when model unavailable', async () => {
+      mockIsModelAvailable.mockReturnValue(false);
+
       const result = await isNovel(tempDir, 'Use Polars for large files');
       expect(result.novel).toBe(true);
+      expect(mockFindSimilarLessons).not.toHaveBeenCalled();
     });
 
-    it('returns true when insight has no words longer than 3 chars', async () => {
-      // All words are 3 chars or less, so no keywords extracted for search
-      const result = await isNovel(tempDir, 'a b c d e');
-      expect(result.novel).toBe(true);
-    });
-
-    it('returns true for new unique insight', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for CSV processing'));
-      await rebuildIndex(tempDir);
-      closeDb();
+    it('returns novel: true when no similar lessons found', async () => {
+      mockFindSimilarLessons.mockResolvedValue([]);
 
       const result = await isNovel(tempDir, 'Always run tests before committing');
       expect(result.novel).toBe(true);
     });
 
-    it('returns false for exact duplicate insight', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for large files'));
-      await rebuildIndex(tempDir);
-      closeDb();
+    it('returns novel: false when near-duplicate exists (>= 0.98)', async () => {
+      const lesson = createQuickLesson('L001', 'Use Polars for large files');
+      mockFindSimilarLessons.mockResolvedValue([
+        { item: lesson, score: 0.99 },
+      ]);
 
       const result = await isNovel(tempDir, 'Use Polars for large files');
       expect(result.novel).toBe(false);
-      expect(result.reason).toContain('similar');
+      expect(result.reason).toContain('Near-duplicate');
       expect(result.existingId).toBe('L001');
     });
 
-    it('returns false for highly similar insight', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for large CSV files'));
-      await rebuildIndex(tempDir);
-      closeDb();
+    it('returns novel: true when similar but below threshold (0.80-0.97)', async () => {
+      // findSimilarLessons is called with threshold=0.98, so items with
+      // score 0.90 will NOT be returned (filtered out by findSimilarLessons)
+      mockFindSimilarLessons.mockResolvedValue([]);
 
-      // Very similar - shares most words
-      const result = await isNovel(tempDir, 'Use Polars for large files');
-      expect(result.novel).toBe(false);
-    });
-
-    it('allows configurable similarity threshold', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for data'));
-      await rebuildIndex(tempDir);
-      closeDb();
-
-      // With very low threshold, most things should be considered novel
-      const result = await isNovel(tempDir, 'Use Polars', { threshold: 0.99 });
+      const result = await isNovel(tempDir, 'Use Polars for CSV processing');
       expect(result.novel).toBe(true);
     });
 
-    it('returns existing lesson id when duplicate found', async () => {
-      await appendLesson(tempDir, createQuickLesson('L123', 'Always test your code'));
-      await rebuildIndex(tempDir);
-      closeDb();
+    it('returns novel: true when findSimilarLessons throws', async () => {
+      mockFindSimilarLessons.mockRejectedValue(new Error('DB error'));
 
-      const result = await isNovel(tempDir, 'Always test your code');
-      expect(result.existingId).toBe('L123');
+      const result = await isNovel(tempDir, 'Use Polars for large files');
+      expect(result.novel).toBe(true);
     });
 
-    it('catches identical strings via Jaccard similarity, not exact-match branch', async () => {
-      // Identical strings have Jaccard similarity = 1.0, which >= 0.8 threshold.
-      // This proves the exact-match branch (if it existed) would be dead code.
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use POLARS for data'));
-      await rebuildIndex(tempDir);
-      closeDb();
-
-      const result = await isNovel(tempDir, 'use polars for data');
-      expect(result.novel).toBe(false);
-      expect(result.reason).toContain('similar'); // Jaccard branch, NOT "Exact duplicate found"
-      expect(result.existingId).toBe('L001');
-    });
-
-    it('does not increment retrieval counts during novelty checks', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars for large files'));
-      await rebuildIndex(tempDir);
-      closeDb();
-
+    it('passes threshold to findSimilarLessons', async () => {
       await isNovel(tempDir, 'Use Polars for large files');
 
-      const stats = getRetrievalStats(tempDir);
-      const l001 = stats.find((s) => s.id === 'L001');
-      expect(l001?.count).toBe(0);
+      expect(mockFindSimilarLessons).toHaveBeenCalledWith(
+        tempDir,
+        'Use Polars for large files',
+        { threshold: 0.98 }
+      );
+    });
+
+    it('allows configurable threshold', async () => {
+      await isNovel(tempDir, 'Use Polars for large files', { threshold: 0.95 });
+
+      expect(mockFindSimilarLessons).toHaveBeenCalledWith(
+        tempDir,
+        'Use Polars for large files',
+        { threshold: 0.95 }
+      );
     });
   });
 
@@ -264,14 +256,27 @@ describe('quality filters', () => {
       expect(result.shouldPropose).toBe(true);
     });
 
-    it('returns false for duplicate insight', async () => {
-      await appendLesson(tempDir, createQuickLesson('L001', 'Use Polars instead of pandas for files'));
-      await rebuildIndex(tempDir);
-      closeDb();
+    it('returns false for near-duplicate', async () => {
+      const lesson = createQuickLesson('L001', 'Use Polars instead of pandas for files');
+      mockFindSimilarLessons.mockResolvedValue([
+        { item: lesson, score: 0.99 },
+      ]);
 
       const result = await shouldPropose(tempDir, 'Use Polars instead of pandas for files');
       expect(result.shouldPropose).toBe(false);
-      expect(result.reason).toBeDefined();
+      expect(result.reason).toContain('Near-duplicate');
+    });
+
+    it('returns true for moderately similar text', async () => {
+      // Score 0.90 is below the 0.98 duplicate threshold, so findSimilarLessons
+      // won't return it (threshold filters it out)
+      mockFindSimilarLessons.mockResolvedValue([]);
+
+      const result = await shouldPropose(
+        tempDir,
+        'Use Polars instead of pandas for large CSV files in production'
+      );
+      expect(result.shouldPropose).toBe(true);
     });
 
     it('returns false for vague insight', async () => {

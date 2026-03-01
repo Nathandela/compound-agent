@@ -4,12 +4,11 @@
  */
 
 import { execSync } from 'node:child_process';
-import { appendFile, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { ARCHIVE_DIR } from '../memory/storage/compact.js';
 import { appendLesson, appendMemoryItem, LESSONS_PATH } from '../memory/storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
 import { createFullLesson, createPattern, createPreference, createQuickLesson, createSolution, daysAgo, setupCliTestContext } from '../test-utils.js';
@@ -155,7 +154,7 @@ describe('Management Commands', { tags: ['integration'] }, () => {
   describe('compact command', () => {
     it('shows help for compact command', () => {
       const { combined } = runCli('compact --help');
-      expect(combined).toContain('archive old lessons');
+      expect(combined).toContain('remove tombstones');
       expect(combined).toContain('--force');
       expect(combined).toContain('--dry-run');
     });
@@ -193,21 +192,14 @@ describe('Management Commands', { tags: ['integration'] }, () => {
       expect(content).toContain('"deleted":true');
     });
 
-    it('archives old lessons with force flag', async () => {
-      // Create an old lesson (100 days ago, no retrievals)
+    it('keeps old lessons without archiving them', async () => {
       const oldDate = daysAgo(100);
       await appendLesson(getTempDir(), createQuickLesson('L001', 'old lesson', { created: oldDate }));
-      // And a recent lesson
       await appendLesson(getTempDir(), createQuickLesson('L002', 'new lesson'));
 
       const { combined } = runCli('compact --force');
-      expect(combined).toContain('Archived: 1 lesson');
-      expect(combined).toContain('Lessons remaining: 1');
-
-      // Verify archive file was created
-      const archiveDir = join(getTempDir(), ARCHIVE_DIR);
-      const archives = await readdir(archiveDir);
-      expect(archives.length).toBeGreaterThan(0);
+      expect(combined).toContain('Lessons remaining: 2');
+      expect(combined).not.toContain('Archived:');
     });
 
     it('removes tombstones with force flag', async () => {

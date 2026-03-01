@@ -1,11 +1,9 @@
 /**
- * Tests for compaction and auto-archive functionality
+ * Tests for compaction (tombstone removal and JSONL rewrite)
  *
  * Invariants tested:
- * - Archived lessons are never lost
  * - Active lessons remain in index.jsonl
  * - Tombstones are correctly applied
- * - Archive files use format: YYYY-MM.jsonl
  * - TOCTOU safety: compact reads file once, produces consistent results
  */
 
@@ -19,9 +17,7 @@ import type { MemoryItem } from '../types.js';
 import {
   compact,
   countTombstones,
-  getArchivePath,
   needsCompaction,
-  ARCHIVE_DIR,
   TOMBSTONE_THRESHOLD,
 } from './compact.js';
 import { appendLesson, LESSONS_PATH, readLessons } from './jsonl.js';
@@ -78,29 +74,6 @@ describe('Compaction', () => {
     supersedes: [],
     related: [],
     retrievalCount: options.retrievalCount,
-  });
-
-  /**
-   * Helper to create an old lesson (>90 days)
-   */
-  const createOldLesson = (id: string, insight: string): MemoryItem => {
-    const oldDate = new Date();
-    oldDate.setDate(oldDate.getDate() - 100); // 100 days ago
-    return createLesson(id, insight, { created: oldDate.toISOString() });
-  };
-
-  describe('getArchivePath', () => {
-    it('generates correct archive path for a date', () => {
-      const date = new Date('2024-06-15T10:00:00Z');
-      const path = getArchivePath(tempDir, date);
-      expect(path).toBe(join(tempDir, ARCHIVE_DIR, '2024-06.jsonl'));
-    });
-
-    it('pads single-digit months with zero', () => {
-      const date = new Date('2024-01-05T10:00:00Z');
-      const path = getArchivePath(tempDir, date);
-      expect(path).toContain('2024-01.jsonl');
-    });
   });
 
   describe('countTombstones', () => {
@@ -180,41 +153,55 @@ describe('Compaction', () => {
   });
 
   describe('compact', () => {
-    it('runs both archive and tombstone removal', async () => {
-      // Add old lesson
-      await appendLesson(tempDir, createOldLesson('L001', 'old'));
-      // Add lesson and delete it
+    it('removes tombstones and keeps active lessons', async () => {
+      // Add lessons
+      await appendLesson(tempDir, createLesson('L001', 'first'));
       await appendLesson(tempDir, createLesson('L002', 'deleted'));
       await appendLesson(tempDir, { ...createLesson('L002', 'deleted'), deleted: true });
-      // Add normal lesson
       await appendLesson(tempDir, createLesson('L003', 'keep'));
 
       const result = await compact(tempDir);
 
-      expect(result.archived).toBe(1);
+      expect(result.archived).toBe(0);
       expect(result.tombstonesRemoved).toBeGreaterThanOrEqual(1);
 
-      // Only L003 should remain
+      // L001 and L003 should remain
       const { lessons } = await readLessons(tempDir);
-      expect(lessons).toHaveLength(1);
-      expect(lessons[0]!.id).toBe('L003');
+      expect(lessons).toHaveLength(2);
+      expect(lessons.map((l) => l.id).sort()).toEqual(['L001', 'L003']);
+    });
+
+    it('keeps old lessons without archiving them', async () => {
+      const oldDate = new Date();
+      oldDate.setDate(oldDate.getDate() - 100);
+      await appendLesson(tempDir, createLesson('L001', 'old', { created: oldDate.toISOString() }));
+      await appendLesson(tempDir, createLesson('L002', 'keep'));
+
+      const result = await compact(tempDir);
+
+      // No archiving -- old lessons stay in the main file
+      expect(result.archived).toBe(0);
+      expect(result.lessonsRemaining).toBe(2);
+
+      const { lessons } = await readLessons(tempDir);
+      expect(lessons).toHaveLength(2);
     });
 
     it('returns stats about compaction', async () => {
-      await appendLesson(tempDir, createOldLesson('L001', 'old'));
-      await appendLesson(tempDir, createLesson('L002', 'keep'));
+      await appendLesson(tempDir, createLesson('L001', 'keep1'));
+      await appendLesson(tempDir, createLesson('L002', 'keep2'));
 
       const result = await compact(tempDir);
 
       expect(result).toHaveProperty('archived');
       expect(result).toHaveProperty('tombstonesRemoved');
       expect(result).toHaveProperty('lessonsRemaining');
-      expect(result.lessonsRemaining).toBe(1);
+      expect(result.lessonsRemaining).toBe(2);
     });
 
     it('is idempotent', async () => {
-      await appendLesson(tempDir, createOldLesson('L001', 'old'));
-      await appendLesson(tempDir, createLesson('L002', 'keep'));
+      await appendLesson(tempDir, createLesson('L001', 'keep1'));
+      await appendLesson(tempDir, createLesson('L002', 'keep2'));
 
       const result1 = await compact(tempDir);
       const result2 = await compact(tempDir);
@@ -268,7 +255,7 @@ describe('Compaction', () => {
 
   describe('TOCTOU safety', () => {
     it('compact reads the JSONL file at most once', async () => {
-      await appendLesson(tempDir, createOldLesson('L001', 'old'));
+      await appendLesson(tempDir, createLesson('L001', 'first'));
       await appendLesson(tempDir, createLesson('L002', 'keep'));
       await appendLesson(tempDir, createLesson('L003', 'deleted'));
       await appendLesson(tempDir, { ...createLesson('L003', 'deleted'), deleted: true });
@@ -286,10 +273,9 @@ describe('Compaction', () => {
     });
 
     it('returns exact counts for known input', async () => {
-      // 2 archivable (old, 0 retrievals)
-      await appendLesson(tempDir, createOldLesson('L001', 'old1'));
-      await appendLesson(tempDir, createOldLesson('L002', 'old2'));
-      // 2 active
+      // 4 active lessons (no archiving)
+      await appendLesson(tempDir, createLesson('L001', 'lesson1'));
+      await appendLesson(tempDir, createLesson('L002', 'lesson2'));
       await appendLesson(tempDir, createLesson('L003', 'active1'));
       await appendLesson(tempDir, createLesson('L004', 'active2'));
       // 1 deleted (creates 1 tombstone)
@@ -298,21 +284,21 @@ describe('Compaction', () => {
 
       const result = await compact(tempDir);
 
-      expect(result.archived).toBe(2);
+      expect(result.archived).toBe(0);
       expect(result.tombstonesRemoved).toBe(1);
-      expect(result.lessonsRemaining).toBe(2);
+      expect(result.lessonsRemaining).toBe(4);
     });
 
-    it('maintains data invariant: archived + remaining = total non-deleted unique lessons', async () => {
-      await appendLesson(tempDir, createOldLesson('L001', 'archive'));
-      await appendLesson(tempDir, createLesson('L002', 'active'));
+    it('maintains data invariant: remaining = total non-deleted unique lessons', async () => {
+      await appendLesson(tempDir, createLesson('L001', 'keep1'));
+      await appendLesson(tempDir, createLesson('L002', 'keep2'));
       await appendLesson(tempDir, createLesson('L003', 'willdelete'));
       await appendLesson(tempDir, { ...createLesson('L003', 'willdelete'), deleted: true });
 
       const result = await compact(tempDir);
 
-      // L001 (archived) + L002 (remaining) = 2 total non-deleted unique lessons
-      expect(result.archived + result.lessonsRemaining).toBe(2);
+      // L001 + L002 = 2 total non-deleted unique lessons
+      expect(result.lessonsRemaining).toBe(2);
 
       // File contains exactly lessonsRemaining lessons
       const { lessons } = await readLessons(tempDir);

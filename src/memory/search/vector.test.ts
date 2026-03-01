@@ -15,7 +15,12 @@ import {
 } from '../storage/sqlite/index.js';
 import { createQuickLesson } from '../../test-utils.js';
 
-import { clearCctEmbeddingCache, cosineSimilarity, searchVector } from './vector.js';
+import {
+  clearCctEmbeddingCache,
+  cosineSimilarity,
+  findSimilarLessons,
+  searchVector,
+} from './vector.js';
 
 describe('vector search', () => {
   describe('cosineSimilarity', () => {
@@ -441,5 +446,150 @@ describe('vector search', () => {
         expect(results.length).toBeLessThanOrEqual(3);
       });
     });
+  });
+
+  describe('findSimilarLessons', () => {
+    let tempDir: string;
+
+    beforeEach(async () => {
+      tempDir = await mkdtemp(join(tmpdir(), 'compound-agent-similar-'));
+    });
+
+    afterEach(async () => {
+      closeDb();
+      await rm(tempDir, { recursive: true, force: true });
+      vi.restoreAllMocks();
+    });
+
+    it('returns empty when no items exist', async () => {
+      const results = await findSimilarLessons(tempDir, 'some text');
+      expect(results).toEqual([]);
+    });
+
+    it('returns empty when model unavailable', async () => {
+      // Add a lesson so items exist
+      await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
+      await rebuildIndex(tempDir);
+
+      // Mock isModelAvailable to return false
+      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(false);
+
+      const results = await findSimilarLessons(tempDir, 'test query');
+      expect(results).toEqual([]);
+    });
+
+    it('excludes specified excludeId', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'lesson alpha'));
+      await appendLesson(tempDir, createQuickLesson('L002', 'lesson beta'));
+      await rebuildIndex(tempDir);
+
+      // Mock isModelAvailable and embedText
+      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+
+      const results = await findSimilarLessons(tempDir, 'lesson text', { excludeId: 'L001' });
+      const ids = results.map((r) => r.item.id);
+      expect(ids).not.toContain('L001');
+      expect(ids).toContain('L002');
+    });
+
+    it('skips invalidated items', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'valid lesson'));
+      await appendLesson(tempDir, {
+        ...createQuickLesson('L002', 'invalidated lesson'),
+        invalidatedAt: '2026-01-15T10:30:00.000Z',
+        invalidationReason: 'outdated',
+      });
+      await rebuildIndex(tempDir);
+
+      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+
+      const results = await findSimilarLessons(tempDir, 'test query', { threshold: 0 });
+      expect(results).toHaveLength(1);
+      expect(results[0]!.item.id).toBe('L001');
+    });
+
+    it('respects custom threshold', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'close match'));
+      await appendLesson(tempDir, createQuickLesson('L002', 'distant match'));
+      await rebuildIndex(tempDir);
+
+      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+
+      let callCount = 0;
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(async () => {
+        callCount++;
+        // First call is the query vector
+        if (callCount === 1) return [1, 0, 0];
+        // Second call (L001): very similar to query
+        if (callCount === 2) return [0.99, 0.1, 0];
+        // Third call (L002): less similar
+        return [0.5, 0.5, 0.5];
+      });
+
+      // High threshold: only very similar items
+      const highResults = await findSimilarLessons(tempDir, 'test', { threshold: 0.95 });
+      expect(highResults).toHaveLength(1);
+      expect(highResults[0]!.item.id).toBe('L001');
+    });
+
+    it('results sorted by score descending', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'close match'));
+      await appendLesson(tempDir, createQuickLesson('L002', 'exact match'));
+      await appendLesson(tempDir, createQuickLesson('L003', 'distant match'));
+      await rebuildIndex(tempDir);
+
+      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(
+        async (text: string) => {
+          if (text === 'exact match') return [1, 0, 0];
+          if (text === 'close match') return [0.9, 0.1, 0];
+          if (text === 'distant match') return [0.7, 0.3, 0];
+          return [1, 0, 0]; // query
+        }
+      );
+
+      const results = await findSimilarLessons(tempDir, 'query', { threshold: 0.5 });
+      expect(results.length).toBeGreaterThan(1);
+      for (let i = 1; i < results.length; i++) {
+        expect(results[i - 1]!.score).toBeGreaterThanOrEqual(results[i]!.score);
+      }
+    });
+
+    it('does NOT match lessons with same trigger but different insights', async () => {
+      await appendLesson(
+        tempDir,
+        createQuickLesson('L001', 'use Polars for data frames', { trigger: 'data processing' })
+      );
+      await appendLesson(
+        tempDir,
+        createQuickLesson('L002', 'never commit secrets to git', { trigger: 'data processing' })
+      );
+      await rebuildIndex(tempDir);
+
+      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(
+        async (text: string) => {
+          if (text.includes('Polars')) return [1, 0, 0];
+          if (text.includes('secrets')) return [0, 1, 0]; // orthogonal
+          return [1, 0, 0]; // query about data frames
+        }
+      );
+
+      const results = await findSimilarLessons(tempDir, 'data frame processing', {
+        threshold: 0.80,
+      });
+
+      const ids = results.map((r) => r.item.id);
+      expect(ids).toContain('L001');
+      expect(ids).not.toContain('L002');
+    });
+
+    // NOTE: Real-embedding tests for findSimilarLessons are omitted here because
+    // this file runs in the unit (threads) pool. Loading the native ~150MB embedding
+    // model in thread workers causes SIGABRT on cleanup. The mocked tests above
+    // cover all logic paths. Real-model integration tests belong in
+    // src/memory/embeddings/ where they run in the safe singleFork pool.
   });
 });

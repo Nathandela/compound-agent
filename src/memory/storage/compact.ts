@@ -1,41 +1,27 @@
 /**
- * Compaction and auto-archive for lessons
+ * Tombstone removal and JSONL rewrite
  *
  * Handles:
- * - Archiving old lessons (>90 days with 0 retrievals)
  * - Removing tombstones through JSONL rewrite
  * - Tracking compaction thresholds
  */
 
-import { appendFile, mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 import { MemoryItemSchema } from '../types.js';
 import type { MemoryItem } from '../types.js';
-import { getLessonAgeDays } from '../../utils.js';
 
 import { LESSONS_PATH } from './jsonl.js';
 
-/** Relative path to archive directory from repo root */
-export const ARCHIVE_DIR = '.claude/lessons/archive';
-
 /** Number of tombstones that triggers automatic compaction */
 export const TOMBSTONE_THRESHOLD = 100;
-
-/** Age threshold for archiving (in days) */
-export const ARCHIVE_AGE_DAYS = 90;
-
-/** Month offset for JavaScript's 0-indexed months */
-const MONTH_INDEX_OFFSET = 1;
-
-/** Padding length for month in archive filename (e.g., "01" not "1") */
-const MONTH_PAD_LENGTH = 2;
 
 /**
  * Result of a compaction operation
  */
 export interface CompactResult {
-  /** Number of lessons moved to archive */
+  /** Number of lessons moved to archive (always 0, kept for API compat) */
   archived: number;
   /** Number of tombstones removed */
   tombstonesRemoved: number;
@@ -43,16 +29,6 @@ export interface CompactResult {
   lessonsRemaining: number;
   /** Number of records dropped due to invalid schema */
   droppedInvalid: number;
-}
-
-/**
- * Generate archive file path for a given date.
- * Format: .claude/lessons/archive/YYYY-MM.jsonl
- */
-export function getArchivePath(repoRoot: string, date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + MONTH_INDEX_OFFSET).padStart(MONTH_PAD_LENGTH, '0');
-  return join(repoRoot, ARCHIVE_DIR, `${year}-${month}.jsonl`);
 }
 
 /**
@@ -108,24 +84,10 @@ export async function needsCompaction(repoRoot: string): Promise<boolean> {
 }
 
 /**
- * Determine if a lesson should be archived based on age and retrieval count.
- * Lessons are archived if older than ARCHIVE_AGE_DAYS and never retrieved.
+ * Run compaction: remove tombstones and invalid records, rewrite JSONL.
  *
- * @param lesson - The lesson to evaluate
- * @returns true if lesson should be archived
- */
-function shouldArchive(lesson: MemoryItem): boolean {
-  const ageDays = getLessonAgeDays(lesson);
-
-  // Archive if: older than threshold AND never retrieved
-  return ageDays > ARCHIVE_AGE_DAYS && (lesson.retrievalCount === undefined || lesson.retrievalCount === 0);
-}
-
-/**
- * Run full compaction: archive old lessons and remove tombstones.
- *
- * Reads the JSONL file exactly once, computes all operations in-memory,
- * then writes archive files and atomically replaces the main file.
+ * Reads the JSONL file exactly once, deduplicates in-memory,
+ * then atomically replaces the main file.
  */
 export async function compact(repoRoot: string): Promise<CompactResult> {
   const filePath = join(repoRoot, LESSONS_PATH);
@@ -167,39 +129,10 @@ export async function compact(repoRoot: string): Promise<CompactResult> {
     }
   }
 
-  // 3. Split into archivable and kept
-  const toArchive: MemoryItem[] = [];
-  const toKeep: MemoryItem[] = [];
+  // 3. Collect all remaining lessons
+  const toKeep = [...lessonMap.values()];
 
-  for (const lesson of lessonMap.values()) {
-    if (shouldArchive(lesson)) {
-      toArchive.push(lesson);
-    } else {
-      toKeep.push(lesson);
-    }
-  }
-
-  // 4. Write archive files
-  if (toArchive.length > 0) {
-    const archiveGroups = new Map<string, MemoryItem[]>();
-    for (const lesson of toArchive) {
-      const created = new Date(lesson.created);
-      const archivePath = getArchivePath(repoRoot, created);
-      const group = archiveGroups.get(archivePath) ?? [];
-      group.push(lesson);
-      archiveGroups.set(archivePath, group);
-    }
-
-    const archiveDir = join(repoRoot, ARCHIVE_DIR);
-    await mkdir(archiveDir, { recursive: true });
-
-    for (const [archivePath, archiveLessons] of archiveGroups) {
-      const lines = archiveLessons.map((l) => JSON.stringify(l) + '\n').join('');
-      await appendFile(archivePath, lines, 'utf-8');
-    }
-  }
-
-  // 5. Atomic write of main JSONL with only kept lessons
+  // 4. Atomic write of main JSONL with only kept lessons
   await mkdir(dirname(filePath), { recursive: true });
   const tempPath = filePath + '.tmp';
   const lines = toKeep.map((lesson) => JSON.stringify(lesson) + '\n');
@@ -207,7 +140,7 @@ export async function compact(repoRoot: string): Promise<CompactResult> {
   await rename(tempPath, filePath);
 
   return {
-    archived: toArchive.length,
+    archived: 0,
     tombstonesRemoved: tombstoneCount,
     lessonsRemaining: toKeep.length,
     droppedInvalid: droppedCount,

@@ -57,7 +57,6 @@ async function compactAction(options: { force?: boolean; dryRun?: boolean }): Pr
   const result = await compact(repoRoot);
 
   console.log('\nCompaction complete:');
-  console.log(`  Archived: ${result.archived} lesson(s)`);
   console.log(`  Tombstones removed: ${result.tombstonesRemoved}`);
   console.log(`  Lessons remaining: ${result.lessonsRemaining}`);
   if (result.droppedInvalid > 0) {
@@ -160,7 +159,7 @@ async function statsAction(): Promise<void> {
 export function registerMaintenanceCommands(program: Command): void {
   program
     .command('compact')
-    .description('Compact lessons: archive old lessons and remove tombstones')
+    .description('Compact lessons: remove tombstones and invalid records')
     .option('-f, --force', 'Run compaction even if below threshold')
     .option('--dry-run', 'Show what would be done without making changes')
     .action(async (options: { force?: boolean; dryRun?: boolean }) => {

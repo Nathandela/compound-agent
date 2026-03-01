@@ -7,6 +7,7 @@
 
 import { readCctPatterns, type CctPattern } from '../../compound/index.js';
 import { embedText } from '../embeddings/index.js';
+import { isModelAvailable } from '../embeddings/model.js';
 import { contentHash, getCachedEmbedding, readMemoryItems, setCachedEmbedding } from '../storage/index.js';
 import type { MemoryItem } from '../types.js';
 
@@ -163,4 +164,65 @@ export async function searchVector(
   // Sort by score descending and take top N
   scored.sort((a, b) => b.score - a.score);
   return scored.slice(0, limit);
+}
+
+export interface SimilarLesson {
+  item: MemoryItem;
+  score: number;
+}
+
+export interface FindSimilarOptions {
+  threshold?: number;
+  excludeId?: string;
+}
+
+const DEFAULT_THRESHOLD = 0.80;
+
+/**
+ * Find lessons semantically similar to the given text.
+ * Embeds using insight text only (not trigger) to avoid noise from generic triggers.
+ * Does NOT include CCT patterns.
+ */
+export async function findSimilarLessons(
+  repoRoot: string,
+  text: string,
+  options?: FindSimilarOptions
+): Promise<SimilarLesson[]> {
+  const threshold = options?.threshold ?? DEFAULT_THRESHOLD;
+  const excludeId = options?.excludeId;
+
+  if (!isModelAvailable()) return [];
+
+  const { items } = await readMemoryItems(repoRoot);
+  if (items.length === 0) return [];
+
+  const queryVector = await embedText(text);
+
+  const scored: SimilarLesson[] = [];
+  for (const item of items) {
+    if (item.invalidatedAt) continue;
+    if (excludeId && item.id === excludeId) continue;
+
+    try {
+      // Use insight ONLY for embedding (NOT trigger + insight).
+      // Hash differs from searchVector's hash to avoid cache conflicts.
+      const hash = contentHash(item.insight, '');
+      let itemVector = getCachedEmbedding(repoRoot, item.id, hash);
+
+      if (!itemVector) {
+        itemVector = await embedText(item.insight);
+        setCachedEmbedding(repoRoot, item.id, itemVector, hash);
+      }
+
+      const score = cosineSimilarity(queryVector, itemVector);
+      if (score >= threshold) {
+        scored.push({ item, score });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored;
 }

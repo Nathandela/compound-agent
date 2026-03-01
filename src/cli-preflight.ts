@@ -28,7 +28,7 @@ const NEEDS_SQLITE = new Set([
   // Management - invalidation
   'wrong', 'validate',
   // Management - maintenance
-  'compact', 'rebuild', 'stats', 'prime',
+  'compact', 'rebuild', 'stats', 'prime', 'clean-lessons',
   // Management - IO
   'export', 'import',
   // Audit & compound

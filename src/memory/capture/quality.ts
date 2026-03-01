@@ -9,11 +9,12 @@
  * Strategy: capture aggressively, prune later.
  */
 
-import { searchKeyword, syncIfNeeded } from '../storage/index.js';
-import type { MemoryItem } from '../types.js';
+import { isModelAvailable } from '../embeddings/model.js';
+import { findSimilarLessons } from '../search/index.js';
+import { syncIfNeeded } from '../storage/index.js';
 
-/** Default similarity threshold for duplicate detection */
-const DEFAULT_SIMILARITY_THRESHOLD = 0.8;
+/** Cosine similarity threshold for near-duplicate detection */
+const DUPLICATE_THRESHOLD = 0.98;
 
 /** Result of novelty check */
 export interface NoveltyResult {
@@ -28,70 +29,36 @@ export interface NoveltyOptions {
 }
 
 /**
- * Check if an insight is novel (not a duplicate of existing lessons).
- * Uses keyword search to find potentially similar lessons.
+ * Check if an insight is novel (not a near-duplicate of existing lessons).
+ * Uses semantic embeddings with cosine similarity.
+ * Falls back to novel: true when model is unavailable or on error.
  */
 export async function isNovel(
   repoRoot: string,
   insight: string,
   options: NoveltyOptions = {}
 ): Promise<NoveltyResult> {
-  const threshold = options.threshold ?? DEFAULT_SIMILARITY_THRESHOLD;
+  const threshold = options.threshold ?? DUPLICATE_THRESHOLD;
 
-  // Sync index if JSONL has changed
-  await syncIfNeeded(repoRoot);
-
-  // Extract key words for search (take first 3 significant words)
-  const words = insight
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .split(/\s+/)
-    .filter((w) => w.length > 3)
-    .slice(0, 3);
-
-  if (words.length === 0) {
+  if (!isModelAvailable()) {
     return { novel: true };
   }
 
-  // Search for each word and collect results
-  const searchQuery = words.join(' OR ');
-  const results = await searchKeyword(repoRoot, searchQuery, 10);
-
-  if (results.length === 0) {
-    return { novel: true };
-  }
-
-  return checkSimilarity(insight, results, threshold);
-}
-
-/**
- * Check similarity between insight and existing lessons using Jaccard similarity.
- */
-function checkSimilarity(
-  insight: string,
-  lessons: MemoryItem[],
-  threshold: number
-): NoveltyResult {
-  const insightWords = new Set(insight.toLowerCase().split(/\s+/));
-
-  for (const lesson of lessons) {
-    const lessonWords = new Set(lesson.insight.toLowerCase().split(/\s+/));
-
-    // Calculate Jaccard similarity
-    const intersection = [...insightWords].filter((w) => lessonWords.has(w)).length;
-    const union = new Set([...insightWords, ...lessonWords]).size;
-    const similarity = union > 0 ? intersection / union : 0;
-
-    if (similarity >= threshold) {
+  try {
+    await syncIfNeeded(repoRoot);
+    const similar = await findSimilarLessons(repoRoot, insight, { threshold });
+    const top = similar[0];
+    if (top) {
       return {
         novel: false,
-        reason: `Found similar existing lesson: "${lesson.insight.slice(0, 50)}..."`,
-        existingId: lesson.id,
+        reason: `Near-duplicate of existing lesson: "${top.item.insight.slice(0, 50)}..."`,
+        existingId: top.item.id,
       };
     }
+    return { novel: true };
+  } catch {
+    return { novel: true };
   }
-
-  return { novel: true };
 }
 
 /** Minimum word count for a specific insight */

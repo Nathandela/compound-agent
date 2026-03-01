@@ -29,6 +29,7 @@ import { registerVerifyGatesCommand } from './verify-gates.js';
 import { registerAboutCommand } from './about.js';
 import { registerKnowledgeCommand } from './knowledge.js';
 import { registerKnowledgeIndexCommand } from './knowledge-index.js';
+import { registerCleanLessonsCommand } from './clean-lessons.js';
 
 
 export { registerCaptureCommands } from './capture.js';
@@ -82,6 +83,7 @@ export function registerManagementCommands(program: Command): void {
   registerAboutCommand(program);
   registerKnowledgeCommand(program);
   registerKnowledgeIndexCommand(program);
+  registerCleanLessonsCommand(program);
 
   // Deprecation stub: worktree feature removed (superseded by Claude Code native EnterWorktree)
   program.command('worktree').description('(removed) Use Claude Code native worktree support').action(() => {

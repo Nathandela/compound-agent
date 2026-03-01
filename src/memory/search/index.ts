@@ -9,8 +9,8 @@
  */
 
 // Vector search
-export { cosineSimilarity, searchVector } from './vector.js';
-export type { ScoredLesson, SearchVectorOptions } from './vector.js';
+export { cosineSimilarity, findSimilarLessons, searchVector } from './vector.js';
+export type { FindSimilarOptions, ScoredLesson, SearchVectorOptions, SimilarLesson } from './vector.js';
 
 // Ranking
 export {
