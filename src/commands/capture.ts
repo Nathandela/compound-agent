@@ -210,16 +210,18 @@ async function checkSimilarityPostCapture(repoRoot: string, item: MemoryItem): P
 
     const { syncIfNeeded } = await import('../memory/storage/sqlite/sync.js');
     const { findSimilarLessons } = await import('../memory/search/vector.js');
-    const { unloadEmbedding } = await import('../memory/embeddings/nomic.js');
+    const { embedText, unloadEmbedding } = await import('../memory/embeddings/nomic.js');
     const chalk = await import('chalk');
     try {
+      // Early probe to catch runtime failures before full similarity check
+      await embedText('test');
       await syncIfNeeded(repoRoot);
       const similar = await findSimilarLessons(repoRoot, item.insight, { excludeId: item.id });
       if (similar.length > 0) {
         console.log('');
         out.warn('Similar lessons found:');
         for (const s of similar.slice(0, 3)) {
-          console.log(`  ${chalk.default.dim(s.item.id)} (${(s.score * 100).toFixed(0)}%) ${s.item.insight.slice(0, 60)}...`);
+          console.log(`  ${chalk.default.dim(s.item.id)} (${(s.score * 100).toFixed(0)}%) ${s.item.insight.slice(0, 60)}${s.item.insight.length > 60 ? '...' : ''}`);
         }
         console.log('');
         console.log(`Run ${chalk.default.bold("'npx ca clean-lessons'")} to review and resolve.`);
@@ -227,8 +229,11 @@ async function checkSimilarityPostCapture(repoRoot: string, item: MemoryItem): P
     } finally {
       unloadEmbedding();
     }
-  } catch {
+  } catch (err) {
     // Similarity check is best-effort
+    if (process.env['CA_DEBUG']) {
+      process.stderr.write(`[CA_DEBUG] checkSimilarityPostCapture catch: ${err instanceof Error ? err.message : String(err)}\n`);
+    }
   }
 }
 

@@ -4,7 +4,7 @@
 
 ### Data Invariants
 ```
-D1: SIMILARITY_THRESHOLD = 0.8, MIN_WORD_COUNT = 4
+D1: DUPLICATE_THRESHOLD = 0.98, MIN_WORD_COUNT = 4
 D2: All check functions return Result with boolean + optional reason
 ```
 

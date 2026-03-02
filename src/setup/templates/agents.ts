@@ -8,6 +8,7 @@
  */
 
 import { EXTERNAL_AGENT_TEMPLATES } from './agents-external.js';
+import { LESSONS_AGENT_TEMPLATES } from './agents-lessons.js';
 import { PHASE11_AGENT_TEMPLATES } from './agents-phase11.js';
 import { REVIEW_AGENT_TEMPLATES } from './agents-review.js';
 
@@ -15,4 +16,5 @@ export const AGENT_TEMPLATES: Record<string, string> = {
   ...REVIEW_AGENT_TEMPLATES,
   ...PHASE11_AGENT_TEMPLATES,
   ...EXTERNAL_AGENT_TEMPLATES,
+  ...LESSONS_AGENT_TEMPLATES,
 };

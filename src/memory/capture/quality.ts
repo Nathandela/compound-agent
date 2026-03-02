@@ -56,7 +56,10 @@ export async function isNovel(
       };
     }
     return { novel: true };
-  } catch {
+  } catch (err) {
+    if (process.env['CA_DEBUG']) {
+      process.stderr.write(`[CA_DEBUG] isNovel catch: ${err instanceof Error ? err.message : String(err)}\n`);
+    }
     return { novel: true };
   }
 }

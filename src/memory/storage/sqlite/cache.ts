@@ -115,6 +115,57 @@ export function getCachedEmbeddingsBulk(repoRoot: string): Map<string, CachedEmb
 }
 
 /**
+ * Get cached insight-only embedding for a lesson.
+ * Used by findSimilarLessons (insight-only hash, separate from searchVector's trigger+insight hash).
+ */
+export function getCachedInsightEmbedding(
+  repoRoot: string,
+  lessonId: string,
+  expectedHash?: string
+): number[] | null {
+  const database = openDb(repoRoot);
+
+  const row = database
+    .prepare('SELECT embedding_insight, content_hash_insight FROM lessons WHERE id = ?')
+    .get(lessonId) as { embedding_insight: Buffer | null; content_hash_insight: string | null } | undefined;
+
+  if (!row || !row.embedding_insight || !row.content_hash_insight) {
+    return null;
+  }
+
+  if (expectedHash && row.content_hash_insight !== expectedHash) {
+    return null;
+  }
+
+  const float32 = new Float32Array(
+    row.embedding_insight.buffer,
+    row.embedding_insight.byteOffset,
+    row.embedding_insight.byteLength / 4
+  );
+  return Array.from(float32);
+}
+
+/**
+ * Cache insight-only embedding for a lesson in SQLite.
+ * Uses UPDATE-only — the row must already exist.
+ */
+export function setCachedInsightEmbedding(
+  repoRoot: string,
+  lessonId: string,
+  embedding: Float32Array | number[],
+  hash: string
+): void {
+  const database = openDb(repoRoot);
+
+  const float32 = embedding instanceof Float32Array ? embedding : new Float32Array(embedding);
+  const buffer = Buffer.from(float32.buffer, float32.byteOffset, float32.byteLength);
+
+  database
+    .prepare('UPDATE lessons SET embedding_insight = ?, content_hash_insight = ? WHERE id = ?')
+    .run(buffer, hash, lessonId);
+}
+
+/**
  * Collect all cached embeddings from the database.
  * Used during index rebuild to preserve valid caches.
  * @param database - SQLite database instance
@@ -123,12 +174,25 @@ export function getCachedEmbeddingsBulk(repoRoot: string): Map<string, CachedEmb
 export function collectCachedEmbeddings(database: DatabaseType): Map<string, CachedEmbeddingData> {
   const cache = new Map<string, CachedEmbeddingData>();
   const rows = database
-    .prepare('SELECT id, embedding, content_hash FROM lessons WHERE embedding IS NOT NULL')
-    .all() as Array<{ id: string; embedding: Buffer; content_hash: string | null }>;
+    .prepare('SELECT id, embedding, content_hash, embedding_insight, content_hash_insight FROM lessons WHERE embedding IS NOT NULL OR embedding_insight IS NOT NULL')
+    .all() as Array<{ id: string; embedding: Buffer | null; content_hash: string | null; embedding_insight: Buffer | null; content_hash_insight: string | null }>;
 
   for (const row of rows) {
     if (row.embedding && row.content_hash) {
-      cache.set(row.id, { embedding: row.embedding, contentHash: row.content_hash });
+      cache.set(row.id, {
+        embedding: row.embedding,
+        contentHash: row.content_hash,
+        embeddingInsight: row.embedding_insight,
+        contentHashInsight: row.content_hash_insight,
+      });
+    } else if (row.embedding_insight && row.content_hash_insight) {
+      // Only insight cache exists — still worth preserving
+      cache.set(row.id, {
+        embedding: row.embedding_insight, // placeholder, won't match hash
+        contentHash: '',
+        embeddingInsight: row.embedding_insight,
+        contentHashInsight: row.content_hash_insight,
+      });
     }
   }
   return cache;

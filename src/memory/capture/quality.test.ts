@@ -107,6 +107,25 @@ describe('quality filters', () => {
         { threshold: 0.95 }
       );
     });
+
+    it('treats exactly 0.98 as non-novel (boundary)', async () => {
+      const lesson = createQuickLesson('L001', 'Use Polars for large files');
+      mockFindSimilarLessons.mockResolvedValue([
+        { item: lesson, score: 0.98 },
+      ]);
+
+      const result = await isNovel(tempDir, 'Use Polars for large files');
+      expect(result.novel).toBe(false);
+      expect(result.existingId).toBe('L001');
+    });
+
+    it('treats just below 0.98 as novel (boundary)', async () => {
+      // findSimilarLessons with threshold=0.98 won't return items below 0.98
+      mockFindSimilarLessons.mockResolvedValue([]);
+
+      const result = await isNovel(tempDir, 'Use Polars for CSV processing');
+      expect(result.novel).toBe(true);
+    });
   });
 
   describe('isSpecific', () => {

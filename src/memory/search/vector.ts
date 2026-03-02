@@ -8,7 +8,7 @@
 import { readCctPatterns, type CctPattern } from '../../compound/index.js';
 import { embedText } from '../embeddings/index.js';
 import { isModelAvailable } from '../embeddings/model.js';
-import { contentHash, getCachedEmbeddingsBulk, readAllFromSqlite, setCachedEmbedding, syncIfNeeded } from '../storage/index.js';
+import { contentHash, getCachedEmbeddingsBulk, getCachedInsightEmbedding, readAllFromSqlite, setCachedEmbedding, setCachedInsightEmbedding, syncIfNeeded } from '../storage/index.js';
 import type { MemoryItem } from '../types.js';
 
 /**
@@ -181,6 +181,8 @@ export interface SimilarLesson {
 export interface FindSimilarOptions {
   threshold?: number;
   excludeId?: string;
+  /** Pre-loaded items to search. When provided, skips readMemoryItems(). */
+  items?: MemoryItem[];
 }
 
 const DEFAULT_THRESHOLD = 0.80;
@@ -200,15 +202,16 @@ export async function findSimilarLessons(
 
   if (!isModelAvailable()) return [];
 
-  // Ensure SQLite cache is fresh, then read from it (avoids redundant JSONL parse)
-  await syncIfNeeded(repoRoot);
-  const items = readAllFromSqlite(repoRoot);
+  let items: MemoryItem[];
+  if (options?.items) {
+    items = options.items;
+  } else {
+    await syncIfNeeded(repoRoot);
+    items = readAllFromSqlite(repoRoot);
+  }
   if (items.length === 0) return [];
 
   const queryVector = await embedText(text);
-
-  // Bulk-read all cached embeddings in one query (instead of N individual reads)
-  const cachedEmbeddings = getCachedEmbeddingsBulk(repoRoot);
 
   const scored: SimilarLesson[] = [];
   for (const item of items) {
@@ -217,16 +220,13 @@ export async function findSimilarLessons(
 
     try {
       // Use insight ONLY for embedding (NOT trigger + insight).
-      // Hash differs from searchVector's hash to avoid cache conflicts.
+      // Stored in separate columns to avoid cache conflicts with searchVector.
       const hash = contentHash(item.insight, '');
-      const cached = cachedEmbeddings.get(item.id);
-      let itemVector: number[];
+      let itemVector = getCachedInsightEmbedding(repoRoot, item.id, hash);
 
-      if (cached && cached.hash === hash) {
-        itemVector = cached.vector;
-      } else {
+      if (!itemVector) {
         itemVector = await embedText(item.insight);
-        setCachedEmbedding(repoRoot, item.id, itemVector, hash);
+        setCachedInsightEmbedding(repoRoot, item.id, itemVector, hash);
       }
 
       const score = cosineSimilarity(queryVector, itemVector);

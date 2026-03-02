@@ -16,7 +16,9 @@ export {
   contentHash,
   getCachedEmbedding,
   getCachedEmbeddingsBulk,
+  getCachedInsightEmbedding,
   setCachedEmbedding,
+  setCachedInsightEmbedding,
 } from './cache.js';
 export type { CachedEmbeddingEntry } from './cache.js';
 

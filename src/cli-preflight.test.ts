@@ -35,7 +35,7 @@ describe('commandNeedsSqlite', () => {
     'knowledge', 'index-docs',
     'show', 'update', 'delete',
     'wrong', 'validate',
-    'compact', 'rebuild', 'stats', 'prime',
+    'compact', 'rebuild', 'stats', 'prime', 'clean-lessons',
     'export', 'import',
     'audit', 'compound',
   ];

@@ -57,4 +57,6 @@ export interface MemoryItemRow {
 export interface CachedEmbeddingData {
   embedding: Buffer;
   contentHash: string;
+  embeddingInsight?: Buffer | null;
+  contentHashInsight?: string | null;
 }
