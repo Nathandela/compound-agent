@@ -94,6 +94,14 @@ async function handleModelAndEmbed(
     } catch {
       // Non-fatal: don't break init if background embedding fails to spawn
     }
+
+    // Pre-warm lesson embeddings so the first search is fast
+    try {
+      const { preWarmLessonEmbeddings } = await import('../memory/search/prewarm.js');
+      await preWarmLessonEmbeddings(repoRoot);
+    } catch {
+      // Non-fatal: don't break init if lesson pre-warming fails
+    }
   }
 
   return status;
