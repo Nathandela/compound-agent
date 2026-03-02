@@ -8,7 +8,7 @@
 import { readCctPatterns, type CctPattern } from '../../compound/index.js';
 import { embedText } from '../embeddings/index.js';
 import { isModelAvailable } from '../embeddings/model.js';
-import { contentHash, getCachedEmbedding, readMemoryItems, setCachedEmbedding } from '../storage/index.js';
+import { contentHash, getCachedEmbedding, getCachedInsightEmbedding, readMemoryItems, setCachedEmbedding, setCachedInsightEmbedding } from '../storage/index.js';
 import type { MemoryItem } from '../types.js';
 
 /**
@@ -174,6 +174,8 @@ export interface SimilarLesson {
 export interface FindSimilarOptions {
   threshold?: number;
   excludeId?: string;
+  /** Pre-loaded items to search. When provided, skips readMemoryItems(). */
+  items?: MemoryItem[];
 }
 
 const DEFAULT_THRESHOLD = 0.80;
@@ -193,7 +195,7 @@ export async function findSimilarLessons(
 
   if (!isModelAvailable()) return [];
 
-  const { items } = await readMemoryItems(repoRoot);
+  const items = options?.items ?? (await readMemoryItems(repoRoot)).items;
   if (items.length === 0) return [];
 
   const queryVector = await embedText(text);
@@ -205,13 +207,13 @@ export async function findSimilarLessons(
 
     try {
       // Use insight ONLY for embedding (NOT trigger + insight).
-      // Hash differs from searchVector's hash to avoid cache conflicts.
+      // Stored in separate columns to avoid cache conflicts with searchVector.
       const hash = contentHash(item.insight, '');
-      let itemVector = getCachedEmbedding(repoRoot, item.id, hash);
+      let itemVector = getCachedInsightEmbedding(repoRoot, item.id, hash);
 
       if (!itemVector) {
         itemVector = await embedText(item.insight);
-        setCachedEmbedding(repoRoot, item.id, itemVector, hash);
+        setCachedInsightEmbedding(repoRoot, item.id, itemVector, hash);
       }
 
       const score = cosineSimilarity(queryVector, itemVector);

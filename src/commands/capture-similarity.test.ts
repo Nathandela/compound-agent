@@ -22,6 +22,7 @@ vi.mock('../memory/storage/sqlite/sync.js', () => ({
   syncIfNeeded: vi.fn(async () => false),
 }));
 vi.mock('../memory/embeddings/nomic.js', () => ({
+  embedText: vi.fn(async () => new Array(768).fill(0)),
   unloadEmbedding: vi.fn(),
 }));
 

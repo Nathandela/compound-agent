@@ -15,7 +15,9 @@ export { closeDb, DB_PATH, openDb } from './connection.js';
 export {
   contentHash,
   getCachedEmbedding,
+  getCachedInsightEmbedding,
   setCachedEmbedding,
+  setCachedInsightEmbedding,
 } from './cache.js';
 
 // Sync

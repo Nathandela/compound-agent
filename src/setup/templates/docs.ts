@@ -295,7 +295,7 @@ npx ca validate <id>                         # Re-enable an invalidated item
 npx ca export                                # Export as JSON
 npx ca export --since 2026-01-01 --tags "security"
 npx ca import lessons-backup.jsonl           # Import from JSONL file
-npx ca compact                               # Remove tombstones and archive old items
+npx ca compact                               # Remove tombstones and rebuild index
 npx ca compact --dry-run
 npx ca compact --force
 npx ca rebuild                               # Rebuild SQLite index from JSONL
@@ -507,7 +507,7 @@ The index is rebuilt automatically when the JSONL changes. Force rebuild with \`
 | \`npx ca update\` | Appends an updated version (last-write-wins) |
 | \`npx ca delete\` | Appends with \`deleted: true\` flag |
 | \`npx ca wrong\` | Sets \`invalidatedAt\` (excluded from retrieval, preserved in storage) |
-| \`npx ca compact\` | Removes tombstones and archives old items, then rebuilds index |
+| \`npx ca compact\` | Removes tombstones, then rebuilds index |
 
 ---
 

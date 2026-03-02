@@ -136,7 +136,7 @@ confirmation_boost: confirmed=1.3, unconfirmed=1.0
 ```
 
 **Capture quality (lower bar, prune later):**
-- Novelty check: skip if >0.85 similarity with existing item
+- Novelty check: skip if >0.98 cosine similarity with existing item
 - Specificity check: reject obviously vague items
 - No actionability gate (capture more, prune later)
 - User confirmation for high-severity items only
@@ -258,7 +258,7 @@ The compound engineering cycle, triggered by explicit slash commands.
    - Pattern Matcher: find recurring patterns across sessions
    - Solution Writer: formulate structured memory items
 2. Quality filter (lower bar):
-   - Novelty check (>0.85 similarity = skip)
+   - Novelty check (>0.98 cosine similarity = skip)
    - Basic specificity check
    - No actionability gate
 3. Propose memory items to user

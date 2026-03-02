@@ -16,6 +16,7 @@ export {
   DB_PATH,
   ensureSqliteAvailable,
   getCachedEmbedding,
+  getCachedInsightEmbedding,
   getRetrievalStats,
   incrementRetrievalCount,
   openDb,
@@ -24,6 +25,7 @@ export {
   searchKeyword,
   searchKeywordScored,
   setCachedEmbedding,
+  setCachedInsightEmbedding,
   syncIfNeeded,
 } from './sqlite/index.js';
 export type { DbOptions, RetrievalStat, SyncOptions } from './sqlite/index.js';

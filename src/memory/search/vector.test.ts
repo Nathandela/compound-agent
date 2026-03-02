@@ -457,6 +457,7 @@ describe('vector search', () => {
 
     afterEach(async () => {
       closeDb();
+      clearCctEmbeddingCache();
       await rm(tempDir, { recursive: true, force: true });
       vi.restoreAllMocks();
     });
@@ -517,15 +518,11 @@ describe('vector search', () => {
 
       vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
 
-      let callCount = 0;
-      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(async () => {
-        callCount++;
-        // First call is the query vector
-        if (callCount === 1) return [1, 0, 0];
-        // Second call (L001): very similar to query
-        if (callCount === 2) return [0.99, 0.1, 0];
-        // Third call (L002): less similar
-        return [0.5, 0.5, 0.5];
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(async (text: string) => {
+        if (text === 'close match') return [0.99, 0.1, 0];
+        if (text === 'distant match') return [0.5, 0.5, 0.5];
+        // query
+        return [1, 0, 0];
       });
 
       // High threshold: only very similar items
