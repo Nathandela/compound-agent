@@ -16,6 +16,7 @@ export {
   DB_PATH,
   ensureSqliteAvailable,
   getCachedEmbedding,
+  getCachedEmbeddingsBulk,
   getRetrievalStats,
   incrementRetrievalCount,
   openDb,
@@ -27,7 +28,7 @@ export {
   setCachedEmbedding,
   syncIfNeeded,
 } from './sqlite/index.js';
-export type { DbOptions, RetrievalStat, SyncOptions } from './sqlite/index.js';
+export type { CachedEmbeddingEntry, DbOptions, RetrievalStat, SyncOptions } from './sqlite/index.js';
 
 // Compaction (tombstone removal)
 export {

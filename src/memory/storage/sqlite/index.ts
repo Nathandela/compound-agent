@@ -15,8 +15,10 @@ export { closeDb, DB_PATH, openDb } from './connection.js';
 export {
   contentHash,
   getCachedEmbedding,
+  getCachedEmbeddingsBulk,
   setCachedEmbedding,
 } from './cache.js';
+export type { CachedEmbeddingEntry } from './cache.js';
 
 // Sync
 export { rebuildIndex, syncIfNeeded } from './sync.js';

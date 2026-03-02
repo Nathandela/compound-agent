@@ -8,7 +8,7 @@
 import { readCctPatterns, type CctPattern } from '../../compound/index.js';
 import { embedText } from '../embeddings/index.js';
 import { isModelAvailable } from '../embeddings/model.js';
-import { contentHash, getCachedEmbedding, readAllFromSqlite, setCachedEmbedding, syncIfNeeded } from '../storage/index.js';
+import { contentHash, getCachedEmbeddingsBulk, readAllFromSqlite, setCachedEmbedding, syncIfNeeded } from '../storage/index.js';
 import type { MemoryItem } from '../types.js';
 
 /**
@@ -115,6 +115,9 @@ export async function searchVector(
   // Embed the query
   const queryVector = await embedText(query);
 
+  // Bulk-read all cached embeddings in one query (instead of N individual reads)
+  const cachedEmbeddings = getCachedEmbeddingsBulk(repoRoot);
+
   // Score each item, skipping invalidated ones
   const scored: ScoredLesson[] = [];
   for (const item of items) {
@@ -125,11 +128,14 @@ export async function searchVector(
       const itemText = `${item.trigger} ${item.insight}`;
       const hash = contentHash(item.trigger, item.insight);
 
-      // Try cache first
-      let itemVector = getCachedEmbedding(repoRoot, item.id, hash);
+      // Try bulk cache first
+      const cached = cachedEmbeddings.get(item.id);
+      let itemVector: number[];
 
-      if (!itemVector) {
-        // Cache miss - compute and store
+      if (cached && cached.hash === hash) {
+        itemVector = cached.vector;
+      } else {
+        // Cache miss or stale - compute and store
         itemVector = await embedText(itemText);
         setCachedEmbedding(repoRoot, item.id, itemVector, hash);
       }
@@ -201,6 +207,9 @@ export async function findSimilarLessons(
 
   const queryVector = await embedText(text);
 
+  // Bulk-read all cached embeddings in one query (instead of N individual reads)
+  const cachedEmbeddings = getCachedEmbeddingsBulk(repoRoot);
+
   const scored: SimilarLesson[] = [];
   for (const item of items) {
     if (item.invalidatedAt) continue;
@@ -210,9 +219,12 @@ export async function findSimilarLessons(
       // Use insight ONLY for embedding (NOT trigger + insight).
       // Hash differs from searchVector's hash to avoid cache conflicts.
       const hash = contentHash(item.insight, '');
-      let itemVector = getCachedEmbedding(repoRoot, item.id, hash);
+      const cached = cachedEmbeddings.get(item.id);
+      let itemVector: number[];
 
-      if (!itemVector) {
+      if (cached && cached.hash === hash) {
+        itemVector = cached.vector;
+      } else {
         itemVector = await embedText(item.insight);
         setCachedEmbedding(repoRoot, item.id, itemVector, hash);
       }
