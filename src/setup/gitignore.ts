@@ -7,7 +7,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 /** Patterns compound-agent needs in .gitignore. */
-const REQUIRED_PATTERNS = ['node_modules/', '.claude/.cache/'];
+const REQUIRED_PATTERNS = ['node_modules/', '.claude/.cache/', '.claude/.ca-*.json'];
 
 /** Section comment marker. */
 const SECTION_COMMENT = '# compound-agent';

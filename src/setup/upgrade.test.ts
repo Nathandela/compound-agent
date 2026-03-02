@@ -50,9 +50,9 @@ describe('detectExistingInstall', () => {
 });
 
 describe('removeDeprecatedCommands', () => {
-  const DEPRECATED = ['search.md', 'list.md', 'show.md', 'stats.md', 'wrong.md'];
+  const DEPRECATED = ['search.md', 'list.md', 'show.md', 'stats.md', 'wrong.md', 'learn.md'];
 
-  it('removes all 5 deprecated command files from compound/', async () => {
+  it('removes all 6 deprecated command files from compound/', async () => {
     const commandsDir = join(tempDir, '.claude', 'commands', 'compound');
     await mkdir(commandsDir, { recursive: true });
 
@@ -91,13 +91,13 @@ describe('removeDeprecatedCommands', () => {
     await mkdir(commandsDir, { recursive: true });
 
     await writeFile(join(commandsDir, 'brainstorm.md'), 'keep me', 'utf-8');
-    await writeFile(join(commandsDir, 'learn.md'), 'keep me too', 'utf-8');
+    await writeFile(join(commandsDir, 'learn-that.md'), 'keep me too', 'utf-8');
     await writeFile(join(commandsDir, 'search.md'), 'npx ca search', 'utf-8');
 
     await removeDeprecatedCommands(tempDir);
 
     expect(existsSync(join(commandsDir, 'brainstorm.md'))).toBe(true);
-    expect(existsSync(join(commandsDir, 'learn.md'))).toBe(true);
+    expect(existsSync(join(commandsDir, 'learn-that.md'))).toBe(true);
     expect(existsSync(join(commandsDir, 'search.md'))).toBe(false);
   });
 

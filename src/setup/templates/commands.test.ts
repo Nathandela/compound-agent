@@ -14,22 +14,24 @@ const PHASE_FILENAMES = [
 ];
 
 const UTILITY_FILENAMES = [
-  'learn.md',
+  'learn-that.md',
+  'check-that.md',
   'prime.md',
 ];
 
-/** CLI wrapper commands removed in v1.3 — must NOT appear in WORKFLOW_COMMANDS. */
+/** CLI wrapper commands removed in v1.3+ — must NOT appear in WORKFLOW_COMMANDS. */
 const REMOVED_CLI_WRAPPERS = [
   'search.md',
   'list.md',
   'show.md',
   'stats.md',
   'wrong.md',
+  'learn.md',
 ];
 
 describe('WORKFLOW_COMMANDS', () => {
-  it('has exactly 11 entries (9 phase + 2 utility)', () => {
-    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(11);
+  it('has exactly 12 entries (9 phase + 3 utility)', () => {
+    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(12);
   });
 
   it('has all expected filenames', () => {
@@ -133,8 +135,14 @@ describe('WORKFLOW_COMMANDS', () => {
   });
 
   describe('utility commands (remaining)', () => {
-    it('learn.md references ca learn', () => {
-      expect(WORKFLOW_COMMANDS['learn.md']).toContain('ca learn');
+    it('learn-that.md references ca learn and $ARGUMENTS', () => {
+      expect(WORKFLOW_COMMANDS['learn-that.md']).toContain('ca learn');
+      expect(WORKFLOW_COMMANDS['learn-that.md']).toContain('$ARGUMENTS');
+    });
+
+    it('check-that.md references ca search and $ARGUMENTS', () => {
+      expect(WORKFLOW_COMMANDS['check-that.md']).toContain('ca search');
+      expect(WORKFLOW_COMMANDS['check-that.md']).toContain('$ARGUMENTS');
     });
 
     it('prime.md references ca prime', () => {

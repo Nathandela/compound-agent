@@ -83,6 +83,37 @@ export function setCachedEmbedding(
     .run(buffer, hash, lessonId);
 }
 
+/** Entry returned by getCachedEmbeddingsBulk */
+export interface CachedEmbeddingEntry {
+  vector: number[];
+  hash: string;
+}
+
+/**
+ * Bulk-read all cached embeddings in a single query.
+ * Returns a Map of lessonId to {vector, hash} for every lesson
+ * that has a cached embedding and content_hash.
+ * Callers validate the hash themselves.
+ */
+export function getCachedEmbeddingsBulk(repoRoot: string): Map<string, CachedEmbeddingEntry> {
+  const database = openDb(repoRoot);
+  const rows = database
+    .prepare('SELECT id, embedding, content_hash FROM lessons WHERE embedding IS NOT NULL')
+    .all() as Array<{ id: string; embedding: Buffer; content_hash: string | null }>;
+
+  const result = new Map<string, CachedEmbeddingEntry>();
+  for (const row of rows) {
+    if (!row.content_hash) continue;
+    const float32 = new Float32Array(
+      row.embedding.buffer,
+      row.embedding.byteOffset,
+      row.embedding.byteLength / 4
+    );
+    result.set(row.id, { vector: Array.from(float32), hash: row.content_hash });
+  }
+  return result;
+}
+
 /**
  * Get cached insight-only embedding for a lesson.
  * Used by findSimilarLessons (insight-only hash, separate from searchVector's trigger+insight hash).

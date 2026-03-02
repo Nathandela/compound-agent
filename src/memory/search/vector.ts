@@ -8,7 +8,7 @@
 import { readCctPatterns, type CctPattern } from '../../compound/index.js';
 import { embedText } from '../embeddings/index.js';
 import { isModelAvailable } from '../embeddings/model.js';
-import { contentHash, getCachedEmbedding, getCachedInsightEmbedding, readMemoryItems, setCachedEmbedding, setCachedInsightEmbedding } from '../storage/index.js';
+import { contentHash, getCachedEmbeddingsBulk, getCachedInsightEmbedding, readAllFromSqlite, setCachedEmbedding, setCachedInsightEmbedding, syncIfNeeded } from '../storage/index.js';
 import type { MemoryItem } from '../types.js';
 
 /**
@@ -98,8 +98,9 @@ export async function searchVector(
   options?: SearchVectorOptions
 ): Promise<ScoredLesson[]> {
   const limit = options?.limit ?? DEFAULT_LIMIT;
-  // Read all memory items (all types)
-  const { items } = await readMemoryItems(repoRoot);
+  // Ensure SQLite cache is fresh, then read from it (avoids redundant JSONL parse)
+  await syncIfNeeded(repoRoot);
+  const items = readAllFromSqlite(repoRoot);
 
   // Read CCT patterns if available
   let cctPatterns: CctPattern[] = [];
@@ -114,6 +115,9 @@ export async function searchVector(
   // Embed the query
   const queryVector = await embedText(query);
 
+  // Bulk-read all cached embeddings in one query (instead of N individual reads)
+  const cachedEmbeddings = getCachedEmbeddingsBulk(repoRoot);
+
   // Score each item, skipping invalidated ones
   const scored: ScoredLesson[] = [];
   for (const item of items) {
@@ -124,11 +128,14 @@ export async function searchVector(
       const itemText = `${item.trigger} ${item.insight}`;
       const hash = contentHash(item.trigger, item.insight);
 
-      // Try cache first
-      let itemVector = getCachedEmbedding(repoRoot, item.id, hash);
+      // Try bulk cache first
+      const cached = cachedEmbeddings.get(item.id);
+      let itemVector: number[];
 
-      if (!itemVector) {
-        // Cache miss - compute and store
+      if (cached && cached.hash === hash) {
+        itemVector = cached.vector;
+      } else {
+        // Cache miss or stale - compute and store
         itemVector = await embedText(itemText);
         setCachedEmbedding(repoRoot, item.id, itemVector, hash);
       }
@@ -195,7 +202,13 @@ export async function findSimilarLessons(
 
   if (!isModelAvailable()) return [];
 
-  const items = options?.items ?? (await readMemoryItems(repoRoot)).items;
+  let items: MemoryItem[];
+  if (options?.items) {
+    items = options.items;
+  } else {
+    await syncIfNeeded(repoRoot);
+    items = readAllFromSqlite(repoRoot);
+  }
   if (items.length === 0) return [];
 
   const queryVector = await embedText(text);

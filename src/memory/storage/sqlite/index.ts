@@ -15,10 +15,12 @@ export { closeDb, DB_PATH, openDb } from './connection.js';
 export {
   contentHash,
   getCachedEmbedding,
+  getCachedEmbeddingsBulk,
   getCachedInsightEmbedding,
   setCachedEmbedding,
   setCachedInsightEmbedding,
 } from './cache.js';
+export type { CachedEmbeddingEntry } from './cache.js';
 
 // Sync
 export { rebuildIndex, syncIfNeeded } from './sync.js';
@@ -30,6 +32,7 @@ export { ensureSqliteAvailable, resetSqliteAvailability } from './availability.j
 export {
   getRetrievalStats,
   incrementRetrievalCount,
+  readAllFromSqlite,
   searchKeyword,
   searchKeywordScored,
 } from './search.js';

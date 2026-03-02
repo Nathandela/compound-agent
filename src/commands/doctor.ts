@@ -33,7 +33,7 @@ function checkGitignoreHealth(repoRoot: string): boolean {
   try {
     const content = readFileSync(gitignorePath, 'utf-8');
     const lines = new Set(content.split('\n').map(l => l.trim()));
-    return ['node_modules/', '.claude/.cache/'].every(p => lines.has(p));
+    return ['node_modules/', '.claude/.cache/', '.claude/.ca-*.json'].every(p => lines.has(p));
   } catch {
     return false;
   }
