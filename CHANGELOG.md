@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`/compound:learn-that` slash command**: Conversation-aware lesson capture with user confirmation before saving
+- **`/compound:check-that` slash command**: Search lessons and proactively apply them to current work
 - **Eager knowledge embedding**: Knowledge chunks from `docs/` are now embedded for semantic search when the model is available
   - `ca index-docs --embed` embeds chunks after indexing
   - `ca init` now downloads the embedding model (with `--skip-model` opt-out) and installs the post-commit hook
@@ -21,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 
+- **`/compound:learn` slash command**: Replaced by `/compound:learn-that` with conversation-aware capture and user confirmation
 - **`ca worktree` command family**: All five subcommands (`create`, `merge`, `list`, `cleanup`, `wire-deps`) removed. Claude Code now provides native `EnterWorktree` support. Running `ca worktree` prints a deprecation notice.
 - **`/compound:set-worktree` slash command**: Use Claude Code's native worktree workflow instead.
 - **Conditional Merge gate in `verify-gates`**: Only Review and Compound gates remain.

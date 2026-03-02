@@ -1,0 +1,6 @@
+description = "Search lessons and proactively apply them to current work"
+prompt = """
+@{.claude/commands/compound/check-that.md}
+
+{{args}}
+"""
