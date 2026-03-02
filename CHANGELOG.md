@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-03-02
+
 ### Added
 
 - **`ca watch` command**: Live pretty-printer for infinity loop trace files. Tails `agent_logs/trace_*.jsonl` and formats stream-json events (tool calls, text deltas, token usage, epic markers) with colored output. Supports `--epic <id>` to watch a specific epic and `--no-follow` for one-shot reads.
@@ -56,6 +58,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **P3**: Barrel re-exports consolidated through `./memory/knowledge/index.js`
 - **`EPIC_ID_PATTERN` duplication**: `loop.ts` now uses distinctly named `LOOP_EPIC_ID_PATTERN` to avoid confusion with the canonical pattern in `cli-utils.ts`.
 - **Stale worktree lesson invalidated**: Memory item `Ld204372e` marked invalid to prevent irrelevant context injection.
+
+### Performance
+
+- **Eliminate double model initialization**: `ca search` now uses `isModelAvailable()` (fs.existsSync, zero cost) instead of `isModelUsable()` which loaded the 278MB native model just to probe availability, then loaded it again for actual embedding
+- **Bulk-read cached embeddings**: `getCachedEmbeddingsBulk()` replaces N individual `getCachedEmbedding()` SQLite queries with a single bulk read
+- **Eliminate redundant JSONL parsing**: `searchVector()` and `findSimilarLessons()` now use `readAllFromSqlite()` after `syncIfNeeded()` instead of re-parsing the JSONL file
+- **Float32Array consistency**: Lesson embedding path now keeps `Float32Array` from node-llama-cpp instead of converting via `Array.from()` (4x memory savings per vector)
+- **Pre-warm lesson embedding cache**: `ca init` now pre-computes embeddings for all lessons with missing or stale cache entries, eliminating cold-start latency on first search
+- **Graceful embedding fallback**: `ca search` falls back to keyword-only search on runtime embedding failures instead of crashing
 
 ## [1.5.0] - 2026-02-24
 

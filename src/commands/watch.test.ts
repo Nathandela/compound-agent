@@ -2,6 +2,10 @@
  * Tests for the `ca watch` command (live trace pretty-printer).
  */
 
+import { mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -90,6 +94,53 @@ describe('formatStreamEvent', () => {
     const output = formatStreamEvent(event);
     expect(output).toMatch(/\d{2}:\d{2}:\d{2}/);
   });
+
+  it('formats HUMAN_REQUIRED result events as marker', () => {
+    const event: StreamEvent = {
+      type: 'result',
+      result: 'HUMAN_REQUIRED: Need AWS credentials',
+      timestamp: '2026-03-02T14:45:02Z',
+    };
+    const output = formatStreamEvent(event);
+    expect(output).toContain('MARKER');
+    expect(output).toContain('HUMAN_REQUIRED');
+  });
+
+  it('truncates long result text to 120 chars', () => {
+    const longResult = 'Some prefix text\nEPIC_COMPLETE\n' + 'x'.repeat(200);
+    const event: StreamEvent = {
+      type: 'result',
+      result: longResult,
+      timestamp: '2026-03-02T14:45:02Z',
+    };
+    const output = formatStreamEvent(event);
+    expect(output).toContain('MARKER');
+    expect(output).toContain('EPIC_COMPLETE');
+    // Should not contain the full 200 x's
+    expect(output!.length).toBeLessThan(200);
+  });
+
+  it('formats thinking block as THINK indicator', () => {
+    const event: StreamEvent = {
+      type: 'content_block_start',
+      content_block: { type: 'thinking' },
+      timestamp: '2026-03-02T14:30:48Z',
+    };
+    const output = formatStreamEvent(event);
+    expect(output).toContain('THINK');
+  });
+
+  it('formats message_delta with output tokens', () => {
+    const event: StreamEvent = {
+      type: 'message_delta',
+      usage: { output_tokens: 5678 },
+      timestamp: '2026-03-02T14:31:25Z',
+    } as StreamEvent;
+    const output = formatStreamEvent(event);
+    expect(output).toContain('TOKENS');
+    expect(output).toMatch(/5,?678/);
+    expect(output).toContain('final');
+  });
 });
 
 // ============================================================================
@@ -106,6 +157,43 @@ describe('findLatestTraceFile', () => {
     // Use a temp directory that exists but has no trace files
     const result = findLatestTraceFile('/tmp');
     expect(result).toBeNull();
+  });
+
+  it('returns file pointed to by .latest symlink', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'watch-test-'));
+    try {
+      writeFileSync(join(dir, 'trace_epic-2026-03-02.jsonl'), '{}');
+      symlinkSync('trace_epic-2026-03-02.jsonl', join(dir, '.latest'));
+      const result = findLatestTraceFile(dir);
+      expect(result).toContain('trace_epic-2026-03-02.jsonl');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('falls back to filename sort when .latest is broken symlink', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'watch-test-'));
+    try {
+      writeFileSync(join(dir, 'trace_a-2026-03-01.jsonl'), '{}');
+      writeFileSync(join(dir, 'trace_b-2026-03-02.jsonl'), '{}');
+      symlinkSync('trace_nonexistent.jsonl', join(dir, '.latest'));
+      const result = findLatestTraceFile(dir);
+      expect(result).toContain('trace_b-2026-03-02.jsonl');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('returns latest trace file by filename sort', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'watch-test-'));
+    try {
+      writeFileSync(join(dir, 'trace_x-2026-03-01_10-00-00.jsonl'), '{}');
+      writeFileSync(join(dir, 'trace_x-2026-03-02_10-00-00.jsonl'), '{}');
+      const result = findLatestTraceFile(dir);
+      expect(result).toContain('trace_x-2026-03-02_10-00-00.jsonl');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
@@ -131,5 +219,10 @@ describe('ca watch CLI', { tags: ['integration'] }, () => {
     // Running watch in a directory without trace files should not crash
     const { combined } = runCli('watch --no-follow');
     expect(combined).toMatch(/no trace|not found|no active/i);
+  });
+
+  it('rejects invalid epic ID with shell metacharacters', () => {
+    const { combined } = runCli('watch --epic "$(bad)" --no-follow');
+    expect(combined).toMatch(/invalid|epic/i);
   });
 });

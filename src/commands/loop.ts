@@ -221,10 +221,10 @@ function buildStreamExtractor(): string {
 # Reads JSONL from stdin, outputs plain text lines for marker detection
 extract_text() {
   if [ "$HAS_JQ" = true ]; then
-    jq -r --unbuffered '
+    jq -j --unbuffered '
       select(.type == "content_block_delta" and .delta.type == "text_delta") |
       .delta.text // empty
-    ' 2>/dev/null || cat
+    ' 2>/dev/null || { echo "WARN: extract_text parser failed" >&2; }
   else
     python3 -c "
 import sys, json
@@ -240,7 +240,7 @@ for line in sys.stdin:
                 print(text, end='', flush=True)
     except (json.JSONDecodeError, KeyError):
         pass
-" 2>/dev/null || cat
+" 2>/dev/null || { echo "WARN: extract_text parser failed" >&2; }
   fi
 }
 `;
@@ -268,8 +268,12 @@ while true; do
 
   while [ $ATTEMPT -le $MAX_RETRIES ]; do
     ATTEMPT=$((ATTEMPT + 1))
-    LOGFILE="$LOG_DIR/loop_$EPIC_ID-$(timestamp).log"
-    TRACEFILE="$LOG_DIR/trace_$EPIC_ID-$(timestamp).jsonl"
+    TS=$(timestamp)
+    LOGFILE="$LOG_DIR/loop_$EPIC_ID-$TS.log"
+    TRACEFILE="$LOG_DIR/trace_$EPIC_ID-$TS.jsonl"
+
+    # Update .latest symlink for ca watch (before claude invocation so watch can discover it)
+    ln -sf "$(basename "$TRACEFILE")" "$LOG_DIR/.latest"
 
     log "Attempt $ATTEMPT/$((MAX_RETRIES + 1)) for $EPIC_ID (log: $LOGFILE)"
 
@@ -291,9 +295,6 @@ while true; do
 
     # Append stderr to macro log
     [ -f "$LOGFILE.stderr" ] && cat "$LOGFILE.stderr" >> "$LOGFILE" && rm -f "$LOGFILE.stderr"
-
-    # Update .latest symlink for ca watch
-    ln -sf "$(basename "$TRACEFILE")" "$LOG_DIR/.latest"
 
     if grep -q "^EPIC_COMPLETE$" "$LOGFILE"; then
       log "Epic $EPIC_ID completed successfully"

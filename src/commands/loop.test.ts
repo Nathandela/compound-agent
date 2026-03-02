@@ -358,6 +358,56 @@ describe('generateLoopScript', () => {
     expect(script).toMatch(/\.latest|ln -sf/);
   });
 
+  it('extract_text does not use dangerous || cat fallback', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // extract_text should not fall back to cat (which would pass raw JSONL to macro log)
+    expect(script).not.toMatch(/extract_text[\s\S]*?\|\| cat/);
+  });
+
+  it('.latest symlink is created before claude invocation', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    const symlinkPos = script.indexOf('ln -sf');
+    const claudePos = script.indexOf('claude --dangerously-skip-permissions');
+    expect(symlinkPos).toBeGreaterThan(-1);
+    expect(claudePos).toBeGreaterThan(-1);
+    expect(symlinkPos).toBeLessThan(claudePos);
+  });
+
+  it('LOGFILE and TRACEFILE use shared timestamp variable', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Should assign TS once and use $TS in both, not call $(timestamp) twice
+    expect(script).toMatch(/TS=\$\(timestamp\)/);
+    expect(script).toMatch(/LOGFILE.*\$TS/);
+    expect(script).toMatch(/TRACEFILE.*\$TS/);
+  });
+
+  it('python3 extract_text correctly extracts text_delta from stream-json event', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Extract the python3 snippet from extract_text function
+    const pyMatch = script.match(/extract_text\(\) \{[\s\S]*?python3 -c "\n([\s\S]*?)"\s*2>/);
+    expect(pyMatch).toBeTruthy();
+    const pyCode = pyMatch![1];
+    const input = '{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello world"}}';
+    const result = execSync(
+      `echo '${input}' | python3 -c "${pyCode}"`,
+      { encoding: 'utf-8', shell: '/bin/bash' },
+    );
+    expect(result).toBe('Hello world');
+  });
+
+  it('python3 extract_text skips non-text-delta events', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    const pyMatch = script.match(/extract_text\(\) \{[\s\S]*?python3 -c "\n([\s\S]*?)"\s*2>/);
+    expect(pyMatch).toBeTruthy();
+    const pyCode = pyMatch![1];
+    const input = '{"type":"content_block_start","content_block":{"type":"tool_use","name":"Bash"}}';
+    const result = execSync(
+      `echo '${input}' | python3 -c "${pyCode}"`,
+      { encoding: 'utf-8', shell: '/bin/bash' },
+    );
+    expect(result.trim()).toBe('');
+  });
+
   it('does not break &> capture -- uses pipe instead', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
     // The old &> LOGFILE pattern should be replaced by piped stream handling

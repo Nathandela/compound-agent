@@ -132,9 +132,9 @@ The CLI binary is `ca` (alias: `compound-agent`).
 
 | Command | Description |
 |---------|-------------|
-| `ca learn "<insight>"` | Capture a memory item manually |
+| `ca learn "<insight>"` | Capture a lesson manually |
 | `ca learn "<insight>" --trigger "<context>"` | Capture with trigger context |
-| `ca learn "<insight>" --severity high` | Set severity level |
+| `ca learn "<insight>" --severity high` | Set severity (low/medium/high) |
 | `ca learn "<insight>" --citation src/api.ts:42` | Attach file provenance |
 | `ca capture --input <file>` | Capture from structured input file |
 | `ca detect --input <file>` | Detect correction patterns in input |
@@ -240,7 +240,7 @@ A: ~278MB for the embedding model (one-time download, shared across projects) pl
 A: The CLI (`ca`) works standalone with any tool. Full hook integration is available for Claude Code and Gemini CLI. The TypeScript API can be integrated into other tools.
 
 **Q: What happens if the embedding model isn't available?**
-A: Compound Agent hard-fails rather than silently degrading. Run `npx ca doctor` to diagnose issues.
+A: Search gracefully falls back to keyword-only mode. Other commands that require embeddings will tell you what's missing. Run `npx ca doctor` to diagnose issues.
 
 ## Development
 
