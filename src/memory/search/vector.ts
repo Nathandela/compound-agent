@@ -8,7 +8,7 @@
 import { readCctPatterns, type CctPattern } from '../../compound/index.js';
 import { embedText } from '../embeddings/index.js';
 import { isModelAvailable } from '../embeddings/model.js';
-import { contentHash, getCachedEmbedding, readMemoryItems, setCachedEmbedding } from '../storage/index.js';
+import { contentHash, getCachedEmbedding, readAllFromSqlite, setCachedEmbedding, syncIfNeeded } from '../storage/index.js';
 import type { MemoryItem } from '../types.js';
 
 /**
@@ -98,8 +98,9 @@ export async function searchVector(
   options?: SearchVectorOptions
 ): Promise<ScoredLesson[]> {
   const limit = options?.limit ?? DEFAULT_LIMIT;
-  // Read all memory items (all types)
-  const { items } = await readMemoryItems(repoRoot);
+  // Ensure SQLite cache is fresh, then read from it (avoids redundant JSONL parse)
+  await syncIfNeeded(repoRoot);
+  const items = readAllFromSqlite(repoRoot);
 
   // Read CCT patterns if available
   let cctPatterns: CctPattern[] = [];
@@ -193,7 +194,9 @@ export async function findSimilarLessons(
 
   if (!isModelAvailable()) return [];
 
-  const { items } = await readMemoryItems(repoRoot);
+  // Ensure SQLite cache is fresh, then read from it (avoids redundant JSONL parse)
+  await syncIfNeeded(repoRoot);
+  const items = readAllFromSqlite(repoRoot);
   if (items.length === 0) return [];
 
   const queryVector = await embedText(text);

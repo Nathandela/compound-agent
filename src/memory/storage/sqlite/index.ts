@@ -28,6 +28,7 @@ export { ensureSqliteAvailable, resetSqliteAvailability } from './availability.j
 export {
   getRetrievalStats,
   incrementRetrievalCount,
+  readAllFromSqlite,
   searchKeyword,
   searchKeywordScored,
 } from './search.js';

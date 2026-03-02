@@ -8,7 +8,7 @@ import chalk from 'chalk';
 import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
-import { isModelUsable, loadSessionLessons, retrieveForPlan } from '../index.js';
+import { isModelAvailable, loadSessionLessons, retrieveForPlan } from '../index.js';
 import { incrementRetrievalCount, readLessons, readMemoryItems, searchKeyword, searchKeywordScored, syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem } from '../memory/index.js';
 import { CANDIDATE_MULTIPLIER, MIN_HYBRID_SCORE, mergeHybridResults, rankLessons, searchVector } from '../memory/search/index.js';
@@ -153,9 +153,8 @@ async function searchAction(cmd: Command, query: string, options: { limit: strin
   await syncIfNeeded(repoRoot);
 
   let results: MemoryItem[];
-  try {
-    const usability = await isModelUsable();
-    if (usability.usable) {
+  if (isModelAvailable()) {
+    try {
       // Hybrid search: blend vector + keyword
       const candidateLimit = limit * CANDIDATE_MULTIPLIER;
       const [vectorResults, keywordResults] = await Promise.all([
@@ -165,15 +164,13 @@ async function searchAction(cmd: Command, query: string, options: { limit: strin
       const merged = mergeHybridResults(vectorResults, keywordResults, { minScore: MIN_HYBRID_SCORE });
       const ranked = rankLessons(merged);
       results = ranked.slice(0, limit).map((r) => r.lesson);
-    } else {
-      // FTS-only fallback when embedding model unavailable
+    } catch {
+      // Model failed at runtime — fall back to keyword-only search
       results = await searchKeyword(repoRoot, query, limit);
     }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Search failed';
-    console.error(formatError('search', 'SEARCH_FAILED', message, 'Check your query syntax'));
-    process.exitCode = 1;
-    return;
+  } else {
+    // FTS-only fallback when embedding model unavailable
+    results = await searchKeyword(repoRoot, query, limit);
   }
   if (results.length > 0) {
     incrementRetrievalCount(repoRoot, results.map((lesson) => lesson.id));
@@ -315,17 +312,16 @@ async function checkPlanAction(cmd: Command, options: { plan?: string; json?: bo
 
   await syncIfNeeded(repoRoot);
 
-  const usability = await isModelUsable();
-  if (!usability.usable) {
+  if (!isModelAvailable()) {
     if (options.json) {
       console.log(JSON.stringify({
         lessons: [],
         count: 0,
-        error: usability.reason,
-        action: usability.action,
+        error: 'Embedding model not found',
+        action: 'Run: npx ca download-model',
       }));
     } else {
-      console.error(formatError('check-plan', 'MODEL_UNAVAILABLE', usability.reason, usability.action));
+      console.error(formatError('check-plan', 'MODEL_UNAVAILABLE', 'Embedding model not found', 'Run: npx ca download-model'));
     }
     process.exitCode = 1;
     return;

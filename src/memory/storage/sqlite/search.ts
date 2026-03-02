@@ -65,6 +65,24 @@ function rowToMemoryItem(row: MemoryItemRow): MemoryItem | null {
 }
 
 
+/**
+ * Read all non-invalidated memory items from the SQLite cache.
+ * Use this instead of readMemoryItems() when the SQLite index is
+ * already synced, to avoid a redundant JSONL parse + Zod validation.
+ *
+ * @param repoRoot - Absolute path to repository root
+ * @returns Array of MemoryItem objects
+ */
+export function readAllFromSqlite(repoRoot: string): MemoryItem[] {
+  const database = openDb(repoRoot);
+
+  const rows = database
+    .prepare('SELECT * FROM lessons WHERE invalidated_at IS NULL')
+    .all() as MemoryItemRow[];
+
+  return rows.map(rowToMemoryItem).filter((x): x is MemoryItem => x !== null);
+}
+
 /** FTS5 operator tokens to remove */
 const FTS_OPERATORS = new Set(['AND', 'OR', 'NOT', 'NEAR']);
 

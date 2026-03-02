@@ -19,6 +19,7 @@ export {
   getRetrievalStats,
   incrementRetrievalCount,
   openDb,
+  readAllFromSqlite,
   rebuildIndex,
   resetSqliteAvailability,
   searchKeyword,
