@@ -25,7 +25,7 @@ vi.mock('../cli-utils.js', async (importOriginal) => {
   };
 });
 
-// Mock the index.js barrel -- retrieval.ts imports isModelUsable from here
+// Mock the index.js barrel -- retrieval.ts imports isModelAvailable from here
 vi.mock('../index.js', async () => ({
   isModelUsable: vi.fn(),
   isModelAvailable: vi.fn(() => true),

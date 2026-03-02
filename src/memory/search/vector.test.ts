@@ -161,7 +161,7 @@ describe('vector search', () => {
       await rebuildIndex(tempDir);
 
       // Mock embedText
-      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
       const results = await searchVector(tempDir, 'test', { limit: 2 });
       expect(results.length).toBeLessThanOrEqual(2);
@@ -178,7 +178,7 @@ describe('vector search', () => {
         setCachedEmbedding(tempDir, 'L001', cachedEmbedding, hash);
 
         // Mock embedText to track calls
-        const embedMock = vi.fn().mockResolvedValue([0.8, 0.2, 0]);
+        const embedMock = vi.fn().mockResolvedValue(new Float32Array([0.8, 0.2, 0]));
         vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
         await searchVector(tempDir, 'test query', { limit: 10 });
@@ -193,7 +193,7 @@ describe('vector search', () => {
         await rebuildIndex(tempDir);
 
         // No cached embedding
-        const embedMock = vi.fn().mockResolvedValue([0.8, 0.2, 0]);
+        const embedMock = vi.fn().mockResolvedValue(new Float32Array([0.8, 0.2, 0]));
         vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
         await searchVector(tempDir, 'test query', { limit: 10 });
@@ -222,7 +222,7 @@ describe('vector search', () => {
         const staleEmbedding = new Float32Array([0.1, 0.1, 0.1]);
         setCachedEmbedding(tempDir, 'L001', staleEmbedding, staleHash);
 
-        const embedMock = vi.fn().mockResolvedValue([0.8, 0.2, 0]);
+        const embedMock = vi.fn().mockResolvedValue(new Float32Array([0.8, 0.2, 0]));
         vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
         await searchVector(tempDir, 'test query', { limit: 10 });
@@ -240,7 +240,7 @@ describe('vector search', () => {
       await rebuildIndex(tempDir);
 
       // Mock embedText
-      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
       // Call without options - should use default limit of 10
       const results = await searchVector(tempDir, 'test');
@@ -260,7 +260,7 @@ describe('vector search', () => {
         await rebuildIndex(tempDir);
 
         // Mock embedText
-        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
         const results = await searchVector(tempDir, 'lesson', { limit: 10 });
         expect(results).toHaveLength(1);
@@ -279,7 +279,7 @@ describe('vector search', () => {
         await rebuildIndex(tempDir);
 
         // Mock embedText
-        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
         const results = await searchVector(tempDir, 'test query', { limit: 10 });
         expect(results).toEqual([]);
@@ -294,7 +294,7 @@ describe('vector search', () => {
         await rebuildIndex(tempDir);
 
         // Mock embedText to track calls
-        const embedMock = vi.fn().mockResolvedValue([1, 0, 0]);
+        const embedMock = vi.fn().mockResolvedValue(new Float32Array([1, 0, 0]));
         vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
         await searchVector(tempDir, 'test query', { limit: 10 });
@@ -372,7 +372,7 @@ describe('vector search', () => {
         await writeFile(cctPath, JSON.stringify(pattern) + '\n', 'utf-8');
 
         // Mock embedText
-        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
         const results = await searchVector(tempDir, 'const vs let', { limit: 10 });
         // Should include both the lesson and the CCT pattern
@@ -385,7 +385,7 @@ describe('vector search', () => {
         await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
         await rebuildIndex(tempDir);
 
-        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
         const results = await searchVector(tempDir, 'test', { limit: 10 });
         expect(results).toHaveLength(1);
@@ -408,7 +408,7 @@ describe('vector search', () => {
         await writeFile(cctPath, JSON.stringify(pattern) + '\n', 'utf-8');
 
         const spy = vi.spyOn(await import('../embeddings/nomic.js'), 'embedText')
-          .mockResolvedValue([1, 0, 0]);
+          .mockResolvedValue(new Float32Array([1, 0, 0]));
 
         // First search: query embed + CCT pattern embed = 2 calls
         await searchVector(tempDir, 'cache test', { limit: 10 });
@@ -440,7 +440,7 @@ describe('vector search', () => {
         }
         await writeFile(cctPath, lines.join('\n') + '\n', 'utf-8');
 
-        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+        vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
         const results = await searchVector(tempDir, 'pattern', { limit: 3 });
         expect(results.length).toBeLessThanOrEqual(3);
@@ -457,6 +457,7 @@ describe('vector search', () => {
 
     afterEach(async () => {
       closeDb();
+      clearCctEmbeddingCache();
       await rm(tempDir, { recursive: true, force: true });
       vi.restoreAllMocks();
     });
@@ -485,7 +486,7 @@ describe('vector search', () => {
 
       // Mock isModelAvailable and embedText
       vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
-      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
       const results = await findSimilarLessons(tempDir, 'lesson text', { excludeId: 'L001' });
       const ids = results.map((r) => r.item.id);
@@ -503,7 +504,7 @@ describe('vector search', () => {
       await rebuildIndex(tempDir);
 
       vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
-      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
       const results = await findSimilarLessons(tempDir, 'test query', { threshold: 0 });
       expect(results).toHaveLength(1);
@@ -517,15 +518,11 @@ describe('vector search', () => {
 
       vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
 
-      let callCount = 0;
-      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(async () => {
-        callCount++;
-        // First call is the query vector
-        if (callCount === 1) return [1, 0, 0];
-        // Second call (L001): very similar to query
-        if (callCount === 2) return [0.99, 0.1, 0];
-        // Third call (L002): less similar
-        return [0.5, 0.5, 0.5];
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(async (text: string) => {
+        if (text === 'close match') return [0.99, 0.1, 0];
+        if (text === 'distant match') return [0.5, 0.5, 0.5];
+        // query
+        return [1, 0, 0];
       });
 
       // High threshold: only very similar items

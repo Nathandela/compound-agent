@@ -22,6 +22,10 @@ export {
 } from './ranking.js';
 export type { RankedLesson } from './ranking.js';
 
+// Pre-warm
+export { preWarmLessonEmbeddings } from './prewarm.js';
+export type { PreWarmResult } from './prewarm.js';
+
 // Hybrid search
 export {
   CANDIDATE_MULTIPLIER,

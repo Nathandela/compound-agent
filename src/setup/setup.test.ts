@@ -82,7 +82,8 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
 
       const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
 
-      expect(existsSync(join(commandsDir, 'learn.md'))).toBe(true);
+      expect(existsSync(join(commandsDir, 'learn-that.md'))).toBe(true);
+      expect(existsSync(join(commandsDir, 'check-that.md'))).toBe(true);
       expect(existsSync(join(commandsDir, 'prime.md'))).toBe(true);
     });
 
@@ -92,7 +93,8 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       const commandsDir = join(getTempDir(), '.claude', 'commands');
 
       // Utility commands should NOT exist at root level
-      expect(existsSync(join(commandsDir, 'learn.md'))).toBe(false);
+      expect(existsSync(join(commandsDir, 'learn-that.md'))).toBe(false);
+      expect(existsSync(join(commandsDir, 'check-that.md'))).toBe(false);
       expect(existsSync(join(commandsDir, 'prime.md'))).toBe(false);
     });
 
@@ -101,8 +103,11 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
 
       const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
 
-      const learnContent = await readFile(join(commandsDir, 'learn.md'), 'utf-8');
+      const learnContent = await readFile(join(commandsDir, 'learn-that.md'), 'utf-8');
       expect(learnContent).toContain('ca learn');
+
+      const checkContent = await readFile(join(commandsDir, 'check-that.md'), 'utf-8');
+      expect(checkContent).toContain('ca search');
 
       const primeContent = await readFile(join(commandsDir, 'prime.md'), 'utf-8');
       expect(primeContent).toContain('ca prime');
@@ -430,7 +435,7 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       runCli('init');
 
       const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
-      expect(existsSync(join(commandsDir, 'learn.md'))).toBe(true);
+      expect(existsSync(join(commandsDir, 'learn-that.md'))).toBe(true);
 
       runCli('setup --uninstall');
 
@@ -525,7 +530,7 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
 
       // Create deprecated command files
       const commandsDir = join(getTempDir(), '.claude', 'commands', 'compound');
-      const deprecated = ['search.md', 'list.md', 'show.md', 'stats.md', 'wrong.md'];
+      const deprecated = ['search.md', 'list.md', 'show.md', 'stats.md', 'wrong.md', 'learn.md'];
       for (const f of deprecated) {
         await writeFile(join(commandsDir, f), 'Run npx ca search to find lessons', 'utf-8');
       }
@@ -568,9 +573,10 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
         expect(existsSync(join(commandsDir, f))).toBe(false);
       }
 
-      // compound/ folder should have the kept commands (learn, prime)
+      // compound/ folder should have the kept commands (learn-that, check-that, prime)
       const compoundDir = join(commandsDir, 'compound');
-      expect(existsSync(join(compoundDir, 'learn.md'))).toBe(true);
+      expect(existsSync(join(compoundDir, 'learn-that.md'))).toBe(true);
+      expect(existsSync(join(compoundDir, 'check-that.md'))).toBe(true);
       expect(existsSync(join(compoundDir, 'prime.md'))).toBe(true);
     });
 

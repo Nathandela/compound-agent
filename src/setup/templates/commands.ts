@@ -115,26 +115,48 @@ Then: scan docs/compound/research/ for gaps, propose topics via AskUserQuestion,
 `,
 
   // =========================================================================
-  // Utility commands (kept: learn, prime)
+  // Utility commands (kept: learn-that, check-that, prime)
   // Removed in v1.3: search, list, show, wrong, stats (CLI wrappers)
+  // Removed in v1.4: learn (replaced by learn-that)
   // =========================================================================
 
-  'learn.md': `---
-name: compound:learn
-description: Capture a lesson from this session into the memory system
+  'learn-that.md': `---
+name: compound:learn-that
+description: Conversation-aware lesson capture with user confirmation
 argument-hint: "<insight to remember>"
 ---
-Capture a lesson from this session.
+# Learn That
 
-Usage: /compound learn <insight>
+If $ARGUMENTS is provided, use it as the insight. Otherwise, analyze the conversation for corrections, discoveries, or fixes worth capturing.
 
-Examples:
-- /compound learn "Always use Polars for large CSV files"
-- /compound learn "API requires X-Request-ID header"
+Formulate:
+- **Trigger**: What situation should recall this lesson?
+- **Insight**: What should be done differently?
+- **Tags**: 2-4 lowercase keywords
+
+Confirm with the user via AskUserQuestion before saving.
+
+Then run:
 
 \`\`\`bash
-npx ca learn "$ARGUMENTS"
+npx ca learn "$ARGUMENTS" --tags "<tag1>,<tag2>"
 \`\`\`
+`,
+
+  'check-that.md': `---
+name: compound:check-that
+description: Search lessons and proactively apply them to current work
+argument-hint: "<query to search for>"
+---
+# Check That
+
+If $ARGUMENTS is provided, use it as the search query. Otherwise, infer from current context.
+
+\`\`\`bash
+npx ca search "$ARGUMENTS"
+\`\`\`
+
+Analyze the results and proactively suggest or apply relevant lessons to the current work.
 `,
   'prime.md': `---
 name: compound:prime

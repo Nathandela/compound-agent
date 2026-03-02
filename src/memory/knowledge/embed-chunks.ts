@@ -67,10 +67,9 @@ export async function embedChunks(
   const updateStmt = db.prepare(
     'UPDATE chunks SET embedding = ?, content_hash = ? WHERE id = ?'
   );
-  const writeBatch = db.transaction((batch: Array<{ id: string; content_hash: string; vector: number[] }>) => {
+  const writeBatch = db.transaction((batch: Array<{ id: string; content_hash: string; vector: Float32Array }>) => {
     for (const item of batch) {
-      const float32 = new Float32Array(item.vector);
-      const buffer = Buffer.from(float32.buffer, float32.byteOffset, float32.byteLength);
+      const buffer = Buffer.from(item.vector.buffer, item.vector.byteOffset, item.vector.byteLength);
       updateStmt.run(buffer, item.content_hash, item.id);
     }
   });

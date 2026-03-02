@@ -32,6 +32,7 @@ async function findDuplicatePairs(repoRoot: string, activeItems: MemoryItem[]): 
   for (const item of activeItems) {
     const similar = await findSimilarLessons(repoRoot, item.insight, {
       excludeId: item.id,
+      items: activeItems,
     });
 
     for (const match of similar) {
@@ -113,7 +114,7 @@ async function cleanLessonsAction(): Promise<void> {
   try {
     await syncIfNeeded(repoRoot);
     const { items } = await readMemoryItems(repoRoot);
-    const activeItems = items.filter((item) => !item.invalidatedAt);
+    const activeItems = items.filter((item) => !item.invalidatedAt && item.type === 'lesson');
     const pairs = await findDuplicatePairs(repoRoot, activeItems);
 
     if (pairs.length === 0) {

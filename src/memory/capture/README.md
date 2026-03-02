@@ -23,6 +23,6 @@ Quality filters and trigger detection for lesson capture.
 ## Quality Gate
 
 Lessons must pass all three checks:
-1. **Novelty** - Not similar to existing lessons (Jaccard > 0.8)
+1. **Novelty** - Not similar to existing lessons (cosine > 0.98)
 2. **Specificity** - At least 4 words, no vague phrases
 3. **Actionability** - Contains clear action guidance

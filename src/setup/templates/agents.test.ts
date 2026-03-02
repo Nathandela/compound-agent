@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { AGENT_TEMPLATES } from './agents.js';
 
-/** 6 thin subagent wrappers + 2 external reviewers = 8 total. */
+/** 6 thin subagent wrappers + 1 lessons agent + 2 external reviewers = 9 total. */
 const THIN_WRAPPER_FILENAMES = [
   'repo-analyst.md',
   'memory-analyst.md',
@@ -11,16 +11,20 @@ const THIN_WRAPPER_FILENAMES = [
   'drift-detector.md',
 ];
 
+const LESSONS_FILENAMES = [
+  'lessons-reviewer.md',
+];
+
 const EXTERNAL_REVIEWER_FILENAMES = [
   'external-reviewer-gemini.md',
   'external-reviewer-codex.md',
 ];
 
-const ALL_FILENAMES = [...THIN_WRAPPER_FILENAMES, ...EXTERNAL_REVIEWER_FILENAMES];
+const ALL_FILENAMES = [...THIN_WRAPPER_FILENAMES, ...LESSONS_FILENAMES, ...EXTERNAL_REVIEWER_FILENAMES];
 
 describe('AGENT_TEMPLATES', () => {
-  it('has exactly 8 entries (6 thin wrappers + 2 external reviewers)', () => {
-    expect(Object.keys(AGENT_TEMPLATES)).toHaveLength(8);
+  it('has exactly 9 entries (6 thin wrappers + 1 lessons + 2 external reviewers)', () => {
+    expect(Object.keys(AGENT_TEMPLATES)).toHaveLength(9);
   });
 
   it('every key ends with .md', () => {
@@ -29,7 +33,7 @@ describe('AGENT_TEMPLATES', () => {
     }
   });
 
-  it('contains all 8 expected filenames', () => {
+  it('contains all 9 expected filenames', () => {
     const keys = Object.keys(AGENT_TEMPLATES);
     for (const filename of ALL_FILENAMES) {
       expect(keys, `missing ${filename}`).toContain(filename);

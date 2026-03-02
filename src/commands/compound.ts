@@ -49,7 +49,7 @@ export function registerCompoundCommands(program: Command): void {
       openDb(repoRoot);
 
       // Compute embeddings for all items (with cache)
-      const embeddings: number[][] = [];
+      const embeddings: Float32Array[] = [];
       try {
         for (const item of items) {
           const text = `${item.trigger} ${item.insight}`;
@@ -61,7 +61,7 @@ export function registerCompoundCommands(program: Command): void {
             setCachedEmbedding(repoRoot, item.id, vec, hash);
           }
 
-          embeddings.push(Array.isArray(vec) ? vec : Array.from(vec));
+          embeddings.push(vec);
         }
       } catch (err) {
         console.error(`Error computing embeddings: ${err instanceof Error ? err.message : String(err)}`);

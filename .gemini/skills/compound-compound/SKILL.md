@@ -24,7 +24,7 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
    - Pipeline: context-analyzers -> lesson-extractors -> pattern-matcher + solution-writer -> compounding
    - Agents coordinate via SendMessage throughout the pipeline
 3. Agents pass results through the pipeline via `SendMessage`. The lead coordinates: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
-4. Apply quality filters: novelty check (>0.85 similarity = skip), specificity check
+4. Apply quality filters: novelty check (>0.98 cosine similarity = skip), specificity check
 5. Classify each item by type: lesson, solution, pattern, or preference
 6. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
 7. Store via `npx ca learn` with supersedes/related links where applicable.

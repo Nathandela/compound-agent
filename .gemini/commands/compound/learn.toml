@@ -1,6 +1,0 @@
-description = "Capture a lesson from this session into the memory system"
-prompt = """
-@{.claude/commands/compound/learn.md}
-
-{{args}}
-"""

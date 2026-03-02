@@ -182,8 +182,9 @@ describe('clean-lessons command', () => {
   });
 
   it('fails with error when model unavailable', async () => {
-    const { isModelAvailable } = await import('../memory/embeddings/nomic.js');
-    vi.mocked(isModelAvailable).mockReturnValue(false);
+    // clean-lessons.ts imports via barrel -> nomic.js re-export, so mock nomic's copy
+    const nomic = await import('../memory/embeddings/nomic.js');
+    vi.mocked(nomic.isModelAvailable).mockReturnValue(false);
 
     await register();
     await program.parseAsync(['node', 'ca', 'clean-lessons']);
@@ -193,6 +194,21 @@ describe('clean-lessons command', () => {
     expect(process.exitCode).toBe(1);
 
     // Reset exitCode for other tests
+    process.exitCode = undefined;
+  });
+
+  it('fails with MODEL_UNUSABLE when embedText throws after isModelAvailable returns true', async () => {
+    const { embedText } = await import('../memory/embeddings/nomic.js');
+    vi.mocked(embedText).mockRejectedValue(new Error('CUDA unavailable'));
+
+    await register();
+    await program.parseAsync(['node', 'ca', 'clean-lessons']);
+
+    const errorOutput = errors.join('\n');
+    expect(errorOutput).toContain('MODEL_UNUSABLE');
+    expect(errorOutput).toContain('CUDA unavailable');
+    expect(process.exitCode).toBe(1);
+
     process.exitCode = undefined;
   });
 });

@@ -15,8 +15,8 @@ import { collectCachedEmbeddings, contentHash } from './cache.js';
 
 /** SQL for inserting a lesson record */
 const INSERT_LESSON_SQL = `
-  INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, last_retrieved, embedding, content_hash, invalidated_at, invalidation_reason, citation_file, citation_line, citation_commit, compaction_level, compacted_at, pattern_bad, pattern_good)
-  VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count, @last_retrieved, @embedding, @content_hash, @invalidated_at, @invalidation_reason, @citation_file, @citation_line, @citation_commit, @compaction_level, @compacted_at, @pattern_bad, @pattern_good)
+  INSERT INTO lessons (id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, last_retrieved, embedding, content_hash, embedding_insight, content_hash_insight, invalidated_at, invalidation_reason, citation_file, citation_line, citation_commit, compaction_level, compacted_at, pattern_bad, pattern_good)
+  VALUES (@id, @type, @trigger, @insight, @evidence, @severity, @tags, @source, @context, @supersedes, @related, @created, @confirmed, @deleted, @retrieval_count, @last_retrieved, @embedding, @content_hash, @embedding_insight, @content_hash_insight, @invalidated_at, @invalidation_reason, @citation_file, @citation_line, @citation_commit, @compaction_level, @compacted_at, @pattern_bad, @pattern_good)
 `;
 
 /**
@@ -81,8 +81,10 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
   const insertMany = database.transaction((memoryItems: MemoryItem[]) => {
     for (const item of memoryItems) {
       const newHash = contentHash(item.trigger, item.insight);
+      const insightHash = contentHash(item.insight, '');
       const cached = cachedEmbeddings.get(item.id);
       const hasValidCache = cached && cached.contentHash === newHash;
+      const hasValidInsightCache = cached && cached.contentHashInsight === insightHash;
 
       insert.run({
         id: item.id,
@@ -103,6 +105,8 @@ export async function rebuildIndex(repoRoot: string): Promise<void> {
         last_retrieved: item.lastRetrieved ?? null,
         embedding: hasValidCache ? cached.embedding : null,
         content_hash: hasValidCache ? cached.contentHash : null,
+        embedding_insight: hasValidInsightCache ? cached.embeddingInsight : null,
+        content_hash_insight: hasValidInsightCache ? cached.contentHashInsight : null,
         invalidated_at: item.invalidatedAt ?? null,
         invalidation_reason: item.invalidationReason ?? null,
         citation_file: item.citation?.file ?? null,

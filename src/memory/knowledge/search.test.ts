@@ -84,7 +84,7 @@ describe('searchKnowledgeVector', () => {
 
     // Mock embedText to return queryLike vector
     const embeddings = await import('../embeddings/nomic.js');
-    vi.spyOn(embeddings, 'embedText').mockResolvedValue(Array.from(queryLike));
+    vi.spyOn(embeddings, 'embedText').mockResolvedValue(queryLike);
 
     const results = await searchKnowledgeVector(testRepo, 'close');
     expect(results.length).toBe(2);
@@ -109,7 +109,7 @@ describe('searchKnowledgeVector', () => {
     seedChunks(chunks, embeddingMap);
 
     const embeddings = await import('../embeddings/nomic.js');
-    vi.spyOn(embeddings, 'embedText').mockResolvedValue(Array.from(queryLike));
+    vi.spyOn(embeddings, 'embedText').mockResolvedValue(queryLike);
 
     const results = await searchKnowledgeVector(testRepo, 'test', { limit: 2 });
     expect(results).toHaveLength(2);
@@ -124,7 +124,7 @@ describe('searchKnowledgeVector', () => {
     seedChunks(chunks, embeddingMap);
 
     const embeddings = await import('../embeddings/nomic.js');
-    vi.spyOn(embeddings, 'embedText').mockResolvedValue(Array.from(queryLike));
+    vi.spyOn(embeddings, 'embedText').mockResolvedValue(queryLike);
 
     const results = await searchKnowledgeVector(testRepo, 'architecture');
     expect(results[0]).toHaveProperty('item');
@@ -193,7 +193,7 @@ describe('searchKnowledge', () => {
     vi.spyOn(model, 'isModelUsable').mockResolvedValue({ usable: true });
 
     const embeddings = await import('../embeddings/nomic.js');
-    vi.spyOn(embeddings, 'embedText').mockResolvedValue(Array.from(queryLike));
+    vi.spyOn(embeddings, 'embedText').mockResolvedValue(queryLike);
 
     const results = await searchKnowledge(testRepo, 'architecture');
     expect(results.length).toBeGreaterThanOrEqual(1);
@@ -214,7 +214,7 @@ describe('searchKnowledge', () => {
     vi.spyOn(model, 'isModelUsable').mockResolvedValue({ usable: true });
 
     const embeddings = await import('../embeddings/nomic.js');
-    vi.spyOn(embeddings, 'embedText').mockResolvedValue(Array.from(new Float32Array([1, 0, 0])));
+    vi.spyOn(embeddings, 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
     const results = await searchKnowledge(testRepo, 'architecture');
     // Should NOT be empty -- falls back to keyword results
