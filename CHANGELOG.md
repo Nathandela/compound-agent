@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`ca watch` command**: Live pretty-printer for infinity loop trace files. Tails `agent_logs/trace_*.jsonl` and formats stream-json events (tool calls, text deltas, token usage, epic markers) with colored output. Supports `--epic <id>` to watch a specific epic and `--no-follow` for one-shot reads.
+- **Stream-json micro logging**: Generated infinity loop scripts now use `--output-format stream-json --include-partial-messages` to capture structured JSONL event traces alongside the existing macro text log. Trace files written to `agent_logs/trace_<epic>-<ts>.jsonl` with `.latest` symlink for easy discovery.
 - **`/compound:learn-that` slash command**: Conversation-aware lesson capture with user confirmation before saving
 - **`/compound:check-that` slash command**: Search lessons and proactively apply them to current work
 - **Eager knowledge embedding**: Knowledge chunks from `docs/` are now embedded for semantic search when the model is available
@@ -31,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Loop script uses piped stream splitting**: Claude invocation changed from `&>` capture to a `tee | extract_text` pipeline. Raw JSONL streams to trace file while extracted text feeds the macro log for marker detection. Backwards compatible — all existing markers (EPIC_COMPLETE, EPIC_FAILED, HUMAN_REQUIRED) still work.
 - **`ca setup --update` now cleans deprecated paths**: Automatically removes stale worktree skill/command files from `.claude/` and `.gemini/` directories.
 - **`ca setup` also cleans deprecated paths**: Fresh setup runs now remove stale files from prior versions.
 - **SKILLS.md template**: Command inventory now lists all 11 slash commands (was 7).

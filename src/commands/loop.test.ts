@@ -306,6 +306,64 @@ describe('generateLoopScript', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
     expect(script).toContain('grep -q "^HUMAN_REQUIRED:"');
   });
+
+  // ========================================================================
+  // Stream-JSON micro logging (two-scope observability)
+  // ========================================================================
+
+  it('uses --output-format stream-json for claude invocation', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('--output-format stream-json');
+  });
+
+  it('uses --include-partial-messages flag', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('--include-partial-messages');
+  });
+
+  it('creates trace JSONL file alongside macro log', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Should write to a trace_<epic>-<ts>.jsonl file
+    expect(script).toMatch(/TRACEFILE.*trace_/);
+  });
+
+  it('tees stream to both trace file and text extraction', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // The stream should be split: raw JSONL to trace, extracted text to macro log
+    expect(script).toContain('tee');
+  });
+
+  it('extracts text content from stream-json for macro log', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Should extract text from content_block_delta or result events
+    // for the macro log that marker detection reads
+    expect(script).toMatch(/extract_text|content_block_delta|"type"/);
+  });
+
+  it('marker detection reads from macro log, not trace JSONL', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // grep for markers should be on LOGFILE (macro), not TRACEFILE
+    expect(script).toMatch(/grep.*EPIC_COMPLETE.*\$LOGFILE/s);
+  });
+
+  it('DRY_RUN mode works with stream-json script shape', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Dry run should still skip the claude invocation entirely
+    expect(script).toMatch(/LOOP_DRY_RUN.*DRY RUN/s);
+  });
+
+  it('writes a .latest pointer for the current trace file', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Should create a symlink or file pointing to the latest trace
+    expect(script).toMatch(/\.latest|ln -sf/);
+  });
+
+  it('does not break &> capture -- uses pipe instead', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // The old &> LOGFILE pattern should be replaced by piped stream handling
+    // The claude invocation should NOT use &> for output
+    expect(script).not.toMatch(/claude\b[^|]*&>\s*"\$LOGFILE"/);
+  });
 });
 
 describe('ca loop CLI', { tags: ['integration'] }, () => {
