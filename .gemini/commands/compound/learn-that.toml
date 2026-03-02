@@ -1,0 +1,6 @@
+description = "Conversation-aware lesson capture with user confirmation"
+prompt = """
+@{.claude/commands/compound/learn-that.md}
+
+{{args}}
+"""
