@@ -10,7 +10,7 @@
  *   Management: wrong, validate, compact, stats, rebuild, export, import, show, update, delete
  *   Setup:      init, setup claude, hooks, download-model
  *   Reviewer:   reviewer enable, reviewer disable, reviewer list
- *   Loop:       loop
+ *   Loop:       loop, watch
  *   Health:     doctor
  */
 
@@ -24,6 +24,7 @@ import {
   registerPhaseCheckCommand,
   registerRetrievalCommands,
   registerSetupCommands,
+  registerWatchCommand,
 } from './commands/index.js';
 import { VERSION } from './version.js';
 import { getRepoRoot } from './cli-utils.js';
@@ -88,6 +89,7 @@ registerManagementCommands(program);
 registerSetupCommands(program);
 registerCompoundCommands(program);
 registerLoopCommands(program);
+registerWatchCommand(program);
 registerPhaseCheckCommand(program);
 
 // ============================================================================

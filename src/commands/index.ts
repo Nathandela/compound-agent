@@ -34,6 +34,7 @@ import { registerCleanLessonsCommand } from './clean-lessons.js';
 
 export { registerCaptureCommands } from './capture.js';
 export { registerLoopCommands } from './loop.js';
+export { registerWatchCommand } from './watch.js';
 export { expectedGateForPhase, getPhaseState, registerPhaseCheckCommand, updatePhaseState } from './phase-check.js';
 export { registerRetrievalCommands } from './retrieval.js';
 

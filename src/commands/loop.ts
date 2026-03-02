@@ -215,6 +215,37 @@ PROMPT_BODY
 }`;
 }
 
+function buildStreamExtractor(): string {
+  return `
+# extract_text() - Extract assistant text from stream-json events
+# Reads JSONL from stdin, outputs plain text lines for marker detection
+extract_text() {
+  if [ "$HAS_JQ" = true ]; then
+    jq -r --unbuffered '
+      select(.type == "content_block_delta" and .delta.type == "text_delta") |
+      .delta.text // empty
+    ' 2>/dev/null || cat
+  else
+    python3 -c "
+import sys, json
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        obj = json.loads(line)
+        if obj.get('type') == 'content_block_delta' and obj.get('delta', {}).get('type') == 'text_delta':
+            text = obj['delta'].get('text', '')
+            if text:
+                print(text, end='', flush=True)
+    except (json.JSONDecodeError, KeyError):
+        pass
+" 2>/dev/null || cat
+  fi
+}
+`;
+}
+
 function buildMainLoop(): string {
   return `
 # Main loop
@@ -238,6 +269,7 @@ while true; do
   while [ $ATTEMPT -le $MAX_RETRIES ]; do
     ATTEMPT=$((ATTEMPT + 1))
     LOGFILE="$LOG_DIR/loop_$EPIC_ID-$(timestamp).log"
+    TRACEFILE="$LOG_DIR/trace_$EPIC_ID-$(timestamp).jsonl"
 
     log "Attempt $ATTEMPT/$((MAX_RETRIES + 1)) for $EPIC_ID (log: $LOGFILE)"
 
@@ -249,10 +281,19 @@ while true; do
 
     PROMPT=$(build_prompt "$EPIC_ID")
 
+    # Two-scope logging: stream-json to trace JSONL, extracted text to macro log
     claude --dangerously-skip-permissions \\
            --model "$MODEL" \\
+           --output-format stream-json \\
+           --include-partial-messages \\
            -p "$PROMPT" \\
-           &> "$LOGFILE" || true
+           2>"$LOGFILE.stderr" | tee "$TRACEFILE" | extract_text > "$LOGFILE" || true
+
+    # Append stderr to macro log
+    [ -f "$LOGFILE.stderr" ] && cat "$LOGFILE.stderr" >> "$LOGFILE" && rm -f "$LOGFILE.stderr"
+
+    # Update .latest symlink for ca watch
+    ln -sf "$(basename "$TRACEFILE")" "$LOG_DIR/.latest"
 
     if grep -q "^EPIC_COMPLETE$" "$LOGFILE"; then
       log "Epic $EPIC_ID completed successfully"
@@ -325,6 +366,7 @@ export function generateLoopScript(options: LoopScriptOptions): string {
   const timestamp = new Date().toISOString();
 
   return buildScriptHeader(timestamp, options.maxRetries, options.model, epicIds)
+    + buildStreamExtractor()
     + buildMainLoop();
 }
 
