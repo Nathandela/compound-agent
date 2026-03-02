@@ -86,7 +86,7 @@ describe('unified search across all memory types', () => {
       await rebuildIndex(tempDir);
 
       // Mock embedText to return predictable vectors
-      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
       const results = await searchVector(tempDir, 'testing', { limit: 10 });
       expect(results.length).toBe(4);
@@ -102,7 +102,7 @@ describe('unified search across all memory types', () => {
       } as MemoryItem);
       await rebuildIndex(tempDir);
 
-      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue([1, 0, 0]);
+      vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
       const results = await searchVector(tempDir, 'solution', { limit: 10 });
       expect(results).toHaveLength(1);

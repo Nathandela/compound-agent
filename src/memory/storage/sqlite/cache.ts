@@ -30,7 +30,7 @@ export function getCachedEmbedding(
   repoRoot: string,
   lessonId: string,
   expectedHash?: string
-): number[] | null {
+): Float32Array | null {
   const database = openDb(repoRoot);
 
   const row = database
@@ -45,12 +45,11 @@ export function getCachedEmbedding(
     return null;
   }
 
-  const float32 = new Float32Array(
+  return new Float32Array(
     row.embedding.buffer,
     row.embedding.byteOffset,
     row.embedding.byteLength / 4
   );
-  return Array.from(float32);
 }
 
 /**
@@ -85,7 +84,7 @@ export function setCachedEmbedding(
 
 /** Entry returned by getCachedEmbeddingsBulk */
 export interface CachedEmbeddingEntry {
-  vector: number[];
+  vector: Float32Array;
   hash: string;
 }
 
@@ -109,7 +108,7 @@ export function getCachedEmbeddingsBulk(repoRoot: string): Map<string, CachedEmb
       row.embedding.byteOffset,
       row.embedding.byteLength / 4
     );
-    result.set(row.id, { vector: Array.from(float32), hash: row.content_hash });
+    result.set(row.id, { vector: float32, hash: row.content_hash });
   }
   return result;
 }
@@ -122,7 +121,7 @@ export function getCachedInsightEmbedding(
   repoRoot: string,
   lessonId: string,
   expectedHash?: string
-): number[] | null {
+): Float32Array | null {
   const database = openDb(repoRoot);
 
   const row = database
@@ -137,12 +136,11 @@ export function getCachedInsightEmbedding(
     return null;
   }
 
-  const float32 = new Float32Array(
+  return new Float32Array(
     row.embedding_insight.buffer,
     row.embedding_insight.byteOffset,
     row.embedding_insight.byteLength / 4
   );
-  return Array.from(float32);
 }
 
 /**

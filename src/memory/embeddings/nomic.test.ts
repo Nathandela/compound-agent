@@ -23,11 +23,10 @@ describe('embeddings', () => {
   });
 
   describe('embedText', () => {
-    it.skipIf(skipEmbedding)('returns a vector for text input', async () => {
+    it.skipIf(skipEmbedding)('returns a Float32Array for text input', async () => {
       const vector = await embedText('Use Polars for large files');
-      expect(Array.isArray(vector)).toBe(true);
+      expect(vector).toBeInstanceOf(Float32Array);
       expect(vector.length).toBeGreaterThan(0);
-      expect(vector.every((v) => typeof v === 'number')).toBe(true);
     });
 
     it.skipIf(skipEmbedding)('returns consistent vectors for same input', async () => {
@@ -44,13 +43,13 @@ describe('embeddings', () => {
 
     it.skipIf(skipEmbedding)('handles empty string', async () => {
       const vector = await embedText('');
-      expect(Array.isArray(vector)).toBe(true);
+      expect(vector).toBeInstanceOf(Float32Array);
     });
 
     it.skipIf(skipEmbedding)('handles long text', async () => {
       const longText = 'This is a test sentence. '.repeat(100);
       const vector = await embedText(longText);
-      expect(Array.isArray(vector)).toBe(true);
+      expect(vector).toBeInstanceOf(Float32Array);
       expect(vector.length).toBeGreaterThan(0);
     });
   });
@@ -60,7 +59,7 @@ describe('embeddings', () => {
       const texts = ['first text', 'second text', 'third text'];
       const vectors = await embedTexts(texts);
       expect(vectors).toHaveLength(3);
-      expect(vectors.every((v) => Array.isArray(v))).toBe(true);
+      expect(vectors.every((v) => v instanceof Float32Array)).toBe(true);
     });
 
     it.skipIf(skipEmbedding)('returns empty array for empty input', async () => {

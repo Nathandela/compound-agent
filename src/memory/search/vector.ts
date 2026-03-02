@@ -17,7 +17,7 @@ import type { MemoryItem } from '../types.js';
  * so setCachedEmbedding (UPDATE-only) is a no-op for them.
  * This Map caches embeddings keyed by "id:contentHash".
  */
-const cctEmbeddingCache = new Map<string, number[]>();
+const cctEmbeddingCache = new Map<string, Float32Array>();
 
 /** Clear the CCT embedding cache. Exported for testing. */
 export function clearCctEmbeddingCache(): void {
@@ -130,7 +130,7 @@ export async function searchVector(
 
       // Try bulk cache first
       const cached = cachedEmbeddings.get(item.id);
-      let itemVector: number[];
+      let itemVector: Float32Array;
 
       if (cached && cached.hash === hash) {
         itemVector = cached.vector;

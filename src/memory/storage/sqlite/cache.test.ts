@@ -75,7 +75,7 @@ describe('getCachedEmbeddingsBulk', () => {
     expect(entry!.hash).toBe(hash);
   });
 
-  it('returns correct vectors', async () => {
+  it('returns correct vectors as Float32Array', async () => {
     await appendLesson(tempDir, createQuickLesson('L001', 'lesson one'));
     await rebuildIndex(tempDir);
 
@@ -87,6 +87,7 @@ describe('getCachedEmbeddingsBulk', () => {
     const entry = result.get('L001');
 
     expect(entry).toBeDefined();
+    expect(entry!.vector).toBeInstanceOf(Float32Array);
     expect(entry!.vector).toHaveLength(3);
     expect(entry!.vector[0]).toBeCloseTo(0.1);
     expect(entry!.vector[1]).toBeCloseTo(0.2);

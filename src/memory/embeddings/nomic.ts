@@ -146,7 +146,7 @@ export function unloadEmbedding(): void {
  * Subsequent calls use the cached model and complete in milliseconds.
  *
  * @param text - The text to embed
- * @returns A 768-dimensional vector (number[])
+ * @returns A 768-dimensional Float32Array vector
  * @throws Error if model download fails
  *
  * @example
@@ -161,10 +161,10 @@ export function unloadEmbedding(): void {
  * @see {@link embedTexts} for batch embedding
  * @see {@link unloadEmbedding} for releasing memory
  */
-export async function embedText(text: string): Promise<number[]> {
+export async function embedText(text: string): Promise<Float32Array> {
   const ctx = await getEmbedding();
   const result = await ctx.getEmbeddingFor(text);
-  return Array.from(result.vector);
+  return new Float32Array(result.vector);
 }
 
 /**
@@ -194,15 +194,15 @@ export async function embedText(text: string): Promise<number[]> {
  * @see {@link embedText} for single text embedding
  * @see {@link unloadEmbedding} for releasing memory
  */
-export async function embedTexts(texts: string[]): Promise<number[][]> {
+export async function embedTexts(texts: string[]): Promise<Float32Array[]> {
   if (texts.length === 0) return [];
 
   const ctx = await getEmbedding();
-  const results: number[][] = [];
+  const results: Float32Array[] = [];
 
   for (const text of texts) {
     const result = await ctx.getEmbeddingFor(text);
-    results.push(Array.from(result.vector));
+    results.push(new Float32Array(result.vector));
   }
 
   return results;

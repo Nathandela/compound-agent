@@ -314,7 +314,7 @@ describe('SQLite schema', () => {
       expect(result).toBeNull();
     });
 
-    it('returns cached embedding when content_hash matches', async () => {
+    it('returns cached embedding as Float32Array when content_hash matches', async () => {
       await appendLesson(tempDir, createQuickLesson('L001', 'test insight'));
       await rebuildIndex(tempDir);
 
@@ -324,6 +324,7 @@ describe('SQLite schema', () => {
 
       const result = getCachedEmbedding(tempDir, 'L001', hash);
       expect(result).not.toBeNull();
+      expect(result).toBeInstanceOf(Float32Array);
       expect(result).toHaveLength(3);
       expect(result![0]).toBeCloseTo(1.5);
       expect(result![1]).toBeCloseTo(2.5);

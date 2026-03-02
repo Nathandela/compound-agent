@@ -17,7 +17,7 @@ const DEFAULT_THRESHOLD = 0.75;
  * @param embeddings - Array of embedding vectors
  * @returns NxN similarity matrix
  */
-export function buildSimilarityMatrix(embeddings: number[][]): number[][] {
+export function buildSimilarityMatrix(embeddings: ArrayLike<number>[]): number[][] {
   const n = embeddings.length;
   const matrix: number[][] = Array.from({ length: n }, () => new Array<number>(n).fill(0));
 
@@ -44,7 +44,7 @@ export function buildSimilarityMatrix(embeddings: number[][]): number[][] {
  */
 export function clusterBySimilarity(
   items: MemoryItem[],
-  embeddings: number[][],
+  embeddings: ArrayLike<number>[],
   threshold: number = DEFAULT_THRESHOLD
 ): ClusterResult {
   const n = items.length;
