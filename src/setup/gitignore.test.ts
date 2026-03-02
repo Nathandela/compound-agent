@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ensureGitignore, type GitignoreResult } from './gitignore.js';
 
 /** Required patterns that must be in .gitignore. */
-const REQUIRED_PATTERNS = ['node_modules/', '.claude/.cache/'];
+const REQUIRED_PATTERNS = ['node_modules/', '.claude/.cache/', '.claude/.ca-*.json'];
 
 describe('ensureGitignore', () => {
   let tempDir: string;
@@ -36,6 +36,7 @@ describe('ensureGitignore', () => {
     const content = await readFile(join(tempDir, '.gitignore'), 'utf-8');
     expect(content).toContain('node_modules/');
     expect(content).toContain('.claude/.cache/');
+    expect(content).toContain('.claude/.ca-*.json');
     expect(result.added.length).toBeGreaterThan(0);
   });
 
@@ -59,8 +60,10 @@ describe('ensureGitignore', () => {
     expect(content).toContain('dist/');
     expect(content).toContain('node_modules/');
     expect(content).toContain('.claude/.cache/');
+    expect(content).toContain('.claude/.ca-*.json');
     expect(result.added).toContain('node_modules/');
     expect(result.added).toContain('.claude/.cache/');
+    expect(result.added).toContain('.claude/.ca-*.json');
   });
 
   it('appends under section comment when adding to existing .gitignore', async () => {
@@ -95,7 +98,7 @@ describe('ensureGitignore', () => {
   it('returns empty added array when all patterns exist', async () => {
     await writeFile(
       join(tempDir, '.gitignore'),
-      'node_modules/\n.claude/.cache/\ndist/\n',
+      'node_modules/\n.claude/.cache/\n.claude/.ca-*.json\ndist/\n',
       'utf-8'
     );
 
