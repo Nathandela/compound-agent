@@ -107,6 +107,45 @@ describe('ensureGitignore', () => {
     expect(result.added).toEqual([]);
   });
 
+  it('appends to existing section instead of creating duplicate comment header', async () => {
+    // Simulate a file where an earlier run added some patterns under # compound-agent,
+    // but a new required pattern was added to REQUIRED_PATTERNS since then.
+    await writeFile(
+      join(tempDir, '.gitignore'),
+      '# compound-agent\nnode_modules/\n.claude/.cache/\n',
+      'utf-8'
+    );
+
+    const result = await ensureGitignore(tempDir);
+
+    const content = await readFile(join(tempDir, '.gitignore'), 'utf-8');
+    // Should have only ONE occurrence of the section comment
+    const commentCount = (content.match(/# compound-agent/g) || []).length;
+    expect(commentCount).toBe(1);
+    // New pattern should be added under the existing section
+    expect(content).toContain('.claude/.ca-*.json');
+    expect(result.added).toEqual(['.claude/.ca-*.json']);
+  });
+
+  it('inserts into section in middle of file without corrupting content after it', async () => {
+    const initial =
+      '# compound-agent\nnode_modules/\n.claude/.cache/\n\n# other stuff\ndist/\n*.log\n';
+    await writeFile(join(tempDir, '.gitignore'), initial, 'utf-8');
+
+    const result = await ensureGitignore(tempDir);
+
+    const content = await readFile(join(tempDir, '.gitignore'), 'utf-8');
+    // Only one section comment
+    const commentCount = (content.match(/# compound-agent/g) || []).length;
+    expect(commentCount).toBe(1);
+    // New pattern inserted within the section
+    expect(result.added).toEqual(['.claude/.ca-*.json']);
+    // Content after the section is preserved intact
+    expect(content).toContain('# other stuff');
+    expect(content).toContain('dist/');
+    expect(content).toContain('*.log');
+  });
+
   it('does not duplicate patterns on repeated calls', async () => {
     await ensureGitignore(tempDir);
     await ensureGitignore(tempDir);

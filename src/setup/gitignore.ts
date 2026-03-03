@@ -42,9 +42,26 @@ export async function ensureGitignore(repoRoot: string): Promise<GitignoreResult
     return { added: [] };
   }
 
-  const section = [SECTION_COMMENT, ...missing].join('\n');
-  const separator = content.length > 0 && !content.endsWith('\n') ? '\n\n' : content.length > 0 ? '\n' : '';
-  const newContent = content + separator + section + '\n';
+  let newContent: string;
+  const sectionIdx = lines.findIndex(l => l.trim() === SECTION_COMMENT);
+
+  if (sectionIdx >= 0) {
+    // Append to existing section: find last contiguous non-empty pattern line after the comment
+    let insertAfter = sectionIdx;
+    for (let i = sectionIdx + 1; i < lines.length; i++) {
+      const line = lines[i];
+      if (line === undefined) break;
+      const trimmed = line.trim();
+      if (trimmed === '' || trimmed.startsWith('#')) break;
+      insertAfter = i;
+    }
+    lines.splice(insertAfter + 1, 0, ...missing);
+    newContent = lines.join('\n');
+  } else {
+    const section = [SECTION_COMMENT, ...missing].join('\n');
+    const separator = content.length > 0 && !content.endsWith('\n') ? '\n\n' : content.length > 0 ? '\n' : '';
+    newContent = content + separator + section + '\n';
+  }
 
   await writeFile(gitignorePath, newContent, 'utf-8');
 
