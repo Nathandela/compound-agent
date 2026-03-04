@@ -18,7 +18,8 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
-2. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with `team_name`):
+2. Detect spec drift: compare final implementation against original EARS requirements in the epic description (`bd show <epic>`). Note any divergences -- what changed, why, was it justified. If drift reveals a spec was wrong or incomplete, flag that for lesson extraction.
+3. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with `team_name`):
    - Role skills: `.claude/skills/compound/agents/{context-analyzer,lesson-extractor,pattern-matcher,solution-writer,compounding}/SKILL.md`
    - For large diffs, deploy MULTIPLE context-analyzers and lesson-extractors
    - Pipeline: context-analyzers -> lesson-extractors -> pattern-matcher + solution-writer -> compounding
@@ -57,6 +58,7 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 - User confirmed high-severity items
 - Beads checked for related issues (`bd`)
 - Each item gives clear, concrete guidance for future sessions
+- Spec drift analyzed and captured
 
 ## FINAL GATE -- EPIC CLOSURE
 Before closing the epic:

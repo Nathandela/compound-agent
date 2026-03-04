@@ -48,7 +48,7 @@ describe('Phase Check State Machine', () => {
       const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
       expect(state.lfg_active).toBe(true);
       expect(state.epic_id).toBe('learning_agent-5dfm');
-      expect(state.current_phase).toBe('brainstorm');
+      expect(state.current_phase).toBe('spec-dev');
       expect(state.phase_index).toBe(1);
       expect(state.skills_read).toEqual([]);
       expect(state.gates_passed).toEqual([]);
@@ -80,7 +80,7 @@ describe('Phase Check State Machine', () => {
       initPhaseState(repoRoot, 'learning_agent-5dfm');
 
       const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-      expect(state.current_phase).toBe('brainstorm');
+      expect(state.current_phase).toBe('spec-dev');
       expect(state.phase_index).toBe(1);
     });
   });
@@ -92,7 +92,7 @@ describe('Phase Check State Machine', () => {
 
       expect(state).not.toBeNull();
       expect(state!.lfg_active).toBe(true);
-      expect(state!.current_phase).toBe('brainstorm');
+      expect(state!.current_phase).toBe('spec-dev');
       expect(state!.epic_id).toBe('learning_agent-5dfm');
     });
 

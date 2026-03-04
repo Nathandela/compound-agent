@@ -1,0 +1,6 @@
+description = "Develop precise specifications through Socratic dialogue, EARS notation, and Mermaid diagrams"
+prompt = """
+@{.claude/commands/compound/spec-dev.md}
+
+{{args}}
+"""

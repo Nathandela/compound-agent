@@ -5,61 +5,93 @@
  */
 
 export const PHASE_SKILLS: Record<string, string> = {
-  brainstorm: `---
-name: Brainstorm
-description: Divergent-then-convergent thinking to explore solution space
+  'spec-dev': `---
+name: Spec Dev
+description: Develop precise specifications through Socratic dialogue, EARS notation, and Mermaid diagrams
 ---
 
-# Brainstorm Skill
+# Spec Dev Skill
 
 ## Overview
-Explore the problem space before committing to a solution. This phase produces a structured brainstorm document with decisions, open questions, and a beads epic for handoff to planning.
+Develop unambiguous, testable specifications before committing to implementation. This phase uses a 4-phase process (Explore, Understand, Specify, Hand off) that produces EARS-notation requirements, Mermaid diagrams, and a beads epic ready for planning.
+
+Scale formality to risk: skip spec-dev for trivial tasks, use lightweight EARS for small tasks, run the full 4-phase process for medium/large work.
 
 ## Methodology
-1. Ask "why" before "how" -- understand the real problem
-2. Search memory with \`npx ca search\` and docs with \`npx ca knowledge "relevant topic"\` for similar past features and known constraints
-3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
+
+### Phase 1: Explore
+1. Ask "why" before "how" -- understand the real need behind the request
+2. Search memory: \`npx ca search\` and docs: \`npx ca knowledge "relevant topic"\` for similar past features and constraints
+3. Spawn **subagents** in parallel for research:
    - Available agents: \`.claude/agents/compound/repo-analyst.md\`, \`memory-analyst.md\`
-   - Or use \`subagent_type: Explore\` for ad-hoc research
-   - Deploy MULTIPLE when topic spans several domains; synthesize all findings before proceeding
-4. When facing deep unknowns or complex technical domains, invoke the **researcher skill** (read \`.claude/skills/compound/researcher/SKILL.md\`) to produce a structured survey document before narrowing approaches
-5. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences
-6. Divergent phase: generate multiple approaches without filtering
-7. Identify constraints and non-functional requirements (performance, security, etc.)
-8. Convergent phase: evaluate approaches against constraints
-9. Document decisions with rationale, list open questions, and create a beads epic
-10. Auto-create ADR files in \`docs/decisions/\` for significant decisions (lightweight: Status, Context, Decision, Consequences)
+   - Or use \`subagent_type: Explore\` for ad-hoc codebase research
+   - Deploy MULTIPLE when topic spans several domains; synthesize findings before proceeding
+4. For deep unknowns, invoke the **researcher skill** (\`.claude/skills/compound/researcher/SKILL.md\`) to produce a survey document
+5. Build a discovery mindmap (Mermaid) showing stakeholders, capabilities, constraints
+6. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences
+
+### Phase 2: Understand
+1. Probe each capability with Socratic questions: What triggers it? Edge cases? Constraints? Acceptance criteria?
+2. Use Mermaid diagrams as thinking tools (\`sequenceDiagram\` for workflows, \`stateDiagram-v2\` for lifecycles)
+3. Detect and flag ambiguities: vague adjectives, unclear pronouns, passive voice, compound requirements
+4. Build a domain glossary for terms with multiple interpretations
+5. Resolve ambiguities with \`AskUserQuestion\` before moving on
+
+### Phase 3: Specify
+1. Write requirements using EARS notation:
+   - Ubiquitous: \`The system shall <action>.\`
+   - Event-driven: \`When <trigger>, the system shall <action>.\`
+   - State-driven: \`While <state>, the system shall <action>.\`
+   - Unwanted behavior: \`If <condition>, then the system shall <action>.\`
+   - Combined ordering: Where > While > When > If/then > shall
+2. Verify each requirement is testable, quantified, and unambiguous
+3. Document trade-offs when requirements conflict (MCDA scoring or satisficing)
+4. Produce architecture diagrams (\`erDiagram\`, \`C4Context\`, \`flowchart\`)
+5. Create ADRs in \`docs/decisions/\` for significant decisions
+
+### Phase 4: Hand off
+1. Store consolidated spec in beads epic description (\`bd update <epic> --description="..."\`)
+2. Create the beads epic with \`bd create\` if not already created
+3. Flag open questions for the plan phase
+4. Capture lessons: \`npx ca learn\` for novel insights
+
+**Iteration**: If a later phase reveals gaps, loop back to the earlier phase.
+
+See \`references/spec-guide.md\` for EARS patterns, Mermaid templates, ambiguity checklist, and trade-off frameworks.
 
 ## Memory Integration
-- Run \`npx ca search\` and \`npx ca knowledge "relevant topic"\` with relevant keywords before generating approaches
+- \`npx ca search\` and \`npx ca knowledge "topic"\` before generating approaches
 - Look for past architectural decisions, pitfalls, and preferences
-- If the problem domain matches past work, review those lessons first
+- \`npx ca learn\` after corrections or novel discoveries
 
 ## Docs Integration
 - Spawn docs-explorer to scan \`docs/\` for relevant architecture docs, research, and standards
-- Review existing ADRs in \`docs/decisions/\` -- prior decisions may constrain the brainstorm
-- Auto-create ADR for each significant decision made during convergence
+- Review existing ADRs in \`docs/decisions/\` -- prior decisions may constrain the spec
+- Auto-create ADR for significant decisions made during specification
 
 ## Common Pitfalls
-- Jumping to the first solution without exploring alternatives
-- Ignoring non-functional requirements (scalability, maintainability)
+- Jumping to solutions before exploring the problem
+- Skipping diagrams -- they reveal hidden assumptions, not just document decisions
+- Writing vague requirements ("handle errors gracefully") instead of EARS patterns
 - Not searching memory for similar past features
 - Not checking existing docs and ADRs for prior decisions
-- Over-scoping: trying to solve everything at once
-- Skipping the "why" and diving into "how"
+- Over-specifying trivially small tasks
+- Ignoring iteration signals when specifying reveals gaps
+- Not creating a beads epic from conclusions (losing spec output)
 - Not invoking the researcher skill when the domain requires deep investigation
-- Not creating a beads epic from conclusions (losing brainstorm output)
 
 ## Quality Criteria
 - Multiple approaches were considered (at least 2-3)
-- Constraints and requirements are explicitly listed
+- Requirements use EARS notation (not freeform prose)
+- Ambiguities detected and resolved via Socratic dialogue
+- Mermaid diagrams used as thinking tools
 - Memory was searched for relevant context
 - Existing docs and ADRs were reviewed for prior decisions
-- User was engaged via \`AskUserQuestion\` for clarification
-- A clear decision was made with documented rationale
+- Trade-offs documented with rationale
+- User engaged via \`AskUserQuestion\` at each decision point
+- Spec stored in beads epic description
 - ADRs created for significant architectural decisions
-- Open questions are captured for the plan phase
-- A beads epic was created from conclusions via \`bd create\`
+- Open questions flagged for the plan phase
 `,
 
   plan: `---
@@ -73,7 +105,7 @@ description: Decompose work into small testable tasks with clear dependencies
 Create a concrete implementation plan by decomposing work into small, testable tasks with dependencies and acceptance criteria.
 
 ## Methodology
-1. Review brainstorm output for decisions and open questions
+1. Read the spec from the epic description (\`bd show <epic>\`) for EARS requirements, decisions, and open questions
 2. Search memory with \`npx ca search\` and docs with \`npx ca knowledge "relevant topic"\` for architectural patterns and past mistakes
 3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
    - Available agents: \`.claude/agents/compound/repo-analyst.md\`, \`memory-analyst.md\`
@@ -84,8 +116,9 @@ Create a concrete implementation plan by decomposing work into small, testable t
 6. Use \`AskUserQuestion\` to resolve ambiguities, conflicting constraints, or priority trade-offs before decomposing
 7. Decompose into tasks small enough to verify individually
 8. Define acceptance criteria for each task
-9. Map dependencies between tasks
-10. Create beads issues: \`bd create --title="..." --type=task\`
+9. Ensure each task traces back to a spec requirement for traceability
+10. Map dependencies between tasks
+11. Create beads issues: \`bd create --title="..." --type=task\`
 11. Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) that depend on work tasks — these survive compaction and surface via \`bd ready\` after work completes
 
 ## Memory Integration
@@ -115,6 +148,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Existing docs and ADRs were checked for constraints
 - Ambiguities resolved via \`AskUserQuestion\` before decomposing
 - Complexity estimates are realistic (no "should be quick")
+- Each task traces back to a spec requirement
 
 ## POST-PLAN VERIFICATION -- MANDATORY
 After creating all tasks, verify review and compound tasks exist:
@@ -135,15 +169,17 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 ## Methodology
 1. Pick tasks from \`bd ready\` or \`$ARGUMENTS\`
 2. Mark tasks in progress: \`bd update <id> --status=in_progress\`
-3. Run \`npx ca search\` per agent/subtask for targeted context. Display results.
+3. Read the epic description (\`bd show <epic>\`) for spec context -- EARS requirements guide what "done" looks like
+4. Run \`npx ca search\` per agent/subtask for targeted context. Display results.
 4. Assess parallelization: identify independent tasks that can be worked simultaneously
 5. Deploy an **AgentTeam** (TeamCreate + Task with \`team_name\`) with MULTIPLE test-writers and implementers:
    - Role skills: \`.claude/skills/compound/agents/{test-writer,implementer}/SKILL.md\`
    - Scale teammate count to independent tasks; pairs coordinate via SendMessage on shared interfaces
 6. Agents communicate via SendMessage when working on overlapping areas.
 7. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-8. If blocked, use AskUserQuestion to get user direction.
-9. Shut down the team when done: send shutdown_request to all teammates.
+8. If implementation diverges from spec requirements, stop and discuss with user via AskUserQuestion before proceeding.
+9. If blocked, use AskUserQuestion to get user direction.
+10. Shut down the team when done: send shutdown_request to all teammates.
 10. Commit incrementally as tests pass.
 11. Run full test suite for regressions.
 12. Close tasks: \`bd close <id>\`
@@ -186,6 +222,7 @@ for complex changes. For all changes, \`/implementation-reviewer\` is the minimu
 - Incremental commits made as tests pass
 - All tests pass after refactoring
 - Task lifecycle tracked via beads (\`bd\`)
+- Implementation aligns with spec requirements from epic
 
 ## PHASE GATE 3 -- MANDATORY
 Before starting Review, verify ALL work tasks are closed:
@@ -206,8 +243,9 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 
 ## Methodology
 1. Run quality gates first: \`pnpm test && pnpm lint\`
-2. Search memory with \`npx ca search\` for known patterns and recurring issues
-3. Select reviewer tier based on diff size:
+2. Read the epic description (\`bd show <epic>\`) for EARS requirements -- reviewers verify each requirement is met
+3. Search memory with \`npx ca search\` for known patterns and recurring issues
+4. Select reviewer tier based on diff size:
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
    - **Medium** (100-500): add architecture, performance, edge-case (7 total)
    - **Large** (500+): all 11 reviewers including docs, consistency, error-handling, pattern-matcher
@@ -220,9 +258,10 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 7. Classify by severity: P0 (blocks merge), P1 (critical/blocking), P2 (important), P3 (minor)
 8. Use \`AskUserQuestion\` when severity is ambiguous or fix has multiple valid options
 9. Create beads issues for P1 findings: \`bd create --title="P1: ..."\`
-10. Fix all P1 findings before proceeding
-11. Run \`/implementation-reviewer\` as mandatory gate
-12. Capture novel findings with \`npx ca learn\`; pattern-matcher auto-reinforces recurring issues
+10. Verify spec alignment: flag unmet EARS requirements as P1, flag requirements met but missing from acceptance criteria as gaps
+11. Fix all P1 findings before proceeding
+12. Run \`/implementation-reviewer\` as mandatory gate
+13. Capture novel findings with \`npx ca learn\`; pattern-matcher auto-reinforces recurring issues
 
 ## Memory Integration
 - Run \`npx ca search\` before review for known recurring issues
@@ -253,6 +292,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 - security-reviewer P0 findings: none (blocks merge)
 - security-reviewer P1 findings: all acknowledged or resolved
 - All P1 findings fixed before \`/implementation-reviewer\` approval
+- All spec requirements verified against implementation
 - \`/implementation-reviewer\` approved as mandatory gate
 
 ## PHASE GATE 4 -- MANDATORY
@@ -278,7 +318,8 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
 
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
-2. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with \`team_name\`):
+2. Detect spec drift: compare final implementation against original EARS requirements in the epic description (\`bd show <epic>\`). Note any divergences -- what changed, why, was it justified. If drift reveals a spec was wrong or incomplete, flag that for lesson extraction.
+3. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with \`team_name\`):
    - Role skills: \`.claude/skills/compound/agents/{context-analyzer,lesson-extractor,pattern-matcher,solution-writer,compounding}/SKILL.md\`
    - For large diffs, deploy MULTIPLE context-analyzers and lesson-extractors
    - Pipeline: context-analyzers -> lesson-extractors -> pattern-matcher + solution-writer -> compounding
@@ -317,6 +358,7 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
 - User confirmed high-severity items
 - Beads checked for related issues (\`bd\`)
 - Each item gives clear, concrete guidance for future sessions
+- Spec drift analyzed and captured
 
 ## FINAL GATE -- EPIC CLOSURE
 Before closing the epic:
@@ -356,7 +398,7 @@ Conduct deep research on a topic and produce a structured survey document follow
    - References (full citations)
    - Practitioner Resources (annotated tools/repos)
 6. Store output at \`docs/compound/research/<topic-slug>.md\` (kebab-case filename)
-7. Report key findings back for upstream skill (brainstorm/plan) to act on
+7. Report key findings back for upstream skill (spec-dev/plan) to act on
 
 ## Memory Integration
 - Run \`npx ca search\` with topic keywords before starting research
@@ -442,11 +484,11 @@ description: Full-cycle orchestrator chaining all five phases with gates and con
 # LFG Skill
 
 ## Overview
-Chain all 5 phases end-to-end: Brainstorm, Plan, Work, Review, Compound. This skill governs the orchestration -- phase sequencing, gates, progress tracking, and error recovery.
+Chain all 5 phases end-to-end: Spec Dev, Plan, Work, Review, Compound. This skill governs the orchestration -- phase sequencing, gates, progress tracking, and error recovery.
 
 ## CRITICAL RULE -- READ BEFORE EXECUTE
 Before starting EACH phase, you MUST use the Read tool to open its skill file:
-- .claude/skills/compound/brainstorm/SKILL.md
+- .claude/skills/compound/spec-dev/SKILL.md
 - .claude/skills/compound/plan/SKILL.md
 - .claude/skills/compound/work/SKILL.md
 - .claude/skills/compound/review/SKILL.md
@@ -480,7 +522,7 @@ If a gate fails, DO NOT proceed. Fix the issue first.
 - **Progress**: Always announce current phase number before starting.
 
 ## Stop Conditions
-- Brainstorm reveals goal is unclear -- stop, ask user
+- Spec dev reveals goal is unclear -- stop, ask user
 - Tests produce unresolvable failures -- stop, report
 - Review finds critical security issues -- stop, report
 

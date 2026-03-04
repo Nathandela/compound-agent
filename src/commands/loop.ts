@@ -173,7 +173,7 @@ Read the epic details carefully. Understand scope, acceptance criteria, and sub-
 
 ## Step 2: Execute the workflow
 Run the full compound workflow for this epic, starting from the plan phase
-(brainstorm is already done -- the epic exists):
+(spec-dev is already done -- the epic exists):
 
 /compound:lfg from plan -- Epic: $epic_id
 

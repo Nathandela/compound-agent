@@ -16,15 +16,17 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 ## Methodology
 1. Pick tasks from `bd ready` or `$ARGUMENTS`
 2. Mark tasks in progress: `bd update <id> --status=in_progress`
-3. Run `npx ca search` per agent/subtask for targeted context. Display results.
+3. Read the epic description (`bd show <epic>`) for spec context -- EARS requirements guide what "done" looks like
+4. Run `npx ca search` per agent/subtask for targeted context. Display results.
 4. Assess parallelization: identify independent tasks that can be worked simultaneously
 5. Deploy an **AgentTeam** (TeamCreate + Task with `team_name`) with MULTIPLE test-writers and implementers:
    - Role skills: `.claude/skills/compound/agents/{test-writer,implementer}/SKILL.md`
    - Scale teammate count to independent tasks; pairs coordinate via SendMessage on shared interfaces
 6. Agents communicate via SendMessage when working on overlapping areas.
 7. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-8. If blocked, use AskUserQuestion to get user direction.
-9. Shut down the team when done: send shutdown_request to all teammates.
+8. If implementation diverges from spec requirements, stop and discuss with user via AskUserQuestion before proceeding.
+9. If blocked, use AskUserQuestion to get user direction.
+10. Shut down the team when done: send shutdown_request to all teammates.
 10. Commit incrementally as tests pass.
 11. Run full test suite for regressions.
 12. Close tasks: `bd close <id>`
@@ -67,6 +69,7 @@ for complex changes. For all changes, `/implementation-reviewer` is the minimum 
 - Incremental commits made as tests pass
 - All tests pass after refactoring
 - Task lifecycle tracked via beads (`bd`)
+- Implementation aligns with spec requirements from epic
 
 ## PHASE GATE 3 -- MANDATORY
 Before starting Review, verify ALL work tasks are closed:

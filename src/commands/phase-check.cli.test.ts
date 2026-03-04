@@ -45,7 +45,7 @@ describe('phase-check CLI', { tags: ['hooks', 'integration'] }, () => {
       const state = JSON.parse(stdout);
       expect(state.lfg_active).toBe(true);
       expect(state.epic_id).toBe('learning_agent-5dfm');
-      expect(state.current_phase).toBe('brainstorm');
+      expect(state.current_phase).toBe('spec-dev');
     });
 
     it('outputs lfg_active false when no state file exists', () => {

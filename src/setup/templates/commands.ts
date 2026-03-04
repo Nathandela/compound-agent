@@ -3,16 +3,16 @@
  */
 
 export const WORKFLOW_COMMANDS: Record<string, string> = {
-  'brainstorm.md': `---
-name: compound:brainstorm
-description: Explore requirements through collaborative dialogue before committing to a plan
-argument-hint: "<goal or topic to brainstorm>"
+  'spec-dev.md': `---
+name: compound:spec-dev
+description: Develop precise specifications through Socratic dialogue, EARS notation, and Mermaid diagrams
+argument-hint: "<goal or feature to specify>"
 ---
 $ARGUMENTS
 
-# Brainstorm
+# Spec Dev
 
-**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/brainstorm/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/spec-dev/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file. It contains the full workflow you must follow.
 `,
 
   'plan.md': `---

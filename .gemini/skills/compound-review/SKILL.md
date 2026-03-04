@@ -15,8 +15,9 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 
 ## Methodology
 1. Run quality gates first: `pnpm test && pnpm lint`
-2. Search memory with `npx ca search` for known patterns and recurring issues
-3. Select reviewer tier based on diff size:
+2. Read the epic description (`bd show <epic>`) for EARS requirements -- reviewers verify each requirement is met
+3. Search memory with `npx ca search` for known patterns and recurring issues
+4. Select reviewer tier based on diff size:
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
    - **Medium** (100-500): add architecture, performance, edge-case (7 total)
    - **Large** (500+): all 11 reviewers including docs, consistency, error-handling, pattern-matcher
@@ -29,9 +30,10 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 7. Classify by severity: P0 (blocks merge), P1 (critical/blocking), P2 (important), P3 (minor)
 8. Use `AskUserQuestion` when severity is ambiguous or fix has multiple valid options
 9. Create beads issues for P1 findings: `bd create --title="P1: ..."`
-10. Fix all P1 findings before proceeding
-11. Run `/implementation-reviewer` as mandatory gate
-12. Capture novel findings with `npx ca learn`; pattern-matcher auto-reinforces recurring issues
+10. Verify spec alignment: flag unmet EARS requirements as P1, flag requirements met but missing from acceptance criteria as gaps
+11. Fix all P1 findings before proceeding
+12. Run `/implementation-reviewer` as mandatory gate
+13. Capture novel findings with `npx ca learn`; pattern-matcher auto-reinforces recurring issues
 
 ## Memory Integration
 - Run `npx ca search` before review for known recurring issues
@@ -62,6 +64,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 - security-reviewer P0 findings: none (blocks merge)
 - security-reviewer P1 findings: all acknowledged or resolved
 - All P1 findings fixed before `/implementation-reviewer` approval
+- All spec requirements verified against implementation
 - `/implementation-reviewer` approved as mandatory gate
 
 ## PHASE GATE 4 -- MANDATORY

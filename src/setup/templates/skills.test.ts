@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { PHASE_SKILLS } from './skills.js';
 
-const EXPECTED_KEYS = ['brainstorm', 'plan', 'work', 'review', 'compound', 'researcher', 'lfg', 'test-cleaner'];
+const EXPECTED_KEYS = ['spec-dev', 'plan', 'work', 'review', 'compound', 'researcher', 'lfg', 'test-cleaner'];
 
 describe('PHASE_SKILLS', () => {
   it('has exactly 8 entries', () => {
@@ -135,7 +135,7 @@ describe('PHASE_SKILLS', () => {
   });
 
   it('lfg skill lists all 5 phase skill file paths', () => {
-    const phases = ['brainstorm', 'plan', 'work', 'review', 'compound'];
+    const phases = ['spec-dev', 'plan', 'work', 'review', 'compound'];
     for (const phase of phases) {
       expect(PHASE_SKILLS.lfg).toContain(`.claude/skills/compound/${phase}/SKILL.md`);
     }

@@ -47,19 +47,19 @@ describe('Phase Enforcement Lifecycle (E2E)', { tags: ['hooks'] }, () => {
     const initial = getPhaseState(repoRoot);
     expect(initial).not.toBeNull();
     expect(initial!.lfg_active).toBe(true);
-    expect(initial!.current_phase).toBe('brainstorm');
+    expect(initial!.current_phase).toBe('spec-dev');
 
     // Step 2: Edit blocked before reading skill
     const guardResult1 = processPhaseGuard(repoRoot, 'Edit', { file_path: '/src/app.ts' });
     expect(guardResult1.hookSpecificOutput).toBeDefined();
     expect(guardResult1.hookSpecificOutput?.additionalContext).toMatch(/WARNING/i);
 
-    // Step 3: Read brainstorm skill
+    // Step 3: Read spec-dev skill
     processReadTracker(repoRoot, 'Read', {
-      file_path: '.claude/skills/compound/brainstorm/SKILL.md',
+      file_path: '.claude/skills/compound/spec-dev/SKILL.md',
     });
     const afterRead = getPhaseState(repoRoot);
-    expect(afterRead!.skills_read).toContain('.claude/skills/compound/brainstorm/SKILL.md');
+    expect(afterRead!.skills_read).toContain('.claude/skills/compound/spec-dev/SKILL.md');
 
     // Step 4: Transition to plan phase
     startPhase(repoRoot, 'plan');

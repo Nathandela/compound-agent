@@ -357,7 +357,7 @@ This section explains HOW and WHEN Claude should interact with the compound-agen
 
 | Command | Phase | Description |
 |---------|-------|-------------|
-| `/compound:brainstorm` | Brainstorm | Explore requirements through collaborative dialogue |
+| `/compound:spec-dev` | Spec Dev | Develop precise specifications through Socratic dialogue, EARS notation, and Mermaid diagrams |
 | `/compound:plan` | Plan | Create structured plan enriched by semantic memory |
 | `/compound:work` | Work | Execute plan with agent teams and TDD |
 | `/compound:review` | Review | Multi-agent review with inter-communication |

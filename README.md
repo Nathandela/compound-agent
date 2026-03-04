@@ -19,7 +19,7 @@ AI coding agents forget everything between sessions. Compound Agent fixes this w
 
 ```mermaid
 graph LR
-    B[BRAINSTORM] --> P[PLAN]
+    B[SPEC DEV] --> P[PLAN]
     P --> W[WORK]
     W --> R[REVIEW]
     R --> C[COMPOUND]
@@ -64,7 +64,7 @@ Preferences survive across sessions and projects. Once captured, they appear at 
 `ca list` shows all captured knowledge. `ca stats` shows health. `ca wrong <id>` invalidates bad lessons. Everything is git-tracked JSONL -- you can read, diff, and audit it.
 
 **"I want structured phases, not just 'go build this'."**
-Five workflow phases (brainstorm, plan, work, review, compound) with mandatory gates between them. Each phase searches memory and docs for relevant context before starting.
+Five workflow phases (spec-dev, plan, work, review, compound) with mandatory gates between them. Each phase searches memory and docs for relevant context before starting.
 
 **"My agent doesn't read the project docs before making decisions."**
 `ca knowledge "auth flow"` runs hybrid search (vector + keyword) over your indexed docs. Agents query it automatically during planning -- ADRs, specs, and standards surface before code gets written.
@@ -109,7 +109,7 @@ Then run `pnpm install`.
 The five-phase workflow:
 
 ```
-1. /compound:brainstorm  -->  Explore the problem, clarify scope
+1. /compound:spec-dev    -->  Develop precise specifications
 2. /compound:plan        -->  Create tasks enriched by memory search
 3. /compound:work        -->  Execute with agent teams + TDD
 4. /compound:review      -->  Multi-agent review with inter-communication

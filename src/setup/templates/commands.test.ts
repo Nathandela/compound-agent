@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { WORKFLOW_COMMANDS } from './commands.js';
 
 const PHASE_FILENAMES = [
-  'brainstorm.md',
+  'spec-dev.md',
   'plan.md',
   'work.md',
   'review.md',
@@ -180,7 +180,7 @@ describe('WORKFLOW_COMMANDS', () => {
    * shell operators. If user input contains ! ( ) | etc., inline backtick
    * spans that reference $ARGUMENTS trigger permission check failures.
    *
-   * Phase templates (brainstorm, plan, work, review, compound, lfg) are
+   * Phase templates (spec-dev, plan, work, review, compound, lfg) are
    * instruction-heavy and must avoid shell-unsafe patterns in backticks.
    * Utility templates (learn, show, etc.) are thin CLI wrappers where
    * ```bash blocks are intentional and work correctly.

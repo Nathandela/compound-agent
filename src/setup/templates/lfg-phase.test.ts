@@ -49,7 +49,7 @@ describe('LFG Phase Integration', () => {
     });
 
     it('lists all 5 phase skill file paths', () => {
-      const phases = ['brainstorm', 'plan', 'work', 'review', 'compound'];
+      const phases = ['spec-dev', 'plan', 'work', 'review', 'compound'];
       for (const phase of phases) {
         expect(lfgSkill).toContain(`.claude/skills/compound/${phase}/SKILL.md`);
       }
@@ -148,7 +148,7 @@ describe('LFG Phase Integration', () => {
 
   describe('cross-template consistency', () => {
     it('every phase referenced in lfg skill exists as its own command', () => {
-      const phases = ['brainstorm', 'plan', 'work', 'review', 'compound'];
+      const phases = ['spec-dev', 'plan', 'work', 'review', 'compound'];
       for (const phase of phases) {
         expect(
           WORKFLOW_COMMANDS[`${phase}.md`],
@@ -158,7 +158,7 @@ describe('LFG Phase Integration', () => {
     });
 
     it('every phase has a corresponding skill in PHASE_SKILLS', () => {
-      const phases = ['brainstorm', 'plan', 'work', 'review', 'compound'];
+      const phases = ['spec-dev', 'plan', 'work', 'review', 'compound'];
       for (const phase of phases) {
         expect(
           PHASE_SKILLS[phase],

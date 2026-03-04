@@ -16,14 +16,14 @@ const STATE_FILE = '.ca-phase-state.json';
 /** Max age for phase state before it's considered stale (72 hours). */
 export const PHASE_STATE_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 
-export const PHASES = ['brainstorm', 'plan', 'work', 'review', 'compound'] as const;
+export const PHASES = ['spec-dev', 'plan', 'work', 'review', 'compound'] as const;
 export type PhaseName = (typeof PHASES)[number];
 
 export const GATES = ['post-plan', 'gate-3', 'gate-4', 'final'] as const;
 export type GateName = (typeof GATES)[number];
 
 const PHASE_INDEX: Record<PhaseName, number> = {
-  brainstorm: 1,
+  'spec-dev': 1,
   plan: 2,
   work: 3,
   review: 4,
@@ -94,8 +94,8 @@ export function initPhaseState(repoRoot: string, epicId: string): PhaseState {
   const state: PhaseState = {
     lfg_active: true,
     epic_id: epicId,
-    current_phase: 'brainstorm',
-    phase_index: PHASE_INDEX.brainstorm,
+    current_phase: 'spec-dev',
+    phase_index: PHASE_INDEX['spec-dev'],
     skills_read: [],
     gates_passed: [],
     started_at: new Date().toISOString(),
@@ -203,7 +203,7 @@ function registerPhaseSubcommands(
       }
       if (getDryRun()) { console.log(`[dry-run] Would initialize phase state for epic ${epicId} in ${repoRoot()}`); return; }
       initPhaseState(repoRoot(), epicId);
-      console.log(`Phase state initialized for ${epicId}. Current phase: brainstorm (1/5).`);
+      console.log(`Phase state initialized for ${epicId}. Current phase: spec-dev (1/5).`);
     });
 
   phaseCheck

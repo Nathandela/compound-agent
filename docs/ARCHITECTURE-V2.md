@@ -29,7 +29,7 @@ The core insight: compound-engineering's workflow is powerful but its knowledge 
 
 ```
 LAYER 3: WORKFLOWS
-  Slash commands (/compound:brainstorm, /compound:plan, etc.)
+  Slash commands (/compound:spec-dev, /compound:plan, etc.)
   Agent teams at each phase (with inter-communication)
   TDD pair model (adaptive per task complexity)
 
@@ -150,7 +150,7 @@ The compound engineering cycle, triggered by explicit slash commands.
 
 | Command | Phase | Description |
 |---------|-------|-------------|
-| `/compound:brainstorm` | Brainstorm | Explore the problem, iterate with user |
+| `/compound:spec-dev` | Spec Dev | Develop precise specifications through Socratic dialogue |
 | `/compound:plan` | Plan | Create detailed plan with semantic retrieval |
 | `/compound:work` | Work | Execute with agent teams |
 | `/compound:review` | Review | Multi-agent review with inter-communication |
@@ -162,27 +162,26 @@ The compound engineering cycle, triggered by explicit slash commands.
 
 ## Workflow Phases
 
-### Phase 1: Brainstorm (`/compound:brainstorm`)
+### Phase 1: Spec Dev (`/compound:spec-dev`)
 
-**Purpose**: Understand the epic-level task before diving into details. Claude is excellent at this -- proactively exploring, asking questions, identifying concerns.
+**Purpose**: Develop precise, unambiguous specifications through Socratic dialogue, EARS notation, and Mermaid diagrams. Replaces the former brainstorm phase with a structured 4-phase spec development process.
 
 **Process:**
-1. User describes the high-level goal
-2. Agent explores: reads relevant code, searches memory for related knowledge
-3. AskUserQuestion dialogue to clarify scope, constraints, preferences
-4. Optional: spawn Explore subagents for quick research on specific aspects
-5. Output: clear problem definition + approach + beads epic
+1. **Explore**: User describes the goal. Agent maps stakeholders, constraints, and domain concepts (mindmap diagrams)
+2. **Understand**: Iterative Socratic dialogue to crystallize requirements using EARS notation. Agent challenges vagueness and ambiguity
+3. **Specify**: Assemble formal spec with EARS requirements, Mermaid diagrams, trade-off documentation, and a glossary
+4. **Hand off**: Create beads epic with tasks derived from spec. Downstream skills (plan, work, review) are spec-aware
 
-**Agent model**: Single agent (lead) with user dialogue. No team needed.
+**Agent model**: Single agent (lead) with user dialogue. Research subagents for domain exploration.
 
-**Memory integration**: Search memory for related lessons/solutions before asking questions. Past experiences inform the brainstorm.
+**Memory integration**: Search memory for related lessons/solutions before asking questions. Past specs and decisions inform current work.
 
 ### Phase 2: Plan (`/compound:plan`)
 
 **Purpose**: Create a detailed technical plan with blocking tasks, enriched by semantic memory.
 
 **Process:**
-1. Read brainstorm output (if exists)
+1. Read spec-dev output (if exists)
 2. Semantic memory search: retrieve relevant lessons, solutions, patterns
 3. Spawn research agent team:
    - Repo analyst: codebase patterns and architecture
@@ -311,8 +310,10 @@ Skills define HOW each phase works. They are SKILL.md files, not stored knowledg
 ```
 .claude/skills/
   compound/
-    brainstorm/
-      SKILL.md       # How to brainstorm, what questions to ask
+    spec-dev/
+      SKILL.md       # How to develop specs, EARS notation, Mermaid diagrams
+      references/
+        spec-guide.md  # Quick reference (EARS, diagrams, ambiguity, trade-offs)
     plan/
       SKILL.md       # How to plan, what agents to spawn, what to search
     work/
@@ -368,7 +369,7 @@ Implemented as Claude Code commands (markdown files):
 ```
 .claude/commands/
   compound/
-    brainstorm.md
+    spec-dev.md
     plan.md
     work.md
     review.md

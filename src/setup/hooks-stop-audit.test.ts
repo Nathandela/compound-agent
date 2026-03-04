@@ -123,7 +123,7 @@ describe('Stop Audit Hook', () => {
   describe('mid-phase (not transitioning)', () => {
     it('returns {} when no stop_hook_active flag', () => {
       writeState({
-        current_phase: 'brainstorm',
+        current_phase: 'spec-dev',
         phase_index: 1,
       });
 

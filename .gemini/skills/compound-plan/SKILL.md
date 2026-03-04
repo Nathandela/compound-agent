@@ -14,7 +14,7 @@ description: Decompose work into small testable tasks with clear dependencies
 Create a concrete implementation plan by decomposing work into small, testable tasks with dependencies and acceptance criteria.
 
 ## Methodology
-1. Review brainstorm output for decisions and open questions
+1. Read the spec from the epic description (`bd show <epic>`) for EARS requirements, decisions, and open questions
 2. Search memory with `npx ca search` and docs with `npx ca knowledge "relevant topic"` for architectural patterns and past mistakes
 3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
    - Available agents: `.claude/agents/compound/repo-analyst.md`, `memory-analyst.md`
@@ -25,8 +25,9 @@ Create a concrete implementation plan by decomposing work into small, testable t
 6. Use `AskUserQuestion` to resolve ambiguities, conflicting constraints, or priority trade-offs before decomposing
 7. Decompose into tasks small enough to verify individually
 8. Define acceptance criteria for each task
-9. Map dependencies between tasks
-10. Create beads issues: `bd create --title="..." --type=task`
+9. Ensure each task traces back to a spec requirement for traceability
+10. Map dependencies between tasks
+11. Create beads issues: `bd create --title="..." --type=task`
 11. Create review and compound blocking tasks (`bd create` + `bd dep add`) that depend on work tasks — these survive compaction and surface via `bd ready` after work completes
 
 ## Memory Integration
@@ -56,6 +57,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Existing docs and ADRs were checked for constraints
 - Ambiguities resolved via `AskUserQuestion` before decomposing
 - Complexity estimates are realistic (no "should be quick")
+- Each task traces back to a spec requirement
 
 ## POST-PLAN VERIFICATION -- MANDATORY
 After creating all tasks, verify review and compound tasks exist:

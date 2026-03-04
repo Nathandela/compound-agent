@@ -33,7 +33,7 @@ Conduct deep research on a topic and produce a structured survey document follow
    - References (full citations)
    - Practitioner Resources (annotated tools/repos)
 6. Store output at `docs/compound/research/<topic-slug>.md` (kebab-case filename)
-7. Report key findings back for upstream skill (brainstorm/plan) to act on
+7. Report key findings back for upstream skill (spec-dev/plan) to act on
 
 ## Memory Integration
 - Run `npx ca search` with topic keywords before starting research

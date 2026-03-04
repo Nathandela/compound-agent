@@ -72,7 +72,7 @@ npx ca doctor
   settings.json                # Claude Code hooks
   plugin.json                  # Plugin manifest
   agents/compound/             # Subagent definitions
-  commands/compound/           # Slash commands (brainstorm, plan, work, review, compound, lfg)
+  commands/compound/           # Slash commands (spec-dev, plan, work, review, compound, lfg)
   skills/compound/             # Phase skills + agent role skills
   lessons/
     index.jsonl                # Memory items (git-tracked source of truth)
@@ -131,7 +131,7 @@ Explore the problem space before committing to a solution.
 
 Decompose work into small, testable tasks with dependencies.
 
-- Review brainstorm output
+- Review spec-dev output
 - Create beads tasks: \`bd create --title="..." --type=task\`
 - Create Review and Compound blocking tasks (these survive compaction)
 
@@ -380,21 +380,21 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 ## Phase skills
 
-### \`/compound:brainstorm\`
+### \`/compound:spec-dev\`
 
-**Purpose**: Divergent-then-convergent thinking to explore the solution space.
+**Purpose**: Develop precise specifications through Socratic dialogue, EARS notation, and Mermaid diagrams.
 
 **When invoked**: At the start of a new feature or epic, before any planning.
 
-**What it does**: Spawns research subagents, searches memory for similar past features, generates multiple approaches, converges on a decision with documented rationale, and creates a beads epic.
+**What it does**: Guides the user through 4 phases (Explore, Understand, Specify, Hand off) to produce a rigorous spec. Spawns research subagents, uses Mermaid diagrams as thinking tools, detects NL ambiguity, writes EARS-notation requirements, and stores the consolidated spec in the beads epic description.
 
 ### \`/compound:plan\`
 
 **Purpose**: Decompose work into small testable tasks with dependencies.
 
-**When invoked**: After brainstorm, before any implementation.
+**When invoked**: After spec-dev, before any implementation.
 
-**What it does**: Reviews brainstorm output, spawns analysts, decomposes into tasks with acceptance criteria, creates beads issues, and creates Review + Compound blocking tasks.
+**What it does**: Reviews spec-dev output, spawns analysts, decomposes into tasks with acceptance criteria, creates beads issues, and creates Review + Compound blocking tasks.
 
 ### \`/compound:work\`
 
@@ -443,7 +443,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 Skills are invoked as Claude Code slash commands:
 
 \`\`\`
-/compound:brainstorm       # Start brainstorm phase
+/compound:spec-dev         # Start spec-dev phase
 /compound:plan             # Start plan phase
 /compound:work             # Start work phase
 /compound:review           # Start review phase

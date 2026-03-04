@@ -1,5 +1,5 @@
 /**
- * Review agent templates: thin subagent wrappers for plan/brainstorm phases.
+ * Review agent templates: thin subagent wrappers for plan/spec-dev phases.
  *
  * 2 research subagents (repo-analyst, memory-analyst).
  * The 5 reviewer agents are now AgentTeam role skills.

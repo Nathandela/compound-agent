@@ -11,11 +11,11 @@ description: Full-cycle orchestrator chaining all five phases with gates and con
 # LFG Skill
 
 ## Overview
-Chain all 5 phases end-to-end: Brainstorm, Plan, Work, Review, Compound. This skill governs the orchestration -- phase sequencing, gates, progress tracking, and error recovery.
+Chain all 5 phases end-to-end: Spec Dev, Plan, Work, Review, Compound. This skill governs the orchestration -- phase sequencing, gates, progress tracking, and error recovery.
 
 ## CRITICAL RULE -- READ BEFORE EXECUTE
 Before starting EACH phase, you MUST use the Read tool to open its skill file:
-- .claude/skills/compound/brainstorm/SKILL.md
+- .claude/skills/compound/spec-dev/SKILL.md
 - .claude/skills/compound/plan/SKILL.md
 - .claude/skills/compound/work/SKILL.md
 - .claude/skills/compound/review/SKILL.md
@@ -49,7 +49,7 @@ If a gate fails, DO NOT proceed. Fix the issue first.
 - **Progress**: Always announce current phase number before starting.
 
 ## Stop Conditions
-- Brainstorm reveals goal is unclear -- stop, ask user
+- Spec dev reveals goal is unclear -- stop, ask user
 - Tests produce unresolvable failures -- stop, report
 - Review finds critical security issues -- stop, report
 

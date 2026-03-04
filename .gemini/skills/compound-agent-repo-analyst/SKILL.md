@@ -26,7 +26,7 @@ Analyze the repository to understand its structure, coding conventions, tech sta
 Return findings directly to the caller for synthesis into the plan.
 
 ## Deployment
-Subagent spawned via the Task tool during the **plan** and **brainstorm** phases. Return findings directly to the caller.
+Subagent spawned via the Task tool during the **plan** and **spec-dev** phases. Return findings directly to the caller.
 
 ## Output Format
 Return a structured summary:

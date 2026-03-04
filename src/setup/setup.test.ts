@@ -813,7 +813,7 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       runCli('init');
 
       // Modify a file
-      const filePath = join(getTempDir(), '.claude', 'skills', 'compound', 'brainstorm', 'SKILL.md');
+      const filePath = join(getTempDir(), '.claude', 'skills', 'compound', 'spec-dev', 'SKILL.md');
       await writeFile(filePath, 'custom skill content', 'utf-8');
 
       runCli('init');

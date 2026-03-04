@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- template data file; each skill is a multiline string constant */
 /**
- * Review agent role skills for the plan, brainstorm, and review phases.
+ * Review agent role skills for the plan, spec-dev, and review phases.
  *
  * 2 research subagents + 5 specialized reviewers + 5 security specialists = 12 entries.
  * These are installed as .claude/skills/compound/agents/<name>/SKILL.md.
@@ -30,7 +30,7 @@ Analyze the repository to understand its structure, coding conventions, tech sta
 Return findings directly to the caller for synthesis into the plan.
 
 ## Deployment
-Subagent spawned via the Task tool during the **plan** and **brainstorm** phases. Return findings directly to the caller.
+Subagent spawned via the Task tool during the **plan** and **spec-dev** phases. Return findings directly to the caller.
 
 ## Output Format
 Return a structured summary:
@@ -62,7 +62,7 @@ Search compound-agent memory to find relevant lessons, patterns, and decisions f
 Return findings directly to the caller for synthesis into the plan.
 
 ## Deployment
-Subagent spawned via the Task tool during the **plan** and **brainstorm** phases. Return findings directly to the caller.
+Subagent spawned via the Task tool during the **plan** and **spec-dev** phases. Return findings directly to the caller.
 
 ## Output Format
 Return a list of relevant memory items:

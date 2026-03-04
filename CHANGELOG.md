@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Renamed brainstorm phase to spec-dev**: The `/compound:brainstorm` slash command is now `/compound:spec-dev`. The phase focuses on structured specification development using EARS notation, Mermaid diagrams, and Socratic dialogue rather than open-ended brainstorming. Old `brainstorm.md` command files are auto-cleaned during upgrade.
+
+### Added
+
+- **Spec reference file**: `.claude/skills/compound/spec-dev/references/spec-guide.md` provides quick-reference material for EARS patterns, Mermaid diagram selection, NL ambiguity detection, and trade-off documentation frameworks.
+
 ## [1.6.0] - 2026-03-02
 
 ### Added
