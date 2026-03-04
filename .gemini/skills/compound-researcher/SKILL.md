@@ -3,11 +3,6 @@ name: compound-researcher
 description: Deep research producing structured survey documents for informed decision-making
 ---
 
----
-name: Researcher
-description: Deep research producing structured survey documents for informed decision-making
----
-
 # Researcher Skill
 
 ## Overview

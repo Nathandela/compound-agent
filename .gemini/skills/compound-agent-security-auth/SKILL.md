@@ -3,11 +3,6 @@ name: compound-agent-security-auth
 description: Route and endpoint audit for authentication, authorization, IDOR, JWT, and CORS vulnerabilities
 ---
 
----
-name: Security Auth Specialist
-description: Route and endpoint audit for authentication, authorization, IDOR, JWT, and CORS vulnerabilities
----
-
 # Security Auth Specialist
 
 ## Role

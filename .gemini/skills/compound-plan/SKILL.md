@@ -3,11 +3,6 @@ name: compound-plan
 description: Decompose work into small testable tasks with clear dependencies
 ---
 
----
-name: Plan
-description: Decompose work into small testable tasks with clear dependencies
----
-
 # Plan Skill
 
 ## Overview

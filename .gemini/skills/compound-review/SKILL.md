@@ -3,11 +3,6 @@ name: compound-review
 description: Multi-agent review with parallel specialized reviewers and severity classification
 ---
 
----
-name: Review
-description: Multi-agent review with parallel specialized reviewers and severity classification
----
-
 # Review Skill
 
 ## Overview

@@ -3,11 +3,6 @@ name: compound-agent-doc-gardener
 description: Audits project documentation for freshness, accuracy, and completeness
 ---
 
----
-name: Doc Gardener
-description: Audits project documentation for freshness, accuracy, and completeness
----
-
 # Doc Gardener
 
 ## Role

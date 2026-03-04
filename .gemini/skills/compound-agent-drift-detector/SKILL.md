@@ -3,11 +3,6 @@ name: compound-agent-drift-detector
 description: Checks implementation for drift from established constraints
 ---
 
----
-name: Drift Detector
-description: Checks implementation for drift from established constraints
----
-
 # Drift Detector
 
 ## Role

@@ -3,11 +3,6 @@ name: compound-lfg
 description: Full-cycle orchestrator chaining all five phases with gates and controls
 ---
 
----
-name: LFG
-description: Full-cycle orchestrator chaining all five phases with gates and controls
----
-
 # LFG Skill
 
 ## Overview

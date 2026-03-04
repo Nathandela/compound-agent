@@ -3,11 +3,6 @@ name: compound-agent-compounding
 description: Clusters similar lessons and synthesizes testable patterns
 ---
 
----
-name: Compounding Agent
-description: Clusters similar lessons and synthesizes testable patterns
----
-
 # Compounding Agent
 
 ## Role

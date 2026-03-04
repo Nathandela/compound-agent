@@ -3,11 +3,6 @@ name: compound-agent-architecture-reviewer
 description: Reviews code for architectural compliance and design integrity
 ---
 
----
-name: Architecture Reviewer
-description: Reviews code for architectural compliance and design integrity
----
-
 # Architecture Reviewer
 
 ## Role

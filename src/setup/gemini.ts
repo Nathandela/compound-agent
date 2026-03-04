@@ -86,6 +86,11 @@ function parseDescription(content: string, fallback: string): string {
   return raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
+/** Strip YAML frontmatter (---...---) from content if present. */
+function stripFrontmatter(content: string): string {
+  return content.replace(/^---\n[\s\S]*?\n---\n*/, '');
+}
+
 async function writeSettings(geminiDir: string): Promise<void> {
   const settingsPath = join(geminiDir, 'settings.json');
   let settings = SETTINGS_JSON as Record<string, unknown>;
@@ -126,14 +131,16 @@ async function writeSkills(geminiDir: string): Promise<void> {
     const skillDir = join(geminiDir, 'skills', `compound-${phase}`);
     await mkdir(skillDir, { recursive: true });
     const description = parseDescription(content, `Compound ${phase} skill`);
-    await writeFile(join(skillDir, 'SKILL.md'), `---\nname: compound-${phase}\ndescription: ${description}\n---\n\n${content}\n`, 'utf8');
+    const body = stripFrontmatter(content);
+    await writeFile(join(skillDir, 'SKILL.md'), `---\nname: compound-${phase}\ndescription: ${description}\n---\n\n${body}\n`, 'utf8');
   }
 
   for (const [name, content] of Object.entries(AGENT_ROLE_SKILLS)) {
     const skillDir = join(geminiDir, 'skills', `compound-agent-${name}`);
     await mkdir(skillDir, { recursive: true });
     const description = parseDescription(content, `Compound agent ${name} skill`);
-    await writeFile(join(skillDir, 'SKILL.md'), `---\nname: compound-agent-${name}\ndescription: ${description}\n---\n\n${content}\n`, 'utf8');
+    const body = stripFrontmatter(content);
+    await writeFile(join(skillDir, 'SKILL.md'), `---\nname: compound-agent-${name}\ndescription: ${description}\n---\n\n${body}\n`, 'utf8');
   }
 }
 

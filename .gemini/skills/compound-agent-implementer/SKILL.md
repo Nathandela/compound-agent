@@ -3,11 +3,6 @@ name: compound-agent-implementer
 description: Implements minimal code to pass failing tests
 ---
 
----
-name: Implementer
-description: Implements minimal code to pass failing tests
----
-
 # Implementer
 
 ## Role

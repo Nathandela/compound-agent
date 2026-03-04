@@ -3,11 +3,6 @@ name: compound-agent-test-writer
 description: Writes failing tests before implementation exists
 ---
 
----
-name: Test Writer
-description: Writes failing tests before implementation exists
----
-
 # Test Writer
 
 ## Role

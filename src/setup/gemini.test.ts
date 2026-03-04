@@ -216,6 +216,20 @@ describe('Gemini adapter', { tags: ['integration'] }, () => {
       expect(content).toMatch(/---\n/);
     });
 
+    it('skill files have exactly one frontmatter block (no duplicate)', async () => {
+      setupGemini();
+      for (const phase of Object.keys(PHASE_SKILLS)) {
+        const content = await readFile(join(geminiDir(), 'skills', `compound-${phase}`, 'SKILL.md'), 'utf8');
+        const fmCount = (content.match(/^---$/gm) ?? []).length;
+        expect(fmCount, `compound-${phase} should have exactly 2 --- delimiters`).toBe(2);
+      }
+      for (const name of Object.keys(AGENT_ROLE_SKILLS)) {
+        const content = await readFile(join(geminiDir(), 'skills', `compound-agent-${name}`, 'SKILL.md'), 'utf8');
+        const fmCount = (content.match(/^---$/gm) ?? []).length;
+        expect(fmCount, `compound-agent-${name} should have exactly 2 --- delimiters`).toBe(2);
+      }
+    });
+
     it('skill files inline the source content (no @path file injection)', async () => {
       setupGemini();
       const firstPhase = Object.keys(PHASE_SKILLS)[0];

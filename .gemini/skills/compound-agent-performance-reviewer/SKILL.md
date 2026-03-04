@@ -3,11 +3,6 @@ name: compound-agent-performance-reviewer
 description: Reviews code for performance issues and resource usage
 ---
 
----
-name: Performance Reviewer
-description: Reviews code for performance issues and resource usage
----
-
 # Performance Reviewer
 
 ## Role

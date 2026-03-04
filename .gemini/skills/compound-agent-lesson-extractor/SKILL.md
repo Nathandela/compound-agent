@@ -3,11 +3,6 @@ name: compound-agent-lesson-extractor
 description: Extracts actionable lessons from work context
 ---
 
----
-name: Lesson Extractor
-description: Extracts actionable lessons from work context
----
-
 # Lesson Extractor
 
 ## Role

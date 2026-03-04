@@ -3,11 +3,6 @@ name: compound-agent-simplicity-reviewer
 description: Reviews code for unnecessary complexity and over-engineering
 ---
 
----
-name: Simplicity Reviewer
-description: Reviews code for unnecessary complexity and over-engineering
----
-
 # Simplicity Reviewer
 
 ## Role

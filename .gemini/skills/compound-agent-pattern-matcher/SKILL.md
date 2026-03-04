@@ -3,11 +3,6 @@ name: compound-agent-pattern-matcher
 description: Matches lessons against existing memory to avoid duplicates
 ---
 
----
-name: Pattern Matcher
-description: Matches lessons against existing memory to avoid duplicates
----
-
 # Pattern Matcher
 
 ## Role

@@ -3,11 +3,6 @@ name: compound-agent-cct-subagent
 description: Injects mistake-derived test requirements into the TDD pipeline
 ---
 
----
-name: CCT Subagent
-description: Injects mistake-derived test requirements into the TDD pipeline
----
-
 # CCT Subagent
 
 ## Role

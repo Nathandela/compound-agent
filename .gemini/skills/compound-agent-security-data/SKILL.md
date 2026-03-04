@@ -3,11 +3,6 @@ name: compound-agent-security-data
 description: Audit for PII in logs, verbose error responses, sensitive data in URLs, and overly broad API responses
 ---
 
----
-name: Security Data Specialist
-description: Audit for PII in logs, verbose error responses, sensitive data in URLs, and overly broad API responses
----
-
 # Security Data Specialist
 
 ## Role

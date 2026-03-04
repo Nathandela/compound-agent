@@ -3,11 +3,6 @@ name: compound-agent-security-deps
 description: Dependency audit for vulnerable packages, lockfile changes, postinstall scripts, and supply chain risks
 ---
 
----
-name: Security Deps Specialist
-description: Dependency audit for vulnerable packages, lockfile changes, postinstall scripts, and supply chain risks
----
-
 # Security Deps Specialist
 
 ## Role

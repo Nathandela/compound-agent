@@ -3,11 +3,6 @@ name: compound-test-cleaner
 description: Multi-phase test suite optimization with adversarial review
 ---
 
----
-name: Test Cleaner
-description: Multi-phase test suite optimization with adversarial review
----
-
 # Test Cleaner Skill
 
 ## Overview

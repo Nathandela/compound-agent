@@ -3,11 +3,6 @@ name: compound-agent-security-reviewer
 description: Mandatory core-4 reviewer with P0-P3 severity classification and specialist escalation
 ---
 
----
-name: Security Reviewer
-description: Mandatory core-4 reviewer with P0-P3 severity classification and specialist escalation
----
-
 # Security Reviewer
 
 ## Role

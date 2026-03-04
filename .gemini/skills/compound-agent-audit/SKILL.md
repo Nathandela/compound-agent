@@ -3,11 +3,6 @@ name: compound-agent-audit
 description: Deep semantic analysis of codebase against rules, patterns, and lessons
 ---
 
----
-name: Audit Agent
-description: Deep semantic analysis of codebase against rules, patterns, and lessons
----
-
 # Audit Agent
 
 ## Role

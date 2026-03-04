@@ -3,11 +3,6 @@ name: compound-agent-context-analyzer
 description: Analyzes completed work to identify what was done and learned
 ---
 
----
-name: Context Analyzer
-description: Analyzes completed work to identify what was done and learned
----
-
 # Context Analyzer
 
 ## Role

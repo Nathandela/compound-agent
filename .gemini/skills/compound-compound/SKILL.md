@@ -3,11 +3,6 @@ name: compound-compound
 description: Reflect on the cycle and capture high-quality lessons for future sessions
 ---
 
----
-name: Compound
-description: Reflect on the cycle and capture high-quality lessons for future sessions
----
-
 # Compound Skill
 
 ## Overview

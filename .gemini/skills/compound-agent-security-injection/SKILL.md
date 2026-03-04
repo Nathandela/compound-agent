@@ -3,11 +3,6 @@ name: compound-agent-security-injection
 description: Deep trace analysis for SQL, command, XSS, SSRF, and SSTI injection vulnerabilities
 ---
 
----
-name: Security Injection Specialist
-description: Deep trace analysis for SQL, command, XSS, SSRF, and SSTI injection vulnerabilities
----
-
 # Security Injection Specialist
 
 ## Role

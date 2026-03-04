@@ -3,11 +3,6 @@ name: compound-agent-repo-analyst
 description: Analyzes repository structure, conventions, and patterns
 ---
 
----
-name: Repo Analyst
-description: Analyzes repository structure, conventions, and patterns
----
-
 # Repo Analyst
 
 ## Role

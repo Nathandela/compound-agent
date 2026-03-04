@@ -3,11 +3,6 @@ name: compound-agent-test-coverage-reviewer
 description: Reviews test quality, assertions, and edge case coverage
 ---
 
----
-name: Test Coverage Reviewer
-description: Reviews test quality, assertions, and edge case coverage
----
-
 # Test Coverage Reviewer
 
 ## Role

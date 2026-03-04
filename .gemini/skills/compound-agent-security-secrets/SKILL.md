@@ -3,11 +3,6 @@ name: compound-agent-security-secrets
 description: Credential and secrets scanning using pattern matching, entropy analysis, and git history checks
 ---
 
----
-name: Security Secrets Specialist
-description: Credential and secrets scanning using pattern matching, entropy analysis, and git history checks
----
-
 # Security Secrets Specialist
 
 ## Role

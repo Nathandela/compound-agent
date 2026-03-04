@@ -3,11 +3,6 @@ name: compound-agent-memory-analyst
 description: Searches and retrieves relevant memory items for context
 ---
 
----
-name: Memory Analyst
-description: Searches and retrieves relevant memory items for context
----
-
 # Memory Analyst
 
 ## Role

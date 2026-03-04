@@ -3,11 +3,6 @@ name: compound-agent-solution-writer
 description: Writes final memory items in correct schema format
 ---
 
----
-name: Solution Writer
-description: Writes final memory items in correct schema format
----
-
 # Solution Writer
 
 ## Role
