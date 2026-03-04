@@ -30,7 +30,7 @@ describe('Read Tracker Hook (PostToolUse)', () => {
 
   function writeState(state: Record<string, unknown>): void {
     const base = {
-      lfg_active: true,
+      cookit_active: true,
       epic_id: 'learning_agent-5dfm',
       current_phase: 'work',
       phase_index: 3,
@@ -62,9 +62,9 @@ describe('Read Tracker Hook (PostToolUse)', () => {
       expect(result).toEqual({});
     });
 
-    it('returns {} when lfg_active is false', () => {
+    it('returns {} when cookit_active is false', () => {
       writeState({
-        lfg_active: false,
+        cookit_active: false,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],
@@ -89,7 +89,7 @@ describe('Read Tracker Hook (PostToolUse)', () => {
   describe('non-Read tools', () => {
     it('returns {} for Edit tool', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],
@@ -102,7 +102,7 @@ describe('Read Tracker Hook (PostToolUse)', () => {
 
     it('returns {} for Bash tool', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],
@@ -117,7 +117,7 @@ describe('Read Tracker Hook (PostToolUse)', () => {
   describe('Read of non-skill file', () => {
     it('does not modify skills_read', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],
@@ -134,7 +134,7 @@ describe('Read Tracker Hook (PostToolUse)', () => {
   describe('Read of skill file', () => {
     it('appends skill file path to skills_read', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],
@@ -151,7 +151,7 @@ describe('Read Tracker Hook (PostToolUse)', () => {
 
     it('does not add duplicates on repeated reads', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],
@@ -169,7 +169,7 @@ describe('Read Tracker Hook (PostToolUse)', () => {
 
     it('tracks multiple different skill files', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],

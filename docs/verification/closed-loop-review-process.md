@@ -110,7 +110,7 @@ Every implementation must pass independent review before being considered comple
 - [ ] No string interpolation in SQL queries
 - [ ] Error messages do not leak sensitive data
 
-### 8. Workflow Gates (for `/compound:lfg` epic work)
+### 8. Workflow Gates (for `/compound:cook-it` epic work)
 - [ ] `ca verify-gates <epic-id>` passes (review + compound tasks exist and are closed)
 - [ ] All phase gates passed (PHASE GATE 3, PHASE GATE 4, FINAL GATE)
 

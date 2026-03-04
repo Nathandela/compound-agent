@@ -30,7 +30,7 @@ describe('Stop Audit Hook', () => {
 
   function writeState(state: Record<string, unknown>): void {
     const base = {
-      lfg_active: true,
+      cookit_active: true,
       epic_id: 'learning_agent-5dfm',
       current_phase: 'work',
       phase_index: 3,
@@ -58,9 +58,9 @@ describe('Stop Audit Hook', () => {
       expect(result).toEqual({});
     });
 
-    it('returns {} when lfg_active is false', () => {
+    it('returns {} when cookit_active is false', () => {
       writeState({
-        lfg_active: false,
+        cookit_active: false,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],

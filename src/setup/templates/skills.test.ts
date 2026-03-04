@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { PHASE_SKILLS } from './skills.js';
 
-const EXPECTED_KEYS = ['spec-dev', 'plan', 'work', 'review', 'compound', 'researcher', 'lfg', 'test-cleaner'];
+const EXPECTED_KEYS = ['spec-dev', 'plan', 'work', 'review', 'compound', 'researcher', 'cook-it', 'test-cleaner'];
 
 describe('PHASE_SKILLS', () => {
   it('has exactly 8 entries', () => {
@@ -27,9 +27,9 @@ describe('PHASE_SKILLS', () => {
     }
   });
 
-  it('every phase skill has a ## Methodology section (lfg uses Phase Execution Protocol)', () => {
+  it('every phase skill has a ## Methodology section (cook-it uses Phase Execution Protocol)', () => {
     for (const [key, content] of Object.entries(PHASE_SKILLS)) {
-      if (key === 'lfg') {
+      if (key === 'cook-it') {
         expect(content, `${key} missing ## Phase Execution Protocol`).toContain('## Phase Execution Protocol');
       } else {
         expect(content, `${key} missing ## Methodology`).toContain('## Methodology');
@@ -127,46 +127,46 @@ describe('PHASE_SKILLS', () => {
     expect(PHASE_SKILLS.compound).toMatch(/SendMessage/);
   });
 
-  // --- LFG orchestration skill ---
+  // --- cook-it orchestration skill ---
 
-  it('lfg skill contains READ BEFORE EXECUTE rule', () => {
-    expect(PHASE_SKILLS.lfg).toContain('READ BEFORE EXECUTE');
-    expect(PHASE_SKILLS.lfg).toContain('Read tool');
+  it('cook-it skill contains READ BEFORE EXECUTE rule', () => {
+    expect(PHASE_SKILLS['cook-it']).toContain('READ BEFORE EXECUTE');
+    expect(PHASE_SKILLS['cook-it']).toContain('Read tool');
   });
 
-  it('lfg skill lists all 5 phase skill file paths', () => {
+  it('cook-it skill lists all 5 phase skill file paths', () => {
     const phases = ['spec-dev', 'plan', 'work', 'review', 'compound'];
     for (const phase of phases) {
-      expect(PHASE_SKILLS.lfg).toContain(`.claude/skills/compound/${phase}/SKILL.md`);
+      expect(PHASE_SKILLS['cook-it']).toContain(`.claude/skills/compound/${phase}/SKILL.md`);
     }
   });
 
-  it('lfg skill contains phase gates', () => {
-    expect(PHASE_SKILLS.lfg).toContain('GATE 3');
-    expect(PHASE_SKILLS.lfg).toContain('GATE 4');
-    expect(PHASE_SKILLS.lfg).toContain('FINAL GATE');
+  it('cook-it skill contains phase gates', () => {
+    expect(PHASE_SKILLS['cook-it']).toContain('GATE 3');
+    expect(PHASE_SKILLS['cook-it']).toContain('GATE 4');
+    expect(PHASE_SKILLS['cook-it']).toContain('FINAL GATE');
   });
 
-  it('lfg skill references phase-check init/start/gate flow', () => {
-    expect(PHASE_SKILLS.lfg).toContain('phase-check init');
-    expect(PHASE_SKILLS.lfg).toContain('phase-check start');
-    expect(PHASE_SKILLS.lfg).toContain('phase-check gate post-plan');
-    expect(PHASE_SKILLS.lfg).toContain('phase-check gate gate-3');
-    expect(PHASE_SKILLS.lfg).toContain('phase-check gate gate-4');
-    expect(PHASE_SKILLS.lfg).toContain('phase-check gate final');
+  it('cook-it skill references phase-check init/start/gate flow', () => {
+    expect(PHASE_SKILLS['cook-it']).toContain('phase-check init');
+    expect(PHASE_SKILLS['cook-it']).toContain('phase-check start');
+    expect(PHASE_SKILLS['cook-it']).toContain('phase-check gate post-plan');
+    expect(PHASE_SKILLS['cook-it']).toContain('phase-check gate gate-3');
+    expect(PHASE_SKILLS['cook-it']).toContain('phase-check gate gate-4');
+    expect(PHASE_SKILLS['cook-it']).toContain('phase-check gate final');
   });
 
-  it('lfg skill contains phase control (skip/resume/retry)', () => {
-    expect(PHASE_SKILLS.lfg).toMatch(/skip/i);
-    expect(PHASE_SKILLS.lfg).toMatch(/resume/i);
-    expect(PHASE_SKILLS.lfg).toMatch(/retry/i);
+  it('cook-it skill contains phase control (skip/resume/retry)', () => {
+    expect(PHASE_SKILLS['cook-it']).toMatch(/skip/i);
+    expect(PHASE_SKILLS['cook-it']).toMatch(/resume/i);
+    expect(PHASE_SKILLS['cook-it']).toMatch(/retry/i);
   });
 
-  it('lfg skill contains session close protocol', () => {
-    expect(PHASE_SKILLS.lfg).toContain('SESSION CLOSE');
+  it('cook-it skill contains session close protocol', () => {
+    expect(PHASE_SKILLS['cook-it']).toContain('SESSION CLOSE');
   });
 
-  it('lfg skill references verify-gates', () => {
-    expect(PHASE_SKILLS.lfg).toContain('verify-gates');
+  it('cook-it skill references verify-gates', () => {
+    expect(PHASE_SKILLS['cook-it']).toContain('verify-gates');
   });
 });

@@ -1,11 +1,22 @@
 ---
-name: compound-lfg
+name: compound-cook-it
 description: Full-cycle orchestrator chaining all five phases with gates and controls
 ---
 
-# LFG Skill
+# Cook It Skill
 
 ## Overview
+
+```
+
+┌───────┐
+ │▒▒▒▒▒│
+ ▐▛███▜▌ o
+▝▜█████▛▘|
+  ▘▘ ▝▝
+Let's cook!
+```
+
 Chain all 5 phases end-to-end: Spec Dev, Plan, Work, Review, Compound. This skill governs the orchestration -- phase sequencing, gates, progress tracking, and error recovery.
 
 ## CRITICAL RULE -- READ BEFORE EXECUTE

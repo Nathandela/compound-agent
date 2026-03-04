@@ -157,7 +157,7 @@ External reviewers:
 
 ## Workflow Enforcement Gates
 
-When using `/compound:lfg` to chain all 5 workflow phases, mechanical gates prevent phase-skipping:
+When using `/compound:cook-it` to chain all 5 workflow phases, mechanical gates prevent phase-skipping:
 
 | Gate | Location | Checks |
 |------|----------|--------|

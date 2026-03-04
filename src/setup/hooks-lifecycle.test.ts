@@ -4,7 +4,7 @@
  * TDD GATE: Imports from modules that do NOT exist yet.
  * Tests should fail with import errors, not logic errors.
  *
- * Simulates a full LFG loop:
+ * Simulates a full cook-it loop:
  *   init -> read skills -> phase transitions -> gate checks -> cleanup
  */
 
@@ -41,12 +41,12 @@ describe('Phase Enforcement Lifecycle (E2E)', { tags: ['hooks'] }, () => {
     await rm(repoRoot, { recursive: true, force: true });
   });
 
-  it('full LFG cycle: init -> skills -> transitions -> gates -> cleanup', () => {
+  it('full cook-it cycle: init -> skills -> transitions -> gates -> cleanup', () => {
     // Step 1: Initialize phase state
     initPhaseState(repoRoot, 'learning_agent-5dfm');
     const initial = getPhaseState(repoRoot);
     expect(initial).not.toBeNull();
-    expect(initial!.lfg_active).toBe(true);
+    expect(initial!.cookit_active).toBe(true);
     expect(initial!.current_phase).toBe('spec-dev');
 
     // Step 2: Edit blocked before reading skill
@@ -97,9 +97,9 @@ describe('Phase Enforcement Lifecycle (E2E)', { tags: ['hooks'] }, () => {
     expect(processStopAudit(repoRoot)).toEqual({});
   });
 
-  it('hooks are inert when lfg_active is false', () => {
+  it('hooks are inert when cookit_active is false', () => {
     initPhaseState(repoRoot, 'learning_agent-5dfm');
-    updatePhaseState(repoRoot, { lfg_active: false });
+    updatePhaseState(repoRoot, { cookit_active: false });
 
     expect(processPhaseGuard(repoRoot, 'Edit', { file_path: '/src/x.ts' })).toEqual({});
     expect(processReadTracker(repoRoot, 'Read', {

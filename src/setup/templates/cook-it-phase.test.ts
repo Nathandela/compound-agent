@@ -3,98 +3,98 @@ import { WORKFLOW_COMMANDS } from './commands.js';
 import { PHASE_SKILLS } from './skills.js';
 
 /**
- * LFG phase structural tests.
+ * Cook-it phase structural tests.
  *
  * After v1.2.8 refactor:
- * - lfg.md is a thin wrapper (< 500 chars) that enforces reading the lfg skill
- * - lfg SKILL.md has the full orchestration: phase gates, progress, skip/resume/retry
+ * - cook-it.md is a thin wrapper (< 500 chars) that enforces reading the cook-it skill
+ * - cook-it SKILL.md has the full orchestration: phase gates, progress, skip/resume/retry
  * - Phase gates also live in individual phase skills
  */
 
-describe('LFG Phase Integration', () => {
-  const lfgCommand = WORKFLOW_COMMANDS['lfg.md'];
-  const lfgSkill = PHASE_SKILLS['lfg'];
+describe('Cook-it Phase Integration', () => {
+  const cookitCommand = WORKFLOW_COMMANDS['cook-it.md'];
+  const cookitSkill = PHASE_SKILLS['cook-it'];
 
-  describe('lfg.md command (thin wrapper)', () => {
+  describe('cook-it.md command (thin wrapper)', () => {
     it('exists in WORKFLOW_COMMANDS', () => {
-      expect(lfgCommand).toBeDefined();
+      expect(cookitCommand).toBeDefined();
     });
 
     it('starts with YAML frontmatter followed by $ARGUMENTS', () => {
-      expect(lfgCommand.trimStart()).toMatch(/^---/);
-      expect(lfgCommand).toContain('$ARGUMENTS');
+      expect(cookitCommand.trimStart()).toMatch(/^---/);
+      expect(cookitCommand).toContain('$ARGUMENTS');
     });
 
     it('references the skill', () => {
-      expect(lfgCommand).toMatch(/skill/i);
+      expect(cookitCommand).toMatch(/skill/i);
     });
 
     it('is under 500 characters (thin wrapper)', () => {
-      expect(lfgCommand.length).toBeLessThanOrEqual(500);
+      expect(cookitCommand.length).toBeLessThanOrEqual(500);
     });
 
-    it('enforces reading the lfg skill file first', () => {
-      expect(lfgCommand).toContain('.claude/skills/compound/lfg/SKILL.md');
-      expect(lfgCommand).toMatch(/MANDATORY.*Read tool/i);
+    it('enforces reading the cook-it skill file first', () => {
+      expect(cookitCommand).toContain('.claude/skills/compound/cook-it/SKILL.md');
+      expect(cookitCommand).toMatch(/MANDATORY.*Read tool/i);
     });
   });
 
-  describe('lfg SKILL.md (orchestration logic)', () => {
+  describe('cook-it SKILL.md (orchestration logic)', () => {
     it('exists in PHASE_SKILLS', () => {
-      expect(lfgSkill).toBeDefined();
+      expect(cookitSkill).toBeDefined();
     });
 
     it('starts with YAML frontmatter', () => {
-      expect(lfgSkill.trimStart()).toMatch(/^---/);
+      expect(cookitSkill.trimStart()).toMatch(/^---/);
     });
 
     it('lists all 5 phase skill file paths', () => {
       const phases = ['spec-dev', 'plan', 'work', 'review', 'compound'];
       for (const phase of phases) {
-        expect(lfgSkill).toContain(`.claude/skills/compound/${phase}/SKILL.md`);
+        expect(cookitSkill).toContain(`.claude/skills/compound/${phase}/SKILL.md`);
       }
     });
 
     it('contains phase gates', () => {
-      expect(lfgSkill).toContain('GATE 3');
-      expect(lfgSkill).toContain('GATE 4');
-      expect(lfgSkill).toContain('FINAL GATE');
+      expect(cookitSkill).toContain('GATE 3');
+      expect(cookitSkill).toContain('GATE 4');
+      expect(cookitSkill).toContain('FINAL GATE');
     });
 
     it('contains phase execution protocol with progress announcements', () => {
-      expect(lfgSkill).toMatch(/\[Phase N\/5\]/);
+      expect(cookitSkill).toMatch(/\[Phase N\/5\]/);
     });
 
     it('uses phase-check state machine commands', () => {
-      expect(lfgSkill).toContain('phase-check init');
-      expect(lfgSkill).toContain('phase-check start');
-      expect(lfgSkill).toContain('phase-check gate post-plan');
-      expect(lfgSkill).toContain('phase-check gate gate-3');
-      expect(lfgSkill).toContain('phase-check gate gate-4');
-      expect(lfgSkill).toContain('phase-check gate final');
+      expect(cookitSkill).toContain('phase-check init');
+      expect(cookitSkill).toContain('phase-check start');
+      expect(cookitSkill).toContain('phase-check gate post-plan');
+      expect(cookitSkill).toContain('phase-check gate gate-3');
+      expect(cookitSkill).toContain('phase-check gate gate-4');
+      expect(cookitSkill).toContain('phase-check gate final');
     });
 
     it('contains phase control (skip/resume/retry)', () => {
-      expect(lfgSkill).toMatch(/skip/i);
-      expect(lfgSkill).toMatch(/resume/i);
-      expect(lfgSkill).toMatch(/retry/i);
+      expect(cookitSkill).toMatch(/skip/i);
+      expect(cookitSkill).toMatch(/resume/i);
+      expect(cookitSkill).toMatch(/retry/i);
     });
 
     it('contains stop conditions', () => {
-      expect(lfgSkill).toContain('Stop Conditions');
+      expect(cookitSkill).toContain('Stop Conditions');
     });
 
     it('contains session close protocol', () => {
-      expect(lfgSkill).toContain('SESSION CLOSE');
-      expect(lfgSkill).toContain('phase-clean');
+      expect(cookitSkill).toContain('SESSION CLOSE');
+      expect(cookitSkill).toContain('phase-clean');
     });
 
     it('references verify-gates', () => {
-      expect(lfgSkill).toContain('verify-gates');
+      expect(cookitSkill).toContain('verify-gates');
     });
 
     it('stays under 6000 characters', () => {
-      expect(lfgSkill.length).toBeLessThanOrEqual(6000);
+      expect(cookitSkill.length).toBeLessThanOrEqual(6000);
     });
   });
 
@@ -147,7 +147,7 @@ describe('LFG Phase Integration', () => {
   });
 
   describe('cross-template consistency', () => {
-    it('every phase referenced in lfg skill exists as its own command', () => {
+    it('every phase referenced in cook-it skill exists as its own command', () => {
       const phases = ['spec-dev', 'plan', 'work', 'review', 'compound'];
       for (const phase of phases) {
         expect(
@@ -167,8 +167,8 @@ describe('LFG Phase Integration', () => {
       }
     });
 
-    it('lfg has its own skill in PHASE_SKILLS', () => {
-      expect(PHASE_SKILLS['lfg']).toBeDefined();
+    it('cook-it has its own skill in PHASE_SKILLS', () => {
+      expect(PHASE_SKILLS['cook-it']).toBeDefined();
     });
   });
 });

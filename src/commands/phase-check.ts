@@ -1,7 +1,7 @@
 /**
  * Phase check state machine.
  *
- * Manages LFG phase state in .claude/.ca-phase-state.json.
+ * Manages cook-it phase state in .claude/.ca-phase-state.json.
  */
 
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -31,7 +31,7 @@ const PHASE_INDEX: Record<PhaseName, number> = {
 };
 
 export interface PhaseState {
-  lfg_active: boolean;
+  cookit_active: boolean;
   epic_id: string;
   current_phase: PhaseName;
   phase_index: number;
@@ -66,7 +66,7 @@ function validatePhaseState(raw: unknown): raw is PhaseState {
   const state = raw as Record<string, unknown>;
 
   return (
-    typeof state.lfg_active === 'boolean' &&
+    typeof state.cookit_active === 'boolean' &&
     typeof state.epic_id === 'string' &&
     isPhaseName(state.current_phase) &&
     typeof state.phase_index === 'number' &&
@@ -92,7 +92,7 @@ export function initPhaseState(repoRoot: string, epicId: string): PhaseState {
   mkdirSync(dir, { recursive: true });
 
   const state: PhaseState = {
-    lfg_active: true,
+    cookit_active: true,
     epic_id: epicId,
     current_phase: 'spec-dev',
     phase_index: PHASE_INDEX['spec-dev'],
@@ -111,7 +111,7 @@ export function getPhaseState(repoRoot: string): PhaseState | null {
     const raw = readFileSync(path, 'utf-8');
     const parsed = JSON.parse(raw) as unknown;
     if (!validatePhaseState(parsed)) return null;
-    // TTL check: discard and clean up stale state from abandoned LFG runs
+    // TTL check: discard and clean up stale state from abandoned cook-it runs
     const age = Date.now() - new Date(parsed.started_at).getTime();
     if (age > PHASE_STATE_MAX_AGE_MS) {
       cleanPhaseState(repoRoot);
@@ -175,10 +175,10 @@ export function recordGatePassed(repoRoot: string, gate: GateName): PhaseState |
 
 function printStatusHuman(state: PhaseState | null): void {
   if (state === null) {
-    console.log('No active LFG session.');
+    console.log('No active cook-it session.');
     return;
   }
-  console.log('Active LFG Session');
+  console.log('Active cook-it Session');
   console.log(`  Epic: ${state.epic_id}`);
   console.log(`  Phase: ${state.current_phase} (${state.phase_index}/5)`);
   console.log(`  Skills read: ${state.skills_read.length === 0 ? '(none)' : state.skills_read.join(', ')}`);
@@ -254,7 +254,7 @@ function registerPhaseSubcommands(
     .option('--json', 'Output raw JSON')
     .action((options: { json?: boolean }) => {
       const state = getPhaseState(repoRoot());
-      if (options.json) { console.log(JSON.stringify(state ?? { lfg_active: false })); return; }
+      if (options.json) { console.log(JSON.stringify(state ?? { cookit_active: false })); return; }
       printStatusHuman(state);
     });
 
@@ -271,7 +271,7 @@ function registerPhaseSubcommands(
 export function registerPhaseCheckCommand(program: Command): void {
   const phaseCheck = program
     .command('phase-check')
-    .description('Manage LFG phase state')
+    .description('Manage cook-it phase state')
     .option('--dry-run', 'Show what would be done without making changes');
 
   const getDryRun = (): boolean => phaseCheck.opts<{ dryRun?: boolean }>().dryRun ?? false;

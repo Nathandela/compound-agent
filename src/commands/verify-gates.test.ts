@@ -281,7 +281,7 @@ describe('verify-gates', () => {
       await writeFile(
         statePath,
         JSON.stringify({
-          lfg_active: true,
+          cookit_active: true,
           epic_id: 'learning_agent-5dfm',
           current_phase: 'compound',
           phase_index: 5,

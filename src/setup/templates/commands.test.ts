@@ -7,7 +7,7 @@ const PHASE_FILENAMES = [
   'work.md',
   'review.md',
   'compound.md',
-  'lfg.md',
+  'cook-it.md',
   'research.md',
   'test-clean.md',
   'get-a-phd.md',
@@ -99,7 +99,7 @@ describe('WORKFLOW_COMMANDS', () => {
     });
 
     it('every phase command references the skill file path', () => {
-      const SINGLE_PHASE_FILENAMES = PHASE_FILENAMES.filter((k) => k !== 'lfg.md' && k !== 'research.md' && k !== 'test-clean.md' && k !== 'get-a-phd.md');
+      const SINGLE_PHASE_FILENAMES = PHASE_FILENAMES.filter((k) => k !== 'cook-it.md' && k !== 'research.md' && k !== 'test-clean.md' && k !== 'get-a-phd.md');
       for (const key of SINGLE_PHASE_FILENAMES) {
         const phase = key.replace('.md', '');
         expect(
@@ -109,8 +109,8 @@ describe('WORKFLOW_COMMANDS', () => {
       }
     });
 
-    it('lfg.md references reading its own skill file', () => {
-      expect(WORKFLOW_COMMANDS['lfg.md']).toContain('.claude/skills/compound/lfg/SKILL.md');
+    it('cook-it.md references reading its own skill file', () => {
+      expect(WORKFLOW_COMMANDS['cook-it.md']).toContain('.claude/skills/compound/cook-it/SKILL.md');
     });
 
     it('research.md references researcher skill file', () => {
@@ -180,7 +180,7 @@ describe('WORKFLOW_COMMANDS', () => {
    * shell operators. If user input contains ! ( ) | etc., inline backtick
    * spans that reference $ARGUMENTS trigger permission check failures.
    *
-   * Phase templates (spec-dev, plan, work, review, compound, lfg) are
+   * Phase templates (spec-dev, plan, work, review, compound, cook-it) are
    * instruction-heavy and must avoid shell-unsafe patterns in backticks.
    * Utility templates (learn, show, etc.) are thin CLI wrappers where
    * ```bash blocks are intentional and work correctly.

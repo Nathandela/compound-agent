@@ -362,7 +362,7 @@ This section explains HOW and WHEN Claude should interact with the compound-agen
 | `/compound:work` | Work | Execute plan with agent teams and TDD |
 | `/compound:review` | Review | Multi-agent review with inter-communication |
 | `/compound:compound` | Compound | Capture knowledge, feed back into memory |
-| `/compound:lfg` | All | Chain all 5 phases sequentially |
+| `/compound:cook-it` | All | Chain all 5 phases sequentially |
 
 ### CLI
 
@@ -374,7 +374,7 @@ This section explains HOW and WHEN Claude should interact with the compound-agen
 | `npx ca list` | List all lessons |
 | `npx ca stats` | Database health |
 | `npx ca verify-gates <epic-id>` | Verify review + compound tasks exist and are closed |
-| `npx ca phase-check` | Manage LFG phase state (init/status/clean/gate) |
+| `npx ca phase-check` | Manage cook-it phase state (init/status/clean/gate) |
 
 ### Core Principle
 

@@ -31,7 +31,7 @@ function hasTransitionEvidence(state: {
  * Process a Stop event and check if the expected gate is passed.
  *
  * Returns { continue: false, stopReason } when stop is blocked.
- * Returns {} in all other cases (no state, lfg inactive, gate passed, etc.).
+ * Returns {} in all other cases (no state, cook-it inactive, gate passed, etc.).
  */
 export function processStopAudit(repoRoot: string, stopHookActive = false): StopAuditOutput {
   try {
@@ -39,7 +39,7 @@ export function processStopAudit(repoRoot: string, stopHookActive = false): Stop
     if (stopHookActive) return {};
 
     const state = getPhaseState(repoRoot);
-    if (state === null || !state.lfg_active) return {};
+    if (state === null || !state.cookit_active) return {};
 
     const expectedGate = expectedGateForPhase(state.phase_index);
     if (expectedGate === null) return {};

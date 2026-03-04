@@ -1,6 +1,6 @@
 description = "Full workflow cycle chaining all five phases"
 prompt = """
-@{.claude/commands/compound/lfg.md}
+@{.claude/commands/compound/cook-it.md}
 
 {{args}}
 """

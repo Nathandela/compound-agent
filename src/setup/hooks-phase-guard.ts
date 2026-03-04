@@ -31,7 +31,7 @@ export function processPhaseGuard(
     if (toolName !== 'Edit' && toolName !== 'Write') return {};
 
     const state = getPhaseState(repoRoot);
-    if (state === null || !state.lfg_active) return {};
+    if (state === null || !state.cookit_active) return {};
 
     const expectedSkillPath = `.claude/skills/compound/${state.current_phase}/SKILL.md`;
     const skillRead = state.skills_read.includes(expectedSkillPath);
@@ -41,7 +41,7 @@ export function processPhaseGuard(
         hookSpecificOutput: {
           hookEventName: 'PreToolUse',
           additionalContext:
-            `PHASE GUARD WARNING: You are in LFG phase ${state.phase_index}/5 (${state.current_phase}) ` +
+            `PHASE GUARD WARNING: You are in cook-it phase ${state.phase_index}/5 (${state.current_phase}) ` +
             `but have NOT read the skill file yet. Read ${expectedSkillPath} before continuing.`,
         },
       };

@@ -119,7 +119,7 @@ The five-phase workflow:
 Or run all phases sequentially:
 
 ```
-/compound:lfg "Add auth to API"
+/compound:cook-it "Add auth to API"
 ```
 
 Each phase searches memory for relevant past knowledge and injects it into agent context. The compound phase captures new knowledge, closing the loop.
@@ -166,7 +166,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca import <file>` | Import items from JSONL file |
 | `ca prime` | Load workflow context (used by hooks) |
 | `ca verify-gates <epic-id>` | Verify review + compound tasks exist and are closed |
-| `ca phase-check` | Manage LFG phase state (init/status/clean/gate) |
+| `ca phase-check` | Manage cook-it phase state (init/status/clean/gate) |
 | `ca audit` | Run audit checks against the codebase |
 | `ca rules check` | Run repository-defined rule checks |
 | `ca test-summary` | Run tests and output a compact summary |

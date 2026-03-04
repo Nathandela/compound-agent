@@ -30,7 +30,7 @@ describe('Phase Guard Hook (PreToolUse)', () => {
 
   function writeState(state: Record<string, unknown>): void {
     const base = {
-      lfg_active: true,
+      cookit_active: true,
       epic_id: 'learning_agent-5dfm',
       current_phase: 'work',
       phase_index: 3,
@@ -58,9 +58,9 @@ describe('Phase Guard Hook (PreToolUse)', () => {
       expect(result).toEqual({});
     });
 
-    it('returns {} when lfg_active is false', () => {
+    it('returns {} when cookit_active is false', () => {
       writeState({
-        lfg_active: false,
+        cookit_active: false,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],
@@ -84,7 +84,7 @@ describe('Phase Guard Hook (PreToolUse)', () => {
   describe('when phase skill was read', () => {
     it('returns {} (allows Edit)', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'work',
         skills_read: ['.claude/skills/compound/work/SKILL.md'],
         gates_passed: [],
@@ -97,7 +97,7 @@ describe('Phase Guard Hook (PreToolUse)', () => {
 
     it('returns {} (allows Write)', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'work',
         skills_read: ['.claude/skills/compound/work/SKILL.md'],
         gates_passed: [],
@@ -112,7 +112,7 @@ describe('Phase Guard Hook (PreToolUse)', () => {
   describe('when phase skill was NOT read', () => {
     it('returns warning context for Edit', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],
@@ -126,7 +126,7 @@ describe('Phase Guard Hook (PreToolUse)', () => {
 
     it('returns warning context for Write', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'plan',
         skills_read: [],
         gates_passed: [],
@@ -142,7 +142,7 @@ describe('Phase Guard Hook (PreToolUse)', () => {
   describe('non-Edit/Write tools', () => {
     it('returns {} for Read tool', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],
@@ -155,7 +155,7 @@ describe('Phase Guard Hook (PreToolUse)', () => {
 
     it('returns {} for Bash tool', () => {
       writeState({
-        lfg_active: true,
+        cookit_active: true,
         current_phase: 'work',
         skills_read: [],
         gates_passed: [],

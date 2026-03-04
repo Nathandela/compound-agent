@@ -11,7 +11,7 @@ pnpm lint      # Zero violations
 
 ## Exit Criteria Checklist (ALL Required)
 
-The `/implementation-reviewer` validates ALL categories below. **Every checkbox must pass.** (Category 7 applies only to `/compound:lfg` epic work.)
+The `/implementation-reviewer` validates ALL categories below. **Every checkbox must pass.** (Category 7 applies only to `/compound:cook-it` epic work.)
 
 ### 1. Tests (MUST ALL PASS)
 - [ ] `pnpm test` shows 100% pass rate
@@ -50,7 +50,7 @@ The `/implementation-reviewer` validates ALL categories below. **Every checkbox 
 - [ ] No string interpolation in SQL queries
 - [ ] Error messages do not leak sensitive data
 
-### 8. Workflow Gates (for `/compound:lfg` epic work)
+### 8. Workflow Gates (for `/compound:cook-it` epic work)
 - [ ] `ca verify-gates <epic-id>` passes (review + compound tasks exist and are closed)
 - [ ] All phase gates passed (PHASE GATE 3, PHASE GATE 4, FINAL GATE)
 

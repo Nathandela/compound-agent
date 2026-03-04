@@ -98,9 +98,9 @@ function formatLessonForPrime(lesson: MemoryItem): string {
   return `- **${lesson.insight}**${tags}\n  Learned: ${date} via ${source}`;
 }
 
-function formatActiveLfgSection(repoRoot: string): string | null {
+function formatActiveCookitSection(repoRoot: string): string | null {
   const state = getPhaseState(repoRoot);
-  if (state === null || !state.lfg_active) return null;
+  if (state === null || !state.cookit_active) return null;
 
   const skillsRead = state.skills_read.length === 0 ? '(none)' : state.skills_read.join(', ');
   const gatesPassed = state.gates_passed.length === 0 ? '(none)' : state.gates_passed.join(', ');
@@ -108,7 +108,7 @@ function formatActiveLfgSection(repoRoot: string): string | null {
   return `
 ---
 
-# ACTIVE LFG SESSION
+# ACTIVE COOK-IT SESSION
 
 Epic: ${state.epic_id}
 Phase: ${state.current_phase} (${state.phase_index}/5)
@@ -161,9 +161,9 @@ ${formattedLessons}
 `;
   }
 
-  const lfgSection = formatActiveLfgSection(root);
-  if (lfgSection !== null) {
-    output += lfgSection;
+  const cookitSection = formatActiveCookitSection(root);
+  if (cookitSection !== null) {
+    output += cookitSection;
   }
 
   return output;

@@ -43,22 +43,22 @@ describe('phase-check CLI', { tags: ['hooks', 'integration'] }, () => {
       const { stdout } = runCli('phase-check status --json', tempDir);
 
       const state = JSON.parse(stdout);
-      expect(state.lfg_active).toBe(true);
+      expect(state.cookit_active).toBe(true);
       expect(state.epic_id).toBe('learning_agent-5dfm');
       expect(state.current_phase).toBe('spec-dev');
     });
 
-    it('outputs lfg_active false when no state file exists', () => {
+    it('outputs cookit_active false when no state file exists', () => {
       const { stdout } = runCli('phase-check status --json', tempDir);
 
       const state = JSON.parse(stdout);
-      expect(state.lfg_active).toBe(false);
+      expect(state.cookit_active).toBe(false);
     });
 
     it('outputs human-readable status by default', () => {
       runCli('phase-check init learning_agent-5dfm', tempDir);
       const { combined } = runCli('phase-check status', tempDir);
-      expect(combined).toContain('Active LFG Session');
+      expect(combined).toContain('Active cook-it Session');
       expect(combined).toContain('learning_agent-5dfm');
     });
   });

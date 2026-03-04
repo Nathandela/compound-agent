@@ -46,7 +46,7 @@ describe('Phase Check State Machine', () => {
 
       expect(existsSync(stateFile)).toBe(true);
       const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
-      expect(state.lfg_active).toBe(true);
+      expect(state.cookit_active).toBe(true);
       expect(state.epic_id).toBe('learning_agent-5dfm');
       expect(state.current_phase).toBe('spec-dev');
       expect(state.phase_index).toBe(1);
@@ -91,7 +91,7 @@ describe('Phase Check State Machine', () => {
       const state = getPhaseState(repoRoot);
 
       expect(state).not.toBeNull();
-      expect(state!.lfg_active).toBe(true);
+      expect(state!.cookit_active).toBe(true);
       expect(state!.current_phase).toBe('spec-dev');
       expect(state!.epic_id).toBe('learning_agent-5dfm');
     });
@@ -163,7 +163,7 @@ describe('Phase Check State Machine', () => {
       const state = getPhaseState(repoRoot);
       expect(state!.current_phase).toBe('work');
       expect(state!.phase_index).toBe(3);
-      expect(state!.lfg_active).toBe(true);
+      expect(state!.cookit_active).toBe(true);
     });
 
     it('updates skills_read array', () => {
@@ -296,6 +296,6 @@ describe('registerPhaseCheckCommand respects COMPOUND_AGENT_ROOT', () => {
 
     const state = JSON.parse(readFileSync(stateFile, 'utf-8'));
     expect(state.epic_id).toBe('test-epic');
-    expect(state.lfg_active).toBe(true);
+    expect(state.cookit_active).toBe(true);
   });
 });

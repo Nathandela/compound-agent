@@ -105,7 +105,7 @@ export async function runVerifyGates(
   const allPassed = checks.every((check) => check.status === 'pass');
   if (allPassed) {
     const state = getPhaseState(repoRoot);
-    if (state !== null && state.lfg_active && state.gates_passed.includes('final')) {
+    if (state !== null && state.cookit_active && state.gates_passed.includes('final')) {
       cleanPhaseState(repoRoot);
     }
   }

@@ -409,14 +409,14 @@ describe('Prime Command', () => {
     });
   });
 
-  describe('Active LFG Session Injection', () => {
+  describe('Active cook-it Session Injection', () => {
     it('injects phase context when phase state is active', async () => {
       const statePath = join(tempDir, '.claude', '.ca-phase-state.json');
       await mkdir(join(tempDir, '.claude'), { recursive: true });
       await writeFile(
         statePath,
         JSON.stringify({
-          lfg_active: true,
+          cookit_active: true,
           epic_id: 'learning_agent-5dfm',
           current_phase: 'work',
           phase_index: 3,
@@ -428,20 +428,20 @@ describe('Prime Command', () => {
       );
 
       const output = await getPrimeContext(tempDir);
-      expect(output).toContain('ACTIVE LFG SESSION');
+      expect(output).toContain('ACTIVE COOK-IT SESSION');
       expect(output).toContain('learning_agent-5dfm');
       expect(output).toContain('work (3/5)');
       expect(output).toContain('npx ca phase-check start work');
       expect(output).toContain('.claude/skills/compound/work/SKILL.md');
     });
 
-    it('does not inject phase context when lfg_active is false', async () => {
+    it('does not inject phase context when cookit_active is false', async () => {
       const statePath = join(tempDir, '.claude', '.ca-phase-state.json');
       await mkdir(join(tempDir, '.claude'), { recursive: true });
       await writeFile(
         statePath,
         JSON.stringify({
-          lfg_active: false,
+          cookit_active: false,
           epic_id: 'learning_agent-5dfm',
           current_phase: 'work',
           phase_index: 3,
@@ -453,7 +453,7 @@ describe('Prime Command', () => {
       );
 
       const output = await getPrimeContext(tempDir);
-      expect(output).not.toContain('ACTIVE LFG SESSION');
+      expect(output).not.toContain('ACTIVE COOK-IT SESSION');
     });
   });
 

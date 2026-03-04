@@ -50,9 +50,9 @@ describe('generateLoopScript', () => {
     expect(script).toContain('bd show');
   });
 
-  it('prompt includes compound:lfg', () => {
+  it('prompt includes compound:cook-it', () => {
     const script = generateLoopScript({ maxRetries: 3, model: 'claude-opus-4-6' });
-    expect(script).toContain('compound:lfg');
+    expect(script).toContain('compound:cook-it');
   });
 
   it('includes EPIC_COMPLETE marker', () => {

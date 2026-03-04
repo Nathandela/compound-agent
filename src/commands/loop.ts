@@ -175,7 +175,7 @@ Read the epic details carefully. Understand scope, acceptance criteria, and sub-
 Run the full compound workflow for this epic, starting from the plan phase
 (spec-dev is already done -- the epic exists):
 
-/compound:lfg from plan -- Epic: $epic_id
+/compound:cook-it from plan -- Epic: $epic_id
 
 Work through all phases: plan, work, review, compound.
 

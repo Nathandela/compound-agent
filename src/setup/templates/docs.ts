@@ -72,7 +72,7 @@ npx ca doctor
   settings.json                # Claude Code hooks
   plugin.json                  # Plugin manifest
   agents/compound/             # Subagent definitions
-  commands/compound/           # Slash commands (spec-dev, plan, work, review, compound, lfg)
+  commands/compound/           # Slash commands (spec-dev, plan, work, review, compound, cook-it)
   skills/compound/             # Phase skills + agent role skills
   lessons/
     index.jsonl                # Memory items (git-tracked source of truth)
@@ -93,14 +93,14 @@ docs/compound/
 | Search docs knowledge | \`npx ca knowledge "query"\` |
 | Check plan against memory | \`npx ca check-plan --plan "description"\` |
 | View stats | \`npx ca stats\` |
-| Run full workflow | \`/compound:lfg <epic-id>\` |
+| Run full workflow | \`/compound:cook-it <epic-id>\` |
 | Health check | \`npx ca doctor\` |
 
 ---
 
 ## Further reading
 
-- [WORKFLOW.md](WORKFLOW.md) -- The 5-phase development workflow and LFG orchestrator
+- [WORKFLOW.md](WORKFLOW.md) -- The 5-phase development workflow and cook-it orchestrator
 - [CLI_REFERENCE.md](CLI_REFERENCE.md) -- Complete CLI command reference
 - [SKILLS.md](SKILLS.md) -- Phase skills and agent role skills
 - [INTEGRATION.md](INTEGRATION.md) -- Memory system, hooks, beads, and agent guidance
@@ -109,12 +109,12 @@ docs/compound/
   'WORKFLOW.md': `---
 version: "{{VERSION}}"
 last-updated: "{{DATE}}"
-summary: "The 5-phase compound-agent workflow and LFG orchestrator"
+summary: "The 5-phase compound-agent workflow and cook-it orchestrator"
 ---
 
 # Workflow
 
-Every feature or epic follows five phases. The \`/compound:lfg\` skill chains them with enforcement gates.
+Every feature or epic follows five phases. The \`/compound:cook-it\` skill chains them with enforcement gates.
 
 ---
 
@@ -164,20 +164,20 @@ Extract and store lessons learned. This is what makes the system compound.
 
 ---
 
-## LFG orchestrator
+## Cook-it orchestrator
 
-\`/compound:lfg\` chains all 5 phases with enforcement gates.
+\`/compound:cook-it\` chains all 5 phases with enforcement gates.
 
 ### Invocation
 
 \`\`\`
-/compound:lfg <epic-id>
-/compound:lfg <epic-id> from plan
+/compound:cook-it <epic-id>
+/compound:cook-it <epic-id> from plan
 \`\`\`
 
 ### Phase execution protocol
 
-For each phase, LFG:
+For each phase, cook-it:
 
 1. Announces progress: \`[Phase N/5] PHASE_NAME\`
 2. Initializes state: \`npx ca phase-check start <phase>\`
@@ -196,18 +196,18 @@ For each phase, LFG:
 | Gate 4 | After Review | \`/implementation-reviewer\` returned APPROVED |
 | Final | After Compound | \`npx ca verify-gates <epic-id>\` passes, \`pnpm test\` and \`pnpm lint\` pass |
 
-If any gate fails, LFG stops. You must fix the issue before proceeding.
+If any gate fails, cook-it stops. You must fix the issue before proceeding.
 
 ### Resumption
 
-If interrupted, LFG can resume:
+If interrupted, cook-it can resume:
 
 1. Run \`bd show <epic-id>\` and read the notes for phase state
 2. Re-invoke with \`from <phase>\` to skip completed phases
 
 ### Phase state tracking
 
-LFG persists state in \`.claude/.ca-phase-state.json\`. Useful commands:
+Cook-it persists state in \`.claude/.ca-phase-state.json\`. Useful commands:
 
 \`\`\`bash
 npx ca phase-check status      # See current phase state
@@ -216,7 +216,7 @@ npx ca phase-check clean       # Reset phase state (escape hatch)
 
 ### Session close
 
-Before saying "done", LFG runs this inviolable checklist:
+Before saying "done", cook-it runs this inviolable checklist:
 
 \`\`\`bash
 git status
@@ -420,7 +420,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **What it does**: Spawns an analysis pipeline (context-analyzer, lesson-extractor, pattern-matcher, solution-writer, compounding), applies quality filters, classifies items by type and severity, stores via \`npx ca learn\`, runs \`npx ca verify-gates\`.
 
-### \`/compound:lfg\`
+### \`/compound:cook-it\`
 
 **Purpose**: Full-cycle orchestrator chaining all five phases.
 
@@ -448,7 +448,7 @@ Skills are invoked as Claude Code slash commands:
 /compound:work             # Start work phase
 /compound:review           # Start review phase
 /compound:compound         # Start compound phase
-/compound:lfg <epic-id>    # Run all phases end-to-end
+/compound:cook-it <epic-id>    # Run all phases end-to-end
 /compound:research         # Spawn research subagent
 /compound:test-clean       # Clean test artifacts
 /compound:get-a-phd <focus>       # Deep research for agent knowledge

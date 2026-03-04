@@ -159,7 +159,7 @@ describe('Doctor Command', () => {
   it('passes .gitignore check when all patterns present', async () => {
     await writeFile(
       join(tempDir, '.gitignore'),
-      'node_modules/\n.claude/.cache/\n',
+      'node_modules/\n.claude/.cache/\n.claude/.ca-*.json\n',
       'utf-8'
     );
 

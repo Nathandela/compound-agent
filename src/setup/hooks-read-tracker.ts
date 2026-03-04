@@ -36,7 +36,7 @@ export function processReadTracker(
     if (toolName !== 'Read') return {};
 
     const state = getPhaseState(repoRoot);
-    if (state === null || !state.lfg_active) return {};
+    if (state === null || !state.cookit_active) return {};
 
     const filePath = typeof toolInput.file_path === 'string' ? toolInput.file_path : null;
     if (filePath === null) return {};

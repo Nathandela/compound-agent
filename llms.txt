@@ -2,7 +2,7 @@
 
 > Semantic memory plugin for Claude Code. Captures lessons from mistakes, corrections, and discoveries. Stores them in git-tracked JSONL with SQLite FTS5 indexing and local vector embeddings (EmbeddingGemma-300M via node-llama-cpp). Retrieves relevant knowledge at session start, during planning, and before architectural decisions. Install as a dev dependency, run `npx ca setup`, and every work cycle compounds -- mistakes become searchable lessons that prevent recurrence.
 
-Compound Agent is a TypeScript CLI tool (`ca`) installable via npm/pnpm. It integrates with Claude Code through hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse) and slash commands (/compound:brainstorm, /compound:plan, /compound:work, /compound:review, /compound:compound, /compound:lfg). Storage uses a three-layer architecture: Beads for issue tracking, Semantic Memory for knowledge, and Workflows for structured development phases.
+Compound Agent is a TypeScript CLI tool (`ca`) installable via npm/pnpm. It integrates with Claude Code through hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse) and slash commands (/compound:brainstorm, /compound:plan, /compound:work, /compound:review, /compound:compound, /compound:cook-it). Storage uses a three-layer architecture: Beads for issue tracking, Semantic Memory for knowledge, and Workflows for structured development phases.
 
 ## Core Documentation
 

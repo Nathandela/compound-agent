@@ -155,7 +155,7 @@ The compound engineering cycle, triggered by explicit slash commands.
 | `/compound:work` | Work | Execute with agent teams |
 | `/compound:review` | Review | Multi-agent review with inter-communication |
 | `/compound:compound` | Compound | Capture knowledge, feed back into memory |
-| `/compound:lfg` | All | Chain all phases sequentially |
+| `/compound:cook-it` | All | Chain all phases sequentially |
 | `ca phase-check` | All | Phase state management (init/status/clean/gate) |
 
 ---
@@ -374,7 +374,7 @@ Implemented as Claude Code commands (markdown files):
     work.md
     review.md
     compound.md
-    lfg.md
+    cook-it.md
 ```
 
 ### Agent Definitions
