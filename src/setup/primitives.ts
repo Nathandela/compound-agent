@@ -17,7 +17,7 @@ import {
   COMPOUND_AGENT_SECTION_HEADER,
   PLUGIN_MANIFEST,
 } from './templates.js';
-import { AGENT_TEMPLATES, AGENT_ROLE_SKILLS, DOC_TEMPLATES, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
+import { AGENT_TEMPLATES, AGENT_ROLE_SKILLS, DOC_TEMPLATES, WORKFLOW_COMMANDS, PHASE_SKILLS, PHASE_SKILL_REFERENCES } from './templates/index.js';
 
 /**
  * @deprecated Kept for backward compatibility with all.ts --update detection.
@@ -172,6 +172,17 @@ export async function installPhaseSkills(repoRoot: string): Promise<boolean> {
       created = true;
     }
   }
+
+  // Install reference files alongside skills
+  for (const [relPath, content] of Object.entries(PHASE_SKILL_REFERENCES)) {
+    const filePath = join(repoRoot, '.claude', 'skills', 'compound', relPath);
+    await mkdir(dirname(filePath), { recursive: true });
+    if (!existsSync(filePath)) {
+      await writeFile(filePath, content, 'utf-8');
+      created = true;
+    }
+  }
+
   return created;
 }
 

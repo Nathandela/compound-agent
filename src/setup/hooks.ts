@@ -24,6 +24,14 @@ import {
   COMPOUND_AGENT_POST_COMMIT_BLOCK,
 } from './templates.js';
 
+/** Log hook errors to stderr when CA_DEBUG is set. */
+function logHookError(hookName: string, err: unknown): void {
+  if (process.env.CA_DEBUG) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[CA_DEBUG] Hook ${hookName} error: ${msg}`);
+  }
+}
+
 /** Make hook file executable (mode 0o755) */
 const HOOK_FILE_MODE = 0o755;
 
@@ -277,8 +285,8 @@ async function runUserPromptHook(): Promise<void> {
 
     const result = processUserPrompt(data.prompt);
     console.log(JSON.stringify(result));
-  } catch {
-    // On any error, exit silently with empty output
+  } catch (err) {
+    logHookError('user-prompt', err);
     console.log(JSON.stringify({}));
   }
 }
@@ -304,7 +312,8 @@ async function runPostToolFailureHook(): Promise<void> {
     const stateDir = join(getRepoRoot(), '.claude');
     const result = processToolFailure(data.tool_name, data.tool_input ?? {}, stateDir);
     console.log(JSON.stringify(result));
-  } catch {
+  } catch (err) {
+    logHookError('post-tool-failure', err);
     console.log(JSON.stringify({}));
   }
 }
@@ -319,7 +328,8 @@ async function runPostToolSuccessHook(): Promise<void> {
     const stateDir = join(getRepoRoot(), '.claude');
     processToolSuccess(stateDir);
     console.log(JSON.stringify({}));
-  } catch {
+  } catch (err) {
+    logHookError('post-tool-success', err);
     console.log(JSON.stringify({}));
   }
 }
@@ -333,7 +343,7 @@ async function runToolHook(
     const data = JSON.parse(input) as { tool_name?: string; tool_input?: Record<string, unknown> };
     if (!data.tool_name) { console.log(JSON.stringify({})); return; }
     console.log(JSON.stringify(processor(getRepoRoot(), data.tool_name, data.tool_input ?? {})));
-  } catch { console.log(JSON.stringify({})); }
+  } catch (err) { logHookError('tool-hook', err); console.log(JSON.stringify({})); }
 }
 
 /** Run the Stop audit hook. */
@@ -342,7 +352,7 @@ async function runStopAuditHook(): Promise<void> {
     const input = await readStdin();
     const data = JSON.parse(input) as { stop_hook_active?: boolean };
     console.log(JSON.stringify(processStopAudit(getRepoRoot(), data.stop_hook_active ?? false)));
-  } catch { console.log(JSON.stringify({})); }
+  } catch (err) { logHookError('stop-audit', err); console.log(JSON.stringify({})); }
 }
 
 /**

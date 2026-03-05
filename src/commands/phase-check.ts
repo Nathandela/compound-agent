@@ -61,9 +61,18 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
+/** Migrate legacy lfg_active field to cookit_active. */
+function migrateLegacyFields(raw: Record<string, unknown>): void {
+  if (raw.cookit_active === undefined && typeof raw.lfg_active === 'boolean') {
+    raw.cookit_active = raw.lfg_active;
+    delete raw.lfg_active;
+  }
+}
+
 function validatePhaseState(raw: unknown): raw is PhaseState {
   if (typeof raw !== 'object' || raw === null) return false;
   const state = raw as Record<string, unknown>;
+  migrateLegacyFields(state);
 
   return (
     typeof state.cookit_active === 'boolean' &&

@@ -403,7 +403,7 @@ export function runCli(args: string, tempDir: string): CliResult {
       encoding: 'utf-8',
       env: { ...process.env, COMPOUND_AGENT_ROOT: tempDir },
       stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 30_000,
+      timeout: 60_000,
     });
     const stdout = result;
     return { stdout, stderr: '', combined: stdout };
@@ -437,7 +437,7 @@ export function runCliWithEnv(
       encoding: 'utf-8',
       env: { ...process.env, COMPOUND_AGENT_ROOT: tempDir, ...env },
       stdio: ['pipe', 'pipe', 'pipe'],
-      timeout: 30_000,
+      timeout: 60_000,
     });
     const stdout = result;
     return { stdout, stderr: '', combined: stdout };

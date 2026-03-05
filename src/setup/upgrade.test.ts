@@ -50,9 +50,9 @@ describe('detectExistingInstall', () => {
 });
 
 describe('removeDeprecatedCommands', () => {
-  const DEPRECATED = ['search.md', 'list.md', 'show.md', 'stats.md', 'wrong.md', 'learn.md', 'brainstorm.md'];
+  const DEPRECATED = ['search.md', 'list.md', 'show.md', 'stats.md', 'wrong.md', 'learn.md', 'brainstorm.md', 'lfg.md'];
 
-  it('removes all 7 deprecated command files from compound/', async () => {
+  it('removes all 8 deprecated command files from compound/', async () => {
     const commandsDir = join(tempDir, '.claude', 'commands', 'compound');
     await mkdir(commandsDir, { recursive: true });
 

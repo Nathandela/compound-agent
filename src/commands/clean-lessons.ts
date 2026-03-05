@@ -115,6 +115,9 @@ async function cleanLessonsAction(): Promise<void> {
     await syncIfNeeded(repoRoot);
     const { items } = await readMemoryItems(repoRoot);
     const activeItems = items.filter((item) => !item.invalidatedAt && item.type === 'lesson');
+    if (items.length > activeItems.length) {
+      console.log(`Analyzing ${activeItems.length} lesson-type items only (${items.length - activeItems.length} non-lesson items excluded).`);
+    }
     const pairs = await findDuplicatePairs(repoRoot, activeItems);
 
     if (pairs.length === 0) {

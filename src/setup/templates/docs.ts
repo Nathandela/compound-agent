@@ -118,13 +118,13 @@ Every feature or epic follows five phases. The \`/compound:cook-it\` skill chain
 
 ---
 
-## Phase 1: Brainstorm
+## Phase 1: Spec Dev
 
-Explore the problem space before committing to a solution.
+Develop precise specifications through Socratic dialogue, EARS notation, and Mermaid diagrams.
 
-- Ask "why" before "how"
-- Search memory for similar past features
-- Generate multiple approaches, then converge
+- Ask "why" before "how" -- understand the real need
+- Search memory for past features, constraints, decisions
+- Use EARS notation for clear, testable requirements
 - Create a beads epic: \`bd create --title="..." --type=epic\`
 
 ## Phase 2: Plan

@@ -29,6 +29,9 @@ interface LockBusy {
 
 export type LockResult = LockAcquired | LockBusy;
 
+/** Max lock age before considered expired (1 hour). */
+const LOCK_MAX_AGE_MS = 60 * 60 * 1000;
+
 interface LockContent {
   pid: number;
   startedAt: string;
@@ -90,10 +93,14 @@ export function acquireEmbedLock(repoRoot: string): LockResult {
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
 
-    // Lock file exists -- check if holder is alive
+    // Lock file exists -- check if holder is alive and lock is not expired
     const existing = readLock(file);
     if (existing && isProcessAlive(existing.pid)) {
-      return { acquired: false, holder: existing.pid };
+      const lockAge = Date.now() - new Date(existing.startedAt).getTime();
+      if (lockAge < LOCK_MAX_AGE_MS) {
+        return { acquired: false, holder: existing.pid };
+      }
+      // Lock expired -- fall through to overwrite
     }
 
     // Stale lock -- delete then re-create atomically with 'wx'

@@ -9,13 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.1] - 2026-03-05
+
 ### Changed
 
 - **Renamed brainstorm phase to spec-dev**: The `/compound:brainstorm` slash command is now `/compound:spec-dev`. The phase focuses on structured specification development using EARS notation, Mermaid diagrams, and Socratic dialogue rather than open-ended brainstorming. Old `brainstorm.md` command files are auto-cleaned during upgrade.
+- **Integration test stability**: Reduced integration test parallelism (`maxForks: 1`) and increased timeouts to 60s to eliminate non-deterministic ETIMEDOUT failures under load.
 
 ### Added
 
-- **Spec reference file**: `.claude/skills/compound/spec-dev/references/spec-guide.md` provides quick-reference material for EARS patterns, Mermaid diagram selection, NL ambiguity detection, and trade-off documentation frameworks.
+- **Spec reference file**: `.claude/skills/compound/spec-dev/references/spec-guide.md` provides quick-reference material for EARS patterns, Mermaid diagram selection, NL ambiguity detection, and trade-off documentation frameworks. Installed automatically during `ca setup`.
+- **Hook error visibility**: Hook runners now log errors to stderr when `CA_DEBUG` environment variable is set, instead of silently swallowing all failures.
+- **check-plan stdin safety**: `ca check-plan` now enforces a 30-second timeout and 1MB size limit when reading from stdin, preventing hangs in CI/CD environments.
+- **Embed lock expiry**: Embedding lock files now expire after 1 hour as a safety valve against zombie processes holding locks indefinitely.
+- **Phase-state backward compatibility**: Legacy `lfg_active` field in phase state files is automatically migrated to `cookit_active` on read.
+- **clean-lessons scope messaging**: `ca clean-lessons` now reports when non-lesson items are excluded from analysis.
+
+### Fixed
+
+- **Missing spec-guide.md**: The reference file was declared in skill templates and CHANGELOG but never generated during setup. Now installed alongside phase skills.
+- **Upgrade cleanup for lfg.md**: Added `lfg.md` to deprecated commands list so `ca setup --update` removes stale lfg command files from upgraded repos.
+- **Docs template terminology**: WORKFLOW.md template now uses "Spec Dev" instead of "Brainstorm" for Phase 1.
+- **Test file naming**: Renamed `brainstorm-phase.test.ts` to `spec-dev-phase.test.ts` to match the refactored phase name.
+- **Library bundle cleanup**: Moved CLI-only re-exports (`registerWatchCommand`, `registerLoopCommands`) out of the library barrel to eliminate unused import warnings in `dist/index.js`.
+- **plan.test.ts embedding guard**: Added `skipIf(skipEmbedding)` to unguarded test that calls `retrieveForPlan` without mocking.
+- **Agent template test count**: Updated setup.test.ts to expect 9 agent templates (was 8), matching the actual AGENT_TEMPLATES count after `lessons-reviewer.md` was added.
 
 ## [1.6.0] - 2026-03-02
 

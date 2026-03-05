@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PHASE_SKILLS } from './skills.js';
+import { PHASE_SKILLS, PHASE_SKILL_REFERENCES } from './skills.js';
 
 const EXPECTED_KEYS = ['spec-dev', 'plan', 'work', 'review', 'compound', 'researcher', 'cook-it', 'test-cleaner'];
 
@@ -168,5 +168,38 @@ describe('PHASE_SKILLS', () => {
 
   it('cook-it skill references verify-gates', () => {
     expect(PHASE_SKILLS['cook-it']).toContain('verify-gates');
+  });
+});
+
+describe('PHASE_SKILL_REFERENCES', () => {
+  it('contains the spec-guide.md reference file', () => {
+    expect(PHASE_SKILL_REFERENCES['spec-dev/references/spec-guide.md']).toBeDefined();
+  });
+
+  it('spec-guide.md contains EARS notation patterns', () => {
+    const content = PHASE_SKILL_REFERENCES['spec-dev/references/spec-guide.md']!;
+    expect(content).toContain('EARS');
+    expect(content).toContain('Ubiquitous');
+    expect(content).toContain('Event-driven');
+    expect(content).toContain('State-driven');
+  });
+
+  it('spec-guide.md contains Mermaid diagram guide', () => {
+    const content = PHASE_SKILL_REFERENCES['spec-dev/references/spec-guide.md']!;
+    expect(content).toContain('Mermaid');
+    expect(content).toContain('mindmap');
+    expect(content).toContain('sequenceDiagram');
+  });
+
+  it('spec-guide.md contains ambiguity checklist', () => {
+    const content = PHASE_SKILL_REFERENCES['spec-dev/references/spec-guide.md']!;
+    expect(content).toContain('Ambiguity');
+    expect(content).toContain('Vague adjectives');
+  });
+
+  it('spec-guide.md contains trade-off framework', () => {
+    const content = PHASE_SKILL_REFERENCES['spec-dev/references/spec-guide.md']!;
+    expect(content).toContain('Trade-off');
+    expect(content).toContain('Reversibility');
   });
 });

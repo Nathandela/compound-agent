@@ -3,8 +3,8 @@
  * Each entry is a markdown file that Claude Code discovers as a spawnable agent.
  *
  * Templates are split across multiple files to stay within the 400-line limit:
- * - agents-review.ts: Research + review agents (7 templates)
- * - agents-phase11.ts: Phase 11 intelligent compounding agents (5 templates)
+ * - agents-review.ts: Research + review agents (2 templates)
+ * - agents-phase11.ts: Phase 11 intelligent compounding agents (4 templates)
  */
 
 import { EXTERNAL_AGENT_TEMPLATES } from './agents-external.js';

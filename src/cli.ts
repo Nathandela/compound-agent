@@ -19,13 +19,13 @@ import { Command } from 'commander';
 import { registerCompoundCommands } from './commands/compound.js';
 import {
   registerCaptureCommands,
-  registerLoopCommands,
   registerManagementCommands,
   registerPhaseCheckCommand,
   registerRetrievalCommands,
   registerSetupCommands,
-  registerWatchCommand,
 } from './commands/index.js';
+import { registerLoopCommands } from './commands/loop.js';
+import { registerWatchCommand } from './commands/watch.js';
 import { VERSION } from './version.js';
 import { getRepoRoot } from './cli-utils.js';
 import { commandNeedsSqlite } from './cli-preflight.js';

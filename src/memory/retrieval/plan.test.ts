@@ -115,7 +115,7 @@ describe('plan retrieval', () => {
   });
 
   describe('error handling', () => {
-    it('returns empty results when no lessons exist', async () => {
+    it.skipIf(skipEmbedding)('returns empty results when no lessons exist', async () => {
       const result = await retrieveForPlan(tempDir, 'some plan');
       expect(result.lessons).toEqual([]);
       expect(result.message).toContain('No relevant lessons');

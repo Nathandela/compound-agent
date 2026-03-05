@@ -116,6 +116,25 @@ describe('Phase Check State Machine', () => {
       const state = getPhaseState(repoRoot);
       expect(state).toBeNull();
     });
+
+    it('migrates legacy lfg_active field to cookit_active', () => {
+      mkdirSync(stateDir, { recursive: true });
+      const legacyState = {
+        lfg_active: true,
+        epic_id: 'test-epic',
+        current_phase: 'plan',
+        phase_index: 2,
+        skills_read: [],
+        gates_passed: [],
+        started_at: new Date().toISOString(),
+      };
+      writeFileSync(stateFile, JSON.stringify(legacyState), 'utf-8');
+
+      const state = getPhaseState(repoRoot);
+      expect(state).not.toBeNull();
+      expect(state!.cookit_active).toBe(true);
+      expect(state!.epic_id).toBe('test-epic');
+    });
   });
 
   describe('getPhaseState TTL', () => {
