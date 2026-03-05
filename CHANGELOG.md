@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.2] - 2026-03-05
+
+### Fixed
+
+- **Cook-it session banner**: The cook-it skill now instructs Claude to print the "Claude the Cooker" ASCII chef banner at the very start of every cooking session.
+
 ## [1.6.1] - 2026-03-05
 
 ### Changed

@@ -499,16 +499,6 @@ description: Full-cycle orchestrator chaining all five phases with gates and con
 
 ## Overview
 
-\`\`\`
-
-\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510
- \u2502\u2592\u2592\u2592\u2592\u2592\u2502
- \u2590\u259b\u2588\u2588\u2588\u259c\u258c o
-\u259d\u259c\u2588\u2588\u2588\u2588\u2588\u259b\u2598|
-  \u2598\u2598 \u259d\u259d
-Let's cook!
-\`\`\`
-
 Chain all 5 phases end-to-end: Spec Dev, Plan, Work, Review, Compound. This skill governs the orchestration -- phase sequencing, gates, progress tracking, and error recovery.
 
 ## CRITICAL RULE -- READ BEFORE EXECUTE
@@ -520,6 +510,21 @@ Before starting EACH phase, you MUST use the Read tool to open its skill file:
 - .claude/skills/compound/compound/SKILL.md
 
 Do NOT proceed from memory. Read the skill, then follow it exactly.
+
+## Session Start
+When a cooking session begins, IMMEDIATELY print the chef banner below (copy it verbatim):
+
+\`\`\`
+
+\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510
+ \u2502\u2592\u2592\u2592\u2592\u2592\u2502
+ \u2590\u259b\u2588\u2588\u2588\u259c\u258c o
+\u259d\u259c\u2588\u2588\u2588\u2588\u2588\u259b\u2598|
+  \u2598\u2598 \u259d\u259d
+Claude the Cooker
+\`\`\`
+
+Then proceed with the protocol below.
 
 ## Phase Execution Protocol
 0. Initialize state: \`npx ca phase-check init <epic-id>\`
