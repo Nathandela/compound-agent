@@ -13,85 +13,83 @@ description: Develop precise specifications through Socratic dialogue, EARS nota
 # Spec Dev Skill
 
 ## Overview
-Develop unambiguous, testable specifications before committing to implementation. This phase uses a 4-phase process (Explore, Understand, Specify, Hand off) that produces EARS-notation requirements, Mermaid diagrams, and a beads epic ready for planning.
+Develop unambiguous, testable specifications before implementation. Structured 4-phase process producing EARS-notation requirements, architecture diagrams, and a beads epic.
 
-Scale formality to risk: skip spec-dev for trivial tasks, use lightweight EARS for small tasks, run the full 4-phase process for medium/large work.
+Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for small, full 4-phase for medium+. Use \`AskUserQuestion\` early to gauge scope.
 
-## Methodology
+## Methodology: 4-Phase Spec Development
 
 ### Phase 1: Explore
-1. Ask "why" before "how" -- understand the real need behind the request
-2. Search memory: \`npx ca search\` and docs: \`npx ca knowledge "relevant topic"\` for similar past features and constraints
-3. Spawn **subagents** in parallel for research:
-   - Available agents: \`.claude/agents/compound/repo-analyst.md\`, \`memory-analyst.md\`
-   - Or use \`subagent_type: Explore\` for ad-hoc codebase research
-   - Deploy MULTIPLE when topic spans several domains; synthesize findings before proceeding
-4. For deep unknowns, invoke the **researcher skill** (\`.claude/skills/compound/researcher/SKILL.md\`) to produce a survey document
-5. Build a discovery mindmap (Mermaid) showing stakeholders, capabilities, constraints
-6. Use \`AskUserQuestion\` to clarify scope, constraints, and preferences
+**Goal**: Map the problem domain before narrowing.
+1. Ask "why" before "how" -- understand the real need
+2. Search memory: \`npx ca search\` for past features, constraints, decisions
+3. Search knowledge: \`npx ca knowledge "relevant terms"\`
+4. Spawn subagents for research (\`.claude/agents/compound/repo-analyst.md\`, \`memory-analyst.md\`, or \`subagent_type: Explore\`)
+5. For deep domain knowledge, consider \`/get-a-phd\`
+6. Build a discovery mindmap (Mermaid \`mindmap\`) -- makes implicit assumptions visible
+7. Use \`AskUserQuestion\` to clarify scope and preferences
+
+**Iteration trigger**: If research reveals the problem is fundamentally different, restart Explore.
 
 ### Phase 2: Understand
-1. Probe each capability with Socratic questions: What triggers it? Edge cases? Constraints? Acceptance criteria?
-2. Use Mermaid diagrams as thinking tools (\`sequenceDiagram\` for workflows, \`stateDiagram-v2\` for lifecycles)
-3. Detect and flag ambiguities: vague adjectives, unclear pronouns, passive voice, compound requirements
-4. Build a domain glossary for terms with multiple interpretations
-5. Resolve ambiguities with \`AskUserQuestion\` before moving on
+**Goal**: Crystallize requirements through Socratic dialogue.
+1. For each capability, ask: triggers? edge cases? constraints? acceptance criteria?
+2. Use Mermaid diagrams (\`sequenceDiagram\`, \`stateDiagram-v2\`) to expose hidden structure
+3. Detect ambiguities: vague adjectives, unclear pronouns, passive voice, compound requirements. See \`references/spec-guide.md\` for full checklist
+4. Build a domain glossary for ambiguous terms
+5. Use \`AskUserQuestion\` to resolve each ambiguity
+
+**Iteration trigger**: If specifying reveals missing knowledge, loop back to Explore.
 
 ### Phase 3: Specify
-1. Write requirements using EARS notation:
+**Goal**: Produce formal, testable requirements.
+1. Write each requirement using **EARS notation**:
    - Ubiquitous: \`The system shall <action>.\`
    - Event-driven: \`When <trigger>, the system shall <action>.\`
    - State-driven: \`While <state>, the system shall <action>.\`
    - Unwanted behavior: \`If <condition>, then the system shall <action>.\`
-   - Combined ordering: Where > While > When > If/then > shall
-2. Verify each requirement is testable, quantified, and unambiguous
-3. Document trade-offs when requirements conflict (MCDA scoring or satisficing)
+   - Optional: \`Where <feature>, the system shall <action>.\`
+   - Combined ordering: \`Where > While > When > If/then > shall\`
+2. Verify each requirement: no vague adjectives, edge cases covered, quantities specified, testable
+3. Document trade-offs when requirements conflict (see \`references/spec-guide.md\`)
 4. Produce architecture diagrams (\`erDiagram\`, \`C4Context\`, \`flowchart\`)
 5. Create ADRs in \`docs/decisions/\` for significant decisions
 
+**Iteration trigger**: If contradictions or gaps emerge, loop back to Understand.
+
 ### Phase 4: Hand off
-1. Store consolidated spec in beads epic description (\`bd update <epic> --description="..."\`)
-2. Create the beads epic with \`bd create\` if not already created
-3. Flag open questions for the plan phase
-4. Capture lessons: \`npx ca learn\` for novel insights
-
-**Iteration**: If a later phase reveals gaps, loop back to the earlier phase.
-
-See \`references/spec-guide.md\` for EARS patterns, Mermaid templates, ambiguity checklist, and trade-off frameworks.
+1. Store spec in beads epic description (\`bd update <epic> --description="..."\`) -- single source of truth
+2. Create beads epic if needed (\`bd create\`)
+3. Flag open questions for plan phase
+4. Capture lessons: \`npx ca learn\`
 
 ## Memory Integration
-- \`npx ca search\` and \`npx ca knowledge "topic"\` before generating approaches
-- Look for past architectural decisions, pitfalls, and preferences
-- \`npx ca learn\` after corrections or novel discoveries
+- \`npx ca search\` before generating approaches
+- \`npx ca knowledge\` for indexed project docs
+- \`npx ca learn\` after corrections or discoveries
 
-## Docs Integration
-- Spawn docs-explorer to scan \`docs/\` for relevant architecture docs, research, and standards
-- Review existing ADRs in \`docs/decisions/\` -- prior decisions may constrain the spec
-- Auto-create ADR for significant decisions made during specification
+## Reference Material
+Read \`.claude/skills/compound/spec-dev/references/spec-guide.md\` on demand for EARS patterns, Mermaid templates, ambiguity checklists, and trade-off frameworks.
 
 ## Common Pitfalls
 - Jumping to solutions before exploring the problem
-- Skipping diagrams -- they reveal hidden assumptions, not just document decisions
-- Writing vague requirements ("handle errors gracefully") instead of EARS patterns
-- Not searching memory for similar past features
-- Not checking existing docs and ADRs for prior decisions
-- Over-specifying trivially small tasks
-- Ignoring iteration signals when specifying reveals gaps
-- Not creating a beads epic from conclusions (losing spec output)
-- Not invoking the researcher skill when the domain requires deep investigation
+- Skipping diagrams -- they reveal hidden assumptions
+- Vague requirements without EARS patterns
+- Not searching memory for past patterns and pitfalls
+- Over-specifying trivial tasks
+- Ignoring iteration signals when gaps emerge
+- Not creating the beads epic
+- Specifying implementation instead of requirements
 
 ## Quality Criteria
-- Multiple approaches were considered (at least 2-3)
-- Requirements use EARS notation (not freeform prose)
-- Ambiguities detected and resolved via Socratic dialogue
-- Mermaid diagrams used as thinking tools
-- Memory was searched for relevant context
-- Existing docs and ADRs were reviewed for prior decisions
-- Trade-offs documented with rationale
-- User engaged via \`AskUserQuestion\` at each decision point
-- Spec stored in beads epic description
-- ADRs created for significant architectural decisions
-- Open questions flagged for the plan phase
+- [ ] Requirements use EARS notation
+- [ ] Ambiguities detected and resolved via dialogue
+- [ ] Mermaid diagrams used as thinking tools
+- [ ] Memory searched (\`npx ca search\`)
+- [ ] Trade-offs documented with rationale
+- [ ] User engaged via \`AskUserQuestion\` at decisions
+- [ ] Spec stored in beads epic description
+- [ ] ADRs created for significant decisions
 `,
 
   plan: `---
@@ -119,7 +117,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 9. Ensure each task traces back to a spec requirement for traceability
 10. Map dependencies between tasks
 11. Create beads issues: \`bd create --title="..." --type=task\`
-11. Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) that depend on work tasks — these survive compaction and surface via \`bd ready\` after work completes
+12. Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) that depend on work tasks — these survive compaction and surface via \`bd ready\` after work completes
 
 ## Memory Integration
 - Run \`npx ca search\` and \`npx ca knowledge "relevant topic"\` for patterns related to the feature area
@@ -171,18 +169,18 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 2. Mark tasks in progress: \`bd update <id> --status=in_progress\`
 3. Read the epic description (\`bd show <epic>\`) for spec context -- EARS requirements guide what "done" looks like
 4. Run \`npx ca search\` per agent/subtask for targeted context. Display results.
-4. Assess parallelization: identify independent tasks that can be worked simultaneously
-5. Deploy an **AgentTeam** (TeamCreate + Task with \`team_name\`) with MULTIPLE test-writers and implementers:
+5. Assess parallelization: identify independent tasks that can be worked simultaneously
+6. Deploy an **AgentTeam** (TeamCreate + Task with \`team_name\`) with MULTIPLE test-writers and implementers:
    - Role skills: \`.claude/skills/compound/agents/{test-writer,implementer}/SKILL.md\`
    - Scale teammate count to independent tasks; pairs coordinate via SendMessage on shared interfaces
-6. Agents communicate via SendMessage when working on overlapping areas.
-7. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-8. If implementation diverges from spec requirements, stop and discuss with user via AskUserQuestion before proceeding.
-9. If blocked, use AskUserQuestion to get user direction.
-10. Shut down the team when done: send shutdown_request to all teammates.
-10. Commit incrementally as tests pass.
-11. Run full test suite for regressions.
-12. Close tasks: \`bd close <id>\`
+7. Agents communicate via SendMessage when working on overlapping areas.
+8. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
+9. If implementation diverges from spec requirements, stop and discuss with user via AskUserQuestion before proceeding.
+10. If blocked, use AskUserQuestion to get user direction.
+11. Shut down the team when done: send shutdown_request to all teammates.
+12. Commit incrementally as tests pass.
+13. Run full test suite for regressions.
+14. Close tasks: \`bd close <id>\`
 
 ## Memory Integration
 - Run \`npx ca search\` per delegated subtask with the subtask's specific description
@@ -208,6 +206,12 @@ for complex changes. For all changes, \`/implementation-reviewer\` is the minimu
 - **Scale the team adaptively**: deploy multiple test-writer + implementer pairs proportional to independent task count
 - **Subagent spawning within teammates**: each teammate should spawn opus subagents for independent subtasks (e.g., a test-writer spawning subagents to write tests for multiple modules in parallel)
 - **Coordinate on shared interfaces**: teammates working on overlapping APIs must communicate via SendMessage before implementing
+
+## Literature
+- Consult \`docs/compound/research/tdd/\` for TDD methodology, test-first development evidence, and best practices
+- Consult \`docs/compound/research/property-testing/\` for property-based testing theory and invariant design
+- Run \`npx ca knowledge "TDD test-first"\` for indexed knowledge on testing methodology
+- Run \`npx ca search "testing"\` for lessons from past TDD cycles
 
 ## Common Pitfalls
 - Lead writing code instead of delegating to agents
@@ -249,19 +253,19 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
    - **Medium** (100-500): add architecture, performance, edge-case (7 total)
    - **Large** (500+): all 11 reviewers including docs, consistency, error-handling, pattern-matcher
-4. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with \`team_name\`):
+5. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with \`team_name\`):
    - Role skills: \`.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer}/SKILL.md\`
    - Security specialist skills (on-demand, spawned by security-reviewer): \`.claude/skills/compound/agents/{security-injection,security-secrets,security-auth,security-data,security-deps}/SKILL.md\`
    - For large diffs (500+), deploy MULTIPLE instances; split files across instances, coordinate via SendMessage
-5. Reviewers communicate findings to each other via \`SendMessage\`
-6. Collect, consolidate, and deduplicate all findings
-7. Classify by severity: P0 (blocks merge), P1 (critical/blocking), P2 (important), P3 (minor)
-8. Use \`AskUserQuestion\` when severity is ambiguous or fix has multiple valid options
-9. Create beads issues for P1 findings: \`bd create --title="P1: ..."\`
-10. Verify spec alignment: flag unmet EARS requirements as P1, flag requirements met but missing from acceptance criteria as gaps
-11. Fix all P1 findings before proceeding
-12. Run \`/implementation-reviewer\` as mandatory gate
-13. Capture novel findings with \`npx ca learn\`; pattern-matcher auto-reinforces recurring issues
+6. Reviewers communicate findings to each other via \`SendMessage\`
+7. Collect, consolidate, and deduplicate all findings
+8. Classify by severity: P0 (blocks merge), P1 (critical/blocking), P2 (important), P3 (minor)
+9. Use \`AskUserQuestion\` when severity is ambiguous or fix has multiple valid options
+10. Create beads issues for P1 findings: \`bd create --title="P1: ..."\`
+11. Verify spec alignment: flag unmet EARS requirements as P1, flag requirements met but missing from acceptance criteria as gaps
+12. Fix all P1 findings before proceeding
+13. Run \`/implementation-reviewer\` as mandatory gate
+14. Capture novel findings with \`npx ca learn\`; pattern-matcher auto-reinforces recurring issues
 
 ## Memory Integration
 - Run \`npx ca search\` before review for known recurring issues
@@ -272,6 +276,11 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 ## Docs Integration
 - **docs-reviewer** checks code/docs alignment and ADR compliance
 - Flags undocumented public APIs and ADR violations
+
+## Literature
+- Consult \`docs/compound/research/code-review/\` for systematic review methodology, severity taxonomies, and evidence-based review practices
+- Run \`npx ca knowledge "code review methodology"\` for indexed knowledge on review techniques
+- Run \`npx ca search "review"\` for lessons from past review cycles
 
 ## Common Pitfalls
 - Ignoring reviewer feedback because "it works"
@@ -324,20 +333,25 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
    - For large diffs, deploy MULTIPLE context-analyzers and lesson-extractors
    - Pipeline: context-analyzers -> lesson-extractors -> pattern-matcher + solution-writer -> compounding
    - Agents coordinate via SendMessage throughout the pipeline
-3. Agents pass results through the pipeline via \`SendMessage\`. The lead coordinates: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
-4. Apply quality filters: novelty check (>0.98 cosine similarity = skip), specificity check
-5. Classify each item by type: lesson, solution, pattern, or preference
-6. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
-7. Store via \`npx ca learn\` with supersedes/related links where applicable.
+4. Agents pass results through the pipeline via \`SendMessage\`. The lead coordinates: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
+5. Apply quality filters: novelty check (>0.98 cosine similarity = skip), specificity check
+6. Classify each item by type: lesson, solution, pattern, or preference
+7. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
+8. Store via \`npx ca learn\` with supersedes/related links where applicable.
    At minimum, capture 1 lesson per significant decision made during this cycle
-8. Delegate to the \`compounding\` subagent to run synthesis: cluster accumulated lessons by similarity and write CCT patterns to \`.claude/lessons/cct-patterns.jsonl\`
-9. Update outdated docs and deprecate superseded ADRs (set status to \`deprecated\`)
-10. Use \`AskUserQuestion\` to confirm high-severity items with the user before storing; medium/low items are auto-stored
+9. Delegate to the \`compounding\` subagent to run synthesis: cluster accumulated lessons by similarity and write CCT patterns to \`.claude/lessons/cct-patterns.jsonl\`
+10. Update outdated docs and deprecate superseded ADRs (set status to \`deprecated\`)
+11. Use \`AskUserQuestion\` to confirm high-severity items with the user before storing; medium/low items are auto-stored
 
 ## Docs Integration
 - docs-reviewer checks if \`docs/\` content is outdated after the cycle
 - Check \`docs/decisions/\` for ADRs contradicted by the work done
 - Set ADR status to \`deprecated\` if a decision was reversed, referencing the new ADR
+
+## Literature
+- Consult \`docs/compound/research/learning-systems/\` for knowledge compounding theory, spaced repetition, and lesson extraction methodology
+- Run \`npx ca knowledge "knowledge compounding"\` for indexed knowledge on learning systems
+- Run \`npx ca search "compound"\` for lessons from past compounding cycles
 
 ## Common Pitfalls
 - Not spawning the analysis team (analyzing solo misses cross-cutting patterns)

@@ -23,7 +23,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 9. Ensure each task traces back to a spec requirement for traceability
 10. Map dependencies between tasks
 11. Create beads issues: `bd create --title="..." --type=task`
-11. Create review and compound blocking tasks (`bd create` + `bd dep add`) that depend on work tasks — these survive compaction and surface via `bd ready` after work completes
+12. Create review and compound blocking tasks (`bd create` + `bd dep add`) that depend on work tasks — these survive compaction and surface via `bd ready` after work completes
 
 ## Memory Integration
 - Run `npx ca search` and `npx ca knowledge "relevant topic"` for patterns related to the feature area

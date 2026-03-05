@@ -16,19 +16,19 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
    - **Medium** (100-500): add architecture, performance, edge-case (7 total)
    - **Large** (500+): all 11 reviewers including docs, consistency, error-handling, pattern-matcher
-4. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with `team_name`):
+5. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with `team_name`):
    - Role skills: `.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer}/SKILL.md`
    - Security specialist skills (on-demand, spawned by security-reviewer): `.claude/skills/compound/agents/{security-injection,security-secrets,security-auth,security-data,security-deps}/SKILL.md`
    - For large diffs (500+), deploy MULTIPLE instances; split files across instances, coordinate via SendMessage
-5. Reviewers communicate findings to each other via `SendMessage`
-6. Collect, consolidate, and deduplicate all findings
-7. Classify by severity: P0 (blocks merge), P1 (critical/blocking), P2 (important), P3 (minor)
-8. Use `AskUserQuestion` when severity is ambiguous or fix has multiple valid options
-9. Create beads issues for P1 findings: `bd create --title="P1: ..."`
-10. Verify spec alignment: flag unmet EARS requirements as P1, flag requirements met but missing from acceptance criteria as gaps
-11. Fix all P1 findings before proceeding
-12. Run `/implementation-reviewer` as mandatory gate
-13. Capture novel findings with `npx ca learn`; pattern-matcher auto-reinforces recurring issues
+6. Reviewers communicate findings to each other via `SendMessage`
+7. Collect, consolidate, and deduplicate all findings
+8. Classify by severity: P0 (blocks merge), P1 (critical/blocking), P2 (important), P3 (minor)
+9. Use `AskUserQuestion` when severity is ambiguous or fix has multiple valid options
+10. Create beads issues for P1 findings: `bd create --title="P1: ..."`
+11. Verify spec alignment: flag unmet EARS requirements as P1, flag requirements met but missing from acceptance criteria as gaps
+12. Fix all P1 findings before proceeding
+13. Run `/implementation-reviewer` as mandatory gate
+14. Capture novel findings with `npx ca learn`; pattern-matcher auto-reinforces recurring issues
 
 ## Memory Integration
 - Run `npx ca search` before review for known recurring issues
@@ -39,6 +39,11 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 ## Docs Integration
 - **docs-reviewer** checks code/docs alignment and ADR compliance
 - Flags undocumented public APIs and ADR violations
+
+## Literature
+- Consult `docs/compound/research/code-review/` for systematic review methodology, severity taxonomies, and evidence-based review practices
+- Run `npx ca knowledge "code review methodology"` for indexed knowledge on review techniques
+- Run `npx ca search "review"` for lessons from past review cycles
 
 ## Common Pitfalls
 - Ignoring reviewer feedback because "it works"

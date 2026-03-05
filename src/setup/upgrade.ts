@@ -116,7 +116,7 @@ export async function runUpgrade(repoRoot: string, dryRun = false): Promise<Upgr
 
   const parts: string[] = [];
   if (removedCommands.length > 0) {
-    parts.push(`Removed ${removedCommands.length} deprecated command(s)`);
+    parts.push(`Removed ${removedCommands.length} deprecated command(s): ${removedCommands.join(', ')}`);
   }
   if (strippedHeaders > 0) {
     parts.push(`Stripped headers from ${strippedHeaders} file(s)`);

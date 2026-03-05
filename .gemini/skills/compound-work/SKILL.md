@@ -13,18 +13,18 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 2. Mark tasks in progress: `bd update <id> --status=in_progress`
 3. Read the epic description (`bd show <epic>`) for spec context -- EARS requirements guide what "done" looks like
 4. Run `npx ca search` per agent/subtask for targeted context. Display results.
-4. Assess parallelization: identify independent tasks that can be worked simultaneously
-5. Deploy an **AgentTeam** (TeamCreate + Task with `team_name`) with MULTIPLE test-writers and implementers:
+5. Assess parallelization: identify independent tasks that can be worked simultaneously
+6. Deploy an **AgentTeam** (TeamCreate + Task with `team_name`) with MULTIPLE test-writers and implementers:
    - Role skills: `.claude/skills/compound/agents/{test-writer,implementer}/SKILL.md`
    - Scale teammate count to independent tasks; pairs coordinate via SendMessage on shared interfaces
-6. Agents communicate via SendMessage when working on overlapping areas.
-7. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-8. If implementation diverges from spec requirements, stop and discuss with user via AskUserQuestion before proceeding.
-9. If blocked, use AskUserQuestion to get user direction.
-10. Shut down the team when done: send shutdown_request to all teammates.
-10. Commit incrementally as tests pass.
-11. Run full test suite for regressions.
-12. Close tasks: `bd close <id>`
+7. Agents communicate via SendMessage when working on overlapping areas.
+8. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
+9. If implementation diverges from spec requirements, stop and discuss with user via AskUserQuestion before proceeding.
+10. If blocked, use AskUserQuestion to get user direction.
+11. Shut down the team when done: send shutdown_request to all teammates.
+12. Commit incrementally as tests pass.
+13. Run full test suite for regressions.
+14. Close tasks: `bd close <id>`
 
 ## Memory Integration
 - Run `npx ca search` per delegated subtask with the subtask's specific description
@@ -50,6 +50,12 @@ for complex changes. For all changes, `/implementation-reviewer` is the minimum 
 - **Scale the team adaptively**: deploy multiple test-writer + implementer pairs proportional to independent task count
 - **Subagent spawning within teammates**: each teammate should spawn opus subagents for independent subtasks (e.g., a test-writer spawning subagents to write tests for multiple modules in parallel)
 - **Coordinate on shared interfaces**: teammates working on overlapping APIs must communicate via SendMessage before implementing
+
+## Literature
+- Consult `docs/compound/research/tdd/` for TDD methodology, test-first development evidence, and best practices
+- Consult `docs/compound/research/property-testing/` for property-based testing theory and invariant design
+- Run `npx ca knowledge "TDD test-first"` for indexed knowledge on testing methodology
+- Run `npx ca search "testing"` for lessons from past TDD cycles
 
 ## Common Pitfalls
 - Lead writing code instead of delegating to agents

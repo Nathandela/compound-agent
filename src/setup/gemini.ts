@@ -88,7 +88,7 @@ function parseDescription(content: string, fallback: string): string {
 
 /** Strip YAML frontmatter (---...---) from content if present. */
 function stripFrontmatter(content: string): string {
-  return content.replace(/^---\n[\s\S]*?\n---\n*/, '');
+  return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n*/, '');
 }
 
 async function writeSettings(geminiDir: string): Promise<void> {
