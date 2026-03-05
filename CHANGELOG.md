@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.3] - 2026-03-05
+
+### Changed
+
+- **Cook-it session banner**: Replaced "Claude the Cooker" chef ASCII art with rscr's detailed front-view brain ASCII art ("Claw'd"). Brain features ANSI-colored augmentation zones: cyan neural interface (`##`), bright cyan signal crosslinks (`::`), green bio-circuits (`%`), magenta data highways (`######`), and yellow power nodes (`@@`).
+
 ## [1.6.2] - 2026-03-05
 
 ### Fixed

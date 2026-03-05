@@ -4,6 +4,14 @@
  * Written to .claude/skills/compound/<phase>/SKILL.md during setup.
  */
 
+// ANSI color codes for augmented brain banner
+const _bc = '\x1b[96m'; // bright cyan — signal crosslinks (::)
+const _cn = '\x1b[36m'; // cyan — neural interface (##)
+const _gr = '\x1b[32m'; // green — bio-circuits (%, %%%%)
+const _mg = '\x1b[35m'; // magenta — data highways (######, ###)
+const _yl = '\x1b[33m'; // yellow — power nodes (@@)
+const _rs = '\x1b[0m';  // reset
+
 export const PHASE_SKILLS: Record<string, string> = {
   'spec-dev': `---
 name: Spec Dev
@@ -512,17 +520,25 @@ Before starting EACH phase, you MUST use the Read tool to open its skill file:
 Do NOT proceed from memory. Read the skill, then follow it exactly.
 
 ## Session Start
-When a cooking session begins, IMMEDIATELY print the chef banner below (copy it verbatim):
+When a cooking session begins, IMMEDIATELY print the brain banner below (copy it verbatim):
 
-\`\`\`
-
-\u250c\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2510
- \u2502\u2592\u2592\u2592\u2592\u2592\u2502
- \u2590\u259b\u2588\u2588\u2588\u259c\u258c o
-\u259d\u259c\u2588\u2588\u2588\u2588\u2588\u259b\u2598|
-  \u2598\u2598 \u259d\u259d
-Claude the Cooker
-\`\`\`
+        ___    ___
+    .."\`)  "\`.."  "(\`\`.
+  .'; _..=. ${_bc}::${_rs} \`-'._ ;\`.
+ : ) ;"\`':._. ${_bc}::${_rs}_.      ( :.
+.:-"   _.  \`"${_cn}##${_rs}"\` "._ \`-:\\
+/."   -"\`  ._.${_bc}::${_rs}._.  .'"  ".:
+: :    ( -: \`" ${_bc}::${_rs} "\` :- )    : )
+( .":==._ ' \`'=._${_cn}##${_rs}_.=' ' _.==: .'
+(:  \`, \`"\`    \`"${_cn}##${_rs}"\`    \`"\` .'\`".)
+ \\\`'  \`"--.  "- )( -" ..--"\` \`-/
+ (" (_."\`  ="""-..."\`...-""= "._) ")
+  "..__..-"  )${_gr}%${_rs}\`..'\`${_gr}%${_rs}(  "-..__.."
+       (#"...'\\\\${_gr}%%%%${_rs}/\`..."#)
+        \`${_mg}######${_rs}\`--'${_mg}######${_rs}"
+          "${_mg}###${_rs}")${_yl}@@${_rs}(\`${_mg}###${_rs}"
+               \\${_yl}@@${_rs}/
+             Claw'd
 
 Then proceed with the protocol below.
 
