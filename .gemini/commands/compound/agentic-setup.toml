@@ -1,0 +1,6 @@
+description = "Set up codebase for agentic AI development (audit-first)"
+prompt = """
+@{.claude/commands/compound/agentic-setup.md}
+
+{{args}}
+"""

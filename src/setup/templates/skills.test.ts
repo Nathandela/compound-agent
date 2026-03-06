@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { PHASE_SKILLS, PHASE_SKILL_REFERENCES } from './skills.js';
 
-const EXPECTED_KEYS = ['spec-dev', 'plan', 'work', 'review', 'compound', 'researcher', 'cook-it', 'test-cleaner'];
+const EXPECTED_KEYS = ['spec-dev', 'plan', 'work', 'review', 'compound', 'researcher', 'cook-it', 'test-cleaner', 'agentic'];
 
 describe('PHASE_SKILLS', () => {
-  it('has exactly 8 entries', () => {
-    expect(Object.keys(PHASE_SKILLS)).toHaveLength(8);
+  it('has exactly 9 entries', () => {
+    expect(Object.keys(PHASE_SKILLS)).toHaveLength(9);
   });
 
   it('has all expected keys', () => {
@@ -27,10 +27,13 @@ describe('PHASE_SKILLS', () => {
     }
   });
 
-  it('every phase skill has a ## Methodology section (cook-it uses Phase Execution Protocol)', () => {
+  it('every phase skill has a ## Methodology section (cook-it uses Phase Execution Protocol, agentic uses Audit/Setup Methodology)', () => {
     for (const [key, content] of Object.entries(PHASE_SKILLS)) {
       if (key === 'cook-it') {
         expect(content, `${key} missing ## Phase Execution Protocol`).toContain('## Phase Execution Protocol');
+      } else if (key === 'agentic') {
+        expect(content, `${key} missing ## Audit Methodology`).toContain('## Audit Methodology');
+        expect(content, `${key} missing ## Setup Methodology`).toContain('## Setup Methodology');
       } else {
         expect(content, `${key} missing ## Methodology`).toContain('## Methodology');
       }
@@ -52,12 +55,13 @@ describe('PHASE_SKILLS', () => {
     }
   });
 
-  it('no template exceeds 6000 characters', () => {
+  it('no template exceeds 6000 characters (agentic allowed 12000 due to inline principles)', () => {
     for (const [key, content] of Object.entries(PHASE_SKILLS)) {
+      const max = key === 'agentic' ? 12000 : 6000;
       expect(
         content.length,
-        `${key} is ${content.length} chars (max 6000)`,
-      ).toBeLessThanOrEqual(6000);
+        `${key} is ${content.length} chars (max ${max})`,
+      ).toBeLessThanOrEqual(max);
     }
   });
 
@@ -168,6 +172,67 @@ describe('PHASE_SKILLS', () => {
 
   it('cook-it skill references verify-gates', () => {
     expect(PHASE_SKILLS['cook-it']).toContain('verify-gates');
+  });
+
+  // --- agentic codebase skill ---
+
+  it('agentic skill contains all 15 principles', () => {
+    const skill = PHASE_SKILLS.agentic;
+    // Pillar I: Codebase Memory
+    expect(skill).toContain('Repository is the only truth');
+    expect(skill).toContain('Trace decisions');
+    expect(skill).toContain('Never answer the same question twice');
+    expect(skill).toContain('Knowledge is infrastructure');
+    // Pillar II: Implementation Feedbacks
+    expect(skill).toContain('Test is specification');
+    expect(skill).toContain('Constraints are multipliers');
+    expect(skill).toContain('Write feedback for machines');
+    expect(skill).toContain('Fight entropy continuously');
+    // Pillar III: Mapping the Context
+    expect(skill).toContain('Map, not manual');
+    expect(skill).toContain('Explicit over implicit');
+    expect(skill).toContain('Modularity is non-negotiable');
+    expect(skill).toContain('Structure in layers');
+    // Cross-Cutting
+    expect(skill).toContain('Simplicity compounds');
+    expect(skill).toContain('Human designs the system');
+    expect(skill).toContain('Parallelize by decomposition');
+  });
+
+  it('agentic skill contains scoring rubric (0, 1, 2)', () => {
+    const skill = PHASE_SKILLS.agentic;
+    expect(skill).toMatch(/0.*absent/i);
+    expect(skill).toMatch(/1.*partial/i);
+    expect(skill).toMatch(/2.*present/i);
+  });
+
+  it('agentic skill contains pillar score aggregation', () => {
+    const skill = PHASE_SKILLS.agentic;
+    expect(skill).toContain('Pillar I');
+    expect(skill).toContain('Pillar II');
+    expect(skill).toContain('Pillar III');
+    expect(skill).toContain('Cross-Cutting');
+  });
+
+  it('agentic skill references AskUserQuestion for beads epic offer', () => {
+    const skill = PHASE_SKILLS.agentic;
+    expect(skill).toContain('AskUserQuestion');
+  });
+
+  it('agentic skill contains stack detection guidance', () => {
+    const skill = PHASE_SKILLS.agentic;
+    expect(skill).toMatch(/package\.json|pyproject\.toml|Cargo\.toml/);
+  });
+
+  it('agentic skill setup section references AGENTS.md generation', () => {
+    const skill = PHASE_SKILLS.agentic;
+    expect(skill).toContain('AGENTS.md');
+  });
+
+  it('agentic skill references both audit and setup modes', () => {
+    const skill = PHASE_SKILLS.agentic;
+    expect(skill).toMatch(/mode.*audit/i);
+    expect(skill).toMatch(/mode.*setup/i);
   });
 });
 

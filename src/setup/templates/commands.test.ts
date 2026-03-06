@@ -11,6 +11,8 @@ const PHASE_FILENAMES = [
   'research.md',
   'test-clean.md',
   'get-a-phd.md',
+  'agentic-audit.md',
+  'agentic-setup.md',
 ];
 
 const UTILITY_FILENAMES = [
@@ -30,8 +32,8 @@ const REMOVED_CLI_WRAPPERS = [
 ];
 
 describe('WORKFLOW_COMMANDS', () => {
-  it('has exactly 12 entries (9 phase + 3 utility)', () => {
-    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(12);
+  it('has exactly 14 entries (11 phase + 3 utility)', () => {
+    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(14);
   });
 
   it('has all expected filenames', () => {
@@ -99,7 +101,7 @@ describe('WORKFLOW_COMMANDS', () => {
     });
 
     it('every phase command references the skill file path', () => {
-      const SINGLE_PHASE_FILENAMES = PHASE_FILENAMES.filter((k) => k !== 'cook-it.md' && k !== 'research.md' && k !== 'test-clean.md' && k !== 'get-a-phd.md');
+      const SINGLE_PHASE_FILENAMES = PHASE_FILENAMES.filter((k) => k !== 'cook-it.md' && k !== 'research.md' && k !== 'test-clean.md' && k !== 'get-a-phd.md' && k !== 'agentic-audit.md' && k !== 'agentic-setup.md');
       for (const key of SINGLE_PHASE_FILENAMES) {
         const phase = key.replace('.md', '');
         expect(
@@ -123,6 +125,22 @@ describe('WORKFLOW_COMMANDS', () => {
 
     it('get-a-phd.md references researcher skill file', () => {
       expect(WORKFLOW_COMMANDS['get-a-phd.md']).toContain('.claude/skills/compound/researcher/SKILL.md');
+    });
+
+    it('agentic-audit.md references shared agentic skill file', () => {
+      expect(WORKFLOW_COMMANDS['agentic-audit.md']).toContain('.claude/skills/compound/agentic/SKILL.md');
+    });
+
+    it('agentic-setup.md references shared agentic skill file', () => {
+      expect(WORKFLOW_COMMANDS['agentic-setup.md']).toContain('.claude/skills/compound/agentic/SKILL.md');
+    });
+
+    it('agentic-audit.md indicates audit mode', () => {
+      expect(WORKFLOW_COMMANDS['agentic-audit.md']).toMatch(/audit/i);
+    });
+
+    it('agentic-setup.md indicates setup mode', () => {
+      expect(WORKFLOW_COMMANDS['agentic-setup.md']).toMatch(/setup/i);
     });
 
     it('phase commands do NOT have Key steps summaries (forces reading the skill)', () => {

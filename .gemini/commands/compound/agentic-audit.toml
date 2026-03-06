@@ -1,0 +1,6 @@
+description = "Audit codebase against the 15-principle agentic manifesto"
+prompt = """
+@{.claude/commands/compound/agentic-audit.md}
+
+{{args}}
+"""

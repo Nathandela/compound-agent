@@ -114,6 +114,34 @@ $ARGUMENTS
 Then: scan docs/compound/research/ for gaps, propose topics via AskUserQuestion, spawn parallel researcher subagents.
 `,
 
+  'agentic-audit.md': `---
+name: compound:agentic-audit
+description: Audit codebase against the 15-principle agentic manifesto
+argument-hint: "<scope or focus area>"
+---
+$ARGUMENTS
+
+# Agentic Audit
+
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/agentic/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file.
+
+Run in **audit** mode. Score all 15 principles, produce the report, offer beads epic.
+`,
+
+  'agentic-setup.md': `---
+name: compound:agentic-setup
+description: Set up codebase for agentic AI development (audit-first)
+argument-hint: "<scope or focus area>"
+---
+$ARGUMENTS
+
+# Agentic Setup
+
+**MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/agentic/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file.
+
+Run in **setup** mode. Audit first, then propose and create files to fill gaps.
+`,
+
   // =========================================================================
   // Utility commands (kept: learn-that, check-that, prime)
   // Removed in v1.3: search, list, show, wrong, stats (CLI wrappers)
