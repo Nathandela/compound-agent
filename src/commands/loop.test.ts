@@ -292,6 +292,18 @@ describe('generateLoopScript', () => {
     expect(() => generateLoopScript({ maxRetries: 1, model: 'org/model:latest' })).not.toThrow();
   });
 
+  // P0: macOS ships bash 3.2 which misparses case `)` inside $() as closing the subshell
+  it('passes /bin/bash -n syntax check (macOS bash 3.2 compat)', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    const tmpFile = join('/tmp', `loop-syntax-${Date.now()}.sh`);
+    writeFileSync(tmpFile, script);
+    try {
+      execSync(`/bin/bash -n "${tmpFile}"`, { encoding: 'utf-8' });
+    } finally {
+      try { execSync(`rm -f "${tmpFile}"`); } catch { /* cleanup best-effort */ }
+    }
+  });
+
   it('anchors EPIC_COMPLETE grep to line boundaries', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
     expect(script).toContain('grep -q "^EPIC_COMPLETE$"');
@@ -316,9 +328,9 @@ describe('generateLoopScript', () => {
     expect(script).toContain('--output-format stream-json');
   });
 
-  it('uses --include-partial-messages flag', () => {
+  it('uses --verbose flag (required by stream-json with -p)', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
-    expect(script).toContain('--include-partial-messages');
+    expect(script).toContain('--verbose');
   });
 
   it('creates trace JSONL file alongside macro log', () => {

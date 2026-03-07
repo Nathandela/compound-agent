@@ -115,7 +115,7 @@ get_next_epic() {
   if [ -n "$EPIC_IDS" ]; then
     # From explicit list, find first still-open epic not yet processed
     for epic_id in $EPIC_IDS; do
-      case " $PROCESSED " in *" $epic_id "*) continue ;; esac
+      case " $PROCESSED " in (*" $epic_id "*) continue ;; esac
       local status
       status=$(bd show "$epic_id" --json 2>/dev/null | parse_json '.status' 2>/dev/null || echo "")
       if [ "$status" = "open" ]; then
@@ -129,7 +129,7 @@ get_next_epic() {
     local epic_id
     if [ "$HAS_JQ" = true ]; then
       epic_id=$(bd list --type=epic --ready --json --limit=10 2>/dev/null | jq -r '.[].id' 2>/dev/null | while read -r id; do
-        case " $PROCESSED " in *" $id "*) continue ;; esac
+        case " $PROCESSED " in (*" $id "*) continue ;; esac
         echo "$id"
         break
       done)
@@ -289,7 +289,7 @@ while true; do
     claude --dangerously-skip-permissions \\
            --model "$MODEL" \\
            --output-format stream-json \\
-           --include-partial-messages \\
+           --verbose \\
            -p "$PROMPT" \\
            2>"$LOGFILE.stderr" | tee "$TRACEFILE" | extract_text > "$LOGFILE" || true
 
