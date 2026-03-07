@@ -10,7 +10,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { indexDocs } from '../memory/knowledge/index.js';
-import { unloadEmbedding } from '../memory/embeddings/index.js';
+import { withEmbedding } from '../memory/embeddings/index.js';
 import { closeKnowledgeDb } from '../memory/storage/sqlite-knowledge/index.js';
 import { out } from './shared.js';
 
@@ -26,10 +26,10 @@ export function registerKnowledgeIndexCommand(program: Command): void {
       out.info('Indexing docs/ directory...');
 
       try {
-        const result = await indexDocs(repoRoot, {
+        const result = await withEmbedding(async () => indexDocs(repoRoot, {
           force: options.force,
           embed: options.embed,
-        });
+        }));
 
         const skippedPart = result.filesSkipped > 0
           ? ` (${result.filesSkipped} skipped)`
@@ -51,7 +51,6 @@ export function registerKnowledgeIndexCommand(program: Command): void {
         }
         out.info(`Duration: ${duration}s`);
       } finally {
-        unloadEmbedding();
         closeKnowledgeDb();
       }
     });

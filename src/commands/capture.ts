@@ -210,9 +210,9 @@ async function checkSimilarityPostCapture(repoRoot: string, item: MemoryItem): P
 
     const { syncIfNeeded } = await import('../memory/storage/sqlite/sync.js');
     const { findSimilarLessons } = await import('../memory/search/vector.js');
-    const { embedText, unloadEmbedding } = await import('../memory/embeddings/nomic.js');
+    const { embedText, withEmbedding } = await import('../memory/embeddings/nomic.js');
     const chalk = await import('chalk');
-    try {
+    await withEmbedding(async () => {
       // Early probe to catch runtime failures before full similarity check
       await embedText('test');
       await syncIfNeeded(repoRoot);
@@ -226,9 +226,7 @@ async function checkSimilarityPostCapture(repoRoot: string, item: MemoryItem): P
         console.log('');
         console.log(`Run ${chalk.default.bold("'npx ca clean-lessons'")} to review and resolve.`);
       }
-    } finally {
-      unloadEmbedding();
-    }
+    });
   } catch (err) {
     // Similarity check is best-effort
     if (process.env['CA_DEBUG']) {

@@ -21,7 +21,7 @@ vi.mock('./model.js', () => ({
 
 import { getLlama } from 'node-llama-cpp';
 import { resolveModel } from './model.js';
-import { getEmbedding, unloadEmbedding } from './nomic.js';
+import { getEmbedding, unloadEmbedding, unloadEmbeddingResources, withEmbedding } from './nomic.js';
 
 function createMockContext() {
   return { dispose: vi.fn().mockResolvedValue(undefined), getEmbeddingFor: vi.fn() };
@@ -125,15 +125,15 @@ describe('embedding singleton coordination', () => {
   });
 
   describe('resource cleanup', () => {
-    it('unloadEmbedding() disposes context and allows re-initialization', async () => {
+    it('unloadEmbeddingResources() disposes context and allows re-initialization', async () => {
       const mocks1 = setupMocks();
 
       // First init
       const ctx1 = await getEmbedding();
       expect(ctx1).toBe(mocks1.context);
 
-      // Unload
-      unloadEmbedding();
+      // Unload (await the async version)
+      await unloadEmbeddingResources();
       expect(mocks1.context.dispose).toHaveBeenCalledTimes(1);
 
       // Setup fresh mocks for second init
@@ -147,11 +147,11 @@ describe('embedding singleton coordination', () => {
       expect(getLlama).toHaveBeenCalledTimes(2);
     });
 
-    it('unloadEmbedding() calls dispose on model and llama refs', async () => {
+    it('unloadEmbeddingResources() calls dispose on model and llama refs', async () => {
       const { context, model, llama } = setupMocks();
 
       await getEmbedding();
-      unloadEmbedding();
+      await unloadEmbeddingResources();
 
       expect(context.dispose).toHaveBeenCalledTimes(1);
       expect(model.dispose).toHaveBeenCalledTimes(1);
@@ -161,6 +161,45 @@ describe('embedding singleton coordination', () => {
     it('unloadEmbedding() is safe to call when not initialized', () => {
       // Should not throw
       expect(() => unloadEmbedding()).not.toThrow();
+    });
+  });
+
+  describe('withEmbedding()', () => {
+    it('returns the callback result', async () => {
+      setupMocks();
+      const result = await withEmbedding(async () => 42);
+      expect(result).toBe(42);
+    });
+
+    it('calls unloadEmbeddingResources after callback completes', async () => {
+      const { context, model, llama } = setupMocks();
+      await withEmbedding(async () => {
+        await getEmbedding();
+      });
+      // All native resources should be disposed
+      expect(context.dispose).toHaveBeenCalledTimes(1);
+      expect(model.dispose).toHaveBeenCalledTimes(1);
+      expect(llama.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('cleans up even when callback throws', async () => {
+      const { context, model, llama } = setupMocks();
+      await expect(
+        withEmbedding(async () => {
+          await getEmbedding();
+          throw new Error('boom');
+        }),
+      ).rejects.toThrow('boom');
+      // Resources still disposed
+      expect(context.dispose).toHaveBeenCalledTimes(1);
+      expect(model.dispose).toHaveBeenCalledTimes(1);
+      expect(llama.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('is safe to call when model was never loaded', async () => {
+      // No setupMocks — withEmbedding should not throw during cleanup
+      const result = await withEmbedding(async () => 'ok');
+      expect(result).toBe('ok');
     });
   });
 

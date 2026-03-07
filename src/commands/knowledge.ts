@@ -8,7 +8,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { formatError } from '../cli-error-format.js';
-import { unloadEmbeddingResources } from '../memory/embeddings/index.js';
+import { withEmbedding } from '../memory/embeddings/index.js';
 import { searchKnowledge } from '../memory/knowledge/index.js';
 import { openKnowledgeDb, closeKnowledgeDb, getChunkCount } from '../memory/storage/sqlite-knowledge/index.js';
 import { getGlobalOpts, out } from './shared.js';
@@ -22,19 +22,19 @@ export function registerKnowledgeCommand(program: Command): void {
     .option('-n, --limit <number>', 'Maximum results', '6')
     .action(async function (this: Command, query: string, opts: { limit: string }) {
       const globalOpts = getGlobalOpts(this);
+      let limit: number;
       try {
-        let limit: number;
-        try {
-          limit = parseLimit(opts.limit, 'limit');
-        } catch (err) {
-          const message = err instanceof Error ? err.message : 'Invalid limit';
-          console.error(formatError('knowledge', 'INVALID_LIMIT', message, 'Use -n with a positive integer'));
-          process.exitCode = 1;
-          return;
-        }
+        limit = parseLimit(opts.limit, 'limit');
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Invalid limit';
+        console.error(formatError('knowledge', 'INVALID_LIMIT', message, 'Use -n with a positive integer'));
+        process.exitCode = 1;
+        return;
+      }
 
-        const repoRoot = getRepoRoot();
+      const repoRoot = getRepoRoot();
 
+      try {
         // Check if DB has chunks; auto-index if empty
         openKnowledgeDb(repoRoot);
         if (getChunkCount(repoRoot) === 0) {
@@ -52,7 +52,7 @@ export function registerKnowledgeCommand(program: Command): void {
           }
         }
 
-        const results = await searchKnowledge(repoRoot, query, { limit });
+        const results = await withEmbedding(async () => searchKnowledge(repoRoot, query, { limit }));
 
         if (results.length === 0) {
           out.info('No matching results found.');
@@ -75,7 +75,6 @@ export function registerKnowledgeCommand(program: Command): void {
         console.error(formatError('knowledge', 'SEARCH_FAILED', message, 'Check that docs are indexed'));
         process.exitCode = 1;
       } finally {
-        await unloadEmbeddingResources();
         closeKnowledgeDb();
       }
     });

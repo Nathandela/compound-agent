@@ -9,6 +9,7 @@ import noSqlInterpolation from './rules/no-sql-interpolation.js'
 import noMockModuleUnderTest from './rules/no-mock-module-under-test.js'
 import noUtilsHelpersDirs from './rules/no-utils-helpers-dirs.js'
 import enforceBarrelExports from './rules/enforce-barrel-exports.js'
+import requireEmbeddingCleanup from './rules/require-embedding-cleanup.js'
 
 const plugin = {
   meta: {
@@ -20,6 +21,7 @@ const plugin = {
     'no-mock-module-under-test': noMockModuleUnderTest,
     'no-utils-helpers-dirs': noUtilsHelpersDirs,
     'enforce-barrel-exports': enforceBarrelExports,
+    'require-embedding-cleanup': requireEmbeddingCleanup,
   },
 }
 

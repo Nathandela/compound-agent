@@ -48,6 +48,15 @@ export default tseslint.config(
     },
   },
 
+  // Embedding cleanup enforcement — command/setup layer only
+  {
+    files: ['src/commands/**/*.ts', 'src/setup/**/*.ts'],
+    ignores: ['**/*.test.ts'],
+    rules: {
+      'compound-agent/require-embedding-cleanup': 'error',
+    },
+  },
+
   // Test file rules — relax type-strictness rules that are noisy in tests
   {
     files: ['**/*.test.ts', '**/*.test.js'],

@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { isModelAvailable, loadSessionLessons, retrieveForPlan } from '../index.js';
-import { unloadEmbeddingResources } from '../memory/embeddings/index.js';
+import { withEmbedding } from '../memory/embeddings/index.js';
 import { incrementRetrievalCount, readLessons, readMemoryItems, searchKeyword, searchKeywordScored, syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem } from '../memory/index.js';
 import { CANDIDATE_MULTIPLIER, MIN_HYBRID_SCORE, mergeHybridResults, rankLessons, searchVector } from '../memory/search/index.js';
@@ -169,18 +169,17 @@ function outputSessionLessonsHuman(lessons: MemoryItem[], quiet: boolean): void 
 // ============================================================================
 
 async function searchAction(cmd: Command, query: string, options: { limit: string }): Promise<void> {
-  try {
-    const repoRoot = getRepoRoot();
-    const limit = parseLimitOrNull(options.limit, 'limit', 'search');
-    if (limit === null) {
-      process.exitCode = 1;
-      return;
-    }
-    const { verbose, quiet } = getGlobalOpts(cmd);
+  const repoRoot = getRepoRoot();
+  const limit = parseLimitOrNull(options.limit, 'limit', 'search');
+  if (limit === null) {
+    process.exitCode = 1;
+    return;
+  }
+  const { verbose, quiet } = getGlobalOpts(cmd);
 
-    await syncIfNeeded(repoRoot);
+  await syncIfNeeded(repoRoot);
 
-    let results: MemoryItem[];
+  const results = await withEmbedding(async () => {
     if (isModelAvailable()) {
       try {
         // Hybrid search: blend vector + keyword
@@ -191,41 +190,39 @@ async function searchAction(cmd: Command, query: string, options: { limit: strin
         ]);
         const merged = mergeHybridResults(vectorResults, keywordResults, { minScore: MIN_HYBRID_SCORE });
         const ranked = rankLessons(merged);
-        results = ranked.slice(0, limit).map((r) => r.lesson);
+        return ranked.slice(0, limit).map((r) => r.lesson);
       } catch {
         // Model failed at runtime — fall back to keyword-only search
-        results = await searchKeyword(repoRoot, query, limit);
+        return await searchKeyword(repoRoot, query, limit);
       }
-    } else {
-      // FTS-only fallback when embedding model unavailable
-      results = await searchKeyword(repoRoot, query, limit);
     }
-    if (results.length > 0) {
-      incrementRetrievalCount(repoRoot, results.map((lesson) => lesson.id));
-    }
+    // FTS-only fallback when embedding model unavailable
+    return await searchKeyword(repoRoot, query, limit);
+  });
 
-    if (results.length === 0) {
-      console.log('No lessons match your search. Try a different query or use "list" to see all lessons.');
-      return;
-    }
+  if (results.length > 0) {
+    incrementRetrievalCount(repoRoot, results.map((lesson) => lesson.id));
+  }
 
-    if (!quiet) {
-      out.info(`Found ${results.length} lesson(s):\n`);
+  if (results.length === 0) {
+    console.log('No lessons match your search. Try a different query or use "list" to see all lessons.');
+    return;
+  }
+
+  if (!quiet) {
+    out.info(`Found ${results.length} lesson(s):\n`);
+  }
+  for (const lesson of results) {
+    console.log(`[${chalk.cyan(lesson.id)}] ${lesson.insight}`);
+    console.log(`  Trigger: ${lesson.trigger}`);
+    if (verbose && lesson.context) {
+      console.log(`  Context: ${lesson.context.tool} - ${lesson.context.intent}`);
+      console.log(`  Created: ${lesson.created}`);
     }
-    for (const lesson of results) {
-      console.log(`[${chalk.cyan(lesson.id)}] ${lesson.insight}`);
-      console.log(`  Trigger: ${lesson.trigger}`);
-      if (verbose && lesson.context) {
-        console.log(`  Context: ${lesson.context.tool} - ${lesson.context.intent}`);
-        console.log(`  Created: ${lesson.created}`);
-      }
-      if (lesson.tags.length > 0) {
-        console.log(`  Tags: ${lesson.tags.join(', ')}`);
-      }
-      console.log();
+    if (lesson.tags.length > 0) {
+      console.log(`  Tags: ${lesson.tags.join(', ')}`);
     }
-  } finally {
-    await unloadEmbeddingResources();
+    console.log();
   }
 }
 
@@ -325,69 +322,65 @@ async function loadSessionAction(cmd: Command, options: { json?: boolean }): Pro
 }
 
 async function checkPlanAction(cmd: Command, options: { plan?: string; json?: boolean; limit: string }): Promise<void> {
+  const repoRoot = getRepoRoot();
+  const limit = parseLimitOrNull(options.limit, 'limit', 'check-plan');
+  if (limit === null) {
+    process.exitCode = 1;
+    return;
+  }
+  const { quiet } = getGlobalOpts(cmd);
+
+  const planText = options.plan ?? (await readPlanFromStdin());
+
+  if (!planText) {
+    console.error(formatError('check-plan', 'NO_PLAN', 'No plan provided', 'Use --plan <text> or pipe text to stdin'));
+    process.exitCode = 1;
+    return;
+  }
+
+  await syncIfNeeded(repoRoot);
+
+  if (!isModelAvailable()) {
+    if (options.json) {
+      console.log(JSON.stringify({
+        lessons: [],
+        count: 0,
+        error: 'Embedding model not found',
+        action: 'Run: npx ca download-model',
+      }));
+    } else {
+      console.error(formatError('check-plan', 'MODEL_UNAVAILABLE', 'Embedding model not found', 'Run: npx ca download-model'));
+    }
+    process.exitCode = 1;
+    return;
+  }
+
   try {
-    const repoRoot = getRepoRoot();
-    const limit = parseLimitOrNull(options.limit, 'limit', 'check-plan');
-    if (limit === null) {
-      process.exitCode = 1;
-      return;
-    }
-    const { quiet } = getGlobalOpts(cmd);
+    const result = await withEmbedding(async () => retrieveForPlan(repoRoot, planText, limit));
 
-    const planText = options.plan ?? (await readPlanFromStdin());
-
-    if (!planText) {
-      console.error(formatError('check-plan', 'NO_PLAN', 'No plan provided', 'Use --plan <text> or pipe text to stdin'));
-      process.exitCode = 1;
+    if (options.json) {
+      outputCheckPlanJson(result.lessons);
       return;
     }
 
-    await syncIfNeeded(repoRoot);
-
-    if (!isModelAvailable()) {
-      if (options.json) {
-        console.log(JSON.stringify({
-          lessons: [],
-          count: 0,
-          error: 'Embedding model not found',
-          action: 'Run: npx ca download-model',
-        }));
-      } else {
-        console.error(formatError('check-plan', 'MODEL_UNAVAILABLE', 'Embedding model not found', 'Run: npx ca download-model'));
-      }
-      process.exitCode = 1;
+    if (result.lessons.length === 0) {
+      console.log('No relevant lessons found for this plan.');
       return;
     }
 
-    try {
-      const result = await retrieveForPlan(repoRoot, planText, limit);
-
-      if (options.json) {
-        outputCheckPlanJson(result.lessons);
-        return;
-      }
-
-      if (result.lessons.length === 0) {
-        console.log('No relevant lessons found for this plan.');
-        return;
-      }
-
-      outputCheckPlanHuman(result.lessons, quiet);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error';
-      if (options.json) {
-        console.log(JSON.stringify({
-          lessons: [],
-          count: 0,
-          error: message,
-        }));
-      } else {
-        console.error(formatError('check-plan', 'PLAN_CHECK_FAILED', message, 'Check model installation and try again'));
-      }
-      process.exitCode = 1;
+    outputCheckPlanHuman(result.lessons, quiet);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    if (options.json) {
+      console.log(JSON.stringify({
+        lessons: [],
+        count: 0,
+        error: message,
+      }));
+    } else {
+      console.error(formatError('check-plan', 'PLAN_CHECK_FAILED', message, 'Check model installation and try again'));
     }
-  } finally {
-    await unloadEmbeddingResources();
+    process.exitCode = 1;
   }
 }
 

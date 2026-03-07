@@ -27,6 +27,7 @@ vi.mock('../cli-utils.js', async (importOriginal) => {
 vi.mock('../memory/embeddings/nomic.js', () => ({
   embedText: vi.fn(async () => new Array(768).fill(0)),
   unloadEmbedding: vi.fn(),
+  withEmbedding: vi.fn(async (fn: () => Promise<unknown>) => fn()),
   isModelAvailable: vi.fn(() => true),
   getEmbedding: vi.fn(),
   embedTexts: vi.fn(),

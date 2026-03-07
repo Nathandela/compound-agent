@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { formatError } from '../cli-error-format.js';
-import { embedText, isModelAvailable, unloadEmbedding } from '../memory/embeddings/index.js';
+import { embedText, isModelAvailable, withEmbedding } from '../memory/embeddings/index.js';
 import { findSimilarLessons } from '../memory/search/index.js';
 import { readMemoryItems, syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem } from '../memory/index.js';
@@ -107,11 +107,10 @@ async function cleanLessonsAction(): Promise<void> {
       ),
     );
     process.exitCode = 1;
-    unloadEmbedding();
     return;
   }
 
-  try {
+  await withEmbedding(async () => {
     await syncIfNeeded(repoRoot);
     const { items } = await readMemoryItems(repoRoot);
     const activeItems = items.filter((item) => !item.invalidatedAt && item.type === 'lesson');
@@ -126,9 +125,7 @@ async function cleanLessonsAction(): Promise<void> {
     }
 
     printReport(pairs);
-  } finally {
-    unloadEmbedding();
-  }
+  });
 }
 
 export function registerCleanLessonsCommand(program: Command): void {

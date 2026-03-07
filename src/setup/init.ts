@@ -97,8 +97,9 @@ async function handleModelAndEmbed(
 
     // Pre-warm lesson embeddings so the first search is fast
     try {
+      const { withEmbedding } = await import('../memory/embeddings/index.js');
       const { preWarmLessonEmbeddings } = await import('../memory/search/prewarm.js');
-      await preWarmLessonEmbeddings(repoRoot);
+      await withEmbedding(async () => preWarmLessonEmbeddings(repoRoot));
     } catch {
       // Non-fatal: don't break init if lesson pre-warming fails
     }

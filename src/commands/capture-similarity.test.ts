@@ -24,6 +24,7 @@ vi.mock('../memory/storage/sqlite/sync.js', () => ({
 vi.mock('../memory/embeddings/nomic.js', () => ({
   embedText: vi.fn(async () => new Array(768).fill(0)),
   unloadEmbedding: vi.fn(),
+  withEmbedding: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
 // Must import after vi.mock declarations

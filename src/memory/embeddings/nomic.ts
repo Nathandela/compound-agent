@@ -170,6 +170,23 @@ export function unloadEmbedding(): void {
 }
 
 /**
+ * Run a callback with embedding resources, guaranteeing cleanup.
+ *
+ * The model loads lazily on the first embedText/embedTexts call inside
+ * the callback (via the existing singleton). After the callback completes
+ * or throws, all native resources (~150MB) are disposed.
+ *
+ * Use this instead of manually pairing embedText with unloadEmbeddingResources.
+ */
+export async function withEmbedding<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } finally {
+    await unloadEmbeddingResources();
+  }
+}
+
+/**
  * Embed a single text string into a vector.
  *
  * **Lazy loading:** First call loads the embedding model (~150MB, ~1-3s).

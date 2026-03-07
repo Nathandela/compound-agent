@@ -10,7 +10,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { isModelAvailable, unloadEmbedding } from '../embeddings/index.js';
+import { isModelAvailable, withEmbedding } from '../embeddings/index.js';
 import { closeKnowledgeDb } from '../storage/sqlite-knowledge/index.js';
 import { acquireEmbedLock, isEmbedLocked } from './embed-lock.js';
 import { writeEmbedStatus } from './embed-status.js';
@@ -86,7 +86,7 @@ export async function runBackgroundEmbed(repoRoot: string): Promise<void> {
   writeEmbedStatus(repoRoot, { state: 'running', startedAt: new Date().toISOString() });
 
   try {
-    const result = await embedChunks(repoRoot, { onlyMissing: true });
+    const result = await withEmbedding(async () => embedChunks(repoRoot, { onlyMissing: true }));
     writeEmbedStatus(repoRoot, {
       state: 'completed',
       chunksEmbedded: result.chunksEmbedded,
@@ -101,7 +101,6 @@ export async function runBackgroundEmbed(repoRoot: string): Promise<void> {
       durationMs: Date.now() - start,
     });
   } finally {
-    unloadEmbedding();
     closeKnowledgeDb();
     lock.release();
   }

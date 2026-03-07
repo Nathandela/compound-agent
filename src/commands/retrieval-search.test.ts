@@ -41,6 +41,7 @@ vi.mock('../memory/embeddings/model.js', () => ({
 
 vi.mock('../memory/embeddings/index.js', () => ({
   unloadEmbeddingResources: vi.fn(async () => {}),
+  withEmbedding: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('../memory/storage/index.js', () => ({
@@ -150,8 +151,8 @@ describe('search command: preflight and fallback', () => {
     await register();
     await program.parseAsync(['node', 'ca', 'search', 'Polars']);
 
-    const { unloadEmbeddingResources } = await import('../memory/embeddings/index.js');
-    expect(unloadEmbeddingResources).toHaveBeenCalledTimes(1);
+    const { withEmbedding } = await import('../memory/embeddings/index.js');
+    expect(withEmbedding).toHaveBeenCalled();
   });
 
   it('falls back to keyword-only when model is unavailable', async () => {
@@ -230,8 +231,8 @@ describe('search command: preflight and fallback', () => {
     await register();
     await program.parseAsync(['node', 'ca', 'check-plan', '--plan', 'testing workflow']);
 
-    const { unloadEmbeddingResources } = await import('../memory/embeddings/index.js');
-    expect(unloadEmbeddingResources).toHaveBeenCalledTimes(1);
+    const { withEmbedding } = await import('../memory/embeddings/index.js');
+    expect(withEmbedding).toHaveBeenCalled();
   });
 
   it('releases embedding resources after check-plan failure', async () => {
@@ -242,8 +243,8 @@ describe('search command: preflight and fallback', () => {
     await register();
     await program.parseAsync(['node', 'ca', 'check-plan', '--plan', 'testing workflow']);
 
-    const { unloadEmbeddingResources } = await import('../memory/embeddings/index.js');
-    expect(unloadEmbeddingResources).toHaveBeenCalledTimes(1);
+    const { withEmbedding } = await import('../memory/embeddings/index.js');
+    expect(withEmbedding).toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
     process.exitCode = undefined;
   });

@@ -55,6 +55,7 @@ vi.mock('../memory/knowledge/search.js', () => ({
 
 vi.mock('../memory/embeddings/index.js', () => ({
   unloadEmbeddingResources: vi.fn(async () => {}),
+  withEmbedding: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('../memory/storage/sqlite-knowledge/connection.js', () => ({
@@ -179,7 +180,7 @@ describe('knowledge command', () => {
 
     await program.parseAsync(['node', 'ca', 'knowledge', 'test']);
 
-    const { unloadEmbeddingResources } = await import('../memory/embeddings/index.js');
-    expect(unloadEmbeddingResources).toHaveBeenCalledTimes(1);
+    const { withEmbedding } = await import('../memory/embeddings/index.js');
+    expect(withEmbedding).toHaveBeenCalled();
   });
 });

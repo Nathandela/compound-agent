@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { clusterBySimilarity, synthesizePattern, writeCctPatterns } from '../compound/index.js';
-import { embedText, isModelUsable } from '../memory/embeddings/index.js';
+import { embedText, isModelUsable, withEmbedding } from '../memory/embeddings/index.js';
 import {
   closeDb,
   contentHash,
@@ -49,20 +49,24 @@ export function registerCompoundCommands(program: Command): void {
       openDb(repoRoot);
 
       // Compute embeddings for all items (with cache)
-      const embeddings: Float32Array[] = [];
+      let embeddings: Float32Array[];
       try {
-        for (const item of items) {
-          const text = `${item.trigger} ${item.insight}`;
-          const hash = contentHash(item.trigger, item.insight);
+        embeddings = await withEmbedding(async () => {
+          const vecs: Float32Array[] = [];
+          for (const item of items) {
+            const text = `${item.trigger} ${item.insight}`;
+            const hash = contentHash(item.trigger, item.insight);
 
-          let vec = getCachedEmbedding(repoRoot, item.id, hash);
-          if (!vec) {
-            vec = await embedText(text);
-            setCachedEmbedding(repoRoot, item.id, vec, hash);
+            let vec = getCachedEmbedding(repoRoot, item.id, hash);
+            if (!vec) {
+              vec = await embedText(text);
+              setCachedEmbedding(repoRoot, item.id, vec, hash);
+            }
+
+            vecs.push(vec);
           }
-
-          embeddings.push(vec);
-        }
+          return vecs;
+        });
       } catch (err) {
         console.error(`Error computing embeddings: ${err instanceof Error ? err.message : String(err)}`);
         console.error('Run: npx ca download-model');
