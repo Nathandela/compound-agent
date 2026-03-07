@@ -72,7 +72,7 @@ npx ca doctor
   settings.json                # Claude Code hooks
   plugin.json                  # Plugin manifest
   agents/compound/             # Subagent definitions
-  commands/compound/           # Slash commands (spec-dev, plan, work, review, compound, cook-it)
+  commands/compound/           # Slash commands (spec-dev, plan, work, review, compound, cook-it, agentic-audit, agentic-setup)
   skills/compound/             # Phase skills + agent role skills
   lessons/
     index.jsonl                # Memory items (git-tracked source of truth)
@@ -436,6 +436,22 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **What it does**: Analyzes beads epics for knowledge gaps, checks existing docs coverage, proposes research topics for user confirmation, spawns parallel researcher subagents, and stores output at \`docs/compound/research/<topic>/<slug>.md\`.
 
+### \`/compound:agentic-audit\`
+
+**Purpose**: Audit a codebase against the 15-principle Agentic Codebase Manifesto.
+
+**When invoked**: When evaluating a codebase's readiness for AI agent collaboration.
+
+**What it does**: Detects the project stack, scores all 15 principles (0-2) with specific evidence across 3 pillars (Codebase Memory, Implementation Feedbacks, Mapping the Context) plus cross-cutting concerns. Produces a scored report (out of 30) with prioritized actions and offers to create a beads epic for improvements.
+
+### \`/compound:agentic-setup\`
+
+**Purpose**: Set up a codebase for agentic AI development (runs audit first).
+
+**When invoked**: When you want to improve a codebase's agentic readiness by filling gaps.
+
+**What it does**: Runs the full audit first, then proposes concrete remediation actions for each gap found. Creates real content (AGENTS.md, docs/, ADRs, lint configs) generated from actual codebase analysis. Asks for user approval before each file creation.
+
 ---
 
 ## Skill invocation
@@ -452,6 +468,8 @@ Skills are invoked as Claude Code slash commands:
 /compound:research         # Spawn research subagent
 /compound:test-clean       # Clean test artifacts
 /compound:get-a-phd <focus>       # Deep research for agent knowledge
+/compound:agentic-audit    # Audit codebase against agentic manifesto
+/compound:agentic-setup    # Audit then set up agentic infrastructure
 /compound:learn            # Capture a lesson from context
 /compound:prime            # Prime session with workflow context
 \`\`\`

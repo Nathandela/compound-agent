@@ -13,7 +13,7 @@ This skill operates in two modes:
 - **Mode: audit** -- Score the codebase against all 15 principles, produce a report with evidence and prioritized actions
 - **Mode: setup** -- Run audit first, then incrementally fill gaps with real content generated from codebase analysis
 
-Parse \`$ARGUMENTS\` to determine mode. If it contains "audit", run audit. If it contains "setup", run audit then setup. If unclear, ask via \`AskUserQuestion\`.
+Mode is set by the calling command (\`/compound:agentic-audit\` or \`/compound:agentic-setup\`). The command wrapper tells you which mode to run -- do not parse \`$ARGUMENTS\` for mode detection.
 
 ## Stack Detection
 
@@ -30,6 +30,8 @@ Each principle is scored:
 - **0 (Absent)**: No evidence of this principle in the codebase
 - **1 (Partial)**: Some evidence but incomplete or inconsistent
 - **2 (Present)**: Clear, consistent implementation
+
+Adapt criteria to the detected stack. For example: "strict mode" means TypeScript strict, Python mypy --strict, or Rust default safety. "Linter" means ESLint, pylint/ruff, clippy, golangci-lint, etc. Score based on the ecosystem's equivalent tooling.
 
 ### The 15 Principles
 
@@ -165,8 +167,9 @@ Present as markdown tables per pillar:
 
 Pillar I: Codebase Memory -- X/8
 | # | Principle | Score | Evidence |
+|---|-----------|-------|----------|
 | P1 | Repository is the only truth | 0/1/2 | finding |
-...repeat for all pillars...
+...repeat for all pillars with separator rows...
 
 **Overall Score: X/30**
 
@@ -196,10 +199,22 @@ Run the full audit first. Setup only addresses gaps found by the audit.
 **P9 gaps**: Generate AGENTS.md by analyzing actual codebase (build commands, structure, conventions)
 **P10 gaps**: Suggest type annotation and strict mode settings
 **P11 gaps**: Identify files >500 LOC, suggest refactoring targets
+**P12 gaps**: Document layer structure and suggest import lint rules (e.g., eslint-plugin-import boundaries, Rust mod visibility)
+**P13 gaps**: Flag over-abstraction (deep inheritance, excessive wrappers), suggest simplification targets
+**P14 gaps**: Suggest CI pipeline improvements, test harness setup, or pre-commit hooks for detected stack
+**P15 gaps**: Identify tightly coupled modules, suggest interface extraction for parallel workability
+**P8 gaps**: Suggest automated formatting (prettier/black/rustfmt), dependency update tooling (renovate/dependabot), and quality monitoring
 
 3. Before each action, use \`AskUserQuestion\`: "Create [file]? Preview: [content]"
 4. Only create/modify files the user approves
 5. Never overwrite existing files without explicit approval
+
+### Setup Completion Gate
+After all approved actions are applied, verify:
+- List all files created/modified during setup
+- Run quality gates if available (\`pnpm test\`, \`pnpm lint\`, or stack equivalent)
+- Confirm no existing files were overwritten without approval
+- Present summary: principles addressed, files created, remaining gaps
 
 ## Memory Integration
 

@@ -35,4 +35,10 @@ describe('DOC_TEMPLATES', () => {
     expect(readme).toContain('SKILLS.md');
     expect(readme).toContain('INTEGRATION.md');
   });
+
+  it('SKILLS.md lists all public slash commands including agentic', () => {
+    const skills = DOC_TEMPLATES['SKILLS.md'];
+    expect(skills).toContain('/compound:agentic-audit');
+    expect(skills).toContain('/compound:agentic-setup');
+  });
 });

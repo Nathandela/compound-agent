@@ -234,6 +234,35 @@ describe('PHASE_SKILLS', () => {
     expect(skill).toMatch(/mode.*audit/i);
     expect(skill).toMatch(/mode.*setup/i);
   });
+
+  it('agentic skill report format has markdown table separator row', () => {
+    const skill = PHASE_SKILLS.agentic;
+    expect(skill).toContain('|---|');
+  });
+
+  it('agentic skill has setup remediation for all 15 principles (P1-P15)', () => {
+    const skill = PHASE_SKILLS.agentic;
+    // Verify all principles have remediation guidance in setup section
+    for (const p of ['P1', 'P2', 'P3', 'P5', 'P6', 'P7', 'P8', 'P9', 'P10', 'P11', 'P12', 'P13', 'P14', 'P15']) {
+      expect(skill, `missing setup remediation for ${p}`).toContain(`**${p}`);
+    }
+  });
+
+  it('agentic skill has setup completion gate', () => {
+    const skill = PHASE_SKILLS.agentic;
+    expect(skill).toContain('Setup Completion Gate');
+  });
+
+  it('agentic skill has stack-adaptive scoring guidance', () => {
+    const skill = PHASE_SKILLS.agentic;
+    expect(skill).toMatch(/adapt.*criteria.*stack/i);
+  });
+
+  it('agentic skill mode is set by calling command, not parsed from $ARGUMENTS', () => {
+    const skill = PHASE_SKILLS.agentic;
+    expect(skill).toContain('Mode is set by the calling command');
+    expect(skill).not.toMatch(/Parse.*\$ARGUMENTS.*to determine mode/);
+  });
 });
 
 describe('PHASE_SKILL_REFERENCES', () => {
