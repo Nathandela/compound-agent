@@ -94,23 +94,23 @@ async function cleanLessonsAction(): Promise<void> {
     return;
   }
 
-  // Early probe to catch runtime failures
-  try {
-    await embedText('test');
-  } catch (e) {
-    console.error(
-      formatError(
-        'clean-lessons',
-        'MODEL_UNUSABLE',
-        `Embedding model failed to initialize: ${e instanceof Error ? e.message : String(e)}`,
-        'Check model compatibility',
-      ),
-    );
-    process.exitCode = 1;
-    return;
-  }
-
   await withEmbedding(async () => {
+    // Early probe to catch runtime failures
+    try {
+      await embedText('test');
+    } catch (e) {
+      console.error(
+        formatError(
+          'clean-lessons',
+          'MODEL_UNUSABLE',
+          `Embedding model failed to initialize: ${e instanceof Error ? e.message : String(e)}`,
+          'Check model compatibility',
+        ),
+      );
+      process.exitCode = 1;
+      return;
+    }
+
     await syncIfNeeded(repoRoot);
     const { items } = await readMemoryItems(repoRoot);
     const activeItems = items.filter((item) => !item.invalidatedAt && item.type === 'lesson');
