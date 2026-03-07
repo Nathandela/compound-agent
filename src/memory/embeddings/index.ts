@@ -6,7 +6,7 @@
  */
 
 // Embedding functions
-export { embedText, embedTexts, getEmbedding, isModelAvailable, unloadEmbedding } from './nomic.js';
+export { embedText, embedTexts, getEmbedding, isModelAvailable, unloadEmbedding, unloadEmbeddingResources } from './nomic.js';
 
 // Model resolution
 export { clearUsabilityCache, isModelUsable, MODEL_FILENAME, MODEL_URI, resolveModel } from './model.js';

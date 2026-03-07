@@ -10,9 +10,6 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 
 import { createQuickLesson } from '../test-utils.js';
-import type { MemoryItem } from '../memory/types.js';
-import type { ScoredLesson } from '../memory/search/vector.js';
-
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
@@ -40,6 +37,10 @@ vi.mock('../memory/embeddings/model.js', () => ({
   clearUsabilityCache: vi.fn(),
   MODEL_URI: 'test',
   MODEL_FILENAME: 'test.gguf',
+}));
+
+vi.mock('../memory/embeddings/index.js', () => ({
+  unloadEmbeddingResources: vi.fn(async () => {}),
 }));
 
 vi.mock('../memory/storage/index.js', () => ({
@@ -135,6 +136,24 @@ describe('search command: preflight and fallback', () => {
     expect(searchVector).toHaveBeenCalled();
   });
 
+  it('releases embedding resources after search completes', async () => {
+    const { isModelAvailable } = await import('../index.js');
+    vi.mocked(isModelAvailable).mockReturnValue(true);
+
+    const lesson = createQuickLesson('L001', 'use Polars for data');
+    const { searchVector } = await import('../memory/search/index.js');
+    vi.mocked(searchVector).mockResolvedValue([{ lesson, score: 0.9 }]);
+
+    const { searchKeywordScored } = await import('../memory/storage/index.js');
+    vi.mocked(searchKeywordScored).mockResolvedValue([]);
+
+    await register();
+    await program.parseAsync(['node', 'ca', 'search', 'Polars']);
+
+    const { unloadEmbeddingResources } = await import('../memory/embeddings/index.js');
+    expect(unloadEmbeddingResources).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to keyword-only when model is unavailable', async () => {
     const { isModelAvailable } = await import('../index.js');
     vi.mocked(isModelAvailable).mockReturnValue(false);
@@ -196,5 +215,36 @@ describe('search command: preflight and fallback', () => {
 
     const output = logs.join('\n');
     expect(output).toContain('always test your code');
+  });
+
+  it('releases embedding resources after check-plan completes', async () => {
+    const { isModelAvailable, retrieveForPlan } = await import('../index.js');
+    vi.mocked(isModelAvailable).mockReturnValue(true);
+
+    const lesson = createQuickLesson('L001', 'test your code');
+    vi.mocked(retrieveForPlan).mockResolvedValue({
+      lessons: [{ lesson, score: 0.9, finalScore: 0.9 }],
+      message: 'ok',
+    });
+
+    await register();
+    await program.parseAsync(['node', 'ca', 'check-plan', '--plan', 'testing workflow']);
+
+    const { unloadEmbeddingResources } = await import('../memory/embeddings/index.js');
+    expect(unloadEmbeddingResources).toHaveBeenCalledTimes(1);
+  });
+
+  it('releases embedding resources after check-plan failure', async () => {
+    const { isModelAvailable, retrieveForPlan } = await import('../index.js');
+    vi.mocked(isModelAvailable).mockReturnValue(true);
+    vi.mocked(retrieveForPlan).mockRejectedValue(new Error('model crashed'));
+
+    await register();
+    await program.parseAsync(['node', 'ca', 'check-plan', '--plan', 'testing workflow']);
+
+    const { unloadEmbeddingResources } = await import('../memory/embeddings/index.js');
+    expect(unloadEmbeddingResources).toHaveBeenCalledTimes(1);
+    expect(process.exitCode).toBe(1);
+    process.exitCode = undefined;
   });
 });

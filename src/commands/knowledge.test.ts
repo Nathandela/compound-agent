@@ -53,6 +53,10 @@ vi.mock('../memory/knowledge/search.js', () => ({
   searchKnowledge: vi.fn(async () => []),
 }));
 
+vi.mock('../memory/embeddings/index.js', () => ({
+  unloadEmbeddingResources: vi.fn(async () => {}),
+}));
+
 vi.mock('../memory/storage/sqlite-knowledge/connection.js', () => ({
   openKnowledgeDb: vi.fn(() => ({
     prepare: vi.fn(() => ({ get: vi.fn(() => ({ cnt: 5 })) })),
@@ -165,5 +169,17 @@ describe('knowledge command', () => {
       'test',
       expect.objectContaining({ limit: 3 })
     );
+  });
+
+  it('releases embedding resources after command completion', async () => {
+    const { searchKnowledge } = await import('../memory/knowledge/search.js');
+    vi.mocked(searchKnowledge).mockResolvedValue([
+      makeChunkResult('C1', 'docs/a.md', 'Some text', 0.82, 10, 25),
+    ]);
+
+    await program.parseAsync(['node', 'ca', 'knowledge', 'test']);
+
+    const { unloadEmbeddingResources } = await import('../memory/embeddings/index.js');
+    expect(unloadEmbeddingResources).toHaveBeenCalledTimes(1);
   });
 });

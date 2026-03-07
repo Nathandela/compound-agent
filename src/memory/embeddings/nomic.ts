@@ -83,6 +83,48 @@ export async function getEmbedding(): Promise<LlamaEmbeddingContext> {
 }
 
 /**
+ * Await disposal of all loaded embedding resources.
+ *
+ * This is intended for CLI shutdown paths that must wait for the native addon
+ * to release worker threads before allowing the process to exit.
+ */
+export async function unloadEmbeddingResources(): Promise<void> {
+  const pending = pendingInit;
+  if (pending) {
+    try {
+      await pending;
+    } catch {
+      // Ignore initialization failures; dispose any partially created refs below.
+    }
+  }
+
+  const context = embeddingContext;
+  const model = modelInstance;
+  const llama = llamaInstance;
+
+  embeddingContext = null;
+  modelInstance = null;
+  llamaInstance = null;
+  pendingInit = null;
+
+  const disposals: Promise<unknown>[] = [];
+
+  if (context) {
+    disposals.push(context.dispose());
+  }
+  if (model) {
+    disposals.push(model.dispose());
+  }
+  if (llama) {
+    disposals.push(llama.dispose());
+  }
+
+  if (disposals.length > 0) {
+    await Promise.allSettled(disposals);
+  }
+}
+
+/**
  * Unload the embedding context to free memory (~150MB).
  *
  * **Resource lifecycle:**
@@ -124,19 +166,7 @@ export async function getEmbedding(): Promise<LlamaEmbeddingContext> {
  * @see {@link closeDb} for database cleanup (often used together)
  */
 export function unloadEmbedding(): void {
-  if (embeddingContext) {
-    embeddingContext.dispose().catch(() => {});
-    embeddingContext = null;
-  }
-  if (modelInstance) {
-    modelInstance.dispose().catch(() => {});
-    modelInstance = null;
-  }
-  if (llamaInstance) {
-    llamaInstance.dispose().catch(() => {});
-    llamaInstance = null;
-  }
-  pendingInit = null;
+  void unloadEmbeddingResources();
 }
 
 /**
