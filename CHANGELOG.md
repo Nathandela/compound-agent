@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.5] - 2026-03-07
+
+### Fixed
+
+- **Loop script bash 3.2 syntax error**: macOS ships bash 3.2 which misparses `case` pattern `)` inside `$(...)` as closing the subshell. Added `(` prefix to case patterns for POSIX compliance. Added `/bin/bash -n` regression test.
+- **Loop script `--verbose` flag**: `--output-format=stream-json` with `-p` requires `--verbose`, not `--include-partial-messages`.
+
 ## [1.6.4] - 2026-03-07
 
 ### Fixed
@@ -896,7 +903,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/compound-agent/compare/v1.6.4...HEAD
+[Unreleased]: https://github.com/Nathandela/compound-agent/compare/v1.6.5...HEAD
+[1.6.5]: https://github.com/Nathandela/compound-agent/compare/v1.6.4...v1.6.5
 [1.6.4]: https://github.com/Nathandela/compound-agent/compare/v1.6.3...v1.6.4
 [1.6.3]: https://github.com/Nathandela/compound-agent/compare/v1.6.2...v1.6.3
 [1.6.2]: https://github.com/Nathandela/compound-agent/compare/v1.6.1...v1.6.2
