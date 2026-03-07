@@ -470,7 +470,8 @@ Skills are invoked as Claude Code slash commands:
 /compound:get-a-phd <focus>       # Deep research for agent knowledge
 /compound:agentic-audit    # Audit codebase against agentic manifesto
 /compound:agentic-setup    # Audit then set up agentic infrastructure
-/compound:learn            # Capture a lesson from context
+/compound:learn-that       # Conversation-aware lesson capture with confirmation
+/compound:check-that       # Search lessons and apply to current work
 /compound:prime            # Prime session with workflow context
 \`\`\`
 

@@ -41,4 +41,11 @@ describe('DOC_TEMPLATES', () => {
     expect(skills).toContain('/compound:agentic-audit');
     expect(skills).toContain('/compound:agentic-setup');
   });
+
+  it('SKILLS.md uses learn-that and check-that (not removed /compound:learn)', () => {
+    const skills = DOC_TEMPLATES['SKILLS.md'];
+    expect(skills).toContain('/compound:learn-that');
+    expect(skills).toContain('/compound:check-that');
+    expect(skills).not.toMatch(/\/compound:learn\b\s/);
+  });
 });

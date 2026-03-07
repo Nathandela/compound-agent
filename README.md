@@ -122,6 +122,16 @@ Or run all phases sequentially:
 /compound:cook-it "Add auth to API"
 ```
 
+Additional commands:
+
+```
+/compound:learn-that       -->  Capture a lesson from conversation context
+/compound:check-that       -->  Search lessons and apply to current work
+/compound:get-a-phd        -->  Deep research to build agent knowledge
+/compound:agentic-audit    -->  Score codebase against agentic manifesto
+/compound:agentic-setup    -->  Audit then set up agentic infrastructure
+```
+
 Each phase searches memory for relevant past knowledge and injects it into agent context. The compound phase captures new knowledge, closing the loop.
 
 ## CLI Reference

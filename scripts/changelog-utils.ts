@@ -22,5 +22,5 @@ export function escapeForTemplateLiteral(content: string): string {
   return content
     .replace(/\\/g, '\\\\')
     .replace(/`/g, '\\`')
-    .replace(/\$/g, '\\$');
+    .replace(/\$\{/g, '\\${');
 }

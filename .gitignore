@@ -32,6 +32,10 @@ coverage/
 *.log
 npm-debug.log*
 
+# Beads runtime artifacts
+.beads/dolt-monitor.pid
+.beads/dolt-server.lock
+
 # Environment
 .env
 .env.*

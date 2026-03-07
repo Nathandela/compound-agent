@@ -142,9 +142,13 @@ describe('extract-changelog', () => {
     });
 
     it('escapes all special chars together', () => {
-      const input = 'run `cmd` with $VAR and \\n';
+      const input = 'run `cmd` with ${VAR} and \\n';
       const escaped = escapeForTemplateLiteral(input);
-      expect(escaped).toBe('run \\`cmd\\` with \\$VAR and \\\\n');
+      expect(escaped).toBe('run \\`cmd\\` with \\${VAR} and \\\\n');
+    });
+
+    it('leaves bare dollar signs unescaped (only ${} needs escaping)', () => {
+      expect(escapeForTemplateLiteral('cost is $5')).toBe('cost is $5');
     });
 
     it('returns unchanged string when no special chars', () => {

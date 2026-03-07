@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.4] - 2026-03-07
+
+### Fixed
+
+- **Embedding memory leak**: Every `npx ca search` spawned a process that loaded the ~150MB native embedding model. Without explicit cleanup, native threads kept processes alive as zombies. During heavy usage (Claude Code subagents), 32+ processes accumulated = 4.5GB leaked.
+  - `withEmbedding(fn)` scoped wrapper guarantees cleanup via try/finally. All 9 command-layer consumers migrated from manual try/finally to this single API.
+  - ESLint rule `require-embedding-cleanup` catches any file importing `embedText`/`getEmbedding` without a cleanup function. Scoped to `src/commands/` and `src/setup/`.
+  - `cli-app.ts` backstop: top-level finally in `runProgram()` catches anything the above two miss.
+- **`embedText` probe inside `withEmbedding` scope**: `clean-lessons` command was calling `embedText` outside of `withEmbedding`, leaking the model on every invocation.
+- **Agentic skill report format**: Markdown table was missing `|---|` separator row, rendering as plain text in some renderers.
+- **Agentic skill missing setup remediation**: 5 of 15 principles (P8, P12-P15) had no setup actions. Added concrete remediation guidance for each.
+- **Agentic skill missing completion gate**: Other skills have phase gates; the agentic skill was missing one. Added Setup Completion Gate with verification steps.
+- **Agentic skill stack-biased scoring**: Rubric was TypeScript-heavy. Added language-neutral scoring guidance (mypy, clippy, ruff equivalents).
+- **Agentic skill `$ARGUMENTS` dead code**: Mode is set by the calling command (`/compound:agentic-audit` or `/compound:agentic-setup`), not parsed from `$ARGUMENTS`.
+- **Docs template missing agentic commands**: `SKILLS.md` template now lists `agentic-audit` and `agentic-setup` in the command inventory.
+
 ## [1.6.3] - 2026-03-05
 
 ### Changed
@@ -880,7 +896,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Vitest test suite
   - tsup build configuration
 
-[Unreleased]: https://github.com/Nathandela/compound-agent/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/Nathandela/compound-agent/compare/v1.6.4...HEAD
+[1.6.4]: https://github.com/Nathandela/compound-agent/compare/v1.6.3...v1.6.4
+[1.6.3]: https://github.com/Nathandela/compound-agent/compare/v1.6.2...v1.6.3
+[1.6.2]: https://github.com/Nathandela/compound-agent/compare/v1.6.1...v1.6.2
+[1.6.1]: https://github.com/Nathandela/compound-agent/compare/v1.6.0...v1.6.1
+[1.6.0]: https://github.com/Nathandela/compound-agent/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/Nathandela/compound-agent/compare/v1.4.4...v1.5.0
 [1.4.4]: https://github.com/Nathandela/compound-agent/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/Nathandela/compound-agent/compare/v1.4.2...v1.4.3

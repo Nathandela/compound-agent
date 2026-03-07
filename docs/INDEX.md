@@ -19,6 +19,7 @@ docs/
 ├── invariants/                 # Module invariants (data/safety/liveness)
 ├── research/                   # External research and references
 ├── specs/                      # Feature specifications
+├── compound/                   # User-facing docs (deployed to consumer repos)
 ├── standards/                  # Coding standards and best practices
 └── verification/               # Review workflow and quality criteria
 ```
@@ -27,6 +28,7 @@ docs/
 
 | Directory | Purpose | Index |
 |-----------|---------|-------|
+| `compound/` | User-facing docs deployed to consumer repos via `ca setup` | [compound/README.md](compound/README.md) |
 | `adr/` | Records of key architectural decisions and their rationale | [adr/index.md](adr/index.md) |
 | `archive/` | Historical specs, plans, and summaries from past versions | [archive/index.md](archive/index.md) |
 | `invariants/` | Formal invariants (data, safety, liveness) for each module | [invariants/index.md](invariants/index.md) |
