@@ -143,4 +143,84 @@ describe('plan retrieval', () => {
       expect(stats.find((s) => s.id !== result.lessons[0]!.lesson.id)?.count).toBe(0);
     });
   });
+
+  describe('embedding fallback to keyword-only search', () => {
+    it('falls back to keyword-only results when searchVector throws', async () => {
+      const lesson = createQuickLesson('L001', 'Use JWT for authentication', { trigger: 'login auth' });
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      const searchModule = await import('../search/index.js');
+      vi.spyOn(searchModule, 'searchVector').mockRejectedValue(
+        new Error('Embedding model not available')
+      );
+
+      // Should NOT throw - should fall back to keyword search
+      const result = await retrieveForPlan(tempDir, 'authentication JWT login');
+      expect(result).toBeDefined();
+      expect(result.lessons).toBeDefined();
+      expect(result.message).toContain('Lessons Check');
+    });
+
+    it('returns keyword results when embedding is unavailable', async () => {
+      const lesson = createQuickLesson('L001', 'Always validate user input', { trigger: 'validation security' });
+      await appendLesson(tempDir, lesson);
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      const searchModule = await import('../search/index.js');
+      vi.spyOn(searchModule, 'searchVector').mockRejectedValue(
+        new Error('Embedding model not available')
+      );
+
+      const result = await retrieveForPlan(tempDir, 'validate input');
+      expect(result.lessons.length).toBeGreaterThan(0);
+      expect(result.lessons[0]!.lesson.insight).toBe('Always validate user input');
+    });
+
+    it('ranks keyword-only fallback results with boost factors', async () => {
+      const highLesson = createFullLesson('L001', 'Critical security validation rule', 'high', {
+        trigger: 'security validation',
+      });
+      const lowLesson = createFullLesson('L002', 'Minor security validation tip', 'low', {
+        trigger: 'security validation',
+      });
+      await appendLesson(tempDir, highLesson);
+      await appendLesson(tempDir, lowLesson);
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      const searchModule = await import('../search/index.js');
+      vi.spyOn(searchModule, 'searchVector').mockRejectedValue(
+        new Error('Embedding model not available')
+      );
+
+      const result = await retrieveForPlan(tempDir, 'security validation');
+      expect(result.lessons.length).toBe(2);
+      // High severity should rank first due to boost
+      expect(result.lessons[0]!.lesson.insight).toContain('Critical');
+    });
+
+    it('logs a warning when falling back to keyword-only search', async () => {
+      await appendLesson(tempDir, createQuickLesson('L001', 'test insight', { trigger: 'test trigger' }));
+      await rebuildIndex(tempDir);
+      closeDb();
+
+      const searchModule = await import('../search/index.js');
+      vi.spyOn(searchModule, 'searchVector').mockRejectedValue(
+        new Error('Embedding model not available')
+      );
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+      await retrieveForPlan(tempDir, 'test trigger');
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[compound-agent]')
+      );
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('keyword-only')
+      );
+    });
+  });
 });

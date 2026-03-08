@@ -5,7 +5,7 @@
  * Uses vector search to find semantically similar lessons.
  */
 
-import { CANDIDATE_MULTIPLIER, MIN_HYBRID_SCORE, mergeHybridResults, rankLessons, searchVector, type RankedLesson, type ScoredLesson } from '../search/index.js';
+import { CANDIDATE_MULTIPLIER, DEFAULT_TEXT_WEIGHT, MIN_HYBRID_SCORE, mergeHybridResults, rankLessons, searchVector, type RankedLesson, type ScoredLesson } from '../search/index.js';
 import { incrementRetrievalCount, searchKeywordScored } from '../storage/index.js';
 
 /** Default number of lessons to retrieve */
@@ -23,7 +23,7 @@ export interface PlanRetrievalResult {
  * Uses hybrid search (vector similarity + FTS5 keyword matching)
  * then applies ranking boosts for severity, recency, and confirmation.
  *
- * Hard-fails if embeddings are unavailable (propagates error from embedText).
+ * Falls back to keyword-only search when the embedding model is unavailable.
  *
  * @param repoRoot - Repository root directory
  * @param planText - The plan text to search against
@@ -35,13 +35,34 @@ export async function retrieveForPlan(
   planText: string,
   limit: number = DEFAULT_LIMIT
 ): Promise<PlanRetrievalResult> {
-  // Hybrid search: blend vector similarity with keyword matching
   const candidateLimit = limit * CANDIDATE_MULTIPLIER;
-  const [vectorResults, keywordResults] = await Promise.all([
-    searchVector(repoRoot, planText, { limit: candidateLimit }),
-    searchKeywordScored(repoRoot, planText, candidateLimit),
-  ]);
-  const merged = mergeHybridResults(vectorResults, keywordResults, { minScore: MIN_HYBRID_SCORE });
+
+  // Attempt hybrid search: vector similarity + keyword matching.
+  // If vector search fails (model unavailable/broken), fall back to keyword-only.
+  let vectorResults: ScoredLesson[] = [];
+  let vectorFailed = false;
+  const keywordResultsPromise = searchKeywordScored(repoRoot, planText, candidateLimit);
+
+  try {
+    vectorResults = await searchVector(repoRoot, planText, { limit: candidateLimit });
+  } catch {
+    vectorFailed = true;
+    console.error('[compound-agent] Vector search unavailable, falling back to keyword-only search');
+  }
+
+  const keywordResults = await keywordResultsPromise;
+
+  let merged: ScoredLesson[];
+  if (vectorFailed) {
+    // Keyword-only: use text scores directly (no vector blending, no minScore filter
+    // since keyword-only scores are lower than hybrid blended scores)
+    merged = mergeHybridResults([], keywordResults, {
+      vectorWeight: 0,
+      textWeight: DEFAULT_TEXT_WEIGHT,
+    });
+  } else {
+    merged = mergeHybridResults(vectorResults, keywordResults, { minScore: MIN_HYBRID_SCORE });
+  }
 
   // Apply ranking boosts (severity, recency, confirmation)
   const ranked = rankLessons(merged);
