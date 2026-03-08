@@ -320,6 +320,42 @@ describe('generateLoopScript', () => {
   });
 
   // ========================================================================
+  // P0: Trace fallback for marker detection (0-byte log resilience)
+  // ========================================================================
+
+  it('defines a detect_marker function for resilient marker detection', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toMatch(/detect_marker\s*\(\)/);
+  });
+
+  it('detect_marker checks macro log with anchored patterns', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('grep -q "^EPIC_COMPLETE$" "$logfile"');
+  });
+
+  it('detect_marker falls back to trace when log has no markers', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('grep -q "EPIC_COMPLETE" "$tracefile"');
+  });
+
+  it('trace fallback uses unanchored grep for all marker types', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('grep -q "EPIC_COMPLETE" "$tracefile"');
+    expect(script).toContain('grep -q "EPIC_FAILED" "$tracefile"');
+    expect(script).toContain('grep -q "HUMAN_REQUIRED:" "$tracefile"');
+  });
+
+  it('warns when macro log is empty but trace has content', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toMatch(/extract_text.*fail/i);
+  });
+
+  it('main loop calls detect_marker with both log sources', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('detect_marker "$LOGFILE" "$TRACEFILE"');
+  });
+
+  // ========================================================================
   // Stream-JSON micro logging (two-scope observability)
   // ========================================================================
 
@@ -347,15 +383,17 @@ describe('generateLoopScript', () => {
 
   it('extracts text content from stream-json for macro log', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
-    // Should extract text from content_block_delta or result events
-    // for the macro log that marker detection reads
-    expect(script).toMatch(/extract_text|content_block_delta|"type"/);
+    // Should extract assistant text blocks from Claude Code stream-json format
+    expect(script).toContain('select(.type == "assistant")');
+    expect(script).toContain('.message.content[]?');
   });
 
-  it('marker detection reads from macro log, not trace JSONL', () => {
+  it('marker detection checks macro log first, with trace fallback', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
-    // grep for markers should be on LOGFILE (macro), not TRACEFILE
-    expect(script).toMatch(/grep.*EPIC_COMPLETE.*\$LOGFILE/s);
+    // Primary: anchored grep on logfile
+    expect(script).toContain('grep -q "^EPIC_COMPLETE$" "$logfile"');
+    // Fallback: unanchored grep on tracefile
+    expect(script).toContain('grep -q "EPIC_COMPLETE" "$tracefile"');
   });
 
   it('DRY_RUN mode works with stream-json script shape', () => {
@@ -393,13 +431,13 @@ describe('generateLoopScript', () => {
     expect(script).toMatch(/TRACEFILE.*\$TS/);
   });
 
-  it('python3 extract_text correctly extracts text_delta from stream-json event', () => {
+  it('python3 extract_text correctly extracts text from assistant event', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
     // Extract the python3 snippet from extract_text function
     const pyMatch = script.match(/extract_text\(\) \{[\s\S]*?python3 -c "\n([\s\S]*?)"\s*2>/);
     expect(pyMatch).toBeTruthy();
     const pyCode = pyMatch![1];
-    const input = '{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hello world"}}';
+    const input = '{"type":"assistant","message":{"content":[{"type":"text","text":"Hello world"}]}}';
     const result = execSync(
       `echo '${input}' | python3 -c "${pyCode}"`,
       { encoding: 'utf-8', shell: '/bin/bash' },
@@ -407,12 +445,12 @@ describe('generateLoopScript', () => {
     expect(result).toBe('Hello world');
   });
 
-  it('python3 extract_text skips non-text-delta events', () => {
+  it('python3 extract_text skips non-assistant events', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
     const pyMatch = script.match(/extract_text\(\) \{[\s\S]*?python3 -c "\n([\s\S]*?)"\s*2>/);
     expect(pyMatch).toBeTruthy();
     const pyCode = pyMatch![1];
-    const input = '{"type":"content_block_start","content_block":{"type":"tool_use","name":"Bash"}}';
+    const input = '{"type":"tool_use","tool":{"name":"Bash","input":"echo hi"}}';
     const result = execSync(
       `echo '${input}' | python3 -c "${pyCode}"`,
       { encoding: 'utf-8', shell: '/bin/bash' },

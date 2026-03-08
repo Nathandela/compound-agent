@@ -218,12 +218,14 @@ PROMPT_BODY
 function buildStreamExtractor(): string {
   return `
 # extract_text() - Extract assistant text from stream-json events
-# Reads JSONL from stdin, outputs plain text lines for marker detection
+# Claude Code stream-json format: {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
 extract_text() {
   if [ "$HAS_JQ" = true ]; then
     jq -j --unbuffered '
-      select(.type == "content_block_delta" and .delta.type == "text_delta") |
-      .delta.text // empty
+      select(.type == "assistant") |
+      .message.content[]? |
+      select(.type == "text") |
+      .text // empty
     ' 2>/dev/null || { echo "WARN: extract_text parser failed" >&2; }
   else
     python3 -c "
@@ -234,16 +236,100 @@ for line in sys.stdin:
         continue
     try:
         obj = json.loads(line)
-        if obj.get('type') == 'content_block_delta' and obj.get('delta', {}).get('type') == 'text_delta':
-            text = obj['delta'].get('text', '')
-            if text:
-                print(text, end='', flush=True)
-    except (json.JSONDecodeError, KeyError):
+        if obj.get('type') == 'assistant':
+            for block in obj.get('message', {}).get('content', []):
+                if block.get('type') == 'text':
+                    text = block.get('text', '')
+                    if text:
+                        print(text, end='', flush=True)
+    except (json.JSONDecodeError, KeyError, TypeError):
         pass
 " 2>/dev/null || { echo "WARN: extract_text parser failed" >&2; }
   fi
 }
 `;
+}
+
+function buildMarkerDetection(): string {
+  return `
+# detect_marker() - Check for completion markers in log and trace
+# Primary: macro log (anchored patterns). Fallback: trace JSONL (unanchored).
+# Usage: MARKER=$(detect_marker "$LOGFILE" "$TRACEFILE")
+# Returns: "complete", "failed", "human:<reason>", or "none"
+detect_marker() {
+  local logfile="$1" tracefile="$2"
+
+  # Primary: check extracted text with anchored patterns
+  if [ -s "$logfile" ]; then
+    if grep -q "^EPIC_COMPLETE$" "$logfile"; then
+      echo "complete"; return 0
+    elif grep -q "^HUMAN_REQUIRED:" "$logfile"; then
+      local reason
+      reason=$(grep "^HUMAN_REQUIRED:" "$logfile" | head -1 | sed 's/^HUMAN_REQUIRED: *//')
+      echo "human:$reason"; return 0
+    elif grep -q "^EPIC_FAILED$" "$logfile"; then
+      echo "failed"; return 0
+    fi
+  fi
+
+  # Fallback: check raw trace JSONL (unanchored -- markers are inside JSON strings)
+  if [ -s "$tracefile" ]; then
+    if grep -q "EPIC_COMPLETE" "$tracefile"; then
+      echo "complete"; return 0
+    elif grep -q "HUMAN_REQUIRED:" "$tracefile"; then
+      echo "human:detected in trace"; return 0
+    elif grep -q "EPIC_FAILED" "$tracefile"; then
+      echo "failed"; return 0
+    fi
+  fi
+
+  echo "none"
+}
+`;
+}
+
+function buildSessionRunner(): string {
+  return `
+    PROMPT=$(build_prompt "$EPIC_ID")
+
+    # Two-scope logging: stream-json to trace JSONL, extracted text to macro log
+    claude --dangerously-skip-permissions \\
+           --model "$MODEL" \\
+           --output-format stream-json \\
+           --verbose \\
+           -p "$PROMPT" \\
+           2>"$LOGFILE.stderr" | tee "$TRACEFILE" | extract_text > "$LOGFILE" || true
+
+    # Append stderr to macro log
+    [ -f "$LOGFILE.stderr" ] && cat "$LOGFILE.stderr" >> "$LOGFILE" && rm -f "$LOGFILE.stderr"
+
+    # Health check: warn if macro log extraction failed
+    if [ -s "$TRACEFILE" ] && [ ! -s "$LOGFILE" ]; then
+      log "WARN: Macro log is empty but trace has content (extract_text may have failed)"
+    fi
+
+    MARKER=$(detect_marker "$LOGFILE" "$TRACEFILE")
+    case "$MARKER" in
+      (complete)
+        log "Epic $EPIC_ID completed successfully"
+        SUCCESS=true
+        break
+        ;;
+      (human:*)
+        REASON="\${MARKER#human:}"
+        log "Epic $EPIC_ID needs human action: $REASON"
+        bd update "$EPIC_ID" --notes "Human required: $REASON" 2>/dev/null || true
+        SKIPPED=$((SKIPPED + 1))
+        SUCCESS=skip
+        break
+        ;;
+      (failed)
+        log "Epic $EPIC_ID reported failure (attempt $ATTEMPT)"
+        ;;
+      (*)
+        log "Epic $EPIC_ID session ended without marker (attempt $ATTEMPT)"
+        ;;
+    esac`;
 }
 
 function buildMainLoop(): string {
@@ -282,36 +368,7 @@ while true; do
       SUCCESS=true
       break
     fi
-
-    PROMPT=$(build_prompt "$EPIC_ID")
-
-    # Two-scope logging: stream-json to trace JSONL, extracted text to macro log
-    claude --dangerously-skip-permissions \\
-           --model "$MODEL" \\
-           --output-format stream-json \\
-           --verbose \\
-           -p "$PROMPT" \\
-           2>"$LOGFILE.stderr" | tee "$TRACEFILE" | extract_text > "$LOGFILE" || true
-
-    # Append stderr to macro log
-    [ -f "$LOGFILE.stderr" ] && cat "$LOGFILE.stderr" >> "$LOGFILE" && rm -f "$LOGFILE.stderr"
-
-    if grep -q "^EPIC_COMPLETE$" "$LOGFILE"; then
-      log "Epic $EPIC_ID completed successfully"
-      SUCCESS=true
-      break
-    elif grep -q "^HUMAN_REQUIRED:" "$LOGFILE"; then
-      REASON=$(grep "^HUMAN_REQUIRED:" "$LOGFILE" | head -1 | sed 's/^HUMAN_REQUIRED: *//')
-      log "Epic $EPIC_ID needs human action: $REASON"
-      bd update "$EPIC_ID" --notes "Human required: $REASON" 2>/dev/null || true
-      SKIPPED=$((SKIPPED + 1))
-      SUCCESS=skip
-      break
-    elif grep -q "^EPIC_FAILED$" "$LOGFILE"; then
-      log "Epic $EPIC_ID reported failure (attempt $ATTEMPT)"
-    else
-      log "Epic $EPIC_ID session ended without marker (attempt $ATTEMPT)"
-    fi
+` + buildSessionRunner() + `
 
     if [ $ATTEMPT -le $MAX_RETRIES ]; then
       log "Retrying $EPIC_ID..."
@@ -368,6 +425,7 @@ export function generateLoopScript(options: LoopScriptOptions): string {
 
   return buildScriptHeader(timestamp, options.maxRetries, options.model, epicIds)
     + buildStreamExtractor()
+    + buildMarkerDetection()
     + buildMainLoop();
 }
 
