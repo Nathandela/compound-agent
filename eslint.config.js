@@ -66,6 +66,9 @@ export default tseslint.config(
       'vitest/no-disabled-tests': 'warn',
       '@typescript-eslint/no-unused-vars': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
+      // Available but not yet enabled — 40+ existing tests would trigger warnings.
+      // Enable after cleaning up solo trivial assertions in existing tests.
+      // 'compound-agent/no-solo-trivial-assertion': 'warn',
     },
   },
 

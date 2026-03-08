@@ -10,6 +10,7 @@ import noMockModuleUnderTest from './rules/no-mock-module-under-test.js'
 import noUtilsHelpersDirs from './rules/no-utils-helpers-dirs.js'
 import enforceBarrelExports from './rules/enforce-barrel-exports.js'
 import requireEmbeddingCleanup from './rules/require-embedding-cleanup.js'
+import noSoloTrivialAssertion from './rules/no-solo-trivial-assertion.js'
 
 const plugin = {
   meta: {
@@ -22,6 +23,7 @@ const plugin = {
     'no-utils-helpers-dirs': noUtilsHelpersDirs,
     'enforce-barrel-exports': enforceBarrelExports,
     'require-embedding-cleanup': requireEmbeddingCleanup,
+    'no-solo-trivial-assertion': noSoloTrivialAssertion,
   },
 }
 
