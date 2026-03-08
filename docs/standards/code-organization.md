@@ -23,11 +23,11 @@ Code size limits (functions < 50 lines, files < 300 lines) are mechanically enfo
 
 ```
 docs/                       # All documentation
-├── SPEC.md                 # Complete specification
-├── CONTEXT.md              # Research and decisions
-├── PLAN.md                 # Implementation plan
+├── ARCHITECTURE-V2.md      # Three-layer architecture design
+├── RESOURCE_LIFECYCLE.md    # Heavyweight resource management
+├── MIGRATION.md            # Migration guide (learning-agent -> compound-agent)
 ├── adr/                    # Architectural Decision Records
-├── archive/                # Historical plans and summaries
+├── archive/                # Historical specs, plans, and summaries
 ├── invariants/             # Module invariants (data/safety/liveness)
 ├── research/               # External research and references
 ├── specs/                  # Feature specifications

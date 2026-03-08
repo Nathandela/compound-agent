@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-03-08
+
+### Added
+
+- **Loop observability**: Generated loop script now writes `.loop-status.json` (real-time epic/attempt/status) and `loop-execution.jsonl` (append-only result log with per-epic duration and end-of-loop summary). Enables `ca watch --status` and post-mortem forensics.
+- **ESLint rule `no-solo-trivial-assertion`**: Custom rule that warns when a test's only assertion is `toBeDefined()`, `toBeTruthy()`, `toBeFalsy()`, or `toBeNull()`. Registered but not yet enabled (requires cleanup of ~40 existing violations).
+
+### Fixed
+
+- **Loop 0-byte log resilience**: `extract_text` pipeline could produce 0-byte log files while the trace JSONL had valid content, causing the loop to falsely detect failure. New `detect_marker()` function checks the macro log first (anchored grep), then falls back to the trace JSONL (unanchored grep). Includes health check warning on extraction failure.
+- **Search fallback when embeddings unavailable**: `retrieveForPlan()` no longer throws when the embedding model is missing or broken. Falls back to keyword-only search with a console warning.
+
+### Changed
+
+- **Anti-cargo-cult reviewer strengthened**: Added three new subtle anti-patterns to the reviewer agent: solo trivial assertions, substring-only `toContain()` checks, and keyword-presence tests. Each with bad/good examples.
+- **Loop template extraction**: Bash script templates moved to `loop-templates.ts` to stay within lint limits.
+
 ## [1.6.5] - 2026-03-07
 
 ### Fixed

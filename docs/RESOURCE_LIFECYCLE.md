@@ -92,9 +92,26 @@ The EmbeddingGemma-300M model requires approximately **150MB of RAM** when loade
 - Containers with low memory limits
 - Systems running many concurrent processes
 
-### When to Call unloadEmbedding()
+### Preferred Pattern: `withEmbedding()`
 
-**Always call before process exit** to free memory:
+Use the `withEmbedding()` scoped wrapper for guaranteed cleanup:
+
+```typescript
+import { withEmbedding } from 'compound-agent';
+
+const result = await withEmbedding(async ({ embedText }) => {
+  const vector = await embedText('some text');
+  // ... use vector
+  return vector;
+});
+// Model automatically unloaded after callback completes
+```
+
+This is the recommended approach since v1.6.4. It handles cleanup via `try/finally` internally, preventing the memory leaks that occur when `unloadEmbedding()` is forgotten.
+
+### Manual Cleanup (Legacy)
+
+If you cannot use `withEmbedding()`, call `unloadEmbedding()` before process exit:
 
 ```typescript
 import { embedText, unloadEmbedding } from 'compound-agent';
@@ -107,15 +124,6 @@ async function main() {
     unloadEmbedding();
   }
 }
-```
-
-**After batch processing** in memory-constrained environments:
-
-```typescript
-// Process a batch, then free memory
-const vectors = await embedTexts(batch);
-// ... use vectors
-unloadEmbedding(); // Free ~150MB RAM before next operation
 ```
 
 ## Complete Cleanup Pattern
