@@ -79,6 +79,115 @@ test('search works', () => {
 // - What if query has special characters?
 ```
 
+## Subtle Cargo-Cult Patterns (REJECT or FLAG)
+
+These pass superficial review but provide little real protection against regressions.
+
+### 5. Solo `toBeDefined()` / `toBeTruthy()` Assertions
+
+Verifies something exists but not that it's *correct*.
+
+```typescript
+// CARGO-CULT: Passes even if result is garbage
+test('parse returns config', () => {
+  const config = parseConfig(rawInput);
+  expect(config).toBeDefined();
+  expect(config.port).toBeTruthy();
+});
+
+// GENUINE: Asserts specific correct values
+test('parse extracts port from config', () => {
+  const config = parseConfig('port=3000\nhost=localhost');
+  expect(config.port).toBe(3000);
+  expect(config.host).toBe('localhost');
+});
+```
+
+**Why it's weak**: Returns `{ port: -1, host: '' }` would pass the cargo-cult version. Any non-nullish value satisfies `toBeDefined()` / `toBeTruthy()`.
+
+### 6. Substring-Only `toContain()` Checks
+
+Matches a keyword anywhere in a string without verifying structure or context.
+
+```typescript
+// CARGO-CULT: Passes if "error" appears anywhere
+test('formats error message', () => {
+  const msg = formatError(new TypeError('bad input'));
+  expect(msg).toContain('error');
+});
+
+// GENUINE: Verifies structure and content
+test('formats error with type and message', () => {
+  const msg = formatError(new TypeError('bad input'));
+  expect(msg).toBe('TypeError: bad input');
+  // OR at minimum:
+  expect(msg).toMatch(/^TypeError: .+/);
+});
+```
+
+**Why it's weak**: `"no error found"` or `"[Object error]"` would both pass. The test never confirms the message is correctly formatted.
+
+### 7. Keyword-Presence Tests (Structure-Blind)
+
+Checks that output contains certain words but ignores structure, ordering, or relationships.
+
+```typescript
+// CARGO-CULT: Checks words exist, not that JSON is valid
+test('generates valid JSON report', () => {
+  const report = generateReport(data);
+  expect(report).toContain('title');
+  expect(report).toContain('score');
+  expect(report).toContain('timestamp');
+});
+
+// GENUINE: Parses and validates structure
+test('generates report with required fields', () => {
+  const report = JSON.parse(generateReport(data));
+  expect(report).toEqual({
+    title: 'Q4 Summary',
+    score: 87,
+    timestamp: expect.stringMatching(/^\d{4}-\d{2}-\d{2}/),
+  });
+});
+```
+
+**Why it's weak**: A string like `"title and score and timestamp are missing"` passes all three assertions. Structure, types, and values are unchecked.
+
+### 8. Tests That Survive Implementation Deletion
+
+The ultimate cargo-cult signal: delete or gut the implementation and the test still passes.
+
+```typescript
+// CARGO-CULT: Catches return type, not behavior
+test('getUser returns object', () => {
+  const user = getUser(1);
+  expect(typeof user).toBe('object');
+});
+// getUser could return {} or { id: 999, name: 'wrong' } - still passes
+
+// GENUINE: Pins down expected behavior
+test('getUser returns user with matching id', () => {
+  addUser({ id: 1, name: 'Alice', role: 'admin' });
+  const user = getUser(1);
+  expect(user).toEqual({ id: 1, name: 'Alice', role: 'admin' });
+});
+```
+
+**Why it's weak**: Replace `getUser` with `() => ({})` and the cargo-cult version still passes. The test provides zero regression protection.
+
+### Quick Reference: Assertion Strength
+
+| Pattern | Verdict | Fix |
+|---------|---------|-----|
+| `toBeDefined()` alone | CARGO-CULT | Assert specific value with `toBe()` / `toEqual()` |
+| `toBeTruthy()` alone | CARGO-CULT | Assert specific value or use `toBe(true)` for booleans |
+| `toContain('keyword')` on strings | WEAK | Use `toBe()`, `toMatch(/regex/)`, or `toEqual()` |
+| `toHaveLength(n)` without content check | WEAK | Follow with `toEqual()` or `toContainEqual()` on items |
+| `typeof x === 'object'` | CARGO-CULT | Assert structure with `toEqual()` or `toMatchObject()` |
+| Multiple `toContain()` on keywords | CARGO-CULT | Parse output and assert structure |
+
+**Classification rule**: If an assertion would still pass when the implementation returns a *wrong but non-empty* value, it is CARGO-CULT or WEAK.
+
 ## When Mocking IS Appropriate
 
 **Acceptable**:
@@ -94,18 +203,22 @@ test('search works', () => {
 ## Your Detection Process
 
 1. **Scan Test Files**: Find all test files
-2. **Check Assertions**: Are they meaningful?
+2. **Check Assertions**: Are they meaningful and specific?
 3. **Check Mocks**: Is business logic mocked?
 4. **Check Edge Cases**: Only happy path?
-5. **"Delete Implementation" Test**: Would tests still pass?
+5. **Assertion Strength Audit**: Flag solo `toBeDefined()`, `toBeTruthy()`, substring `toContain()`, keyword-presence patterns
+6. **"Delete Implementation" Test**: Would tests still pass if the function body were emptied or returned a trivial default?
 
 ## Review Checklist
 
 - [ ] Assertions are specific (expected values, not just existence)
+- [ ] No solo `toBeDefined()` / `toBeTruthy()` without a value-checking assertion
+- [ ] `toContain()` on strings is accompanied by structural or regex checks
+- [ ] Keyword-presence tests parse and validate structure, not just word occurrence
 - [ ] Real data used (not all mocked)
 - [ ] Business logic executes (not mocked)
 - [ ] Edge cases tested
-- [ ] Tests would fail if implementation broken
+- [ ] Tests would fail if implementation body deleted or returned trivial defaults
 
 ## Output Format
 
@@ -135,6 +248,18 @@ REJECTED: Cargo cult testing patterns detected
 3. MISSING EDGE CASES ({file})
    - Only happy path tested
    - Fix: Add tests for empty input, invalid input, boundaries
+
+4. WEAK ASSERTION ({file}:{line})
+   - `expect(msg).toContain('error')` - substring match, no structure check
+   - Fix: Use toMatch(/regex/) or toBe() for exact values
+
+5. KEYWORD-PRESENCE ({file}:{line})
+   - Multiple toContain() checking words, not structure
+   - Fix: Parse output and assert with toEqual() / toMatchObject()
+
+6. SURVIVES DELETION ({file}:{line})
+   - Test passes when implementation returns trivial default
+   - Fix: Assert values that only a correct implementation can produce
 
 Address ALL issues before resubmitting.
 ```
