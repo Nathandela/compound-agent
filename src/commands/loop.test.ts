@@ -464,6 +464,97 @@ describe('generateLoopScript', () => {
     // The claude invocation should NOT use &> for output
     expect(script).not.toMatch(/claude\b[^|]*&>\s*"\$LOGFILE"/);
   });
+
+  // ========================================================================
+  // Observability: status file and execution log
+  // ========================================================================
+
+  it('defines a write_status bash function', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toMatch(/write_status\s*\(\)/);
+  });
+
+  it('defines a log_result bash function', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toMatch(/log_result\s*\(\)/);
+  });
+
+  it('writes status file to $LOG_DIR/.loop-status.json', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('.loop-status.json');
+  });
+
+  it('status file contains epic_id and started_at fields', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Bash-escaped quotes in the generated script: \" becomes " at runtime
+    expect(script).toContain('\\"epic_id\\"');
+    expect(script).toContain('\\"started_at\\"');
+  });
+
+  it('status file is updated at the start of each epic', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // write_status should be called with "running" before the retry loop
+    expect(script).toMatch(/write_status.*running/s);
+  });
+
+  it('status file is set to idle when loop finishes', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toMatch(/write_status.*idle/s);
+  });
+
+  it('writes execution log to $LOG_DIR/loop-execution.jsonl', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toContain('loop-execution.jsonl');
+  });
+
+  it('execution log records epic result and duration', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Bash-escaped quotes in the generated script
+    expect(script).toContain('\\"result\\"');
+    expect(script).toContain('\\"duration_s\\"');
+  });
+
+  it('execution log includes a summary line at the end', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Bash-escaped quotes in the generated script
+    expect(script).toContain('\\"type\\":\\"summary\\"');
+  });
+
+  it('tracks EPIC_START timestamp for duration calculation', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toMatch(/EPIC_START=.*date \+%s/);
+  });
+
+  it('calculates duration from EPIC_START', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toMatch(/\$\(\( \$\(date \+%s\) - EPIC_START \)\)/);
+  });
+
+  it('log_result appends to execution log (append mode)', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Should use >> (append) not > (overwrite) for execution log via $EXEC_LOG
+    expect(script).toMatch(/>>\s*"\$EXEC_LOG"/);
+  });
+
+  it('observability functions appear before main loop', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    const writeStatusPos = script.indexOf('write_status()');
+    const mainLoopPos = script.indexOf('# Main loop');
+    expect(writeStatusPos).toBeGreaterThan(-1);
+    expect(mainLoopPos).toBeGreaterThan(-1);
+    expect(writeStatusPos).toBeLessThan(mainLoopPos);
+  });
+
+  it('passes /bin/bash -n syntax check with observability additions', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    const tmpFile = join('/tmp', `loop-obs-syntax-${Date.now()}.sh`);
+    writeFileSync(tmpFile, script);
+    try {
+      execSync(`/bin/bash -n "${tmpFile}"`, { encoding: 'utf-8' });
+    } finally {
+      try { execSync(`rm -f "${tmpFile}"`); } catch { /* cleanup best-effort */ }
+    }
+  });
 });
 
 describe('ca loop CLI', { tags: ['integration'] }, () => {

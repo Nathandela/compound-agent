@@ -11,21 +11,21 @@ import { dirname, resolve } from 'node:path';
 
 import type { Command } from 'commander';
 
+import {
+  buildEpicSelector,
+  buildMainLoop,
+  buildMarkerDetection,
+  buildObservability,
+  buildPromptFunction,
+  buildStreamExtractor,
+} from './loop-templates.js';
 import { out } from './shared.js';
-
-// ============================================================================
-// Constants
-// ============================================================================
 
 /** Safe pattern for epic IDs in loop scripts: extends cli-utils EPIC_ID_PATTERN with dots for version-like IDs */
 const LOOP_EPIC_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 
 /** Safe pattern for model names: alphanumeric, hyphens, underscores, dots, colons */
 const MODEL_PATTERN = /^[a-zA-Z0-9_.:/-]+$/;
-
-// ============================================================================
-// Types
-// ============================================================================
 
 export interface LoopScriptOptions {
   epics?: string[];
@@ -40,10 +40,6 @@ interface LoopOptions {
   model?: string;
   force?: boolean;
 }
-
-// ============================================================================
-// Script Generation
-// ============================================================================
 
 function buildScriptHeader(timestamp: string, maxRetries: number, model: string, epicIds: string): string {
   return `#!/usr/bin/env bash
@@ -109,295 +105,6 @@ mkdir -p "$LOG_DIR"
 ` + buildEpicSelector() + buildPromptFunction();
 }
 
-function buildEpicSelector(): string {
-  return `
-get_next_epic() {
-  if [ -n "$EPIC_IDS" ]; then
-    # From explicit list, find first still-open epic not yet processed
-    for epic_id in $EPIC_IDS; do
-      case " $PROCESSED " in (*" $epic_id "*) continue ;; esac
-      local status
-      status=$(bd show "$epic_id" --json 2>/dev/null | parse_json '.status' 2>/dev/null || echo "")
-      if [ "$status" = "open" ]; then
-        echo "$epic_id"
-        return 0
-      fi
-    done
-    return 1
-  else
-    # Dynamic: get next ready epic from dependency graph, filtering processed
-    local epic_id
-    if [ "$HAS_JQ" = true ]; then
-      epic_id=$(bd list --type=epic --ready --json --limit=10 2>/dev/null | jq -r '.[].id' 2>/dev/null | while read -r id; do
-        case " $PROCESSED " in (*" $id "*) continue ;; esac
-        echo "$id"
-        break
-      done)
-    else
-      epic_id=$(bd list --type=epic --ready --json --limit=10 2>/dev/null | python3 -c "
-import sys, json
-processed = set('$PROCESSED'.split())
-items = json.load(sys.stdin)
-for item in items:
-    if item['id'] not in processed:
-        print(item['id'])
-        break" 2>/dev/null || echo "")
-    fi
-    if [ -z "$epic_id" ]; then
-      return 1
-    fi
-    echo "$epic_id"
-    return 0
-  fi
-}
-`;
-}
-
-function buildPromptFunction(): string {
-  return `
-build_prompt() {
-  local epic_id="$1"
-  cat <<'PROMPT_HEADER'
-You are running in an autonomous infinity loop. Your task is to fully implement a beads epic.
-
-## Step 1: Load context
-Run these commands to prime your session:
-PROMPT_HEADER
-  cat <<PROMPT_BODY
-\\\`\\\`\\\`bash
-npx ca load-session
-bd show $epic_id
-\\\`\\\`\\\`
-
-Read the epic details carefully. Understand scope, acceptance criteria, and sub-tasks.
-
-## Step 2: Execute the workflow
-Run the full compound workflow for this epic, starting from the plan phase
-(spec-dev is already done -- the epic exists):
-
-/compound:cook-it from plan -- Epic: $epic_id
-
-Work through all phases: plan, work, review, compound.
-
-## Step 3: On completion
-When all work is done and tests pass:
-1. Close the epic: \`bd close $epic_id\`
-2. Sync beads: \`bd sync\`
-3. Commit and push all changes
-4. Output this exact marker on its own line:
-
-EPIC_COMPLETE
-
-## Step 4: On failure
-If you cannot complete the epic after reasonable effort:
-1. Add a note: \`bd update $epic_id --notes "Loop failed: <reason>"\`
-2. Output this exact marker on its own line:
-
-EPIC_FAILED
-
-## Step 5: On human required
-If you hit a blocker that REQUIRES human action (account creation, API keys,
-external service setup, design decisions you cannot make, etc.):
-1. Add a note: \`bd update $epic_id --notes "Human required: <reason>"\`
-2. Output this exact marker followed by a short reason on the SAME line:
-
-HUMAN_REQUIRED: <reason>
-
-Example: HUMAN_REQUIRED: Need AWS credentials configured in .env
-
-## Rules
-- Do NOT ask questions -- there is no human. Make reasonable decisions.
-- Do NOT stop early -- complete the full workflow.
-- If tests fail, fix them. Retry up to 3 times before declaring failure.
-- Use HUMAN_REQUIRED only for true blockers that no amount of retrying can solve.
-- Commit incrementally as you make progress.
-PROMPT_BODY
-}`;
-}
-
-function buildStreamExtractor(): string {
-  return `
-# extract_text() - Extract assistant text from stream-json events
-# Claude Code stream-json format: {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
-extract_text() {
-  if [ "$HAS_JQ" = true ]; then
-    jq -j --unbuffered '
-      select(.type == "assistant") |
-      .message.content[]? |
-      select(.type == "text") |
-      .text // empty
-    ' 2>/dev/null || { echo "WARN: extract_text parser failed" >&2; }
-  else
-    python3 -c "
-import sys, json
-for line in sys.stdin:
-    line = line.strip()
-    if not line:
-        continue
-    try:
-        obj = json.loads(line)
-        if obj.get('type') == 'assistant':
-            for block in obj.get('message', {}).get('content', []):
-                if block.get('type') == 'text':
-                    text = block.get('text', '')
-                    if text:
-                        print(text, end='', flush=True)
-    except (json.JSONDecodeError, KeyError, TypeError):
-        pass
-" 2>/dev/null || { echo "WARN: extract_text parser failed" >&2; }
-  fi
-}
-`;
-}
-
-function buildMarkerDetection(): string {
-  return `
-# detect_marker() - Check for completion markers in log and trace
-# Primary: macro log (anchored patterns). Fallback: trace JSONL (unanchored).
-# Usage: MARKER=$(detect_marker "$LOGFILE" "$TRACEFILE")
-# Returns: "complete", "failed", "human:<reason>", or "none"
-detect_marker() {
-  local logfile="$1" tracefile="$2"
-
-  # Primary: check extracted text with anchored patterns
-  if [ -s "$logfile" ]; then
-    if grep -q "^EPIC_COMPLETE$" "$logfile"; then
-      echo "complete"; return 0
-    elif grep -q "^HUMAN_REQUIRED:" "$logfile"; then
-      local reason
-      reason=$(grep "^HUMAN_REQUIRED:" "$logfile" | head -1 | sed 's/^HUMAN_REQUIRED: *//')
-      echo "human:$reason"; return 0
-    elif grep -q "^EPIC_FAILED$" "$logfile"; then
-      echo "failed"; return 0
-    fi
-  fi
-
-  # Fallback: check raw trace JSONL (unanchored -- markers are inside JSON strings)
-  if [ -s "$tracefile" ]; then
-    if grep -q "EPIC_COMPLETE" "$tracefile"; then
-      echo "complete"; return 0
-    elif grep -q "HUMAN_REQUIRED:" "$tracefile"; then
-      echo "human:detected in trace"; return 0
-    elif grep -q "EPIC_FAILED" "$tracefile"; then
-      echo "failed"; return 0
-    fi
-  fi
-
-  echo "none"
-}
-`;
-}
-
-function buildSessionRunner(): string {
-  return `
-    PROMPT=$(build_prompt "$EPIC_ID")
-
-    # Two-scope logging: stream-json to trace JSONL, extracted text to macro log
-    claude --dangerously-skip-permissions \\
-           --model "$MODEL" \\
-           --output-format stream-json \\
-           --verbose \\
-           -p "$PROMPT" \\
-           2>"$LOGFILE.stderr" | tee "$TRACEFILE" | extract_text > "$LOGFILE" || true
-
-    # Append stderr to macro log
-    [ -f "$LOGFILE.stderr" ] && cat "$LOGFILE.stderr" >> "$LOGFILE" && rm -f "$LOGFILE.stderr"
-
-    # Health check: warn if macro log extraction failed
-    if [ -s "$TRACEFILE" ] && [ ! -s "$LOGFILE" ]; then
-      log "WARN: Macro log is empty but trace has content (extract_text may have failed)"
-    fi
-
-    MARKER=$(detect_marker "$LOGFILE" "$TRACEFILE")
-    case "$MARKER" in
-      (complete)
-        log "Epic $EPIC_ID completed successfully"
-        SUCCESS=true
-        break
-        ;;
-      (human:*)
-        REASON="\${MARKER#human:}"
-        log "Epic $EPIC_ID needs human action: $REASON"
-        bd update "$EPIC_ID" --notes "Human required: $REASON" 2>/dev/null || true
-        SKIPPED=$((SKIPPED + 1))
-        SUCCESS=skip
-        break
-        ;;
-      (failed)
-        log "Epic $EPIC_ID reported failure (attempt $ATTEMPT)"
-        ;;
-      (*)
-        log "Epic $EPIC_ID session ended without marker (attempt $ATTEMPT)"
-        ;;
-    esac`;
-}
-
-function buildMainLoop(): string {
-  return `
-# Main loop
-COMPLETED=0
-FAILED=0
-SKIPPED=0
-PROCESSED=""
-
-log "Infinity loop starting"
-log "Config: max_retries=$MAX_RETRIES model=$MODEL"
-[ -n "$EPIC_IDS" ] && log "Targeting epics: $EPIC_IDS" || log "Targeting: all ready epics"
-
-while true; do
-  EPIC_ID=$(get_next_epic) || break
-
-  log "Processing epic: $EPIC_ID"
-
-  ATTEMPT=0
-  SUCCESS=false
-
-  while [ $ATTEMPT -le $MAX_RETRIES ]; do
-    ATTEMPT=$((ATTEMPT + 1))
-    TS=$(timestamp)
-    LOGFILE="$LOG_DIR/loop_$EPIC_ID-$TS.log"
-    TRACEFILE="$LOG_DIR/trace_$EPIC_ID-$TS.jsonl"
-
-    # Update .latest symlink for ca watch (before claude invocation so watch can discover it)
-    ln -sf "$(basename "$TRACEFILE")" "$LOG_DIR/.latest"
-
-    log "Attempt $ATTEMPT/$((MAX_RETRIES + 1)) for $EPIC_ID (log: $LOGFILE)"
-
-    if [ -n "\${LOOP_DRY_RUN:-}" ]; then
-      log "[DRY RUN] Would run claude session for $EPIC_ID"
-      SUCCESS=true
-      break
-    fi
-` + buildSessionRunner() + `
-
-    if [ $ATTEMPT -le $MAX_RETRIES ]; then
-      log "Retrying $EPIC_ID..."
-      sleep 5
-    fi
-  done
-
-  if [ "$SUCCESS" = true ]; then
-    COMPLETED=$((COMPLETED + 1))
-    log "Epic $EPIC_ID done. Completed so far: $COMPLETED"
-  elif [ "$SUCCESS" = skip ]; then
-    log "Epic $EPIC_ID skipped (human required). Continuing."
-  else
-    FAILED=$((FAILED + 1))
-    log "Epic $EPIC_ID failed after $((MAX_RETRIES + 1)) attempts. Stopping loop."
-    PROCESSED="$PROCESSED $EPIC_ID"
-    break
-  fi
-
-  PROCESSED="$PROCESSED $EPIC_ID"
-done
-
-log "Loop finished. Completed: $COMPLETED, Failed: $FAILED, Skipped: $SKIPPED"
-[ $FAILED -eq 0 ] && exit 0 || exit 1`;
-}
-
-/**
- * Validate loop script options before generation.
- */
 function validateOptions(options: LoopScriptOptions): void {
   if (!Number.isInteger(options.maxRetries) || options.maxRetries < 0) {
     throw new Error(`Invalid maxRetries: must be a non-negative integer, got ${options.maxRetries}`);
@@ -426,15 +133,11 @@ export function generateLoopScript(options: LoopScriptOptions): string {
   return buildScriptHeader(timestamp, options.maxRetries, options.model, epicIds)
     + buildStreamExtractor()
     + buildMarkerDetection()
+    + buildObservability()
     + buildMainLoop();
 }
 
-// ============================================================================
-// Command Handler
-// ============================================================================
-
 async function handleLoop(cmd: Command, options: LoopOptions): Promise<void> {
-  // Suppress unused parameter warning -- cmd reserved for future use
   void cmd;
 
   const outputPath = resolve(options.output ?? './infinity-loop.sh');
@@ -474,10 +177,6 @@ async function handleLoop(cmd: Command, options: LoopOptions): Promise<void> {
   out.info('Run it with: ' + outputPath);
   out.info('Preview with: LOOP_DRY_RUN=1 ' + outputPath);
 }
-
-// ============================================================================
-// Command Registration
-// ============================================================================
 
 /**
  * Register loop commands on the program.
