@@ -7,13 +7,18 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { appendLesson } from '../memory/storage/jsonl.js';
 import { closeDb } from '../memory/storage/sqlite/index.js';
 import { syncIfNeeded } from '../memory/storage/sqlite/sync.js';
 import { createFullLesson, createQuickLesson } from '../test-utils.js';
+import { checkForUpdate } from '../update-check.js';
 import { getPrimeContext } from './management-prime.js';
+
+vi.mock('../update-check.js', () => ({
+  checkForUpdate: vi.fn(),
+}));
 
 // Token estimation: ~4 chars per token for English text
 function estimateTokens(text: string): number {
@@ -569,6 +574,64 @@ describe('Prime Command', () => {
 
       expect(output).toContain('Full high insight');
       expect(output).not.toContain('Quick insight');
+    });
+  });
+
+  // ============================================================================
+  // Update Notification in Prime
+  // ============================================================================
+
+  describe('update notification in prime', () => {
+    afterEach(() => {
+      vi.mocked(checkForUpdate).mockReset();
+    });
+
+    it('includes update section when update is available', async () => {
+      vi.mocked(checkForUpdate).mockResolvedValue({
+        current: '1.7.2',
+        latest: '1.8.0',
+        updateAvailable: true,
+      });
+
+      const output = await getPrimeContext(tempDir);
+
+      expect(output).toContain('Update Available');
+      expect(output).toContain('1.7.2');
+      expect(output).toContain('1.8.0');
+    });
+
+    it('does not include update section when no update available', async () => {
+      vi.mocked(checkForUpdate).mockResolvedValue({
+        current: '1.8.0',
+        latest: '1.8.0',
+        updateAvailable: false,
+      });
+
+      const output = await getPrimeContext(tempDir);
+
+      expect(output).not.toContain('Update Available');
+    });
+
+    it('does not include update section when check returns null (network error)', async () => {
+      vi.mocked(checkForUpdate).mockResolvedValue(null);
+
+      const output = await getPrimeContext(tempDir);
+
+      expect(output).not.toContain('Update Available');
+    });
+
+    it('includes both versions and pnpm update command in update section', async () => {
+      vi.mocked(checkForUpdate).mockResolvedValue({
+        current: '1.7.2',
+        latest: '1.8.0',
+        updateAvailable: true,
+      });
+
+      const output = await getPrimeContext(tempDir);
+
+      expect(output).toContain('1.7.2');
+      expect(output).toContain('1.8.0');
+      expect(output).toContain('pnpm update compound-agent');
     });
   });
 });

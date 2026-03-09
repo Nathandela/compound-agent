@@ -6,11 +6,13 @@
  */
 
 import type { Command } from 'commander';
+import { join } from 'node:path';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { loadSessionLessons } from '../memory/retrieval/index.js';
 import { syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem, Source } from '../memory/index.js';
+import { checkForUpdate } from '../update-check.js';
 import { getPhaseState } from './phase-check.js';
 /**
  * Beads-style trust language template.
@@ -164,6 +166,20 @@ ${formattedLessons}
   const cookitSection = formatActiveCookitSection(root);
   if (cookitSection !== null) {
     output += cookitSection;
+  }
+
+  // Append update notification if a newer version is available
+  try {
+    const updateResult = await checkForUpdate(join(root, '.claude', '.cache'));
+    if (updateResult?.updateAvailable) {
+      output += `
+---
+# Update Available
+compound-agent v${updateResult.latest} is available (current: v${updateResult.current}). Run \`pnpm update compound-agent\` to update.
+`;
+    }
+  } catch {
+    // Non-fatal: update check failure should never block prime
   }
 
   return output;

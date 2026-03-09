@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+
 import { Command } from 'commander';
 
 import { registerCompoundCommands } from './commands/compound.js';
@@ -12,6 +14,7 @@ import { registerLoopCommands } from './commands/loop.js';
 import { registerWatchCommand } from './commands/watch.js';
 import { VERSION } from './version.js';
 import { getRepoRoot } from './cli-utils.js';
+import { checkForUpdate, formatUpdateNotification } from './update-check.js';
 import { commandNeedsSqlite } from './cli-preflight.js';
 import { unloadEmbeddingResources } from './memory/embeddings/index.js';
 import { closeDb, ensureSqliteAvailable } from './memory/storage/index.js';
@@ -98,6 +101,19 @@ export function createProgram(): Command {
 export async function runProgram(program: Command, argv: readonly string[] = process.argv): Promise<void> {
   try {
     await program.parseAsync(argv);
+
+    // Show update notification after command output (non-blocking).
+    if (process.stdout.isTTY) {
+      try {
+        const cacheDir = join(getRepoRoot(), '.claude', '.cache');
+        const result = await checkForUpdate(cacheDir);
+        if (result?.updateAvailable) {
+          console.log(formatUpdateNotification(result.current, result.latest));
+        }
+      } catch {
+        // Never let update check break the CLI.
+      }
+    }
   } finally {
     await cleanupCliResources();
   }
