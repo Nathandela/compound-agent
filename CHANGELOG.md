@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.1] - 2026-03-09
+
+### Added
+
+- **Scenario testing integration**: Spec-dev Phase 3 now generates scenario tables from EARS requirements and Mermaid diagrams with five categories (happy, error, boundary, combinatorial, adversarial). Review phase verifies coverage via a new `scenario-coverage-reviewer` agent using heuristic AI-driven matching.
+- **Scenario coverage reviewer**: New medium-tier AgentTeam reviewer that matches test files against epic scenario tables and flags gaps (P1) or partial coverage (P2). Spawned for diffs >100 lines.
+
+### Fixed
+
+- **Stale reviewer count in tests**: Updated "5 reviewer perspectives" test to "6" with `scenario-coverage` assertion. Removed no-op `.replace('security-', 'security-')` in escalation wiring test.
+
 ## [1.7.0] - 2026-03-08
 
 ### Added

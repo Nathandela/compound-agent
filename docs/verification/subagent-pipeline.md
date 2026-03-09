@@ -115,6 +115,20 @@ Use `/drift-detector` to verify implementation alignment:
 - If **APPROVED**: Work is complete
 - **Do NOT argue** -- criteria are objective
 
+## Scenario Coverage
+
+The `scenario-coverage-reviewer` is a medium-tier reviewer that verifies test files cover the scenario table generated during spec-dev Phase 3. It uses heuristic AI-driven matching — not mechanical traceability.
+
+| Category | Matching Heuristic |
+|----------|-------------------|
+| happy | Tests exercising the main success path |
+| error | Tests with error triggers, rejection assertions, or exception expectations |
+| boundary | Tests with min/max/edge values or property tests with constrained generators |
+| combinatorial | Parameterized tests, table-driven tests, or pairwise property tests |
+| adversarial | Tests with invalid input, malformed data, or security-focused assertions |
+
+**Output**: `SCENARIO_GAP` (P1, no test), `PARTIAL` (P2, trigger tested but outcome not asserted), `COVERED`, and a summary line `X/Y scenarios covered (Z%)`.
+
 ## Security Arc
 
 The security-reviewer (core 4) can escalate to 5 on-demand specialist skills for deep analysis.
