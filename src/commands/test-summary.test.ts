@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { parseVitestOutput } from './test-summary.js';
+import { parseVitestOutput, isTestCommandSafe } from './test-summary.js';
 import type { TestSummary } from './test-summary.js';
 
 // ============================================================================
@@ -209,6 +209,32 @@ ${lines.join('\n')}
       expect(result.failures[0]!.error).toContain('error line 10');
       expect(result.failures[0]!.error).not.toContain('error line 11');
     });
+  });
+});
+
+describe('isTestCommandSafe', () => {
+  it('accepts pnpm test commands', () => {
+    expect(isTestCommandSafe('pnpm test')).toBe(true);
+    expect(isTestCommandSafe('pnpm test:fast')).toBe(true);
+    expect(isTestCommandSafe('pnpm vitest run src/test.ts')).toBe(true);
+  });
+
+  it('accepts npm/npx test commands', () => {
+    expect(isTestCommandSafe('npm test')).toBe(true);
+    expect(isTestCommandSafe('npx vitest run')).toBe(true);
+  });
+
+  it('rejects commands with shell metacharacters', () => {
+    expect(isTestCommandSafe('pnpm test; rm -rf /')).toBe(false);
+    expect(isTestCommandSafe('$(whoami)')).toBe(false);
+    expect(isTestCommandSafe('pnpm test | cat /etc/passwd')).toBe(false);
+    expect(isTestCommandSafe('pnpm test && evil')).toBe(false);
+    expect(isTestCommandSafe('`evil`')).toBe(false);
+  });
+
+  it('rejects commands not starting with allowed runners', () => {
+    expect(isTestCommandSafe('rm -rf /')).toBe(false);
+    expect(isTestCommandSafe('/bin/sh -c "evil"')).toBe(false);
   });
 });
 

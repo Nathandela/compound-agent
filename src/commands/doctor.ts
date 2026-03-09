@@ -4,7 +4,7 @@
  * Usage: ca doctor
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { Command } from 'commander';
@@ -120,7 +120,7 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
   // 13. Beads healthy
   if (beadsResult.available && existsSync(beadsDir)) {
     try {
-      execSync('bd doctor', { cwd: repoRoot, shell: '/bin/sh', stdio: 'pipe' });
+      execFileSync('bd', ['doctor'], { cwd: repoRoot, stdio: 'pipe' });
       checks.push({ name: 'Beads healthy', status: 'pass' });
     } catch {
       checks.push({ name: 'Beads healthy', status: 'warn', fix: 'Run: bd doctor' });

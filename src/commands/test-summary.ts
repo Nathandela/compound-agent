@@ -42,6 +42,19 @@ const MAX_ERROR_BODY_LINES = 10;
 /** Default log file path relative to repo root. */
 const LOG_REL_PATH = '.claude/.cache/last-test-run.log';
 
+/** Allowed test command prefixes. */
+const SAFE_CMD_PREFIXES = ['pnpm', 'npm', 'npx', 'yarn', 'vitest', 'jest'];
+
+/** Shell metacharacters that indicate injection attempts. */
+const SHELL_META = /[;|&`$(){}!<>\\]/;
+
+/** Check if a --cmd value is safe to execute. */
+export function isTestCommandSafe(cmd: string): boolean {
+  if (SHELL_META.test(cmd)) return false;
+  const firstWord = cmd.split(/\s/)[0] ?? '';
+  return SAFE_CMD_PREFIXES.includes(firstWord);
+}
+
 // ============================================================================
 // Parser
 // ============================================================================
@@ -167,6 +180,11 @@ export function registerTestSummaryCommand(program: Command): void {
       // Determine test command
       let testCmd = 'pnpm test';
       if (options.cmd) {
+        if (!isTestCommandSafe(options.cmd)) {
+          console.error(`Unsafe --cmd value: "${options.cmd}". Must start with ${SAFE_CMD_PREFIXES.join('/')} and contain no shell metacharacters.`);
+          process.exitCode = 1;
+          return;
+        }
         testCmd = options.cmd;
       } else if (options.fast) {
         testCmd = 'pnpm test:fast';
@@ -199,6 +217,6 @@ export function registerTestSummaryCommand(program: Command): void {
       const summary = parseVitestOutput(output);
       console.log(formatTestSummary(summary, logPath));
 
-      process.exit(exitCode);
+      process.exitCode = exitCode;
     });
 }

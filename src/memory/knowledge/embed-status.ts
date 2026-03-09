@@ -26,11 +26,17 @@ export function writeEmbedStatus(repoRoot: string, status: EmbedStatus): void {
   writeFileSync(filePath, JSON.stringify(status, null, 2), 'utf-8');
 }
 
-/** Read embedding status from disk. Returns null on missing file or parse error. */
+const VALID_STATES = new Set(['idle', 'running', 'completed', 'failed']);
+
+/** Read embedding status from disk. Returns null on missing file, parse error, or invalid shape. */
 export function readEmbedStatus(repoRoot: string): EmbedStatus | null {
   try {
     const raw = readFileSync(statusPath(repoRoot), 'utf-8');
-    return JSON.parse(raw) as EmbedStatus;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || typeof parsed !== 'object' || !VALID_STATES.has(parsed.state as string)) {
+      return null;
+    }
+    return parsed as EmbedStatus;
   } catch {
     return null;
   }

@@ -15,11 +15,15 @@ import type { Violation } from '../engine.js';
  * @param check - The script check configuration
  * @returns Array of violations (empty if command exits with expected code)
  */
+/** Default timeout for script checks (30 seconds). */
+const DEFAULT_SCRIPT_TIMEOUT = 30_000;
+
 export function runScriptCheck(check: ScriptCheck, baseDir?: string): Violation[] {
   const expectedCode = check.expectExitCode ?? 0;
+  const timeout = check.timeout ?? DEFAULT_SCRIPT_TIMEOUT;
 
   try {
-    execSync(check.command, { stdio: ['pipe', 'pipe', 'pipe'], cwd: baseDir });
+    execSync(check.command, { stdio: ['pipe', 'pipe', 'pipe'], cwd: baseDir, timeout });
     // Exit code 0
     if (expectedCode !== 0) {
       return [{ message: `Script exited with exit code 0, expected ${expectedCode}` }];

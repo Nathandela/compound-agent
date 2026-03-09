@@ -76,4 +76,14 @@ describe('runScriptCheck', () => {
     // /tmp should not have a package.json
     expect(violations).toHaveLength(1);
   });
+
+  it('times out long-running commands', () => {
+    const violations = runScriptCheck({
+      type: 'script',
+      command: 'sleep 60',
+      timeout: 100,
+    });
+    expect(violations).toHaveLength(1);
+    expect(violations[0]!.message).toMatch(/timeout|exit code/i);
+  });
 });

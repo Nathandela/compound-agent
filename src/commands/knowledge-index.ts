@@ -60,6 +60,12 @@ export function registerKnowledgeIndexCommand(program: Command): void {
     .command('embed-worker <repoRoot>', { hidden: true })
     .description('Internal: background embedding worker')
     .action(async (repoRoot: string) => {
+      const { existsSync, statSync } = await import('node:fs');
+      if (!existsSync(repoRoot) || !statSync(repoRoot).isDirectory()) {
+        out.error(`Invalid repoRoot: "${repoRoot}" is not a directory`);
+        process.exitCode = 1;
+        return;
+      }
       const { runBackgroundEmbed } = await import('../memory/knowledge/embed-background.js');
       await runBackgroundEmbed(repoRoot);
     });

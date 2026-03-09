@@ -30,6 +30,7 @@ export const ScriptCheckSchema = z.object({
   type: z.literal('script'),
   command: z.string(),
   expectExitCode: z.number().int().optional(),
+  timeout: z.number().int().positive().optional(),
 });
 
 /** Discriminated union of all check types. */
