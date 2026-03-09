@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.3] - 2026-03-09
+
+### Added
+
+- **Update notification**: CLI checks npm registry for newer versions on startup (24h file-based cache, non-blocking). Notification displays after command output (TTY only) and in `ca prime` context.
+
+### Fixed
+
+- **Spec-dev epic type**: `bd create` in spec-dev Phase 4 now explicitly uses `--type=epic`, preventing epics from defaulting to task type. Plan phase also validates the epic type and corrects it if needed.
+- **Update-check hardening**: Added explicit `res.ok` check in `fetchLatestVersion`, removed dead `checkedAt` cache field, removed redundant type cast.
+
 ## [1.7.2] - 2026-03-09
 
 ### Added
