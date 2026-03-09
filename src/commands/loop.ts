@@ -148,6 +148,12 @@ function validateOptions(options: LoopScriptOptions): void {
     if (options.reviewModel && !MODEL_PATTERN.test(options.reviewModel)) {
       throw new Error(`Invalid review model "${options.reviewModel}": must match ${MODEL_PATTERN}`);
     }
+    if (options.reviewEvery !== undefined && (!Number.isInteger(options.reviewEvery) || options.reviewEvery < 0)) {
+      throw new Error(`Invalid reviewEvery: must be a non-negative integer, got ${options.reviewEvery}`);
+    }
+    if (options.maxReviewCycles !== undefined && (!Number.isInteger(options.maxReviewCycles) || options.maxReviewCycles < 1)) {
+      throw new Error(`Invalid maxReviewCycles: must be a positive integer, got ${options.maxReviewCycles}`);
+    }
   }
 }
 

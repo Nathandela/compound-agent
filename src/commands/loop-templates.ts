@@ -258,20 +258,31 @@ function buildReviewTriggers(hasReview: boolean, reviewEvery: number): {
   counterInit: string; periodic: string; final: string;
 } {
   if (!hasReview) return { counterInit: '', periodic: '', final: '' };
+  const usePeriodic = reviewEvery > 0;
   return {
-    counterInit: '\nCOMPLETED_SINCE_REVIEW=0\nREVIEW_DIFF_RANGE="HEAD"',
-    periodic: reviewEvery > 0
+    counterInit: usePeriodic
+      ? '\nCOMPLETED_SINCE_REVIEW=0\nREVIEW_BASE_SHA=$(git rev-parse HEAD)'
+      : '\nREVIEW_BASE_SHA=$(git rev-parse HEAD)',
+    periodic: usePeriodic
       ? `
     COMPLETED_SINCE_REVIEW=$((COMPLETED_SINCE_REVIEW + 1))
     if [ "$COMPLETED_SINCE_REVIEW" -ge "$REVIEW_EVERY" ]; then
-      REVIEW_DIFF_RANGE="HEAD~$COMPLETED_SINCE_REVIEW..HEAD"
+      REVIEW_DIFF_RANGE="$REVIEW_BASE_SHA..HEAD"
       run_review_phase "periodic"
       COMPLETED_SINCE_REVIEW=0
+      REVIEW_BASE_SHA=$(git rev-parse HEAD)
     fi`
       : '',
-    final: `
+    final: usePeriodic
+      ? `
+if [ "$COMPLETED_SINCE_REVIEW" -gt 0 ]; then
+  REVIEW_DIFF_RANGE="$REVIEW_BASE_SHA..HEAD"
+  run_review_phase "final"
+fi
+`
+      : `
 if [ "$COMPLETED" -gt 0 ]; then
-  REVIEW_DIFF_RANGE="HEAD~$COMPLETED..HEAD"
+  REVIEW_DIFF_RANGE="$REVIEW_BASE_SHA..HEAD"
   run_review_phase "final"
 fi
 `,

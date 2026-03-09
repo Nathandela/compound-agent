@@ -366,6 +366,74 @@ describe('generateLoopScript', () => {
     })).not.toThrow();
   });
 
+  it('rejects NaN reviewEvery', () => {
+    expect(() => generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      reviewEvery: NaN,
+    })).toThrow(/reviewEvery/i);
+  });
+
+  it('rejects negative reviewEvery', () => {
+    expect(() => generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      reviewEvery: -1,
+    })).toThrow(/reviewEvery/i);
+  });
+
+  it('rejects NaN maxReviewCycles', () => {
+    expect(() => generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      maxReviewCycles: NaN,
+    })).toThrow(/maxReviewCycles/i);
+  });
+
+  it('rejects zero maxReviewCycles', () => {
+    expect(() => generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      maxReviewCycles: 0,
+    })).toThrow(/maxReviewCycles/i);
+  });
+
+  it('uses git SHA marker for review diff range instead of commit count', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      reviewEvery: 2,
+    });
+    expect(script).toContain('REVIEW_BASE_SHA');
+    expect(script).not.toContain('HEAD~$COMPLETED_SINCE_REVIEW');
+    expect(script).not.toContain('HEAD~$COMPLETED');
+  });
+
+  it('does not emit COMPLETED_SINCE_REVIEW when reviewEvery=0', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      reviewEvery: 0,
+    });
+    expect(script).not.toContain('COMPLETED_SINCE_REVIEW');
+  });
+
+  it('guards final review with COMPLETED_SINCE_REVIEW > 0 to prevent double review', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      reviewEvery: 2,
+    });
+    expect(script).toMatch(/COMPLETED_SINCE_REVIEW.*-gt.*0/);
+  });
+
   it('passes /bin/bash -n with review phase included', () => {
     const script = generateLoopScript({
       maxRetries: 1,

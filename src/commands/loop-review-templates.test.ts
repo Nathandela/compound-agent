@@ -295,6 +295,66 @@ describe('buildReviewLoop', () => {
 });
 
 // ========================================================================
+// P1: Session ID python3 fallback
+// ========================================================================
+
+describe('session ID python3 fallback', () => {
+  it('buildSessionIdManagement includes python3 fallback for reading sessions', () => {
+    const output = buildSessionIdManagement();
+    expect(output).toContain('python3');
+  });
+
+  it('buildSpawnReviewers includes python3 fallback for reading session IDs', () => {
+    const output = buildSpawnReviewers();
+    expect(output).toContain('python3');
+  });
+
+  it('session write works without jq via python3 fallback', () => {
+    const output = buildSessionIdManagement();
+    // When HAS_JQ=false, should still write session IDs
+    expect(output).toMatch(/HAS_JQ.*false|else/s);
+  });
+});
+
+// ========================================================================
+// P2: Reviewer process timeout
+// ========================================================================
+
+describe('reviewer process timeout', () => {
+  it('wraps reviewer commands with timeout', () => {
+    const output = buildSpawnReviewers();
+    expect(output).toContain('timeout');
+  });
+
+  it('uses REVIEW_TIMEOUT variable', () => {
+    const output = buildSpawnReviewers();
+    expect(output).toContain('REVIEW_TIMEOUT');
+  });
+});
+
+// ========================================================================
+// P2: Anchored approval detection
+// ========================================================================
+
+describe('anchored approval detection', () => {
+  it('uses anchored grep for REVIEW_APPROVED in review loop', () => {
+    const output = buildReviewLoop();
+    expect(output).toMatch(/grep.*\^REVIEW_APPROVED/);
+  });
+});
+
+// ========================================================================
+// P2: FIXES_APPLIED check
+// ========================================================================
+
+describe('FIXES_APPLIED verification', () => {
+  it('review loop checks for FIXES_APPLIED after implementer', () => {
+    const output = buildReviewLoop();
+    expect(output).toContain('FIXES_APPLIED');
+  });
+});
+
+// ========================================================================
 // Full composition
 // ========================================================================
 
