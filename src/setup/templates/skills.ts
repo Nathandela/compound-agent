@@ -62,11 +62,24 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 3. Document trade-offs when requirements conflict (see \`references/spec-guide.md\`)
 4. Produce architecture diagrams (\`erDiagram\`, \`C4Context\`, \`flowchart\`)
 5. Create ADRs in \`docs/decisions/\` for significant decisions
+6. **Generate scenario table** from EARS requirements and Mermaid diagrams:
+   - For each EARS requirement: at least one **happy** scenario + one **error** scenario
+   - For quantified parameters: **boundary** scenarios (min, max, just-beyond)
+   - From sequence diagrams: one scenario per message path including alt/opt fragments
+   - From state diagrams: each transition + at least one invalid transition (**adversarial**)
+   - For multi-parameter requirements: **combinatorial** scenarios using pairwise (2-way) coverage
+   - For external interfaces: **adversarial** scenarios per applicable STRIDE category
+   - Use sequential IDs (S1, S2...) and this table format:
+
+   | ID | Source | Category | Precondition | Trigger | Expected Outcome |
+   |----|--------|----------|--------------|---------|------------------|
+
+   Categories: \`happy\`, \`error\`, \`boundary\`, \`combinatorial\`, \`adversarial\`
 
 **Iteration trigger**: If contradictions or gaps emerge, loop back to Understand.
 
 ### Phase 4: Hand off
-1. Store spec in beads epic description (\`bd update <epic> --description="..."\`) -- single source of truth
+1. Store spec in beads epic description (\`bd update <epic> --description="..."\`) -- single source of truth, including both EARS requirements and scenario table
 2. Create beads epic if needed (\`bd create\`)
 3. Flag open questions for plan phase
 4. Capture lessons: \`npx ca learn\`
@@ -88,6 +101,7 @@ Read \`.claude/skills/compound/spec-dev/references/spec-guide.md\` on demand for
 - Ignoring iteration signals when gaps emerge
 - Not creating the beads epic
 - Specifying implementation instead of requirements
+- Skipping scenario table generation after EARS requirements
 
 ## Quality Criteria
 - [ ] Requirements use EARS notation
@@ -96,7 +110,8 @@ Read \`.claude/skills/compound/spec-dev/references/spec-guide.md\` on demand for
 - [ ] Memory searched (\`npx ca search\`)
 - [ ] Trade-offs documented with rationale
 - [ ] User engaged via \`AskUserQuestion\` at decisions
-- [ ] Spec stored in beads epic description
+- [ ] Scenario table generated from EARS requirements and diagrams
+- [ ] Spec and scenario table stored in beads epic description
 - [ ] ADRs created for significant decisions
 `,
 
@@ -259,10 +274,10 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 3. Search memory with \`npx ca search\` for known patterns and recurring issues
 4. Select reviewer tier based on diff size:
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
-   - **Medium** (100-500): add architecture, performance, edge-case (7 total)
-   - **Large** (500+): all 11 reviewers including docs, consistency, error-handling, pattern-matcher
+   - **Medium** (100-500): add architecture, performance, edge-case, scenario-coverage (8 total)
+   - **Large** (500+): all 12 reviewers including docs, consistency, error-handling, pattern-matcher
 5. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with \`team_name\`):
-   - Role skills: \`.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer}/SKILL.md\`
+   - Role skills: \`.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer,scenario-coverage-reviewer}/SKILL.md\`
    - Security specialist skills (on-demand, spawned by security-reviewer): \`.claude/skills/compound/agents/{security-injection,security-secrets,security-auth,security-data,security-deps}/SKILL.md\`
    - For large diffs (500+), deploy MULTIPLE instances; split files across instances, coordinate via SendMessage
 6. Reviewers communicate findings to each other via \`SendMessage\`
@@ -292,7 +307,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 
 ## Common Pitfalls
 - Ignoring reviewer feedback because "it works"
-- Not running all 11 reviewer perspectives (skipping dimensions)
+- Not running all 12 reviewer perspectives (skipping dimensions)
 - Treating all findings as equal priority (classify P1/P2/P3 first)
 - Not creating beads issues for deferred fixes
 - Skipping quality gates before review
@@ -301,7 +316,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 
 ## Quality Criteria
 - All quality gates pass (\`pnpm test\`, lint)
-- All 11 reviewer perspectives were applied in parallel
+- All 12 reviewer perspectives were applied in parallel
 - Findings are classified P0/P1/P2/P3 and deduplicated
 - pattern-matcher checked memory and reinforced recurring issues
 - cct-reviewer checked against known Claude failure patterns
@@ -310,6 +325,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 - security-reviewer P1 findings: all acknowledged or resolved
 - All P1 findings fixed before \`/implementation-reviewer\` approval
 - All spec requirements verified against implementation
+- scenario-coverage-reviewer verified scenario table coverage (medium+ diffs)
 - \`/implementation-reviewer\` approved as mandatory gate
 
 ## PHASE GATE 4 -- MANDATORY

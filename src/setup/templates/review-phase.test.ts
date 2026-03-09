@@ -187,6 +187,7 @@ describe('Review Phase Integration', () => {
       'performance-reviewer',
       'test-coverage-reviewer',
       'simplicity-reviewer',
+      'scenario-coverage-reviewer',
     ];
 
     for (const key of reviewerKeys) {
@@ -230,6 +231,7 @@ describe('Review Phase Integration', () => {
       expect(AGENT_ROLE_SKILLS['performance-reviewer']).toBeDefined();
       expect(AGENT_ROLE_SKILLS['test-coverage-reviewer']).toBeDefined();
       expect(AGENT_ROLE_SKILLS['simplicity-reviewer']).toBeDefined();
+      expect(AGENT_ROLE_SKILLS['scenario-coverage-reviewer']).toBeDefined();
     });
 
     it('review skill references npx ca search and npx ca learn', () => {

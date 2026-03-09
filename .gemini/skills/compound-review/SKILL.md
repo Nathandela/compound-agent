@@ -14,10 +14,10 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 3. Search memory with `npx ca search` for known patterns and recurring issues
 4. Select reviewer tier based on diff size:
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
-   - **Medium** (100-500): add architecture, performance, edge-case (7 total)
-   - **Large** (500+): all 11 reviewers including docs, consistency, error-handling, pattern-matcher
+   - **Medium** (100-500): add architecture, performance, edge-case, scenario-coverage (8 total)
+   - **Large** (500+): all 12 reviewers including docs, consistency, error-handling, pattern-matcher
 5. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with `team_name`):
-   - Role skills: `.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer}/SKILL.md`
+   - Role skills: `.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer,scenario-coverage-reviewer}/SKILL.md`
    - Security specialist skills (on-demand, spawned by security-reviewer): `.claude/skills/compound/agents/{security-injection,security-secrets,security-auth,security-data,security-deps}/SKILL.md`
    - For large diffs (500+), deploy MULTIPLE instances; split files across instances, coordinate via SendMessage
 6. Reviewers communicate findings to each other via `SendMessage`
@@ -47,7 +47,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 
 ## Common Pitfalls
 - Ignoring reviewer feedback because "it works"
-- Not running all 11 reviewer perspectives (skipping dimensions)
+- Not running all 12 reviewer perspectives (skipping dimensions)
 - Treating all findings as equal priority (classify P1/P2/P3 first)
 - Not creating beads issues for deferred fixes
 - Skipping quality gates before review
@@ -56,7 +56,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 
 ## Quality Criteria
 - All quality gates pass (`pnpm test`, lint)
-- All 11 reviewer perspectives were applied in parallel
+- All 12 reviewer perspectives were applied in parallel
 - Findings are classified P0/P1/P2/P3 and deduplicated
 - pattern-matcher checked memory and reinforced recurring issues
 - cct-reviewer checked against known Claude failure patterns
@@ -65,6 +65,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 - security-reviewer P1 findings: all acknowledged or resolved
 - All P1 findings fixed before `/implementation-reviewer` approval
 - All spec requirements verified against implementation
+- scenario-coverage-reviewer verified scenario table coverage (medium+ diffs)
 - `/implementation-reviewer` approved as mandatory gate
 
 ## PHASE GATE 4 -- MANDATORY

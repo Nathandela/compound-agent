@@ -47,11 +47,24 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 3. Document trade-offs when requirements conflict (see `references/spec-guide.md`)
 4. Produce architecture diagrams (`erDiagram`, `C4Context`, `flowchart`)
 5. Create ADRs in `docs/decisions/` for significant decisions
+6. **Generate scenario table** from EARS requirements and Mermaid diagrams:
+   - For each EARS requirement: at least one **happy** scenario + one **error** scenario
+   - For quantified parameters: **boundary** scenarios (min, max, just-beyond)
+   - From sequence diagrams: one scenario per message path including alt/opt fragments
+   - From state diagrams: each transition + at least one invalid transition (**adversarial**)
+   - For multi-parameter requirements: **combinatorial** scenarios using pairwise (2-way) coverage
+   - For external interfaces: **adversarial** scenarios per applicable STRIDE category
+   - Use sequential IDs (S1, S2...) and this table format:
+
+   | ID | Source | Category | Precondition | Trigger | Expected Outcome |
+   |----|--------|----------|--------------|---------|------------------|
+
+   Categories: `happy`, `error`, `boundary`, `combinatorial`, `adversarial`
 
 **Iteration trigger**: If contradictions or gaps emerge, loop back to Understand.
 
 ### Phase 4: Hand off
-1. Store spec in beads epic description (`bd update <epic> --description="..."`) -- single source of truth
+1. Store spec in beads epic description (`bd update <epic> --description="..."`) -- single source of truth, including both EARS requirements and scenario table
 2. Create beads epic if needed (`bd create`)
 3. Flag open questions for plan phase
 4. Capture lessons: `npx ca learn`
@@ -73,6 +86,7 @@ Read `.claude/skills/compound/spec-dev/references/spec-guide.md` on demand for E
 - Ignoring iteration signals when gaps emerge
 - Not creating the beads epic
 - Specifying implementation instead of requirements
+- Skipping scenario table generation after EARS requirements
 
 ## Quality Criteria
 - [ ] Requirements use EARS notation
@@ -81,6 +95,7 @@ Read `.claude/skills/compound/spec-dev/references/spec-guide.md` on demand for E
 - [ ] Memory searched (`npx ca search`)
 - [ ] Trade-offs documented with rationale
 - [ ] User engaged via `AskUserQuestion` at decisions
-- [ ] Spec stored in beads epic description
+- [ ] Scenario table generated from EARS requirements and diagrams
+- [ ] Spec and scenario table stored in beads epic description
 - [ ] ADRs created for significant decisions
 

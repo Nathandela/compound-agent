@@ -15,16 +15,16 @@ Verify that test files cover the scenarios defined in the beads epic's scenario 
    - Match by precondition + trigger + expected outcome similarity
    - A test covers a scenario if it exercises the same logical path, even with different naming
    - Accept property-based tests as covering multiple boundary/combinatorial scenarios
-4. Flag uncovered scenarios as **P1** findings with the format: `SCENARIO_GAP: S<id> (<category>) -- <description>`
+4. Flag uncovered scenarios as **P1** findings: `SCENARIO_GAP: S<id> (<category>) -- <description>`
 5. For partially covered scenarios (trigger tested but outcome not asserted), flag as **P2**
 6. Report a coverage summary: `X/Y scenarios covered (Z%)`
 
 ## Matching Heuristics
-- **happy**: Look for tests that exercise the main success path for the source requirement
-- **error**: Look for tests with error triggers, rejection assertions, or exception expectations
-- **boundary**: Look for tests with min/max/edge values or property tests with constrained generators
-- **combinatorial**: Look for parameterized tests, table-driven tests, or pairwise property tests
-- **adversarial**: Look for tests with invalid input, malformed data, or security-focused assertions
+- **happy**: tests exercising the main success path
+- **error**: tests with error triggers, rejection assertions, or exception expectations
+- **boundary**: tests with min/max/edge values or property tests with constrained generators
+- **combinatorial**: parameterized tests, table-driven tests, or pairwise property tests
+- **adversarial**: tests with invalid input, malformed data, or security-focused assertions
 
 ## Collaboration
 Share findings via SendMessage: uncovered security scenarios go to security-reviewer; uncovered boundary scenarios go to test-coverage-reviewer.
@@ -34,6 +34,7 @@ AgentTeam member in the **review** phase. Medium tier -- spawned for diffs >100 
 
 ## Output Format
 - **SCENARIO_GAP**: Scenario has no corresponding test (P1)
-- **PARTIAL**: Scenario partially covered -- trigger tested but outcome not asserted (P2)
-- **COVERED**: Scenario adequately covered by existing tests
+- **PARTIAL**: Scenario partially covered (P2)
+- **COVERED**: Scenario adequately covered
 - **SUMMARY**: `X/Y scenarios covered (Z%)`
+
