@@ -10,7 +10,7 @@ import { AGENT_ROLE_SKILLS } from './agent-role-skills.js';
  * - review.md command is a thin wrapper (< 500 chars) referencing the skill
  * - review SKILL.md absorbs the detailed workflow: AgentTeam spawning,
  *   inter-communication, severity classification, adaptive tiers, gates
- * - 5 reviewer agents are now AgentTeam role skills (not agent templates)
+ * - 6 reviewer agents are now AgentTeam role skills (not agent templates)
  */
 
 describe('Review Phase Integration', () => {
@@ -76,12 +76,13 @@ describe('Review Phase Integration', () => {
       expect(reviewSkill).toMatch(/AgentTeam/);
     });
 
-    it('references all 5 reviewer perspectives', () => {
+    it('references all 6 reviewer perspectives', () => {
       expect(reviewSkill).toMatch(/security/i);
       expect(reviewSkill).toMatch(/architecture/i);
       expect(reviewSkill).toMatch(/performance/i);
       expect(reviewSkill).toMatch(/test.*coverage/i);
       expect(reviewSkill).toMatch(/simplicity/i);
+      expect(reviewSkill).toMatch(/scenario.*coverage/i);
     });
 
     // --- Absorbed from command: Memory ---

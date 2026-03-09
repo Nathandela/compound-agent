@@ -154,7 +154,7 @@ describe('AGENT_ROLE_SKILLS', () => {
       const reviewer = AGENT_ROLE_SKILLS['security-reviewer'];
       for (const key of SPECIALIST_KEYS) {
         expect(reviewer, `security-reviewer should mention ${key}`).toContain(
-          `/${key.replace('security-', 'security-')}`,
+          `/${key}`,
         );
       }
     });
