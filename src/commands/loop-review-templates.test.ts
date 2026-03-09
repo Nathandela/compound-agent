@@ -317,18 +317,58 @@ describe('session ID python3 fallback', () => {
 });
 
 // ========================================================================
-// P2: Reviewer process timeout
+// P2: Reviewer process timeout (portable)
 // ========================================================================
 
 describe('reviewer process timeout', () => {
-  it('wraps reviewer commands with timeout', () => {
+  it('wraps reviewer commands with portable_timeout', () => {
     const output = buildSpawnReviewers();
-    expect(output).toContain('timeout');
+    expect(output).toContain('portable_timeout');
   });
 
   it('uses REVIEW_TIMEOUT variable', () => {
     const output = buildSpawnReviewers();
     expect(output).toContain('REVIEW_TIMEOUT');
+  });
+});
+
+// ========================================================================
+// P1: Portable timeout wrapper (macOS compat)
+// ========================================================================
+
+describe('portable timeout wrapper', () => {
+  it('buildReviewConfig defines portable_timeout function', () => {
+    const output = buildReviewConfig({
+      reviewers: ['claude-sonnet'],
+      maxReviewCycles: 3,
+      reviewBlocking: false,
+      reviewModel: 'claude-opus-4-6',
+      reviewEvery: 0,
+    });
+    expect(output).toMatch(/portable_timeout\s*\(\)/);
+  });
+
+  it('falls back to gtimeout on macOS', () => {
+    const output = buildReviewConfig({
+      reviewers: ['claude-sonnet'],
+      maxReviewCycles: 3,
+      reviewBlocking: false,
+      reviewModel: 'claude-opus-4-6',
+      reviewEvery: 0,
+    });
+    expect(output).toContain('gtimeout');
+  });
+
+  it('falls back to shell-based timeout when neither available', () => {
+    const output = buildReviewConfig({
+      reviewers: ['claude-sonnet'],
+      maxReviewCycles: 3,
+      reviewBlocking: false,
+      reviewModel: 'claude-opus-4-6',
+      reviewEvery: 0,
+    });
+    // Should have a kill-based fallback
+    expect(output).toContain('kill');
   });
 });
 

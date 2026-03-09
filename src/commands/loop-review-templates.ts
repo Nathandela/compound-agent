@@ -21,6 +21,26 @@ REVIEW_MODEL="${options.reviewModel}"
 REVIEW_REVIEWERS="${options.reviewers.join(' ')}"
 REVIEW_DIR="$LOG_DIR/reviews"
 REVIEW_TIMEOUT=\${REVIEW_TIMEOUT:-600}
+
+# Portable timeout: GNU timeout -> gtimeout (macOS Homebrew) -> shell fallback
+portable_timeout() {
+  local secs="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$secs" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$secs" "$@"
+  else
+    "$@" &
+    local pid=$!
+    ( sleep "$secs" && kill "$pid" 2>/dev/null ) &
+    local watchdog=$!
+    wait "$pid" 2>/dev/null
+    local rc=$?
+    kill "$watchdog" 2>/dev/null
+    wait "$watchdog" 2>/dev/null
+    return $rc
+  fi
+}
 `;
 }
 
@@ -167,10 +187,10 @@ spawn_reviewers() {
         local sid=""
         sid=$(read_session_id "$reviewer" "$REVIEW_DIR/sessions.json")
         if [ "$cycle" -eq 1 ]; then
-          (timeout "$REVIEW_TIMEOUT" claude --model "$model_name" --output-format text \
+          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" --output-format text \
                   --session-id "$sid" -p "$prompt" > "$report" 2>&1 || true) &
         else
-          (timeout "$REVIEW_TIMEOUT" claude --model "$model_name" --output-format text \
+          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" --output-format text \
                   --resume "$sid" \
                   -p "Review the latest fixes. If resolved: REVIEW_APPROVED. Otherwise: REVIEW_CHANGES_REQUESTED with findings." \
                   > "$report" 2>&1 || true) &
@@ -179,9 +199,9 @@ spawn_reviewers() {
         ;;
       (gemini)
         if [ "$cycle" -eq 1 ]; then
-          (timeout "$REVIEW_TIMEOUT" gemini -p "$prompt" -y > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" gemini -p "$prompt" -y > "$report" 2>&1 || true) &
         else
-          (timeout "$REVIEW_TIMEOUT" gemini --resume latest \
+          (portable_timeout "$REVIEW_TIMEOUT" gemini --resume latest \
                   -p "Review the latest fixes. If resolved: REVIEW_APPROVED. Otherwise: REVIEW_CHANGES_REQUESTED with findings." \
                   > "$report" 2>&1 || true) &
         fi
@@ -189,9 +209,9 @@ spawn_reviewers() {
         ;;
       (codex)
         if [ "$cycle" -eq 1 ]; then
-          (timeout "$REVIEW_TIMEOUT" codex exec "$prompt" > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" codex exec "$prompt" > "$report" 2>&1 || true) &
         else
-          (timeout "$REVIEW_TIMEOUT" codex exec resume --last > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" codex exec resume --last > "$report" 2>&1 || true) &
         fi
         pids="$pids $!"
         ;;
