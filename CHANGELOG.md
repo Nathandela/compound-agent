@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Loop review phase**: `ca loop` can now spawn independent AI reviewers (Claude Sonnet, Claude Opus, Gemini, Codex) in parallel after every N completed epics. Reviewers produce severity-tagged reports, an implementer session fixes findings, and reviewers are resumed (not fresh) to verify fixes. Iterates until all approve or max cycles reached. New CLI options: `--reviewers`, `--review-every`, `--max-review-cycles`, `--review-blocking`, `--review-model`. Gracefully skips unavailable CLIs.
+
 ## [1.7.1] - 2026-03-09
 
 ### Added
