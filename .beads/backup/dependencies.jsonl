@@ -49,6 +49,7 @@
 {"created_at":"2026-03-06T21:25:58Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-772","issue_id":"learning_agent-7de","type":"blocks"}
 {"created_at":"2026-03-06T21:25:59Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-ar4","issue_id":"learning_agent-7de","type":"blocks"}
 {"created_at":"2026-03-06T21:25:59Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-r95","issue_id":"learning_agent-7de","type":"blocks"}
+{"created_at":"2026-03-09T08:33:55Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-uig","issue_id":"learning_agent-7jd","type":"blocks"}
 {"created_at":"2026-02-22T14:00:34Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-5r3","issue_id":"learning_agent-88j","type":"blocks"}
 {"created_at":"2026-02-22T14:00:37Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-931","issue_id":"learning_agent-88j","type":"blocks"}
 {"created_at":"2026-02-22T14:00:36Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-9ki","issue_id":"learning_agent-88j","type":"blocks"}
@@ -87,6 +88,7 @@
 {"created_at":"2026-03-01T18:08:11Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-hem","issue_id":"learning_agent-ct4","type":"blocks"}
 {"created_at":"2026-03-01T18:08:09Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-krw","issue_id":"learning_agent-ct4","type":"blocks"}
 {"created_at":"2026-03-01T18:08:08Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-wzj","issue_id":"learning_agent-ct4","type":"blocks"}
+{"created_at":"2026-03-09T08:33:57Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-tlw","issue_id":"learning_agent-egr","type":"blocks"}
 {"created_at":"2026-02-22T14:24:30Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-286","issue_id":"learning_agent-f00","type":"blocks"}
 {"created_at":"2026-02-28T09:09:12Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-5w8","issue_id":"learning_agent-g85","type":"blocks"}
 {"created_at":"2026-02-28T09:09:13Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-nff","issue_id":"learning_agent-g85","type":"blocks"}
@@ -113,7 +115,9 @@
 {"created_at":"2026-03-09T07:52:57Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-ala","issue_id":"learning_agent-l9a","type":"blocks"}
 {"created_at":"2026-03-09T07:24:38Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-xwt","issue_id":"learning_agent-mwu","type":"blocks"}
 {"created_at":"2026-02-28T09:09:10Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-61p","issue_id":"learning_agent-nff","type":"blocks"}
+{"created_at":"2026-03-09T08:33:56Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-7jd","issue_id":"learning_agent-onq","type":"blocks"}
 {"created_at":"2026-03-04T21:13:59Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-yot","issue_id":"learning_agent-ooz","type":"blocks"}
+{"created_at":"2026-03-09T08:33:55Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-7jd","issue_id":"learning_agent-pc4","type":"blocks"}
 {"created_at":"2026-03-04T21:08:12Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-3hm","issue_id":"learning_agent-pmj","type":"blocks"}
 {"created_at":"2026-03-04T21:08:14Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-3hm","issue_id":"learning_agent-ppd","type":"blocks"}
 {"created_at":"2026-03-01T18:33:38Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-vos","issue_id":"learning_agent-pq7","type":"blocks"}
@@ -139,6 +143,8 @@
 {"created_at":"2026-02-28T08:28:08Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-s3m.6","issue_id":"learning_agent-s3m.8","type":"blocks"}
 {"created_at":"2026-02-28T08:28:08Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-s3m.7","issue_id":"learning_agent-s3m.8","type":"blocks"}
 {"created_at":"2026-02-22T11:39:50Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-tep","issue_id":"learning_agent-szq","type":"blocks"}
+{"created_at":"2026-03-09T08:33:57Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-onq","issue_id":"learning_agent-tlw","type":"blocks"}
+{"created_at":"2026-03-09T08:33:56Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-pc4","issue_id":"learning_agent-tlw","type":"blocks"}
 {"created_at":"2026-02-23T20:43:25Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-4nl","issue_id":"learning_agent-tqr","type":"blocks"}
 {"created_at":"2026-03-04T21:08:13Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-2nb","issue_id":"learning_agent-tvp","type":"blocks"}
 {"created_at":"2026-02-22T15:39:54Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-40g","issue_id":"learning_agent-v80","type":"blocks"}
