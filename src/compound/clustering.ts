@@ -90,6 +90,14 @@ export function clusterBySimilarity(
     group.push(items[i]!);
   }
 
-  const clusters = Array.from(groups.values());
-  return { clusters, noise: [] };
+  const clusters: MemoryItem[][] = [];
+  const noise: MemoryItem[] = [];
+  for (const group of groups.values()) {
+    if (group.length === 1) {
+      noise.push(group[0]!);
+    } else {
+      clusters.push(group);
+    }
+  }
+  return { clusters, noise };
 }

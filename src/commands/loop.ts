@@ -34,6 +34,9 @@ import { out } from './shared.js';
 /** Safe pattern for epic IDs in loop scripts: extends cli-utils EPIC_ID_PATTERN with dots for version-like IDs */
 export const LOOP_EPIC_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 
+/** Default Claude model for loop sessions */
+const DEFAULT_MODEL = 'claude-opus-4-6';
+
 /** Safe pattern for model names: alphanumeric, hyphens, underscores, dots, colons */
 const MODEL_PATTERN = /^[a-zA-Z0-9_.:/-]+$/;
 
@@ -177,7 +180,7 @@ export function generateLoopScript(options: LoopScriptOptions): string {
       reviewers: options.reviewers!,
       maxReviewCycles: options.maxReviewCycles ?? 3,
       reviewBlocking: options.reviewBlocking ?? false,
-      reviewModel: options.reviewModel ?? 'claude-opus-4-6',
+      reviewModel: options.reviewModel ?? DEFAULT_MODEL,
       reviewEvery: options.reviewEvery ?? 0,
     });
     script += buildReviewerDetection();
@@ -220,12 +223,12 @@ async function handleLoop(cmd: Command, options: LoopOptions): Promise<void> {
     script = generateLoopScript({
       epics: options.epics,
       maxRetries,
-      model: options.model ?? 'claude-opus-4-6',
+      model: options.model ?? DEFAULT_MODEL,
       reviewers: options.reviewers,
       reviewEvery,
       maxReviewCycles,
       reviewBlocking: options.reviewBlocking,
-      reviewModel: options.reviewModel ?? 'claude-opus-4-6',
+      reviewModel: options.reviewModel ?? DEFAULT_MODEL,
     });
   } catch (err) {
     out.error((err as Error).message);
@@ -252,13 +255,13 @@ export function registerLoopCommands(program: Command): void {
     .option('--epics <ids...>', 'Specific epic IDs to process')
     .option('-o, --output <path>', 'Output script path', './infinity-loop.sh')
     .option('--max-retries <n>', 'Max retries per epic on failure', '1')
-    .option('--model <model>', 'Claude model to use', 'claude-opus-4-6')
+    .option('--model <model>', 'Claude model to use', DEFAULT_MODEL)
     .option('--force', 'Overwrite existing script')
     .option('--review-every <n>', 'Review every N completed epics (0=end-only)', '0')
     .option('--reviewers <names...>', 'Reviewers to use (claude-sonnet claude-opus gemini codex)')
     .option('--max-review-cycles <n>', 'Max review/fix iterations', '3')
     .option('--review-blocking', 'Fail loop if review not approved after max cycles')
-    .option('--review-model <model>', 'Model for implementer fix sessions', 'claude-opus-4-6')
+    .option('--review-model <model>', 'Model for implementer fix sessions', DEFAULT_MODEL)
     .action(async function (this: Command, options: LoopOptions) {
       await handleLoop(this, options);
     });

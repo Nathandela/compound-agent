@@ -180,9 +180,6 @@ export const CLAUDE_PHASE_AUDIT_HOOK_CONFIG = {
   ],
 };
 
-// Back-compat aliases for test imports and older references.
-export const CLAUDE_READ_TRACKER_HOOK_CONFIG = CLAUDE_POST_READ_HOOK_CONFIG;
-export const CLAUDE_STOP_AUDIT_HOOK_CONFIG = CLAUDE_PHASE_AUDIT_HOOK_CONFIG;
 
 // Note: PreCommit is NOT a valid Claude Code hook type.
 // The remind-capture functionality is handled by git pre-commit hooks instead.

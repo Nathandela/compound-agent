@@ -151,10 +151,8 @@ function parseJsonLine(
  * Returns null for tombstone-only records (no MemoryItem data).
  */
 function toMemoryItem(record: LessonRecord): MemoryItem | null {
-  // Tombstone records that are minimal (no type field) cannot be converted
-  if (record.deleted === true) {
-    return null;
-  }
+  // Type guard: exclude tombstone variant (no `type` field)
+  if (record.deleted === true) return null;
 
   // Legacy type conversion: quick/full -> lesson
   if (record.type === 'quick' || record.type === 'full') {

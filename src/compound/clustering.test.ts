@@ -82,13 +82,13 @@ describe('clusterBySimilarity', () => {
     expect(result.noise).toEqual([]);
   });
 
-  it('single item goes into its own cluster', () => {
+  it('single item becomes noise (not a cluster)', () => {
     const items = [createLesson({ id: 'L001', insight: 'single item' })];
     const embeddings = [[1, 0, 0]];
     const result = clusterBySimilarity(items, embeddings);
-    expect(result.clusters).toHaveLength(1);
-    expect(result.clusters[0]).toHaveLength(1);
-    expect(result.clusters[0]![0]!.id).toBe('L001');
+    expect(result.clusters).toHaveLength(0);
+    expect(result.noise).toHaveLength(1);
+    expect(result.noise[0]!.id).toBe('L001');
   });
 
   it('identical embeddings cluster together', () => {
@@ -105,7 +105,7 @@ describe('clusterBySimilarity', () => {
     expect(result.clusters[0]).toHaveLength(2);
   });
 
-  it('dissimilar items stay in separate clusters', () => {
+  it('dissimilar items become noise', () => {
     const items = [
       createLesson({ id: 'L001', insight: 'first' }),
       createLesson({ id: 'L002', insight: 'second' }),
@@ -116,9 +116,8 @@ describe('clusterBySimilarity', () => {
       [0, 1, 0],
     ];
     const result = clusterBySimilarity(items, embeddings);
-    expect(result.clusters).toHaveLength(2);
-    expect(result.clusters[0]).toHaveLength(1);
-    expect(result.clusters[1]).toHaveLength(1);
+    expect(result.clusters).toHaveLength(0);
+    expect(result.noise).toHaveLength(2);
   });
 
   it('threshold parameter controls sensitivity', () => {
@@ -136,9 +135,10 @@ describe('clusterBySimilarity', () => {
     const loose = clusterBySimilarity(items, embeddings, 0.5);
     expect(loose.clusters).toHaveLength(1);
 
-    // High threshold: should stay separate
+    // High threshold: should stay separate (noise, not clusters)
     const strict = clusterBySimilarity(items, embeddings, 0.95);
-    expect(strict.clusters).toHaveLength(2);
+    expect(strict.clusters).toHaveLength(0);
+    expect(strict.noise).toHaveLength(2);
   });
 
   it('three items: two similar, one different', () => {
@@ -154,11 +154,11 @@ describe('clusterBySimilarity', () => {
       [0, 0, 1],
     ];
     const result = clusterBySimilarity(items, embeddings, 0.75);
-    expect(result.clusters).toHaveLength(2);
-    // The two similar items should be in the same cluster
-    const bigCluster = result.clusters.find((c) => c.length === 2);
-    expect(bigCluster).toBeDefined();
-    const ids = bigCluster!.map((item) => item.id).sort();
+    expect(result.clusters).toHaveLength(1);
+    expect(result.clusters[0]).toHaveLength(2);
+    const ids = result.clusters[0]!.map((item) => item.id).sort();
     expect(ids).toEqual(['L001', 'L002']);
+    expect(result.noise).toHaveLength(1);
+    expect(result.noise[0]!.id).toBe('L003');
   });
 });

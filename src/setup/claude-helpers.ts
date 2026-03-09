@@ -97,20 +97,6 @@ export function hasAllCompoundAgentHooks(settings: Record<string, unknown>): boo
 }
 
 /**
- * Add our hook to SessionStart array.
- */
-export function addCompoundAgentHook(settings: Record<string, unknown>): void {
-  if (!settings.hooks) {
-    settings.hooks = {};
-  }
-  const hooks = settings.hooks as Record<string, unknown[]>;
-  if (!hooks.SessionStart) {
-    hooks.SessionStart = [];
-  }
-  hooks.SessionStart.push(CLAUDE_HOOK_CONFIG);
-}
-
-/**
  * Add all hooks managed by compound-agent.
  * Note: PreCommit is handled by git hooks, not Claude Code hooks.
  */
