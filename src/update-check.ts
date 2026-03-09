@@ -15,7 +15,6 @@ export interface UpdateCheckResult {
 
 interface CacheData {
   latest: string;
-  checkedAt: string;
 }
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
@@ -33,6 +32,7 @@ export async function fetchLatestVersion(
     const res = await fetch(`https://registry.npmjs.org/${packageName}`, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
     });
+    if (!res.ok) return null;
     const data = await res.json();
     return (data as Record<string, unknown>)['dist-tags']
       ? ((data as { 'dist-tags': { latest: string } })['dist-tags'].latest ?? null)
@@ -70,7 +70,7 @@ export async function checkForUpdate(
     // Write cache
     try {
       mkdirSync(cacheDir, { recursive: true });
-      const cacheData: CacheData = { latest, checkedAt: new Date().toISOString() };
+      const cacheData: CacheData = { latest };
       writeFileSync(cachePath, JSON.stringify(cacheData));
     } catch {
       // Cache write failure is non-fatal
@@ -106,7 +106,7 @@ function readCache(cachePath: string): CacheData | null {
     if (Date.now() - stat.mtimeMs > CACHE_TTL_MS) return null;
 
     const raw = readFileSync(cachePath, 'utf-8');
-    const data = JSON.parse(raw as string) as CacheData;
+    const data = JSON.parse(raw) as CacheData;
     if (!data.latest) return null;
     return data;
   } catch {

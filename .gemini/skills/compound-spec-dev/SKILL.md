@@ -64,8 +64,8 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 **Iteration trigger**: If contradictions or gaps emerge, loop back to Understand.
 
 ### Phase 4: Hand off
-1. Store spec in beads epic description (`bd update <epic> --description="..."`) -- single source of truth, including both EARS requirements and scenario table
-2. Create beads epic if needed (`bd create`)
+1. Create beads epic if needed (`bd create --title="..." --type=epic --priority=<N>`)
+2. Store spec in the epic description (`bd update <epic-id> --description="..."`) -- single source of truth, including both EARS requirements and scenario table
 3. Flag open questions for plan phase
 4. Capture lessons: `npx ca learn`
 

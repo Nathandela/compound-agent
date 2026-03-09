@@ -168,7 +168,9 @@ ${formattedLessons}
     output += cookitSection;
   }
 
-  // Append update notification if a newer version is available
+  // Append update notification if a newer version is available.
+  // No TTY gate here (unlike cli-app.ts) — prime outputs to Claude Code
+  // session context, not to a terminal, so it should always check.
   try {
     const updateResult = await checkForUpdate(join(root, '.claude', '.cache'));
     if (updateResult?.updateAvailable) {

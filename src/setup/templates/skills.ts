@@ -79,8 +79,8 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 **Iteration trigger**: If contradictions or gaps emerge, loop back to Understand.
 
 ### Phase 4: Hand off
-1. Store spec in beads epic description (\`bd update <epic> --description="..."\`) -- single source of truth, including both EARS requirements and scenario table
-2. Create beads epic if needed (\`bd create\`)
+1. Create beads epic if needed (\`bd create --title="..." --type=epic --priority=<N>\`)
+2. Store spec in the epic description (\`bd update <epic-id> --description="..."\`) -- single source of truth, including both EARS requirements and scenario table
 3. Flag open questions for plan phase
 4. Capture lessons: \`npx ca learn\`
 
@@ -126,7 +126,7 @@ description: Decompose work into small testable tasks with clear dependencies
 Create a concrete implementation plan by decomposing work into small, testable tasks with dependencies and acceptance criteria.
 
 ## Methodology
-1. Read the spec from the epic description (\`bd show <epic>\`) for EARS requirements, decisions, and open questions
+1. Read the spec from the epic description (\`bd show <epic>\`) for EARS requirements, decisions, and open questions. Verify its type is \`epic\` -- if it was created as \`task\`, fix with \`bd update <id> --type=epic\`
 2. Search memory with \`npx ca search\` and docs with \`npx ca knowledge "relevant topic"\` for architectural patterns and past mistakes
 3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
    - Available agents: \`.claude/agents/compound/repo-analyst.md\`, \`memory-analyst.md\`

@@ -170,7 +170,7 @@ describe('checkForUpdate', () => {
     const now = new Date();
     mockedStatSync.mockReturnValue({ mtimeMs: now.getTime() } as ReturnType<typeof statSync>);
     mockedReadFileSync.mockReturnValue(
-      JSON.stringify({ latest: '2.0.0', checkedAt: now.toISOString() }),
+      JSON.stringify({ latest: '2.0.0' }),
     );
     // fetch should NOT be called when cache is fresh
     const fetchSpy = vi.fn();
@@ -188,7 +188,7 @@ describe('checkForUpdate', () => {
     const staleTime = Date.now() - 25 * 60 * 60 * 1000; // 25 hours ago
     mockedStatSync.mockReturnValue({ mtimeMs: staleTime } as ReturnType<typeof statSync>);
     mockedReadFileSync.mockReturnValue(
-      JSON.stringify({ latest: '1.5.0', checkedAt: new Date(staleTime).toISOString() }),
+      JSON.stringify({ latest: '1.5.0' }),
     );
     mockFetchOk({ 'dist-tags': { latest: '2.1.0' } });
 
