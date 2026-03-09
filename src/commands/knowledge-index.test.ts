@@ -67,9 +67,9 @@ describe('embed-worker command', () => {
     const cmd = program.commands.find((c) => c.name() === 'embed-worker');
     expect(cmd).toBeDefined();
 
-    // Parse and invoke
-    await program.parseAsync(['node', 'test', 'embed-worker', '/tmp/test-repo']);
-    expect(runBgSpy).toHaveBeenCalledWith('/tmp/test-repo');
+    // Parse and invoke (use repoRoot which is a real temp directory)
+    await program.parseAsync(['node', 'test', 'embed-worker', repoRoot]);
+    expect(runBgSpy).toHaveBeenCalledWith(repoRoot);
 
     runBgSpy.mockRestore();
   });

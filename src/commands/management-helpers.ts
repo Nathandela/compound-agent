@@ -2,10 +2,6 @@
  * Helper functions for management commands.
  */
 
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
-
-import { LESSONS_PATH } from '../memory/storage/index.js';
 import type { MemoryItem } from '../memory/index.js';
 
 /**
@@ -54,28 +50,3 @@ export function formatLessonHuman(lesson: MemoryItem): string {
   return lines.join('\n');
 }
 
-/**
- * Check if a lesson ID has been deleted (has a tombstone).
- */
-export async function wasLessonDeleted(repoRoot: string, id: string): Promise<boolean> {
-  const filePath = join(repoRoot, LESSONS_PATH);
-  try {
-    const content = await readFile(filePath, 'utf-8');
-    const lines = content.split('\n');
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed) continue;
-      try {
-        const record = JSON.parse(trimmed) as { id: string; deleted?: boolean };
-        if (record.id === id && record.deleted === true) {
-          return true;
-        }
-      } catch {
-        // Skip invalid lines
-      }
-    }
-  } catch {
-    // File doesn't exist
-  }
-  return false;
-}

@@ -2,7 +2,7 @@
  * Templates and constants for setup commands.
  */
 
-import { VERSION } from '../index.js';
+import { VERSION } from '../version.js';
 
 // ============================================================================
 // Hooks Constants

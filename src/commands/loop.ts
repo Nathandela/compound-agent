@@ -32,7 +32,7 @@ import { VALID_LOOP_REVIEWERS } from '../config/index.js';
 import { out } from './shared.js';
 
 /** Safe pattern for epic IDs in loop scripts: extends cli-utils EPIC_ID_PATTERN with dots for version-like IDs */
-const LOOP_EPIC_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
+export const LOOP_EPIC_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 
 /** Safe pattern for model names: alphanumeric, hyphens, underscores, dots, colons */
 const MODEL_PATTERN = /^[a-zA-Z0-9_.:/-]+$/;

@@ -12,7 +12,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
  * Bump this when making incompatible schema changes.
  * The connection module auto-rebuilds when the DB version is older.
  */
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 /** SQL schema for lessons database with FTS5 full-text search */
 const SCHEMA_SQL = `
@@ -63,7 +63,7 @@ const SCHEMA_SQL = `
     VALUES ('delete', old.rowid, old.id, old.trigger, old.insight, old.tags, old.pattern_bad, old.pattern_good);
   END;
 
-  CREATE TRIGGER IF NOT EXISTS lessons_au AFTER UPDATE ON lessons BEGIN
+  CREATE TRIGGER IF NOT EXISTS lessons_au AFTER UPDATE OF id, trigger, insight, tags, pattern_bad, pattern_good ON lessons BEGIN
     INSERT INTO lessons_fts(lessons_fts, rowid, id, trigger, insight, tags, pattern_bad, pattern_good)
     VALUES ('delete', old.rowid, old.id, old.trigger, old.insight, old.tags, old.pattern_bad, old.pattern_good);
     INSERT INTO lessons_fts(rowid, id, trigger, insight, tags, pattern_bad, pattern_good)
@@ -87,5 +87,8 @@ const SCHEMA_SQL = `
  */
 export function createSchema(database: DatabaseType): void {
   database.exec(SCHEMA_SQL);
-  database.pragma(`user_version = ${SCHEMA_VERSION}`);
+  const current = database.pragma('user_version', { simple: true }) as number;
+  if (current !== SCHEMA_VERSION) {
+    database.pragma(`user_version = ${SCHEMA_VERSION}`);
+  }
 }

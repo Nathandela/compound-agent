@@ -14,7 +14,7 @@ import type { MemoryItem, Severity } from '../memory/index.js';
 import { formatError } from '../cli-error-format.js';
 
 import { out } from './shared.js';
-import { formatLessonHuman, wasLessonDeleted } from './management-helpers.js';
+import { formatLessonHuman } from './management-helpers.js';
 
 /** JSON indentation for show output */
 const SHOW_JSON_INDENT = 2;
@@ -26,11 +26,11 @@ const SHOW_JSON_INDENT = 2;
 async function showAction(id: string, options: { json?: boolean }): Promise<void> {
   const repoRoot = getRepoRoot();
 
-  const { items } = await readMemoryItems(repoRoot);
+  const { items, deletedIds } = await readMemoryItems(repoRoot);
   const item = items.find((i) => i.id === id);
 
   if (!item) {
-    const wasDeleted = await wasLessonDeleted(repoRoot, id);
+    const wasDeleted = deletedIds.has(id);
 
     if (options.json) {
       console.log(JSON.stringify({ error: wasDeleted ? `Lesson ${id} not found (deleted)` : `Lesson ${id} not found` }));
@@ -98,11 +98,11 @@ async function updateAction(id: string, options: UpdateOptions): Promise<void> {
     return;
   }
 
-  const { items } = await readMemoryItems(repoRoot);
+  const { items, deletedIds } = await readMemoryItems(repoRoot);
   const item = items.find((i) => i.id === id);
 
   if (!item) {
-    const wasDeleted = await wasLessonDeleted(repoRoot, id);
+    const wasDeleted = deletedIds.has(id);
     if (options.json) {
       console.log(JSON.stringify({ error: wasDeleted ? `Lesson ${id} is deleted` : `Lesson ${id} not found` }));
     } else {
@@ -152,7 +152,7 @@ async function updateAction(id: string, options: UpdateOptions): Promise<void> {
 async function deleteAction(ids: string[], options: { json?: boolean }): Promise<void> {
   const repoRoot = getRepoRoot();
 
-  const { items } = await readMemoryItems(repoRoot);
+  const { items, deletedIds } = await readMemoryItems(repoRoot);
   const itemMap = new Map(items.map((i) => [i.id, i]));
 
   const deleted: string[] = [];
@@ -162,8 +162,7 @@ async function deleteAction(ids: string[], options: { json?: boolean }): Promise
     const item = itemMap.get(id);
 
     if (!item) {
-      const wasDeleted = await wasLessonDeleted(repoRoot, id);
-      warnings.push({ id, message: wasDeleted ? 'already deleted' : 'not found' });
+      warnings.push({ id, message: deletedIds.has(id) ? 'already deleted' : 'not found' });
       continue;
     }
 

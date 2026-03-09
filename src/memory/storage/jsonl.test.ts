@@ -479,6 +479,25 @@ describe('JSONL storage', () => {
       expect(result.items[0]!.id).toBe('L001');
     });
 
+    it('returns deletedIds set with tombstoned IDs', async () => {
+      await appendMemoryItem(tempDir, createSolution('S001', 'keep'));
+      await appendMemoryItem(tempDir, createSolution('S002', 'delete me'));
+      await appendMemoryItem(tempDir, { ...createSolution('S002', 'delete me'), deleted: true, deletedAt: new Date().toISOString() });
+
+      const result = await readMemoryItems(tempDir);
+      expect(result.deletedIds).toBeInstanceOf(Set);
+      expect(result.deletedIds.has('S002')).toBe(true);
+      expect(result.deletedIds.has('S001')).toBe(false);
+    });
+
+    it('returns empty deletedIds when no tombstones exist', async () => {
+      await appendMemoryItem(tempDir, createSolution('S001', 'keep'));
+
+      const result = await readMemoryItems(tempDir);
+      expect(result.deletedIds).toBeInstanceOf(Set);
+      expect(result.deletedIds.size).toBe(0);
+    });
+
     it('converts legacy type:quick records to type:lesson', async () => {
       // Manually write a legacy record with type 'quick'
       const filePath = join(tempDir, LESSONS_PATH);

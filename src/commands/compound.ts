@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot } from '../cli-utils.js';
 import { clusterBySimilarity, synthesizePattern, writeCctPatterns } from '../compound/index.js';
-import { embedText, isModelUsable, withEmbedding } from '../memory/embeddings/index.js';
+import { embedText, isModelAvailable, withEmbedding } from '../memory/embeddings/index.js';
 import {
   closeDb,
   contentHash,
@@ -36,10 +36,9 @@ export function registerCompoundCommands(program: Command): void {
         return;
       }
 
-      // Check if embedding model is available
-      const modelCheck = await isModelUsable();
-      if (!modelCheck.usable) {
-        console.error(`Error: Embedding model unavailable — ${modelCheck.reason}`);
+      // Pre-flight check: model file exists (lightweight, no native allocation)
+      if (!isModelAvailable()) {
+        console.error('Error: Embedding model not found');
         console.error('Run: npx ca download-model');
         process.exitCode = 1;
         return;

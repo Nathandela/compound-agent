@@ -37,7 +37,7 @@ export { expectedGateForPhase, getPhaseState, registerPhaseCheckCommand, updateP
 export { registerRetrievalCommands } from './retrieval.js';
 
 // Re-export types and helpers from management modules
-export { formatLessonHuman, wasLessonDeleted } from './management-helpers.js';
+export { formatLessonHuman } from './management-helpers.js';
 export { getPrimeContext } from './management-prime.js';
 
 // Re-export shared utilities for use by cli.ts

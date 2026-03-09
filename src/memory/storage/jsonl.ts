@@ -59,6 +59,8 @@ export interface ReadLessonsResult {
 export interface ReadMemoryItemsResult {
   /** Successfully parsed memory items */
   items: MemoryItem[];
+  /** IDs that were tombstoned (deleted) */
+  deletedIds: Set<string>;
   /** Number of lines skipped due to errors */
   skippedCount: number;
 }
@@ -190,12 +192,13 @@ export async function readMemoryItems(
     content = await readFile(filePath, 'utf-8');
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
-      return { items: [], skippedCount: 0 };
+      return { items: [], deletedIds: new Set<string>(), skippedCount: 0 };
     }
     throw err;
   }
 
   const items = new Map<string, MemoryItem>();
+  const deletedIds = new Set<string>();
   let skippedCount = 0;
 
   const lines = content.split('\n');
@@ -212,6 +215,7 @@ export async function readMemoryItems(
     // Check if record is a tombstone (canonical or legacy)
     if (record.deleted === true) {
       items.delete(record.id);
+      deletedIds.add(record.id);
     } else {
       const item = toMemoryItem(record);
       if (item) {
@@ -220,7 +224,7 @@ export async function readMemoryItems(
     }
   }
 
-  return { items: Array.from(items.values()), skippedCount };
+  return { items: Array.from(items.values()), deletedIds, skippedCount };
 }
 
 /**

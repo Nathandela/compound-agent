@@ -17,7 +17,7 @@ export const out = {
   success: (msg: string): void => console.log(chalk.green('[ok]'), msg),
   error: (msg: string): void => console.error(chalk.red('[error]'), msg),
   info: (msg: string): void => console.log(chalk.blue('[info]'), msg),
-  warn: (msg: string): void => console.log(chalk.yellow('[warn]'), msg),
+  warn: (msg: string): void => console.error(chalk.yellow('[warn]'), msg),
 };
 
 /** Global options interface */

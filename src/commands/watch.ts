@@ -14,10 +14,8 @@ import type { Command } from 'commander';
 import chalk from 'chalk';
 
 import { getRepoRoot } from '../cli-utils.js';
+import { LOOP_EPIC_ID_PATTERN } from './loop.js';
 import { out } from './shared.js';
-
-/** Same pattern as LOOP_EPIC_ID_PATTERN in loop.ts */
-const EPIC_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
 
 // ============================================================================
 // Types
@@ -233,7 +231,7 @@ async function handleWatch(cmd: Command, options: WatchOptions): Promise<void> {
   let traceFile: string | null = null;
 
   if (options.epic) {
-    if (!EPIC_ID_PATTERN.test(options.epic)) {
+    if (!LOOP_EPIC_ID_PATTERN.test(options.epic)) {
       out.error(`Invalid epic ID: ${options.epic}`);
       process.exitCode = 1;
       return;
