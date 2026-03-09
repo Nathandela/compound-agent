@@ -268,7 +268,7 @@ pnpm lint             # Type check + ESLint
 
 | Script | Duration | Use Case |
 |--------|----------|----------|
-| `pnpm test:fast` | ~6s | Rapid feedback during development |
+| `pnpm test:fast` | ~12s | Rapid feedback during development |
 | `pnpm test` | ~60s | Full suite before committing |
 | `pnpm test:changed` | varies | Only tests affected by recent changes |
 | `pnpm test:watch` | - | Watch mode for TDD workflow |

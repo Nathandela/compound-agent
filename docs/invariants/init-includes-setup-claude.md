@@ -90,7 +90,7 @@ Initialize compound-agent in a repository with a single command that sets up:
 - Uses `getClaudeSettingsPath(false)` for project-local path
 - Uses `readClaudeSettings()` to load existing settings
 - Uses `hasClaudeHook()` to detect existing hooks
-- Uses `addCompoundAgentHook()` to insert hook
+- Uses `addAllCompoundAgentHooks()` to insert all hooks
 - Uses `writeClaudeSettings()` for atomic write
 - NO code duplication from `setup claude` command
 
@@ -429,7 +429,7 @@ To maintain DRY principle and ensure consistency:
    - `getClaudeSettingsPath(global: boolean)`
    - `readClaudeSettings(settingsPath: string)`
    - `hasClaudeHook(settings: Record<string, unknown>)`
-   - `addCompoundAgentHook(settings: Record<string, unknown>)`
+   - `addAllCompoundAgentHooks(settings: Record<string, unknown>)`
    - `writeClaudeSettings(settingsPath: string, settings: Record<string, unknown>)`
 
 2. `init` command calls these functions with `global: false` (project-local)
