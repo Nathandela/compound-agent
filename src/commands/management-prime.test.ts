@@ -681,7 +681,7 @@ describe('Property-Based Tests: Prime Command Invariants', () => {
         ),
       ],
       { numRuns: FC_RUNS }
-    )('output never contains lesson ID patterns (L + 8 hex)', async (lessons) => {
+    )('output never contains lesson ID patterns (L + hex)', async (lessons) => {
       for (const lesson of lessons) {
         await appendLesson(
           tempDir,
@@ -696,8 +696,8 @@ describe('Property-Based Tests: Prime Command Invariants', () => {
         expect(output).not.toContain(lesson.id);
       }
 
-      // Should not match the pattern L[a-f0-9]{8}
-      const idMatches = output.match(/L[a-f0-9]{8}/g);
+      // Should not match the pattern L[a-f0-9]{8,16}
+      const idMatches = output.match(/L[a-f0-9]{8,16}/g);
       expect(idMatches).toBeNull();
     });
   });

@@ -35,7 +35,12 @@ export async function readCctPatterns(repoRoot: string): Promise<CctPattern[]> {
     const trimmed = line.trim();
     if (!trimmed) continue;
 
-    const parsed = JSON.parse(trimmed) as unknown;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(trimmed);
+    } catch {
+      continue; // Skip malformed JSONL lines
+    }
     const result = CctPatternSchema.safeParse(parsed);
     if (result.success) {
       patterns.push(result.data);

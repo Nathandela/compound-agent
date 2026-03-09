@@ -14,8 +14,6 @@ import type { MemoryItem } from '../memory/index.js';
 
 import { formatError } from '../cli-error-format.js';
 
-import { JSON_INDENT_SPACES } from './shared.js';
-
 // ============================================================================
 // Action Handlers
 // ============================================================================
@@ -42,7 +40,10 @@ async function exportAction(options: { since?: string; tags?: string }): Promise
     filtered = filtered.filter((item) => item.tags.some((tag) => filterTags.includes(tag)));
   }
 
-  console.log(JSON.stringify(filtered, null, JSON_INDENT_SPACES));
+  // Output as JSONL (one JSON object per line) for round-trip compatibility with import
+  for (const item of filtered) {
+    console.log(JSON.stringify(item));
+  }
 }
 
 async function importAction(file: string): Promise<void> {

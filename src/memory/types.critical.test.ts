@@ -499,9 +499,9 @@ describe('generateId', () => {
       generateId('a much longer insight string that contains many words'),
       generateId(''),
     ];
-    // All IDs should be same length (L + 8 hex chars = 9)
+    // All IDs should be same length (L + 16 hex chars = 17)
     for (const id of ids) {
-      expect(id.length).toBe(9);
+      expect(id.length).toBe(17);
     }
   });
 });
@@ -542,8 +542,8 @@ describe('Property-Based Tests: Type Unification', () => {
     good: fc.string({ minLength: 1, maxLength: 200 }),
   });
 
-  // Helper to generate hex ID (L + 8 hex chars)
-  const lessonIdArb = fc.integer({ min: 0, max: 0xffffffff }).map((n) => `L${n.toString(16).padStart(8, '0')}`);
+  // Helper to generate hex ID (L + 16 hex chars)
+  const lessonIdArb = fc.bigInt({ min: 0n, max: 0xffffffffffffffffn }).map((n) => `L${n.toString(16).padStart(16, '0')}`);
 
   // Base lesson arbitrary (fields common to all lessons)
   const baseLessonFieldsArb = fc.record({
@@ -657,15 +657,15 @@ describe('Property-Based Tests: Type Unification', () => {
       'generateId always produces format L[0-9a-f]{8}',
       (insight) => {
         const id = generateId(insight);
-        expect(id).toMatch(/^L[0-9a-f]{8}$/);
+        expect(id).toMatch(/^L[0-9a-f]{16}$/);
       }
     );
 
     test.prop([fc.string({ minLength: 0, maxLength: 1000 })], { numRuns: FC_RUNS })(
-      'generateId always produces length 9',
+      'generateId always produces length 17',
       (insight) => {
         const id = generateId(insight);
-        expect(id.length).toBe(9);
+        expect(id.length).toBe(17);
       }
     );
   });
@@ -1224,27 +1224,27 @@ describe('MemoryItem unified schema', () => {
   describe('ID generation with type prefix', () => {
     it('generateId with lesson type returns L prefix', () => {
       const id = generateId('test insight', 'lesson');
-      expect(id).toMatch(/^L[a-f0-9]{8}$/);
+      expect(id).toMatch(/^L[a-f0-9]{16}$/);
     });
 
     it('generateId with solution type returns S prefix', () => {
       const id = generateId('test insight', 'solution');
-      expect(id).toMatch(/^S[a-f0-9]{8}$/);
+      expect(id).toMatch(/^S[a-f0-9]{16}$/);
     });
 
     it('generateId with pattern type returns P prefix', () => {
       const id = generateId('test insight', 'pattern');
-      expect(id).toMatch(/^P[a-f0-9]{8}$/);
+      expect(id).toMatch(/^P[a-f0-9]{16}$/);
     });
 
     it('generateId with preference type returns R prefix', () => {
       const id = generateId('test insight', 'preference');
-      expect(id).toMatch(/^R[a-f0-9]{8}$/);
+      expect(id).toMatch(/^R[a-f0-9]{16}$/);
     });
 
     it('generateId without type defaults to L prefix (backward compat)', () => {
       const id = generateId('test insight');
-      expect(id).toMatch(/^L[a-f0-9]{8}$/);
+      expect(id).toMatch(/^L[a-f0-9]{16}$/);
     });
 
     it('generateId is deterministic for same insight and type', () => {

@@ -63,9 +63,10 @@ async function readPlanFromStdin(): Promise<string | undefined> {
     const chunks: Buffer[] = [];
     let totalBytes = 0;
 
-    const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('stdin read timed out after 30s')), STDIN_TIMEOUT_MS)
-    );
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timerId = setTimeout(() => reject(new Error('stdin read timed out after 30s')), STDIN_TIMEOUT_MS);
+    });
 
     const read = (async (): Promise<string> => {
       for await (const chunk of stdin) {
@@ -84,6 +85,8 @@ async function readPlanFromStdin(): Promise<string | undefined> {
     } catch (err) {
       console.error(`Warning: ${err instanceof Error ? err.message : String(err)}`);
       return undefined;
+    } finally {
+      clearTimeout(timerId);
     }
   }
   return undefined;

@@ -261,14 +261,14 @@ const TYPE_PREFIXES: Record<MemoryItemType, string> = {
 
 /**
  * Generate deterministic memory item ID from insight text.
- * Format: {prefix} + 8 hex characters from SHA-256 hash.
+ * Format: {prefix} + 16 hex characters from SHA-256 hash (64 bits of entropy).
  *
  * @param insight - The insight text to hash
  * @param type - Memory item type (default: 'lesson' for backward compat)
- * @returns ID string like L1a2b3c4d, S1a2b3c4d, P1a2b3c4d, or R1a2b3c4d
+ * @returns ID string like L1a2b3c4d5e6f7g8h
  */
 export function generateId(insight: string, type?: MemoryItemType): string {
   const prefix = TYPE_PREFIXES[type ?? 'lesson'];
   const hash = createHash('sha256').update(insight).digest('hex');
-  return `${prefix}${hash.slice(0, 8)}`;
+  return `${prefix}${hash.slice(0, 16)}`;
 }
