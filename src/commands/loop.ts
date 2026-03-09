@@ -19,6 +19,16 @@ import {
   buildPromptFunction,
   buildStreamExtractor,
 } from './loop-templates.js';
+import {
+  buildReviewConfig,
+  buildReviewerDetection,
+  buildSessionIdManagement,
+  buildReviewPrompt,
+  buildSpawnReviewers,
+  buildImplementerPhase,
+  buildReviewLoop,
+} from './loop-review-templates.js';
+import { VALID_LOOP_REVIEWERS } from '../config/index.js';
 import { out } from './shared.js';
 
 /** Safe pattern for epic IDs in loop scripts: extends cli-utils EPIC_ID_PATTERN with dots for version-like IDs */
@@ -31,6 +41,11 @@ export interface LoopScriptOptions {
   epics?: string[];
   maxRetries: number;
   model: string;
+  reviewers?: string[];
+  maxReviewCycles?: number;
+  reviewBlocking?: boolean;
+  reviewModel?: string;
+  reviewEvery?: number;
 }
 
 interface LoopOptions {
@@ -39,6 +54,11 @@ interface LoopOptions {
   maxRetries?: string;
   model?: string;
   force?: boolean;
+  reviewers?: string[];
+  reviewEvery?: string;
+  maxReviewCycles?: string;
+  reviewBlocking?: boolean;
+  reviewModel?: string;
 }
 
 function buildScriptHeader(timestamp: string, maxRetries: number, model: string, epicIds: string): string {
@@ -119,6 +139,16 @@ function validateOptions(options: LoopScriptOptions): void {
       }
     }
   }
+  if (options.reviewers) {
+    for (const name of options.reviewers) {
+      if (!(VALID_LOOP_REVIEWERS as readonly string[]).includes(name)) {
+        throw new Error(`Invalid reviewer "${name}". Valid: ${VALID_LOOP_REVIEWERS.join(', ')}`);
+      }
+    }
+    if (options.reviewModel && !MODEL_PATTERN.test(options.reviewModel)) {
+      throw new Error(`Invalid review model "${options.reviewModel}": must match ${MODEL_PATTERN}`);
+    }
+  }
 }
 
 /**
@@ -129,12 +159,32 @@ export function generateLoopScript(options: LoopScriptOptions): string {
 
   const epicIds = options.epics?.join(' ') ?? '';
   const timestamp = new Date().toISOString();
+  const hasReview = options.reviewers && options.reviewers.length > 0;
 
-  return buildScriptHeader(timestamp, options.maxRetries, options.model, epicIds)
+  let script = buildScriptHeader(timestamp, options.maxRetries, options.model, epicIds)
     + buildStreamExtractor()
     + buildMarkerDetection()
-    + buildObservability()
-    + buildMainLoop();
+    + buildObservability();
+
+  if (hasReview) {
+    script += buildReviewConfig({
+      reviewers: options.reviewers!,
+      maxReviewCycles: options.maxReviewCycles ?? 3,
+      reviewBlocking: options.reviewBlocking ?? false,
+      reviewModel: options.reviewModel ?? 'claude-opus-4-6',
+      reviewEvery: options.reviewEvery ?? 0,
+    });
+    script += buildReviewerDetection();
+    script += buildSessionIdManagement();
+    script += buildReviewPrompt();
+    script += buildSpawnReviewers();
+    script += buildImplementerPhase();
+    script += buildReviewLoop();
+  }
+
+  script += buildMainLoop(hasReview ? { hasReview: true, reviewEvery: options.reviewEvery ?? 0 } : undefined);
+
+  return script;
 }
 
 async function handleLoop(cmd: Command, options: LoopOptions): Promise<void> {
@@ -156,12 +206,20 @@ async function handleLoop(cmd: Command, options: LoopOptions): Promise<void> {
     return;
   }
 
+  const reviewEvery = Number(options.reviewEvery ?? 0);
+  const maxReviewCycles = Number(options.maxReviewCycles ?? 3);
+
   let script: string;
   try {
     script = generateLoopScript({
       epics: options.epics,
       maxRetries,
       model: options.model ?? 'claude-opus-4-6',
+      reviewers: options.reviewers,
+      reviewEvery,
+      maxReviewCycles,
+      reviewBlocking: options.reviewBlocking,
+      reviewModel: options.reviewModel ?? 'claude-opus-4-6',
     });
   } catch (err) {
     out.error((err as Error).message);
@@ -190,6 +248,11 @@ export function registerLoopCommands(program: Command): void {
     .option('--max-retries <n>', 'Max retries per epic on failure', '1')
     .option('--model <model>', 'Claude model to use', 'claude-opus-4-6')
     .option('--force', 'Overwrite existing script')
+    .option('--review-every <n>', 'Review every N completed epics (0=end-only)', '0')
+    .option('--reviewers <names...>', 'Reviewers to use (claude-sonnet claude-opus gemini codex)')
+    .option('--max-review-cycles <n>', 'Max review/fix iterations', '3')
+    .option('--review-blocking', 'Fail loop if review not approved after max cycles')
+    .option('--review-model <model>', 'Model for implementer fix sessions', 'claude-opus-4-6')
     .action(async function (this: Command, options: LoopOptions) {
       await handleLoop(this, options);
     });

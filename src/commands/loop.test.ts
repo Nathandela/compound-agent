@@ -292,6 +292,99 @@ describe('generateLoopScript', () => {
     expect(() => generateLoopScript({ maxRetries: 1, model: 'org/model:latest' })).not.toThrow();
   });
 
+  // ========================================================================
+  // Review phase options
+  // ========================================================================
+
+  it('does not include review functions when no reviewers specified', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).not.toContain('run_review_phase');
+    expect(script).not.toContain('detect_reviewers');
+  });
+
+  it('includes review functions when reviewers specified', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet', 'gemini'],
+      maxReviewCycles: 3,
+      reviewBlocking: false,
+      reviewModel: 'claude-opus-4-6',
+      reviewEvery: 2,
+    });
+    expect(script).toContain('run_review_phase');
+    expect(script).toContain('detect_reviewers');
+  });
+
+  it('sets REVIEW_EVERY from options', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      maxReviewCycles: 3,
+      reviewBlocking: false,
+      reviewModel: 'claude-opus-4-6',
+      reviewEvery: 5,
+    });
+    expect(script).toContain('REVIEW_EVERY=5');
+  });
+
+  it('sets REVIEW_BLOCKING from options', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      maxReviewCycles: 3,
+      reviewBlocking: true,
+      reviewModel: 'claude-opus-4-6',
+      reviewEvery: 0,
+    });
+    expect(script).toContain('REVIEW_BLOCKING=true');
+  });
+
+  it('rejects invalid reviewer names', () => {
+    expect(() => generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['invalid-reviewer'],
+      maxReviewCycles: 3,
+      reviewBlocking: false,
+      reviewModel: 'claude-opus-4-6',
+      reviewEvery: 0,
+    })).toThrow(/reviewer/i);
+  });
+
+  it('accepts all valid reviewer names', () => {
+    expect(() => generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet', 'claude-opus', 'gemini', 'codex'],
+      maxReviewCycles: 3,
+      reviewBlocking: false,
+      reviewModel: 'claude-opus-4-6',
+      reviewEvery: 0,
+    })).not.toThrow();
+  });
+
+  it('passes /bin/bash -n with review phase included', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet', 'claude-opus', 'gemini', 'codex'],
+      maxReviewCycles: 3,
+      reviewBlocking: false,
+      reviewModel: 'claude-opus-4-6',
+      reviewEvery: 2,
+    });
+    const tmpFile = join('/tmp', `loop-review-syntax-${Date.now()}.sh`);
+    writeFileSync(tmpFile, script);
+    try {
+      execSync(`/bin/bash -n "${tmpFile}"`, { encoding: 'utf-8' });
+    } finally {
+      try { execSync(`rm -f "${tmpFile}"`); } catch { /* cleanup */ }
+    }
+  });
+
   // P0: macOS ships bash 3.2 which misparses case `)` inside $() as closing the subshell
   it('passes /bin/bash -n syntax check (macOS bash 3.2 compat)', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });

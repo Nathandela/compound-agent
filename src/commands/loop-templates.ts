@@ -249,14 +249,41 @@ export function buildSessionRunner(): string {
     esac`;
 }
 
-export function buildMainLoop(): string {
+export interface MainLoopReviewOptions {
+  hasReview: boolean;
+  reviewEvery: number;
+}
+
+export function buildMainLoop(reviewOptions?: MainLoopReviewOptions): string {
+  const hasReview = reviewOptions?.hasReview ?? false;
+  const reviewEvery = reviewOptions?.reviewEvery ?? 0;
+
+  const reviewCounterInit = hasReview ? '\nCOMPLETED_SINCE_REVIEW=0\nREVIEW_DIFF_RANGE="HEAD"' : '';
+  const reviewPeriodicTrigger = hasReview && reviewEvery > 0
+    ? `
+    COMPLETED_SINCE_REVIEW=$((COMPLETED_SINCE_REVIEW + 1))
+    if [ "$COMPLETED_SINCE_REVIEW" -ge "$REVIEW_EVERY" ]; then
+      REVIEW_DIFF_RANGE="HEAD~$COMPLETED_SINCE_REVIEW..HEAD"
+      run_review_phase "periodic"
+      COMPLETED_SINCE_REVIEW=0
+    fi`
+    : '';
+  const reviewFinalTrigger = hasReview
+    ? `
+if [ "$COMPLETED" -gt 0 ]; then
+  REVIEW_DIFF_RANGE="HEAD~$COMPLETED..HEAD"
+  run_review_phase "final"
+fi
+`
+    : '';
+
   return `
 # Main loop
 COMPLETED=0
 FAILED=0
 SKIPPED=0
 PROCESSED=""
-LOOP_START=$(date +%s)
+LOOP_START=$(date +%s)${reviewCounterInit}
 
 log "Infinity loop starting"
 log "Config: max_retries=$MAX_RETRIES model=$MODEL"
@@ -304,7 +331,7 @@ while true; do
   if [ "$SUCCESS" = true ]; then
     COMPLETED=$((COMPLETED + 1))
     log_result "$EPIC_ID" "complete" "$ATTEMPT" "$EPIC_DURATION"
-    log "Epic $EPIC_ID done. Completed so far: $COMPLETED"
+    log "Epic $EPIC_ID done. Completed so far: $COMPLETED"${reviewPeriodicTrigger}
   elif [ "$SUCCESS" = skip ]; then
     SKIPPED=$((SKIPPED + 1))
     log_result "$EPIC_ID" "skipped" "$ATTEMPT" "$EPIC_DURATION"
@@ -319,7 +346,7 @@ while true; do
 
   PROCESSED="$PROCESSED $EPIC_ID"
 done
-
+${reviewFinalTrigger}
 TOTAL_DURATION=$(( $(date +%s) - LOOP_START ))
 echo "{\\"type\\":\\"summary\\",\\"completed\\":$COMPLETED,\\"failed\\":$FAILED,\\"skipped\\":$SKIPPED,\\"total_duration_s\\":$TOTAL_DURATION}" >> "$EXEC_LOG"
 write_status "idle"
