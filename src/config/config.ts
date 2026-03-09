@@ -12,6 +12,10 @@ export const CONFIG_FILENAME = 'compound-agent.json';
 
 /** Valid external reviewer tool names. */
 export const VALID_REVIEWERS = ['gemini', 'codex'] as const;
+
+/** Valid reviewer names for the infinity loop review phase. */
+export const VALID_LOOP_REVIEWERS = ['claude-sonnet', 'claude-opus', 'gemini', 'codex'] as const;
+export type LoopReviewerName = (typeof VALID_LOOP_REVIEWERS)[number];
 export type ReviewerName = (typeof VALID_REVIEWERS)[number];
 
 /** Shape of .claude/compound-agent.json */

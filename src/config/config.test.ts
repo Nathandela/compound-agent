@@ -12,6 +12,7 @@ import {
   disableReviewer,
   CONFIG_FILENAME,
   VALID_REVIEWERS,
+  VALID_LOOP_REVIEWERS,
 } from './index.js';
 
 let tempDir: string;
@@ -35,6 +36,19 @@ describe('VALID_REVIEWERS', () => {
   it('includes gemini and codex', () => {
     expect(VALID_REVIEWERS).toContain('gemini');
     expect(VALID_REVIEWERS).toContain('codex');
+  });
+});
+
+describe('VALID_LOOP_REVIEWERS', () => {
+  it('includes claude-sonnet, claude-opus, gemini, codex', () => {
+    expect(VALID_LOOP_REVIEWERS).toContain('claude-sonnet');
+    expect(VALID_LOOP_REVIEWERS).toContain('claude-opus');
+    expect(VALID_LOOP_REVIEWERS).toContain('gemini');
+    expect(VALID_LOOP_REVIEWERS).toContain('codex');
+  });
+
+  it('has exactly 4 entries', () => {
+    expect(VALID_LOOP_REVIEWERS).toHaveLength(4);
   });
 });
 
