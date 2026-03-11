@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **PhD research output path**: `/compound:get-a-phd` now writes user-generated research to `docs/research/` instead of `docs/compound/research/`. The `docs/compound/` directory is reserved for shipped library content; project-specific research no longer pollutes it. Overlap scanning checks both directories.
+
 ## [1.7.3] - 2026-03-09
 
 ### Added

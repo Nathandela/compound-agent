@@ -28,7 +28,8 @@ For each proposed topic, define:
 ## Gap Analysis
 
 Before proposing topics, scan ALL of `docs/` for existing coverage:
-- `docs/research/` — existing research documents (dev repo) / `docs/compound/research/` (consumer repos)
+- `docs/research/` — project-specific research (user-generated via get-a-phd)
+- `docs/compound/research/` — shipped research from compound-agent package
 - `docs/standards/` — coding standards that may already cover the topic
 - `docs/adr/` — architecture decisions with rationale
 - `docs/invariants/` — formal invariants that document domain knowledge

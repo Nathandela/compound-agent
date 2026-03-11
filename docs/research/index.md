@@ -65,7 +65,7 @@ Use `/compound:get-a-phd` to produce new research documents. The command:
 2. Checks all `docs/` for existing coverage
 3. Proposes PhD topics for user confirmation
 4. Spawns parallel researcher subagents
-5. Stores output at `docs/compound/research/<topic>/<slug>.md`
+5. Stores output at `docs/research/<topic>/<slug>.md`
 
 ## How Agents Use Research
 

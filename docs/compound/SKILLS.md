@@ -64,9 +64,9 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **Purpose**: Conduct deep, PhD-level research to build knowledge for working subagents.
 
-**When invoked**: When agents need domain knowledge not yet covered in `docs/compound/research/`.
+**When invoked**: When agents need domain knowledge not yet covered in `docs/research/`.
 
-**What it does**: Analyzes beads epics for knowledge gaps, checks existing docs coverage, proposes research topics for user confirmation, spawns parallel researcher subagents, and stores output at `docs/compound/research/<topic>/<slug>.md`.
+**What it does**: Analyzes beads epics for knowledge gaps, checks existing docs coverage, proposes research topics for user confirmation, spawns parallel researcher subagents, and stores output at `docs/research/<topic>/<slug>.md`.
 
 ### `/compound:agentic-audit`
 

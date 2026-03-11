@@ -111,7 +111,7 @@ $ARGUMENTS
 
 **MANDATORY FIRST STEP -- NON-NEGOTIABLE**: Use the Read tool to open and read \`.claude/skills/compound/researcher/SKILL.md\` NOW. Do NOT proceed until you have read the complete skill file.
 
-Then: scan docs/compound/research/ for gaps, propose topics via AskUserQuestion, spawn parallel researcher subagents.
+Then: scan docs/research/ and docs/compound/research/ for gaps, propose topics via AskUserQuestion, spawn parallel researcher subagents.
 `,
 
   'agentic-audit.md': `---

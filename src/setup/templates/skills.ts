@@ -414,7 +414,7 @@ description: Deep research producing structured survey documents for informed de
 # Researcher Skill
 
 ## Overview
-Conduct deep research on a topic and produce a structured survey document following the project's research template. This skill spawns parallel research subagents to gather comprehensive information, then synthesizes findings into a PhD-depth document stored in \`docs/compound/research/\`.
+Conduct deep research on a topic and produce a structured survey document following the project's research template. This skill spawns parallel research subagents to gather comprehensive information, then synthesizes findings into a PhD-depth document stored in \`docs/research/\`.
 
 ## Methodology
 1. Identify the research question, scope, and exclusions
@@ -435,16 +435,16 @@ Conduct deep research on a topic and produce a structured survey document follow
    - Conclusion
    - References (full citations)
    - Practitioner Resources (annotated tools/repos)
-6. Store output at \`docs/compound/research/<topic-slug>.md\` (kebab-case filename)
+6. Store output at \`docs/research/<topic-slug>.md\` (kebab-case filename)
 7. Report key findings back for upstream skill (spec-dev/plan) to act on
 
 ## Memory Integration
 - Run \`npx ca search\` with topic keywords before starting research
-- Check for existing research docs in \`docs/compound/research/\` that overlap
+- Check for existing research docs in \`docs/research/\` and \`docs/compound/research/\` that overlap
 - After completion, key findings can be captured via \`npx ca learn\`
 
 ## Docs Integration
-- Scan \`docs/compound/research/\` for prior survey documents on related topics
+- Scan \`docs/research/\` and \`docs/compound/research/\` for prior survey documents on related topics
 - Check \`docs/decisions/\` for ADRs that inform or constrain the research scope
 - Reference existing project docs as primary sources where relevant
 
