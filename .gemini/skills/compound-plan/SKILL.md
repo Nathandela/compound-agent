@@ -9,7 +9,7 @@ description: Decompose work into small testable tasks with clear dependencies
 Create a concrete implementation plan by decomposing work into small, testable tasks with dependencies and acceptance criteria.
 
 ## Methodology
-1. Read the spec from the epic description (`bd show <epic>`) for EARS requirements, decisions, and open questions
+1. Read the spec from the epic description (`bd show <epic>`) for EARS requirements, decisions, and open questions. Verify its type is `epic` -- if it was created as `task`, fix with `bd update <id> --type=epic`
 2. Search memory with `npx ca search` and docs with `npx ca knowledge "relevant topic"` for architectural patterns and past mistakes
 3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
    - Available agents: `.claude/agents/compound/repo-analyst.md`, `memory-analyst.md`

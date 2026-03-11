@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { PHASE_SKILLS, PHASE_SKILL_REFERENCES } from './skills.js';
 
-const EXPECTED_KEYS = ['spec-dev', 'plan', 'work', 'review', 'compound', 'researcher', 'cook-it', 'test-cleaner', 'agentic'];
+const EXPECTED_KEYS = ['spec-dev', 'plan', 'work', 'review', 'compound', 'researcher', 'cook-it', 'test-cleaner', 'agentic', 'architect'];
 
 describe('PHASE_SKILLS', () => {
-  it('has exactly 9 entries', () => {
-    expect(Object.keys(PHASE_SKILLS)).toHaveLength(9);
+  it('has exactly 10 entries', () => {
+    expect(Object.keys(PHASE_SKILLS)).toHaveLength(10);
   });
 
   it('has all expected keys', () => {
@@ -27,13 +27,16 @@ describe('PHASE_SKILLS', () => {
     }
   });
 
-  it('every phase skill has a ## Methodology section (cook-it uses Phase Execution Protocol, agentic uses Audit/Setup Methodology)', () => {
+  it('every phase skill has a ## Methodology section (cook-it uses Phase Execution Protocol, agentic uses Audit/Setup Methodology, architect uses Phase N)', () => {
     for (const [key, content] of Object.entries(PHASE_SKILLS)) {
       if (key === 'cook-it') {
         expect(content, `${key} missing ## Phase Execution Protocol`).toContain('## Phase Execution Protocol');
       } else if (key === 'agentic') {
         expect(content, `${key} missing ## Audit Methodology`).toContain('## Audit Methodology');
         expect(content, `${key} missing ## Setup Methodology`).toContain('## Setup Methodology');
+      } else if (key === 'architect') {
+        expect(content, `${key} missing ## Phase 1`).toContain('## Phase 1');
+        expect(content, `${key} missing ## Phase 4`).toContain('## Phase 4');
       } else {
         expect(content, `${key} missing ## Methodology`).toContain('## Methodology');
       }
@@ -262,6 +265,69 @@ describe('PHASE_SKILLS', () => {
     const skill = PHASE_SKILLS.agentic;
     expect(skill).toContain('Mode is set by the calling command');
     expect(skill).not.toMatch(/Parse.*\$ARGUMENTS.*to determine mode/);
+  });
+
+  // --- architect skill ---
+
+  it('architect skill has 4 phases: Socratic, Spec, Decompose, Materialize', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toContain('Socratic');
+    expect(skill).toContain('Spec');
+    expect(skill).toContain('Decompose');
+    expect(skill).toContain('Materialize');
+  });
+
+  it('architect skill has 3 human gates (AskUserQuestion)', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toContain('AskUserQuestion');
+    // Should reference gates between phases
+    expect(skill).toMatch(/Gate.*1|Gate.*Socratic/i);
+    expect(skill).toMatch(/Gate.*2|Gate.*Spec/i);
+    expect(skill).toMatch(/Gate.*3|Gate.*Decompose/i);
+  });
+
+  it('architect skill references DDD bounded contexts for decomposition', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/bounded context/i);
+  });
+
+  it('architect skill references 4 subagent roles for decomposition', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/context mapper/i);
+    expect(skill).toMatch(/dependency analyst/i);
+    expect(skill).toMatch(/scope sizer/i);
+    expect(skill).toMatch(/interface designer/i);
+  });
+
+  it('architect skill produces interface contracts between epics', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/interface contract/i);
+  });
+
+  it('architect skill creates beads via bd create', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toContain('bd create');
+  });
+
+  it('architect skill wires dependencies via bd dep add', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toContain('bd dep add');
+  });
+
+  it('architect skill writes spec to docs/specs/', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toContain('docs/specs/');
+  });
+
+  it('architect skill references EARS notation', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toContain('EARS');
+  });
+
+  it('architect skill references memory search', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toContain('npx ca search');
+    expect(skill).toContain('npx ca knowledge');
   });
 });
 

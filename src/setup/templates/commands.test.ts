@@ -13,6 +13,7 @@ const PHASE_FILENAMES = [
   'get-a-phd.md',
   'agentic-audit.md',
   'agentic-setup.md',
+  'architect.md',
 ];
 
 const UTILITY_FILENAMES = [
@@ -32,8 +33,8 @@ const REMOVED_CLI_WRAPPERS = [
 ];
 
 describe('WORKFLOW_COMMANDS', () => {
-  it('has exactly 14 entries (11 phase + 3 utility)', () => {
-    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(14);
+  it('has exactly 15 entries (12 phase + 3 utility)', () => {
+    expect(Object.keys(WORKFLOW_COMMANDS)).toHaveLength(15);
   });
 
   it('has all expected filenames', () => {
@@ -141,6 +142,10 @@ describe('WORKFLOW_COMMANDS', () => {
 
     it('agentic-setup.md indicates setup mode', () => {
       expect(WORKFLOW_COMMANDS['agentic-setup.md']).toMatch(/setup/i);
+    });
+
+    it('architect.md references architect skill file', () => {
+      expect(WORKFLOW_COMMANDS['architect.md']).toContain('.claude/skills/compound/architect/SKILL.md');
     });
 
     it('phase commands do NOT have Key steps summaries (forces reading the skill)', () => {

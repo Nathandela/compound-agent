@@ -27,6 +27,7 @@
 {"created_at":"2026-03-09T07:24:40Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-wem","issue_id":"learning_agent-40c","type":"blocks"}
 {"created_at":"2026-03-11T20:49:53Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-m3im","issue_id":"learning_agent-4ejw","type":"blocks"}
 {"created_at":"2026-03-11T20:49:53Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-pc8y","issue_id":"learning_agent-4ejw","type":"blocks"}
+{"created_at":"2026-03-11T21:36:40Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-sf60","issue_id":"learning_agent-5hsx","type":"blocks"}
 {"created_at":"2026-03-04T21:08:15Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-026","issue_id":"learning_agent-5ih","type":"blocks"}
 {"created_at":"2026-03-04T21:08:16Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-1o0","issue_id":"learning_agent-5ih","type":"blocks"}
 {"created_at":"2026-03-04T21:08:15Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-5lp","issue_id":"learning_agent-5ih","type":"blocks"}
@@ -152,6 +153,8 @@
 {"created_at":"2026-02-28T08:28:08Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-s3m.5","issue_id":"learning_agent-s3m.8","type":"blocks"}
 {"created_at":"2026-02-28T08:28:08Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-s3m.6","issue_id":"learning_agent-s3m.8","type":"blocks"}
 {"created_at":"2026-02-28T08:28:08Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-s3m.7","issue_id":"learning_agent-s3m.8","type":"blocks"}
+{"created_at":"2026-03-11T21:36:40Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-chrm","issue_id":"learning_agent-sf60","type":"blocks"}
+{"created_at":"2026-03-11T21:36:39Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-vnhd","issue_id":"learning_agent-sf60","type":"blocks"}
 {"created_at":"2026-02-22T11:39:50Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-tep","issue_id":"learning_agent-szq","type":"blocks"}
 {"created_at":"2026-03-09T08:33:57Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-onq","issue_id":"learning_agent-tlw","type":"blocks"}
 {"created_at":"2026-03-09T08:33:56Z","created_by":"Nathan Delacrétaz","depends_on_id":"learning_agent-pc4","issue_id":"learning_agent-tlw","type":"blocks"}

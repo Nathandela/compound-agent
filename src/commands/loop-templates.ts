@@ -5,8 +5,51 @@
  * Separated from loop.ts to stay within max-lines.
  */
 
-export function buildEpicSelector(): string {
+export function buildDependencyCheck(): string {
   return `
+# check_deps_closed() - Verify all depends_on for an epic are closed
+# Returns 0 if all deps closed (or no deps), 1 if any dep is open
+# Uses the depends_on array from bd show --json (objects with .id/.status)
+check_deps_closed() {
+  local epic_id="$1"
+  local deps_json
+  deps_json=$(bd show "$epic_id" --json 2>/dev/null || echo "")
+  if [ -z "$deps_json" ]; then
+    return 0
+  fi
+  local blocking_dep
+  if [ "$HAS_JQ" = true ]; then
+    blocking_dep=$(echo "$deps_json" | jq -r '
+      if type == "array" then .[0] else . end |
+      (.depends_on // .dependencies // []) |
+      map(select(.status != "closed")) |
+      .[0].id // empty
+    ' 2>/dev/null || echo "")
+  else
+    blocking_dep=$(echo "$deps_json" | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+if isinstance(data, list):
+    data = data[0] if data else {}
+deps = data.get('depends_on', data.get('dependencies', []))
+for d in deps:
+    s = d.get('status', 'open') if isinstance(d, dict) else 'open'
+    if s != 'closed':
+        print(d.get('id', d) if isinstance(d, dict) else d)
+        break
+" 2>/dev/null || echo "")
+  fi
+  if [ -n "$blocking_dep" ]; then
+    log "Skip $epic_id: blocked by dependency $blocking_dep (not closed)"
+    return 1
+  fi
+  return 0
+}
+`;
+}
+
+export function buildEpicSelector(): string {
+  return buildDependencyCheck() + `
 get_next_epic() {
   if [ -n "$EPIC_IDS" ]; then
     for epic_id in $EPIC_IDS; do
@@ -14,6 +57,7 @@ get_next_epic() {
       local status
       status=$(bd show "$epic_id" --json 2>/dev/null | parse_json '.status' 2>/dev/null || echo "")
       if [ "$status" = "open" ]; then
+        check_deps_closed "$epic_id" || continue
         echo "$epic_id"
         return 0
       fi
@@ -24,6 +68,7 @@ get_next_epic() {
     if [ "$HAS_JQ" = true ]; then
       epic_id=$(bd list --type=epic --ready --json --limit=10 2>/dev/null | jq -r '.[].id' 2>/dev/null | while read -r id; do
         case " $PROCESSED " in (*" $id "*) continue ;; esac
+        check_deps_closed "$id" || continue
         echo "$id"
         break
       done)
@@ -36,6 +81,9 @@ for item in items:
     if item['id'] not in processed:
         print(item['id'])
         break" 2>/dev/null || echo "")
+      if [ -n "$epic_id" ]; then
+        check_deps_closed "$epic_id" || epic_id=""
+      fi
     fi
     if [ -z "$epic_id" ]; then
       return 1

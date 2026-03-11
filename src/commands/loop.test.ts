@@ -453,6 +453,44 @@ describe('generateLoopScript', () => {
     }
   });
 
+  // ========================================================================
+  // Dependency-aware epic selection (R29-R30)
+  // ========================================================================
+
+  it('get_next_epic checks dependencies before selecting an epic', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Should check depends_on status from bd show --json
+    expect(script).toMatch(/depends_on|dependencies/);
+  });
+
+  it('defines a check_deps_closed helper function', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).toMatch(/check_deps_closed\s*\(\)/);
+  });
+
+  it('skips epic when dependencies are not all closed', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // Should log when skipping due to open deps
+    expect(script).toMatch(/blocked.*dep|dep.*not.*closed|skip.*dep/i);
+  });
+
+  it('dependency check uses bd show --json for each candidate epic', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // The dependency check should parse the JSON output
+    expect(script).toMatch(/bd show.*--json.*depends_on|depends_on.*bd show.*--json/s);
+  });
+
+  it('passes /bin/bash -n syntax check with dependency checking', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    const tmpFile = join('/tmp', `loop-deps-syntax-${Date.now()}.sh`);
+    writeFileSync(tmpFile, script);
+    try {
+      execSync(`/bin/bash -n "${tmpFile}"`, { encoding: 'utf-8' });
+    } finally {
+      try { execSync(`rm -f "${tmpFile}"`); } catch { /* cleanup */ }
+    }
+  });
+
   // P0: macOS ships bash 3.2 which misparses case `)` inside $() as closing the subshell
   it('passes /bin/bash -n syntax check (macOS bash 3.2 compat)', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
