@@ -168,20 +168,23 @@ ${formattedLessons}
     output += cookitSection;
   }
 
-  // Append update notification if a newer version is available.
-  // No TTY gate here (unlike cli-app.ts) — prime outputs to Claude Code
-  // session context, not to a terminal, so it should always check.
-  try {
-    const updateResult = await checkForUpdate(join(root, '.claude', '.cache'));
-    if (updateResult?.updateAvailable) {
-      output += `
+  // Append update notification when NOT in a TTY.
+  // In a TTY session, runProgram() already prints a post-command update notice,
+  // so we skip it here to avoid duplication. In non-TTY contexts (Claude Code
+  // session context), prime is the only place that can surface this.
+  if (!process.stdout.isTTY) {
+    try {
+      const updateResult = await checkForUpdate(join(root, '.claude', '.cache'));
+      if (updateResult?.updateAvailable) {
+        output += `
 ---
 # Update Available
 compound-agent v${updateResult.latest} is available (current: v${updateResult.current}). Run \`pnpm update --latest compound-agent\` to update.
 `;
+      }
+    } catch {
+      // Non-fatal: update check failure should never block prime
     }
-  } catch {
-    // Non-fatal: update check failure should never block prime
   }
 
   return output;

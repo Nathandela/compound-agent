@@ -1,6 +1,6 @@
 ---
-version: "1.6.5"
-last-updated: "2026-03-07"
+version: "1.7.4"
+last-updated: "2026-03-11"
 summary: "Overview and getting started guide for compound-agent"
 ---
 
