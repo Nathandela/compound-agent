@@ -19,11 +19,14 @@ Create a concrete implementation plan by decomposing work into small, testable t
 5. Synthesize research findings into a coherent approach. Flag conflicts between ADRs and proposed plan.
 6. Use `AskUserQuestion` to resolve ambiguities, conflicting constraints, or priority trade-offs before decomposing
 7. Decompose into tasks small enough to verify individually
-8. Define acceptance criteria for each task
-9. Ensure each task traces back to a spec requirement for traceability
-10. Map dependencies between tasks
-11. Create beads issues: `bd create --title="..." --type=task`
-12. Create review and compound blocking tasks (`bd create` + `bd dep add`) that depend on work tasks — these survive compaction and surface via `bd ready` after work completes
+8. **Boundary stability check**: verify each task stays within its epic's scope boundary. If a task crosses epic boundaries, split it or expand scope.
+9. **Last Responsible Moment**: for each task, assess if it can be deferred for information gain. Mark deferrable tasks with rationale: "defer until <milestone> because <information needed>".
+10. **Change coupling check**: if files A and B change together >50% of the time (git log), they should be in the same task, not separate ones.
+11. Define acceptance criteria for each task
+12. Ensure each task traces back to a spec requirement for traceability
+13. Map dependencies between tasks
+14. Create beads issues: `bd create --title="..." --type=task`
+15. Create review and compound blocking tasks (`bd create` + `bd dep add`) that depend on work tasks — these survive compaction and surface via `bd ready` after work completes
 
 ## Memory Integration
 - Run `npx ca search` and `npx ca knowledge "relevant topic"` for patterns related to the feature area
@@ -43,6 +46,8 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Not reviewing existing ADRs and docs for constraints
 - Making architectural decisions without research backing (use the researcher skill for complex domains)
 - Planning implementation details too early (stay at task level)
+- Not checking tasks against epic boundaries (boundary drift)
+- Splitting change-coupled files into separate tasks
 
 ## Quality Criteria
 - Each task has clear acceptance criteria
@@ -53,6 +58,8 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Ambiguities resolved via `AskUserQuestion` before decomposing
 - Complexity estimates are realistic (no "should be quick")
 - Each task traces back to a spec requirement
+- Tasks respect epic scope boundaries (no cross-boundary work)
+- Change-coupled files grouped together
 
 ## POST-PLAN VERIFICATION -- MANDATORY
 After creating all tasks, verify review and compound tasks exist:

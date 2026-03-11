@@ -15,7 +15,8 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 4. Select reviewer tier based on diff size:
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
    - **Medium** (100-500): add architecture, performance, edge-case, scenario-coverage (8 total)
-   - **Large** (500+): all 12 reviewers including docs, consistency, error-handling, pattern-matcher
+   - **Large** (500+): all 12+ reviewers including docs, consistency, error-handling, pattern-matcher
+   - **Composition changes**: add boundary-reviewer (coupling within epic boundaries?), control-structure-reviewer (STPA mitigations implemented?), observability-reviewer (metrics at boundaries?)
 5. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with `team_name`):
    - Role skills: `.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer,scenario-coverage-reviewer}/SKILL.md`
    - Security specialist skills (on-demand, spawned by security-reviewer): `.claude/skills/compound/agents/{security-injection,security-secrets,security-auth,security-data,security-deps}/SKILL.md`
@@ -25,7 +26,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 8. Classify by severity: P0 (blocks merge), P1 (critical/blocking), P2 (important), P3 (minor)
 9. Use `AskUserQuestion` when severity is ambiguous or fix has multiple valid options
 10. Create beads issues for P1 findings: `bd create --title="P1: ..."`
-11. Verify spec alignment: flag unmet EARS requirements as P1, flag requirements met but missing from acceptance criteria as gaps
+11. Verify spec alignment: flag unmet EARS requirements as P1. Verify assumptions from architect phase still hold. Check change coupling: do modified files cluster within epic boundaries or leak across?
 12. Fix all P1 findings before proceeding
 13. Run `/implementation-reviewer` as mandatory gate
 14. Capture novel findings with `npx ca learn`; pattern-matcher auto-reinforces recurring issues
@@ -53,6 +54,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 - Skipping quality gates before review
 - Bypassing the implementation-reviewer gate
 - Not checking CCT patterns for known Claude mistakes
+- Not verifying architect assumptions still hold after implementation
 
 ## Quality Criteria
 - All quality gates pass (`pnpm test`, lint)

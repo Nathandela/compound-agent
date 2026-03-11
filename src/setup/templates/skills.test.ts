@@ -291,12 +291,14 @@ describe('PHASE_SKILLS', () => {
     expect(skill).toMatch(/bounded context/i);
   });
 
-  it('architect skill references 4 subagent roles for decomposition', () => {
+  it('architect skill references 6 subagent roles for decomposition', () => {
     const skill = PHASE_SKILLS.architect;
     expect(skill).toMatch(/context mapper/i);
     expect(skill).toMatch(/dependency analyst/i);
     expect(skill).toMatch(/scope sizer/i);
     expect(skill).toMatch(/interface designer/i);
+    expect(skill).toMatch(/control structure analyst/i);
+    expect(skill).toMatch(/gap analyst/i);
   });
 
   it('architect skill produces interface contracts between epics', () => {
@@ -328,6 +330,152 @@ describe('PHASE_SKILLS', () => {
     const skill = PHASE_SKILLS.architect;
     expect(skill).toContain('npx ca search');
     expect(skill).toContain('npx ca knowledge');
+  });
+
+  // --- Research-enriched content assertions ---
+
+  // Architect: reversibility, Cynefin, implicit contracts, STPA, gap analysis, org alignment, assumptions, phase transitions
+  it('architect skill contains reversibility analysis', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/reversibility/i);
+    expect(skill).toMatch(/irreversible/i);
+  });
+
+  it('architect skill contains change volatility assessment', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/volatility/i);
+    expect(skill).toMatch(/modularity investment/i);
+  });
+
+  it('architect skill contains STPA control structure analysis', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toContain('STPA');
+    expect(skill).toMatch(/control structure/i);
+    expect(skill).toMatch(/hazard/i);
+  });
+
+  it('architect skill contains implicit interface contracts', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/implicit contract/i);
+    expect(skill).toMatch(/backpressure/i);
+    expect(skill).toMatch(/delivery guarantee/i);
+  });
+
+  it('architect skill contains structural-semantic gap analysis', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/gap analyst/i);
+    expect(skill).toMatch(/semantic partition/i);
+  });
+
+  it('architect skill contains organizational alignment check', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/org alignment/i);
+    expect(skill).toMatch(/stream-aligned/i);
+  });
+
+  it('architect skill contains multi-criteria validation gate', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/multi-criteria/i);
+    expect(skill).toContain('Structural');
+    expect(skill).toContain('Semantic');
+    expect(skill).toContain('Organizational');
+    expect(skill).toContain('Economic');
+  });
+
+  it('architect skill contains assumption capture and fitness functions', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/assumption/i);
+    expect(skill).toMatch(/fitness function/i);
+    expect(skill).toMatch(/re-decomposition/i);
+  });
+
+  it('architect pitfalls reference Cynefin and Garlan', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/Cynefin/i);
+    expect(skill).toMatch(/Garlan/i);
+  });
+
+  // Spec-dev: Cynefin, composition EARS, change volatility
+  it('spec-dev skill contains Cynefin classification', () => {
+    const skill = PHASE_SKILLS['spec-dev'];
+    expect(skill).toMatch(/Cynefin/i);
+    expect(skill).toMatch(/Clear.*Complicated.*Complex/i);
+  });
+
+  it('spec-dev skill contains change volatility assessment', () => {
+    const skill = PHASE_SKILLS['spec-dev'];
+    expect(skill).toMatch(/volatility/i);
+  });
+
+  it('spec-dev skill contains composition EARS templates', () => {
+    const skill = PHASE_SKILLS['spec-dev'];
+    expect(skill).toMatch(/times out/i);
+    expect(skill).toMatch(/retries/i);
+  });
+
+  // Plan: boundary stability, LRM, change coupling
+  it('plan skill contains boundary stability check', () => {
+    const skill = PHASE_SKILLS.plan;
+    expect(skill).toMatch(/boundary.*stability|stability.*check/i);
+  });
+
+  it('plan skill contains Last Responsible Moment', () => {
+    const skill = PHASE_SKILLS.plan;
+    expect(skill).toMatch(/Last Responsible Moment/i);
+    expect(skill).toMatch(/defer/i);
+  });
+
+  it('plan skill contains change coupling check', () => {
+    const skill = PHASE_SKILLS.plan;
+    expect(skill).toMatch(/change coupling/i);
+  });
+
+  // Work: tech debt quadrant, composition boundary verification
+  it('work skill contains technical debt protocol', () => {
+    const skill = PHASE_SKILLS.work;
+    expect(skill).toMatch(/Technical Debt/i);
+    expect(skill).toMatch(/Prudent.*Deliberate/i);
+  });
+
+  it('work skill contains composition boundary verification', () => {
+    const skill = PHASE_SKILLS.work;
+    expect(skill).toMatch(/Composition Boundary/i);
+    expect(skill).toMatch(/metastable/i);
+  });
+
+  // Review: boundary, control structure, observability reviewers
+  it('review skill contains composition-specific reviewers', () => {
+    const skill = PHASE_SKILLS.review;
+    expect(skill).toMatch(/boundary-reviewer/i);
+    expect(skill).toMatch(/control-structure-reviewer/i);
+    expect(skill).toMatch(/observability-reviewer/i);
+  });
+
+  it('review skill validates architect assumptions', () => {
+    const skill = PHASE_SKILLS.review;
+    expect(skill).toMatch(/assumption/i);
+    expect(skill).toMatch(/change coupling/i);
+  });
+
+  // Compound: decomposition lessons, assumption tracking, emergence analysis
+  it('compound skill contains decomposition quality assessment', () => {
+    const skill = PHASE_SKILLS.compound;
+    expect(skill).toMatch(/decomposition quality/i);
+    expect(skill).toMatch(/boundary.*succeeded|boundary.*failed/i);
+  });
+
+  it('compound skill contains assumption tracking', () => {
+    const skill = PHASE_SKILLS.compound;
+    expect(skill).toMatch(/assumption tracking/i);
+    expect(skill).toMatch(/predicted vs actual/i);
+  });
+
+  it('compound skill contains emergence analysis', () => {
+    const skill = PHASE_SKILLS.compound;
+    expect(skill).toMatch(/emergence analysis/i);
+    expect(skill).toMatch(/Garlan/i);
+    expect(skill).toMatch(/STPA/i);
+    expect(skill).toMatch(/phase transition/i);
   });
 });
 

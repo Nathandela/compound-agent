@@ -14,6 +14,9 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
 2. Detect spec drift: compare final implementation against original EARS requirements in the epic description (`bd show <epic>`). Note any divergences -- what changed, why, was it justified. If drift reveals a spec was wrong or incomplete, flag that for lesson extraction.
+3. **Decomposition quality assessment**: compare actual implementation against predicted boundaries from architect. Did files cluster as predicted? Were assumptions valid? Rate boundary quality: "This boundary [succeeded/failed] because..." Capture as lesson for future architect runs.
+4. **Assumption tracking**: for each assumption from architect phase, record predicted vs actual volatility. Store with `npx ca learn` for calibration.
+5. **Emergence analysis**: if unexpected system behaviors occurred, classify root cause: incomplete interface contract (Garlan), control structure inadequacy (STPA), or scale-induced phase transition. Capture preventive lesson.
 3. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with `team_name`):
    - Role skills: `.claude/skills/compound/agents/{context-analyzer,lesson-extractor,pattern-matcher,solution-writer,compounding}/SKILL.md`
    - For large diffs, deploy MULTIPLE context-analyzers and lesson-extractors
@@ -47,6 +50,8 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 - Requiring user confirmation for every item (only high-severity needs it)
 - Not classifying items by type (lesson/solution/pattern/preference)
 - Capturing vague lessons ("be careful with X") -- be specific and concrete
+- Not assessing decomposition boundary quality against architect predictions
+- Not tracking assumption accuracy for future calibration
 
 ## Quality Criteria
 - Analysis team was spawned and agents coordinated via pipeline
@@ -59,6 +64,9 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 - Beads checked for related issues (`bd`)
 - Each item gives clear, concrete guidance for future sessions
 - Spec drift analyzed and captured
+- Decomposition boundary quality assessed
+- Architect assumptions tracked (predicted vs actual)
+- Emergent failures classified by root cause if any occurred
 
 ## FINAL GATE -- EPIC CLOSURE
 Before closing the epic:

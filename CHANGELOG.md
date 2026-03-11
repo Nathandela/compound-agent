@@ -7,10 +7,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.7.4] - 2026-03-11
 
 ### Added
 
+- **Research-enriched phase skills**: Applied insights from 3 PhD-level research documents (Science of Decomposition, Architecture Under Uncertainty, Emergent Behavior in Composed Systems) across all 6 core phase skills:
+  - **Architect**: reversibility analysis (Baldwin & Clark), change volatility, 6-subagent convoy (added STPA control structure analyst + structural-semantic gap analyst), implicit interface contracts (threading, backpressure, delivery guarantees), organizational alignment (Team Topologies), multi-criteria validation gate (structural/semantic/organizational/economic), assumption capture with fitness functions and re-decomposition triggers
+  - **Spec-dev**: Cynefin classification (Clear/Complicated/Complex), composition EARS templates (timeout/retry interactions), change volatility assessment
+  - **Plan**: boundary stability check, Last Responsible Moment identification, change coupling prevention
+  - **Work**: Fowler technical debt quadrant (only Prudent/Deliberate accepted), composition boundary verification with metastable failure checks
+  - **Review**: composition-specific reviewers (boundary-reviewer, control-structure-reviewer, observability-reviewer), architect assumption validation
+  - **Compound**: decomposition quality assessment, assumption tracking (predicted vs actual), emergence root cause classification (Garlan/STPA/phase transition)
 - **Lint graduation in compound phase**: The compound phase (step 10) now spawns a `lint-classifier` subagent that classifies each captured insight as LINTABLE, PARTIAL, or NOT_LINTABLE. High-confidence lintable insights are promoted to beads tasks under a "Linting Improvement" epic with self-contained rule specifications. Two rule classes: Class A (native `rules.json` — regex/glob) and Class B (external linter — AST analysis).
 - **Linter detection module** (`src/lint/`): Scans repos for ESLint (flat + legacy configs including TypeScript variants), Ruff (including `pyproject.toml`), Clippy, golangci-lint, ast-grep, and Semgrep. Exported from the package as `detectLinter()`, `LinterInfoSchema`, `LinterNameSchema`.
 - **Lint-classifier agent template**: Ships via `npx ca init` to `.claude/agents/compound/lint-classifier.md`. Includes 7 few-shot examples, Class A/B routing, and linter-aware task creation.

@@ -30,7 +30,10 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 2. Use Mermaid diagrams (`sequenceDiagram`, `stateDiagram-v2`) to expose hidden structure
 3. Detect ambiguities: vague adjectives, unclear pronouns, passive voice, compound requirements. See `references/spec-guide.md` for full checklist
 4. Build a domain glossary for ambiguous terms
-5. Use `AskUserQuestion` to resolve each ambiguity
+5. **Change volatility**: rate each capability stable/moderate/high. Flag high-volatility areas for modularity investment in architect phase.
+6. **Cynefin classify** each requirement: Clear (apply known solution), Complicated (analyze tradeoffs), Complex (needs safe-to-fail experiments). Complex requirements need experimental validation, not just analysis.
+7. For composed systems, add **composition EARS**: `When <A> times out, <B> shall...`, `If <A> retries, <B> shall...`
+8. Use `AskUserQuestion` to resolve each ambiguity
 
 **Iteration trigger**: If specifying reveals missing knowledge, loop back to Explore.
 
@@ -87,6 +90,7 @@ Read `.claude/skills/compound/spec-dev/references/spec-guide.md` on demand for E
 - Not creating the beads epic
 - Specifying implementation instead of requirements
 - Skipping scenario table generation after EARS requirements
+- Not classifying requirements by Cynefin domain (Complex needs experiments)
 
 ## Quality Criteria
 - [ ] Requirements use EARS notation
@@ -98,4 +102,5 @@ Read `.claude/skills/compound/spec-dev/references/spec-guide.md` on demand for E
 - [ ] Scenario table generated from EARS requirements and diagrams
 - [ ] Spec and scenario table stored in beads epic description
 - [ ] ADRs created for significant decisions
+- [ ] Cynefin classification applied, volatility assessed
 

@@ -57,11 +57,21 @@ for complex changes. For all changes, `/implementation-reviewer` is the minimum 
 - Run `npx ca knowledge "TDD test-first"` for indexed knowledge on testing methodology
 - Run `npx ca search "testing"` for lessons from past TDD cycles
 
+## Technical Debt Protocol
+When shortcuts are proposed, classify using Fowler's quadrant: only **Prudent/Deliberate** debt is rational (conscious choice, known trade-off, explicit repayment plan). Reckless or Inadvertent debt must be fixed immediately. Document debt decisions in epic notes.
+
+## Composition Boundary Verification
+If work touches a composition boundary (inter-epic or inter-service interface):
+- Verify implementation matches the interface contracts (explicit + implicit) from architect phase
+- Write tests for implicit contracts: timeout interactions, retry behavior, backpressure
+- Check for metastable failure risk: feedback loops (retry amplification, cache storms)
+
 ## Common Pitfalls
 - Lead writing code instead of delegating to agents
 - Not injecting memory context into agent prompts
 - Modifying tests to make them pass instead of fixing implementation
 - Not running the full test suite after agent work completes
+- Accumulating reckless/inadvertent tech debt without classification
 
 ## Quality Criteria
 - Tests existed before implementation code
@@ -71,6 +81,8 @@ for complex changes. For all changes, `/implementation-reviewer` is the minimum 
 - All tests pass after refactoring
 - Task lifecycle tracked via beads (`bd`)
 - Implementation aligns with spec requirements from epic
+- Technical debt classified (only Prudent/Deliberate accepted)
+- Composition boundaries verified against interface contracts
 
 ## PHASE GATE 3 -- MANDATORY
 Before starting Review, verify ALL work tasks are closed:

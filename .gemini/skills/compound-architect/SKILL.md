@@ -22,49 +22,56 @@ Take a large system specification and decompose it into naturally-scoped epic be
 3. Ask "why" before "how" -- understand the real need
 4. Build a **domain glossary** (ubiquitous language) from the dialogue
 5. Produce a **discovery mindmap** (Mermaid `mindmap`) to expose assumptions
-6. Use `AskUserQuestion` to clarify scope and preferences
+6. **Reversibility analysis**: classify decisions as irreversible (schema, public API, service boundary), moderate (framework), or reversible (library, config). Spend effort proportional to irreversibility.
+7. **Change volatility**: rate each boundary stable/moderate/high. High-volatility justifies modularity investment.
+8. Use `AskUserQuestion` to clarify scope and preferences
 
 **Gate 1**: Use `AskUserQuestion` to confirm the understanding is complete before proceeding to Spec.
 
 ## Phase 2: Spec
 **Goal**: Produce a system-level specification.
-1. Write **system-level EARS requirements** covering the entire system:
-   - Ubiquitous: `The system shall <action>.`
-   - Event-driven: `When <trigger>, the system shall <action>.`
-   - State-driven: `While <state>, the system shall <action>.`
-   - Unwanted behavior: `If <condition>, then the system shall <action>.`
-   - Optional: `Where <feature>, the system shall <action>.`
+1. Write **system-level EARS requirements** (Ubiquitous/Event/State/Unwanted/Optional patterns)
 2. Produce **architecture diagrams**: C4Context, sequenceDiagram, stateDiagram-v2
 3. Generate a **scenario table** from the EARS requirements
-4. Write the spec to `docs/specs/<name>.md`
-5. Create a **meta-epic bead** linking to the spec file
+4. Write the spec to `docs/specs/<name>.md` and create a **meta-epic bead**
 
 **Gate 2**: Use `AskUserQuestion` to get human approval of the system-level spec.
 
 ## Phase 3: Decompose
 **Goal**: Break the system into naturally-scoped epics using DDD bounded contexts.
 
-Spawn **4 parallel subagents** (via Agent tool):
+Spawn **6 parallel subagents** (via Agent tool):
 1. **Bounded context mapper**: Identify natural domain boundaries and propose candidate epics
-2. **Dependency analyst**: Analyze coupling between candidates, propose dependency graph with processing order
-3. **Scope sizer**: Evaluate each candidate against "completable in one cook-it cycle" heuristic, flag oversized/undersized
-4. **Interface designer**: Define explicit interface contracts (data/APIs) between candidate epics
+2. **Dependency analyst**: Structural + change coupling (git history entropy), dependency graph, processing order
+3. **Scope sizer**: "One cook-it cycle" heuristic, cognitive load check (7+/-2 concepts per epic)
+4. **Interface designer**: Explicit contracts (API/data) + implicit contracts (threading, delivery guarantees, timeout/retry, backpressure, resource ownership, failure modes)
+5. **Control structure analyst** (STPA): Identify hazards at composition boundaries, unsafe control actions (commission/omission/timing), propose mitigations
+6. **Structural-semantic gap analyst**: Compare dependency graph partition vs DDD semantic partition, flag disagreements
 
 **Synthesis**: Merge subagent findings into a proposed epic structure. For each epic:
 - Title and scope boundaries (what is in, what is out)
 - Relevant EARS subset from the system spec
-- Interface contracts: provides (what it exposes) and consumes (what it needs)
+- Interface contracts: explicit (API/data) + implicit (timing, threading, failure modes)
+- Assumptions that must hold for this boundary to remain valid
+- Org alignment: which team type owns this (stream-aligned/platform/enabling/complicated-subsystem)?
 - Pointer to the master spec file
+
+**Multi-criteria validation** before Gate 3 -- for each epic:
+- [ ] Structural: low change coupling, acyclic dependencies
+- [ ] Semantic: stable bounded context, coherent ubiquitous language
+- [ ] Organizational: single team owner, within cognitive budget
+- [ ] Economic: modularity benefit > coordination overhead
 
 **Gate 3**: Use `AskUserQuestion` to get human approval of the epic structure, dependency graph, and interface contracts.
 
 ## Phase 4: Materialize
 **Goal**: Create the actual beads.
 1. Create epic beads via `bd create --title="..." --type=epic --priority=<N>` for each approved epic
-2. Store scope, EARS subset, and interface contracts in each epic description
-3. Wire dependencies via `bd dep add` for all relationships (including child epics depending on meta-epic where needed)
-4. Store suggested processing order as notes on the meta-epic
-5. Capture lessons via `npx ca learn`
+2. Store scope, EARS subset, interface contracts (explicit + implicit), and key assumptions in each epic description
+3. Define **fitness functions** per epic to monitor assumptions. Document re-decomposition trigger.
+4. Wire dependencies via `bd dep add` for all relationships
+5. Store processing order as notes on the meta-epic
+6. Capture lessons via `npx ca learn`
 
 ## Memory Integration
 - `npx ca search` before starting each phase
@@ -79,14 +86,17 @@ Spawn **4 parallel subagents** (via Agent tool):
 - Skipping human gates (the 3 gates are the quality checkpoints)
 - Creating epics without EARS subset (loses traceability to system spec)
 - Not wiring dependencies (loop will process in wrong order)
+- Treating complex decisions as complicated (Cynefin): service boundaries need experiments, not just analysis
+- Ignoring implicit contracts (threading, timing, backpressure) -- Garlan's architectural mismatch
+- Not capturing assumptions that would invalidate the decomposition if wrong
 
 ## Quality Criteria
 - [ ] Socratic phase completed with domain glossary and mindmap
 - [ ] System-level EARS requirements cover all capabilities
 - [ ] Architecture diagrams produced (C4, sequence, state)
 - [ ] Spec written to docs/specs/ and meta-epic created
-- [ ] 4-angle DDD convoy executed for decomposition
-- [ ] Each epic has scope boundaries, EARS subset, and interface contracts
+- [ ] 6-angle convoy executed for decomposition (DDD + STPA + gap analysis)
+- [ ] Each epic has scope boundaries, EARS subset, interface contracts (explicit + implicit), and assumptions
 - [ ] Dependencies wired via bd dep add
 - [ ] Processing order stored on meta-epic
 - [ ] 3 human gates passed via AskUserQuestion

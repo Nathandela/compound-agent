@@ -41,7 +41,10 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 2. Use Mermaid diagrams (\`sequenceDiagram\`, \`stateDiagram-v2\`) to expose hidden structure
 3. Detect ambiguities: vague adjectives, unclear pronouns, passive voice, compound requirements. See \`references/spec-guide.md\` for full checklist
 4. Build a domain glossary for ambiguous terms
-5. Use \`AskUserQuestion\` to resolve each ambiguity
+5. **Change volatility**: rate each capability stable/moderate/high. Flag high-volatility areas for modularity investment in architect phase.
+6. **Cynefin classify** each requirement: Clear (apply known solution), Complicated (analyze tradeoffs), Complex (needs safe-to-fail experiments). Complex requirements need experimental validation, not just analysis.
+7. For composed systems, add **composition EARS**: \`When <A> times out, <B> shall...\`, \`If <A> retries, <B> shall...\`
+8. Use \`AskUserQuestion\` to resolve each ambiguity
 
 **Iteration trigger**: If specifying reveals missing knowledge, loop back to Explore.
 
@@ -98,6 +101,7 @@ Read \`.claude/skills/compound/spec-dev/references/spec-guide.md\` on demand for
 - Not creating the beads epic
 - Specifying implementation instead of requirements
 - Skipping scenario table generation after EARS requirements
+- Not classifying requirements by Cynefin domain (Complex needs experiments)
 
 ## Quality Criteria
 - [ ] Requirements use EARS notation
@@ -109,6 +113,7 @@ Read \`.claude/skills/compound/spec-dev/references/spec-guide.md\` on demand for
 - [ ] Scenario table generated from EARS requirements and diagrams
 - [ ] Spec and scenario table stored in beads epic description
 - [ ] ADRs created for significant decisions
+- [ ] Cynefin classification applied, volatility assessed
 `,
 
   plan: `---
@@ -132,11 +137,14 @@ Create a concrete implementation plan by decomposing work into small, testable t
 5. Synthesize research findings into a coherent approach. Flag conflicts between ADRs and proposed plan.
 6. Use \`AskUserQuestion\` to resolve ambiguities, conflicting constraints, or priority trade-offs before decomposing
 7. Decompose into tasks small enough to verify individually
-8. Define acceptance criteria for each task
-9. Ensure each task traces back to a spec requirement for traceability
-10. Map dependencies between tasks
-11. Create beads issues: \`bd create --title="..." --type=task\`
-12. Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) that depend on work tasks — these survive compaction and surface via \`bd ready\` after work completes
+8. **Boundary stability check**: verify each task stays within its epic's scope boundary. If a task crosses epic boundaries, split it or expand scope.
+9. **Last Responsible Moment**: for each task, assess if it can be deferred for information gain. Mark deferrable tasks with rationale: "defer until <milestone> because <information needed>".
+10. **Change coupling check**: if files A and B change together >50% of the time (git log), they should be in the same task, not separate ones.
+11. Define acceptance criteria for each task
+12. Ensure each task traces back to a spec requirement for traceability
+13. Map dependencies between tasks
+14. Create beads issues: \`bd create --title="..." --type=task\`
+15. Create review and compound blocking tasks (\`bd create\` + \`bd dep add\`) that depend on work tasks — these survive compaction and surface via \`bd ready\` after work completes
 
 ## Memory Integration
 - Run \`npx ca search\` and \`npx ca knowledge "relevant topic"\` for patterns related to the feature area
@@ -156,6 +164,8 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Not reviewing existing ADRs and docs for constraints
 - Making architectural decisions without research backing (use the researcher skill for complex domains)
 - Planning implementation details too early (stay at task level)
+- Not checking tasks against epic boundaries (boundary drift)
+- Splitting change-coupled files into separate tasks
 
 ## Quality Criteria
 - Each task has clear acceptance criteria
@@ -166,6 +176,8 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Ambiguities resolved via \`AskUserQuestion\` before decomposing
 - Complexity estimates are realistic (no "should be quick")
 - Each task traces back to a spec requirement
+- Tasks respect epic scope boundaries (no cross-boundary work)
+- Change-coupled files grouped together
 
 ## POST-PLAN VERIFICATION -- MANDATORY
 After creating all tasks, verify review and compound tasks exist:
@@ -232,11 +244,21 @@ for complex changes. For all changes, \`/implementation-reviewer\` is the minimu
 - Run \`npx ca knowledge "TDD test-first"\` for indexed knowledge on testing methodology
 - Run \`npx ca search "testing"\` for lessons from past TDD cycles
 
+## Technical Debt Protocol
+When shortcuts are proposed, classify using Fowler's quadrant: only **Prudent/Deliberate** debt is rational (conscious choice, known trade-off, explicit repayment plan). Reckless or Inadvertent debt must be fixed immediately. Document debt decisions in epic notes.
+
+## Composition Boundary Verification
+If work touches a composition boundary (inter-epic or inter-service interface):
+- Verify implementation matches the interface contracts (explicit + implicit) from architect phase
+- Write tests for implicit contracts: timeout interactions, retry behavior, backpressure
+- Check for metastable failure risk: feedback loops (retry amplification, cache storms)
+
 ## Common Pitfalls
 - Lead writing code instead of delegating to agents
 - Not injecting memory context into agent prompts
 - Modifying tests to make them pass instead of fixing implementation
 - Not running the full test suite after agent work completes
+- Accumulating reckless/inadvertent tech debt without classification
 
 ## Quality Criteria
 - Tests existed before implementation code
@@ -246,6 +268,8 @@ for complex changes. For all changes, \`/implementation-reviewer\` is the minimu
 - All tests pass after refactoring
 - Task lifecycle tracked via beads (\`bd\`)
 - Implementation aligns with spec requirements from epic
+- Technical debt classified (only Prudent/Deliberate accepted)
+- Composition boundaries verified against interface contracts
 
 ## PHASE GATE 3 -- MANDATORY
 Before starting Review, verify ALL work tasks are closed:
@@ -271,7 +295,8 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 4. Select reviewer tier based on diff size:
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
    - **Medium** (100-500): add architecture, performance, edge-case, scenario-coverage (8 total)
-   - **Large** (500+): all 12 reviewers including docs, consistency, error-handling, pattern-matcher
+   - **Large** (500+): all 12+ reviewers including docs, consistency, error-handling, pattern-matcher
+   - **Composition changes**: add boundary-reviewer (coupling within epic boundaries?), control-structure-reviewer (STPA mitigations implemented?), observability-reviewer (metrics at boundaries?)
 5. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with \`team_name\`):
    - Role skills: \`.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer,scenario-coverage-reviewer}/SKILL.md\`
    - Security specialist skills (on-demand, spawned by security-reviewer): \`.claude/skills/compound/agents/{security-injection,security-secrets,security-auth,security-data,security-deps}/SKILL.md\`
@@ -281,7 +306,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 8. Classify by severity: P0 (blocks merge), P1 (critical/blocking), P2 (important), P3 (minor)
 9. Use \`AskUserQuestion\` when severity is ambiguous or fix has multiple valid options
 10. Create beads issues for P1 findings: \`bd create --title="P1: ..."\`
-11. Verify spec alignment: flag unmet EARS requirements as P1, flag requirements met but missing from acceptance criteria as gaps
+11. Verify spec alignment: flag unmet EARS requirements as P1. Verify assumptions from architect phase still hold. Check change coupling: do modified files cluster within epic boundaries or leak across?
 12. Fix all P1 findings before proceeding
 13. Run \`/implementation-reviewer\` as mandatory gate
 14. Capture novel findings with \`npx ca learn\`; pattern-matcher auto-reinforces recurring issues
@@ -309,6 +334,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 - Skipping quality gates before review
 - Bypassing the implementation-reviewer gate
 - Not checking CCT patterns for known Claude mistakes
+- Not verifying architect assumptions still hold after implementation
 
 ## Quality Criteria
 - All quality gates pass (\`pnpm test\`, lint)
@@ -348,6 +374,9 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
 2. Detect spec drift: compare final implementation against original EARS requirements in the epic description (\`bd show <epic>\`). Note any divergences -- what changed, why, was it justified. If drift reveals a spec was wrong or incomplete, flag that for lesson extraction.
+3. **Decomposition quality assessment**: compare actual implementation against predicted boundaries from architect. Did files cluster as predicted? Were assumptions valid? Rate boundary quality: "This boundary [succeeded/failed] because..." Capture as lesson for future architect runs.
+4. **Assumption tracking**: for each assumption from architect phase, record predicted vs actual volatility. Store with \`npx ca learn\` for calibration.
+5. **Emergence analysis**: if unexpected system behaviors occurred, classify root cause: incomplete interface contract (Garlan), control structure inadequacy (STPA), or scale-induced phase transition. Capture preventive lesson.
 3. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with \`team_name\`):
    - Role skills: \`.claude/skills/compound/agents/{context-analyzer,lesson-extractor,pattern-matcher,solution-writer,compounding}/SKILL.md\`
    - For large diffs, deploy MULTIPLE context-analyzers and lesson-extractors
@@ -381,6 +410,8 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
 - Requiring user confirmation for every item (only high-severity needs it)
 - Not classifying items by type (lesson/solution/pattern/preference)
 - Capturing vague lessons ("be careful with X") -- be specific and concrete
+- Not assessing decomposition boundary quality against architect predictions
+- Not tracking assumption accuracy for future calibration
 
 ## Quality Criteria
 - Analysis team was spawned and agents coordinated via pipeline
@@ -393,6 +424,9 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
 - Beads checked for related issues (\`bd\`)
 - Each item gives clear, concrete guidance for future sessions
 - Spec drift analyzed and captured
+- Decomposition boundary quality assessed
+- Architect assumptions tracked (predicted vs actual)
+- Emergent failures classified by root cause if any occurred
 
 ## FINAL GATE -- EPIC CLOSURE
 Before closing the epic:
@@ -944,49 +978,56 @@ Take a large system specification and decompose it into naturally-scoped epic be
 3. Ask "why" before "how" -- understand the real need
 4. Build a **domain glossary** (ubiquitous language) from the dialogue
 5. Produce a **discovery mindmap** (Mermaid \`mindmap\`) to expose assumptions
-6. Use \`AskUserQuestion\` to clarify scope and preferences
+6. **Reversibility analysis**: classify decisions as irreversible (schema, public API, service boundary), moderate (framework), or reversible (library, config). Spend effort proportional to irreversibility.
+7. **Change volatility**: rate each boundary stable/moderate/high. High-volatility justifies modularity investment.
+8. Use \`AskUserQuestion\` to clarify scope and preferences
 
 **Gate 1**: Use \`AskUserQuestion\` to confirm the understanding is complete before proceeding to Spec.
 
 ## Phase 2: Spec
 **Goal**: Produce a system-level specification.
-1. Write **system-level EARS requirements** covering the entire system:
-   - Ubiquitous: \`The system shall <action>.\`
-   - Event-driven: \`When <trigger>, the system shall <action>.\`
-   - State-driven: \`While <state>, the system shall <action>.\`
-   - Unwanted behavior: \`If <condition>, then the system shall <action>.\`
-   - Optional: \`Where <feature>, the system shall <action>.\`
+1. Write **system-level EARS requirements** (Ubiquitous/Event/State/Unwanted/Optional patterns)
 2. Produce **architecture diagrams**: C4Context, sequenceDiagram, stateDiagram-v2
 3. Generate a **scenario table** from the EARS requirements
-4. Write the spec to \`docs/specs/<name>.md\`
-5. Create a **meta-epic bead** linking to the spec file
+4. Write the spec to \`docs/specs/<name>.md\` and create a **meta-epic bead**
 
 **Gate 2**: Use \`AskUserQuestion\` to get human approval of the system-level spec.
 
 ## Phase 3: Decompose
 **Goal**: Break the system into naturally-scoped epics using DDD bounded contexts.
 
-Spawn **4 parallel subagents** (via Agent tool):
+Spawn **6 parallel subagents** (via Agent tool):
 1. **Bounded context mapper**: Identify natural domain boundaries and propose candidate epics
-2. **Dependency analyst**: Analyze coupling between candidates, propose dependency graph with processing order
-3. **Scope sizer**: Evaluate each candidate against "completable in one cook-it cycle" heuristic, flag oversized/undersized
-4. **Interface designer**: Define explicit interface contracts (data/APIs) between candidate epics
+2. **Dependency analyst**: Structural + change coupling (git history entropy), dependency graph, processing order
+3. **Scope sizer**: "One cook-it cycle" heuristic, cognitive load check (7+/-2 concepts per epic)
+4. **Interface designer**: Explicit contracts (API/data) + implicit contracts (threading, delivery guarantees, timeout/retry, backpressure, resource ownership, failure modes)
+5. **Control structure analyst** (STPA): Identify hazards at composition boundaries, unsafe control actions (commission/omission/timing), propose mitigations
+6. **Structural-semantic gap analyst**: Compare dependency graph partition vs DDD semantic partition, flag disagreements
 
 **Synthesis**: Merge subagent findings into a proposed epic structure. For each epic:
 - Title and scope boundaries (what is in, what is out)
 - Relevant EARS subset from the system spec
-- Interface contracts: provides (what it exposes) and consumes (what it needs)
+- Interface contracts: explicit (API/data) + implicit (timing, threading, failure modes)
+- Assumptions that must hold for this boundary to remain valid
+- Org alignment: which team type owns this (stream-aligned/platform/enabling/complicated-subsystem)?
 - Pointer to the master spec file
+
+**Multi-criteria validation** before Gate 3 -- for each epic:
+- [ ] Structural: low change coupling, acyclic dependencies
+- [ ] Semantic: stable bounded context, coherent ubiquitous language
+- [ ] Organizational: single team owner, within cognitive budget
+- [ ] Economic: modularity benefit > coordination overhead
 
 **Gate 3**: Use \`AskUserQuestion\` to get human approval of the epic structure, dependency graph, and interface contracts.
 
 ## Phase 4: Materialize
 **Goal**: Create the actual beads.
 1. Create epic beads via \`bd create --title="..." --type=epic --priority=<N>\` for each approved epic
-2. Store scope, EARS subset, and interface contracts in each epic description
-3. Wire dependencies via \`bd dep add\` for all relationships (including child epics depending on meta-epic where needed)
-4. Store suggested processing order as notes on the meta-epic
-5. Capture lessons via \`npx ca learn\`
+2. Store scope, EARS subset, interface contracts (explicit + implicit), and key assumptions in each epic description
+3. Define **fitness functions** per epic to monitor assumptions. Document re-decomposition trigger.
+4. Wire dependencies via \`bd dep add\` for all relationships
+5. Store processing order as notes on the meta-epic
+6. Capture lessons via \`npx ca learn\`
 
 ## Memory Integration
 - \`npx ca search\` before starting each phase
@@ -1001,14 +1042,17 @@ Spawn **4 parallel subagents** (via Agent tool):
 - Skipping human gates (the 3 gates are the quality checkpoints)
 - Creating epics without EARS subset (loses traceability to system spec)
 - Not wiring dependencies (loop will process in wrong order)
+- Treating complex decisions as complicated (Cynefin): service boundaries need experiments, not just analysis
+- Ignoring implicit contracts (threading, timing, backpressure) -- Garlan's architectural mismatch
+- Not capturing assumptions that would invalidate the decomposition if wrong
 
 ## Quality Criteria
 - [ ] Socratic phase completed with domain glossary and mindmap
 - [ ] System-level EARS requirements cover all capabilities
 - [ ] Architecture diagrams produced (C4, sequence, state)
 - [ ] Spec written to docs/specs/ and meta-epic created
-- [ ] 4-angle DDD convoy executed for decomposition
-- [ ] Each epic has scope boundaries, EARS subset, and interface contracts
+- [ ] 6-angle convoy executed for decomposition (DDD + STPA + gap analysis)
+- [ ] Each epic has scope boundaries, EARS subset, interface contracts (explicit + implicit), and assumptions
 - [ ] Dependencies wired via bd dep add
 - [ ] Processing order stored on meta-epic
 - [ ] 3 human gates passed via AskUserQuestion
