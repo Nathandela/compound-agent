@@ -124,6 +124,27 @@ describe('detectLinter', () => {
     expect(result.configPath).toBeNull();
   });
 
+  it('detects Ruff via pyproject.toml containing only [tool.ruff.lint] (no [tool.ruff])', () => {
+    writeFileSync(
+      join(tmpDir, 'pyproject.toml'),
+      '[project]\nname = "foo"\n\n[tool.ruff.lint]\nselect = ["E"]\n',
+    );
+
+    const result = detectLinter(tmpDir);
+
+    expect(result.linter).toBe('ruff');
+    expect(result.configPath).toBe('pyproject.toml');
+  });
+
+  it('does not treat a directory named ruff.toml as a config file', () => {
+    mkdirSync(join(tmpDir, 'ruff.toml'));
+
+    const result = detectLinter(tmpDir);
+
+    expect(result.linter).toBe('unknown');
+    expect(result.configPath).toBeNull();
+  });
+
   // Other linters
   it('detects Clippy via clippy.toml', () => {
     writeFileSync(join(tmpDir, 'clippy.toml'), 'cognitive-complexity-threshold = 30\n');

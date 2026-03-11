@@ -177,7 +177,7 @@ ${formattedLessons}
       output += `
 ---
 # Update Available
-compound-agent v${updateResult.latest} is available (current: v${updateResult.current}). Run \`pnpm update compound-agent\` to update.
+compound-agent v${updateResult.latest} is available (current: v${updateResult.current}). Run \`pnpm update --latest compound-agent\` to update.
 `;
     }
   } catch {

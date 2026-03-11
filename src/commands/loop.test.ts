@@ -491,6 +491,20 @@ describe('generateLoopScript', () => {
     }
   });
 
+  it('python3 fallback iterates all candidates when first has blocked deps (no stall)', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    // The python3 path must emit ALL unprocessed candidates (no early break/print-one-and-stop),
+    // so the shell can iterate and call check_deps_closed for each.
+    // Evidence: python3 block must NOT break after first match; shell loop runs check_deps_closed per candidate.
+    const pyBlock = script.match(/python3 -c "([\s\S]*?)" 2>\/dev\/null/g) ?? [];
+    const epicSelectorPy = pyBlock.find(b => b.includes('processed') && b.includes('items'));
+    expect(epicSelectorPy).toBeDefined();
+    // Must NOT have a `break` inside the for-item loop (which would stop at first candidate)
+    expect(epicSelectorPy).not.toMatch(/for item in items[\s\S]*?break/);
+    // Shell must loop over the candidates with check_deps_closed
+    expect(script).toMatch(/for cid in \$candidates.*check_deps_closed/s);
+  });
+
   // P0: macOS ships bash 3.2 which misparses case `)` inside $() as closing the subshell
   it('passes /bin/bash -n syntax check (macOS bash 3.2 compat)', () => {
     const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });

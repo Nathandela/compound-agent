@@ -40,7 +40,7 @@ Take a large system specification and decompose it into naturally-scoped epic be
 ## Phase 3: Decompose
 **Goal**: Break the system into naturally-scoped epics using DDD bounded contexts.
 
-Spawn **6 parallel subagents** (via Agent tool):
+Spawn **6 parallel subagents** (via Task tool):
 1. **Bounded context mapper**: Identify natural domain boundaries and propose candidate epics
 2. **Dependency analyst**: Structural + change coupling (git history entropy), dependency graph, processing order
 3. **Scope sizer**: "One cook-it cycle" heuristic, cognitive load check (7+/-2 concepts per epic)

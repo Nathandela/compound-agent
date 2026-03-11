@@ -34,9 +34,10 @@ export async function fetchLatestVersion(
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return (data as Record<string, unknown>)['dist-tags']
-      ? ((data as { 'dist-tags': { latest: string } })['dist-tags'].latest ?? null)
-      : null;
+    const tags = (data as Record<string, unknown>)['dist-tags'];
+    if (typeof tags !== 'object' || tags === null) return null;
+    const latest = (tags as Record<string, unknown>)['latest'];
+    return typeof latest === 'string' ? latest : null;
   } catch {
     return null;
   }
@@ -59,7 +60,7 @@ export async function checkForUpdate(
       return {
         current: VERSION,
         latest: cached.latest,
-        updateAvailable: cached.latest !== VERSION,
+        updateAvailable: semverGt(cached.latest, VERSION),
       };
     }
 
@@ -79,7 +80,7 @@ export async function checkForUpdate(
     return {
       current: VERSION,
       latest,
-      updateAvailable: latest !== VERSION,
+      updateAvailable: semverGt(latest, VERSION),
     };
   } catch {
     return null;
@@ -93,12 +94,28 @@ export function formatUpdateNotification(
   current: string,
   latest: string,
 ): string {
-  return `Update available: ${current} -> ${latest}\nRun: pnpm update compound-agent`;
+  return `Update available: ${current} -> ${latest}\nRun: pnpm update --latest compound-agent`;
 }
 
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Returns true if version a is strictly greater than version b.
+ * Handles standard MAJOR.MINOR.PATCH semver format.
+ */
+function semverGt(a: string, b: string): boolean {
+  const parse = (v: string): [number, number, number] => {
+    const parts = v.split('.').map(n => parseInt(n, 10) || 0);
+    return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
+  };
+  const [aMaj, aMin, aPat] = parse(a);
+  const [bMaj, bMin, bPat] = parse(b);
+  if (aMaj !== bMaj) return aMaj > bMaj;
+  if (aMin !== bMin) return aMin > bMin;
+  return aPat > bPat;
+}
 
 function readCache(cachePath: string): CacheData | null {
   try {

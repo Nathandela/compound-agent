@@ -41,7 +41,7 @@ You receive insights via SendMessage from the compound lead. Each message contai
 - \`insight\`: The verbatim insight text
 - \`severity\`: high, medium, or low
 
-If no insights are provided via message, read newly captured lessons from \`.claude/lessons/index.jsonl\` (filter to the current session by checking the most recent entries).
+If no insights are provided via message, read the last 10 entries from \`.claude/lessons/index.jsonl\` (each line is a JSON object; parse and reverse to get newest-first, take up to 10).
 
 ## Classification Definition
 
@@ -128,14 +128,19 @@ CHECK_TYPE must be one of: \`file-pattern\`, \`file-size\`, \`script\` (Class A 
 | Classification | Action |
 |---------------|--------|
 | LINTABLE + HIGH | Create beads task under "Linting Improvement" epic |
-| LINTABLE + MEDIUM or PARTIAL + HIGH | Note as "potentially-lintable" in the lesson's \`npx ca learn\` capture (append to insight text) |
+| LINTABLE + MEDIUM or PARTIAL + HIGH | Create a follow-up beads task noting the partial lintability for manual triage |
 | NOT_LINTABLE or LOW confidence | No additional action (lesson already stored by compound flow) |
+
+For LINTABLE + MEDIUM or PARTIAL + HIGH, create a triage task:
+\`\`\`bash
+bd create --title="Triage: potentially-lintable lesson <lesson-id>" --type=task --priority=3 --description="Lesson <lesson-id>: <insight>\\n\\nVerdict: <LINTABLE/PARTIAL> | Confidence: <MEDIUM/HIGH>\\nReason lintability is uncertain: <rationale>"
+\`\`\`
 
 **Critical**: ALL insights are already stored as lessons by the compound pipeline (step 8). Lint task creation is purely additive. Do not re-store or modify existing lessons.
 
 ## Linter Detection
 
-Before creating Class B tasks, detect the project's linter. Use the \`detectLinter()\` function from \`src/lint/detect.ts\` if available, or check the repo root for config files (first match wins):
+Before creating Class B tasks, detect the project's linter by checking the repo root for config files (first match wins):
 
 1. \`eslint.config.*\` / \`.eslintrc.*\` -> eslint
 2. \`ruff.toml\` / \`.ruff.toml\` / \`pyproject.toml\` with \`[tool.ruff]\` -> ruff

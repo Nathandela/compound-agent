@@ -14,7 +14,7 @@ import { registerLoopCommands } from './commands/loop.js';
 import { registerWatchCommand } from './commands/watch.js';
 import { VERSION } from './version.js';
 import { getRepoRoot } from './cli-utils.js';
-import { checkForUpdate, formatUpdateNotification } from './update-check.js';
+import { type UpdateCheckResult, checkForUpdate, formatUpdateNotification } from './update-check.js';
 import { commandNeedsSqlite } from './cli-preflight.js';
 import { unloadEmbeddingResources } from './memory/embeddings/index.js';
 import { closeDb, ensureSqliteAvailable } from './memory/storage/index.js';
@@ -99,14 +99,24 @@ export function createProgram(): Command {
  * Parse CLI arguments and always release resources before returning.
  */
 export async function runProgram(program: Command, argv: readonly string[] = process.argv): Promise<void> {
+  // Start update check concurrently with command execution (TTY only).
+  // Fired before parseAsync so the fetch runs in parallel with the command.
+  let updatePromise: Promise<UpdateCheckResult | null> | null = null;
+  if (process.stdout.isTTY) {
+    try {
+      const cacheDir = join(getRepoRoot(), '.claude', '.cache');
+      updatePromise = checkForUpdate(cacheDir);
+    } catch {
+      // getRepoRoot() can fail outside a git repo -- update check is non-critical.
+    }
+  }
+
   try {
     await program.parseAsync(argv);
 
-    // Show update notification after command output (non-blocking).
-    if (process.stdout.isTTY) {
+    if (updatePromise) {
       try {
-        const cacheDir = join(getRepoRoot(), '.claude', '.cache');
-        const result = await checkForUpdate(cacheDir);
+        const result = await updatePromise;
         if (result?.updateAvailable) {
           console.log(formatUpdateNotification(result.current, result.latest));
         }

@@ -5,7 +5,7 @@
  * info about the first detected linter.
  */
 
-import { existsSync, readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { z } from 'zod';
@@ -80,15 +80,25 @@ function unknown(): LinterInfo {
   return { linter: 'unknown', configPath: null };
 }
 
+/** Returns true only if the path exists AND is a regular file (not a directory). */
+function isFile(filePath: string): boolean {
+  try {
+    return statSync(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Check if pyproject.toml contains a [tool.ruff] section.
+ * Check if pyproject.toml contains a [tool.ruff] or [tool.ruff.*] section.
  * Returns true if found, false otherwise (including on read errors).
  */
 function pyprojectHasRuff(repoRoot: string): boolean {
   const filePath = join(repoRoot, 'pyproject.toml');
   try {
     const content = readFileSync(filePath, 'utf-8');
-    return /^\s*\[tool\.ruff\]/m.test(content);
+    // Match [tool.ruff] or any subsection like [tool.ruff.lint], [tool.ruff.format], etc.
+    return /^\s*\[tool\.ruff\b/m.test(content);
   } catch {
     return false;
   }
@@ -104,7 +114,7 @@ export function detectLinter(repoRoot: string): LinterInfo {
   try {
     for (const rule of DETECTION_RULES) {
       for (const config of rule.configs) {
-        if (existsSync(join(repoRoot, config))) {
+        if (isFile(join(repoRoot, config))) {
           return { linter: rule.linter, configPath: config };
         }
       }

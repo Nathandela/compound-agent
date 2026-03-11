@@ -85,6 +85,17 @@ describe('fetchLatestVersion', () => {
     expect(version).toBeNull();
   });
 
+  it('returns null when HTTP response is not ok (e.g., 404)', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 404, json: () => Promise.resolve({}) }),
+    );
+
+    const version = await fetchLatestVersion('compound-agent');
+
+    expect(version).toBeNull();
+  });
+
   it('returns null on invalid JSON response', async () => {
     vi.stubGlobal(
       'fetch',
@@ -163,6 +174,20 @@ describe('checkForUpdate', () => {
     expect(result).not.toBeNull();
     expect(result!.current).toBe('1.5.0');
     expect(result!.latest).toBe('1.5.0');
+    expect(result!.updateAvailable).toBe(false);
+  });
+
+  it('returns updateAvailable=false when installed version is newer than registry (downgrade guard)', async () => {
+    // Simulates an npm unpublish scenario where registry returns an older version.
+    // Current is 1.5.0 (mocked VERSION), registry returns 1.4.0 -- should NOT prompt upgrade.
+    mockedStatSync.mockImplementation(() => {
+      throw new Error('ENOENT');
+    });
+    mockFetchOk({ 'dist-tags': { latest: '1.4.0' } });
+
+    const result = await checkForUpdate(cacheDir);
+
+    expect(result).not.toBeNull();
     expect(result!.updateAvailable).toBe(false);
   });
 
@@ -266,9 +291,9 @@ describe('formatUpdateNotification', () => {
     expect(output).toContain('2.0.0');
   });
 
-  it('contains "pnpm update compound-agent" instruction', () => {
+  it('contains "pnpm update --latest compound-agent" instruction', () => {
     const output = formatUpdateNotification('1.5.0', '2.0.0');
 
-    expect(output).toContain('pnpm update compound-agent');
+    expect(output).toContain('pnpm update --latest compound-agent');
   });
 });

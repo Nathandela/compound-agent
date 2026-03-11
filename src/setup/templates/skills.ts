@@ -5,8 +5,8 @@
  */
 
 // ANSI color codes for cook-it banner
-const _cn = '\x1b[36m'; // cyan — network nodes/edges
-const _rs = '\x1b[0m';  // reset
+const cn = '\x1b[36m'; // cyan — network nodes/edges
+const rs = '\x1b[0m';  // reset
 
 export const PHASE_SKILLS: Record<string, string> = {
   'spec-dev': `---
@@ -568,7 +568,7 @@ Do NOT proceed from memory. Read the skill, then follow it exactly.
 ## Session Start
 When a cooking session begins, IMMEDIATELY print the banner below (copy it verbatim):
 
-${_cn}         o
+${cn}         o
         /|\\
        o-o-o
       /|\\ /|\\
@@ -576,7 +576,7 @@ ${_cn}         o
       \\|/ \\|/
        o-o-o
         \\|/
-         o${_rs}
+         o${rs}
 
 Then proceed with the protocol below.
 
@@ -996,7 +996,7 @@ Take a large system specification and decompose it into naturally-scoped epic be
 ## Phase 3: Decompose
 **Goal**: Break the system into naturally-scoped epics using DDD bounded contexts.
 
-Spawn **6 parallel subagents** (via Agent tool):
+Spawn **6 parallel subagents** (via Task tool):
 1. **Bounded context mapper**: Identify natural domain boundaries and propose candidate epics
 2. **Dependency analyst**: Structural + change coupling (git history entropy), dependency graph, processing order
 3. **Scope sizer**: "One cook-it cycle" heuristic, cognitive load check (7+/-2 concepts per epic)

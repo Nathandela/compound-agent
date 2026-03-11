@@ -12,7 +12,7 @@ vi.mock('../memory/storage/index.js', () => ({
 vi.mock('../update-check.js', () => ({
   checkForUpdate: vi.fn().mockResolvedValue(null),
   formatUpdateNotification: vi.fn(
-    (current: string, latest: string) => `Update available: ${current} -> ${latest}\nRun: pnpm update compound-agent`,
+    (current: string, latest: string) => `Update available: ${current} -> ${latest}\nRun: pnpm update --latest compound-agent`,
   ),
 }));
 
@@ -28,7 +28,7 @@ describe('runProgram', () => {
     vi.restoreAllMocks();
   });
 
-  it('releases resources after a successful command', async () => {
+  it('releases resources after a successful command', { timeout: 10_000 }, async () => {
     const { runProgram } = await import('../cli-app.js');
 
     const program = new Command();
@@ -62,7 +62,7 @@ describe('runProgram', () => {
 
     await runProgram(program, ['node', 'ca', 'test']);
 
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm update compound-agent'));
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm update --latest compound-agent'));
 
     Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
   });

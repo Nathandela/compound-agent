@@ -73,17 +73,20 @@ get_next_epic() {
         break
       done)
     else
-      epic_id=$(bd list --type=epic --ready --json --limit=10 2>/dev/null | python3 -c "
+      # Emit ALL unprocessed candidates so the shell loop can check each one's deps.
+      local candidates epic_id=""
+      candidates=$(bd list --type=epic --ready --json --limit=10 2>/dev/null | python3 -c "
 import sys, json
 processed = set('$PROCESSED'.split())
 items = json.load(sys.stdin)
 for item in items:
     if item['id'] not in processed:
-        print(item['id'])
-        break" 2>/dev/null || echo "")
-      if [ -n "$epic_id" ]; then
-        check_deps_closed "$epic_id" || epic_id=""
-      fi
+        print(item['id'])" 2>/dev/null || echo "")
+      for cid in $candidates; do
+        check_deps_closed "$cid" || continue
+        epic_id="$cid"
+        break
+      done
     fi
     if [ -z "$epic_id" ]; then
       return 1

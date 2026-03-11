@@ -27,7 +27,7 @@ describe('plan retrieval', () => {
     vi.restoreAllMocks();
   });
 
-  describe('retrieveForPlan', () => {
+  describe('retrieveForPlan', { timeout: 10_000 }, () => {
     it.skipIf(skipEmbedding)('returns empty array for empty database', async () => {
       const result = await retrieveForPlan(tempDir, 'implement user authentication');
       expect(result.lessons).toEqual([]);

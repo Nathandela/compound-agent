@@ -631,7 +631,7 @@ describe('Prime Command', () => {
 
       expect(output).toContain('1.7.2');
       expect(output).toContain('1.8.0');
-      expect(output).toContain('pnpm update compound-agent');
+      expect(output).toContain('pnpm update --latest compound-agent');
     });
   });
 });
