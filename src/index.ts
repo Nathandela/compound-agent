@@ -210,6 +210,10 @@ export {
 } from './compound/index.js';
 export type { CctPattern, ClusterResult } from './compound/index.js';
 
+// Lint detection API
+export { detectLinter, LinterInfoSchema, LinterNameSchema } from './lint/index.js';
+export type { LinterInfo, LinterName } from './lint/index.js';
+
 // Types and schemas
 export {
   generateId,

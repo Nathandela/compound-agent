@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Lint graduation in compound phase**: The compound phase (step 10) now spawns a `lint-classifier` subagent that classifies each captured insight as LINTABLE, PARTIAL, or NOT_LINTABLE. High-confidence lintable insights are promoted to beads tasks under a "Linting Improvement" epic with self-contained rule specifications. Two rule classes: Class A (native `rules.json` — regex/glob) and Class B (external linter — AST analysis).
+- **Linter detection module** (`src/lint/`): Scans repos for ESLint (flat + legacy configs including TypeScript variants), Ruff (including `pyproject.toml`), Clippy, golangci-lint, ast-grep, and Semgrep. Exported from the package as `detectLinter()`, `LinterInfoSchema`, `LinterNameSchema`.
+- **Lint-classifier agent template**: Ships via `npx ca init` to `.claude/agents/compound/lint-classifier.md`. Includes 7 few-shot examples, Class A/B routing, and linter-aware task creation.
+
 ### Fixed
 
 - **PhD research output path**: `/compound:get-a-phd` now writes user-generated research to `docs/research/` instead of `docs/compound/research/`. The `docs/compound/` directory is reserved for shipped library content; project-specific research no longer pollutes it. Overlap scanning checks both directories.

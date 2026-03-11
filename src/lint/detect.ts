@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import { z } from 'zod';
 
 /** Supported linter identifiers. */
-const LinterNameSchema = z.enum([
+export const LinterNameSchema = z.enum([
   'eslint',
   'ruff',
   'clippy',
@@ -28,6 +28,7 @@ export const LinterInfoSchema = z.object({
 });
 
 export type LinterInfo = z.infer<typeof LinterInfoSchema>;
+export type LinterName = z.infer<typeof LinterNameSchema>;
 
 /** Detection rules in priority order. Each entry maps a linter to its config filenames. */
 const DETECTION_RULES: Array<{
@@ -37,10 +38,16 @@ const DETECTION_RULES: Array<{
   {
     linter: 'eslint',
     configs: [
+      // Flat config (ESLint v9+)
       'eslint.config.js',
       'eslint.config.mjs',
       'eslint.config.cjs',
+      'eslint.config.ts',
+      'eslint.config.mts',
+      'eslint.config.cts',
+      // Legacy config
       '.eslintrc.js',
+      '.eslintrc.cjs',
       '.eslintrc.json',
       '.eslintrc.yml',
       '.eslintrc.yaml',
@@ -68,7 +75,10 @@ const DETECTION_RULES: Array<{
   },
 ];
 
-const UNKNOWN: LinterInfo = { linter: 'unknown', configPath: null };
+/** Return a fresh unknown result (avoids shared mutable reference). */
+function unknown(): LinterInfo {
+  return { linter: 'unknown', configPath: null };
+}
 
 /**
  * Check if pyproject.toml contains a [tool.ruff] section.
@@ -78,7 +88,7 @@ function pyprojectHasRuff(repoRoot: string): boolean {
   const filePath = join(repoRoot, 'pyproject.toml');
   try {
     const content = readFileSync(filePath, 'utf-8');
-    return content.includes('[tool.ruff]');
+    return /^\s*\[tool\.ruff\]/m.test(content);
   } catch {
     return false;
   }
@@ -106,8 +116,8 @@ export function detectLinter(repoRoot: string): LinterInfo {
     }
   } catch {
     // Graceful degradation on any unexpected error
-    return UNKNOWN;
+    return unknown();
   }
 
-  return UNKNOWN;
+  return unknown();
 }

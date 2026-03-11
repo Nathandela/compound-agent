@@ -663,14 +663,14 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
    * Tests for agent template installation
    */
   describe('Agent template installation', () => {
-    it('creates .claude/agents/compound/ with 9 .md files', async () => {
+    it('creates .claude/agents/compound/ with 10 .md files', async () => {
       runCli('init');
 
       const agentsDir = join(getTempDir(), '.claude', 'agents', 'compound');
       expect(existsSync(agentsDir)).toBe(true);
 
       const files = readdirSync(agentsDir).filter((f) => f.endsWith('.md'));
-      expect(files.length).toBe(9);
+      expect(files.length).toBe(10);
     });
 
     it('creates all expected agent template files', async () => {

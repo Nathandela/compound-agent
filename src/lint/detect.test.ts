@@ -5,8 +5,9 @@
  * to verify detection logic for each supported linter.
  */
 
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { detectLinter } from './detect.js';
@@ -14,8 +15,7 @@ import { detectLinter } from './detect.js';
 let tmpDir: string;
 
 beforeEach(() => {
-  tmpDir = join(import.meta.dirname, '__test-lint-detect-' + Date.now());
-  mkdirSync(tmpDir, { recursive: true });
+  tmpDir = mkdtempSync(join(tmpdir(), 'lint-detect-'));
 });
 
 afterEach(() => {
@@ -42,6 +42,24 @@ describe('detectLinter', () => {
     expect(result.configPath).toBe('eslint.config.mjs');
   });
 
+  it('detects ESLint flat config (.ts variant)', () => {
+    writeFileSync(join(tmpDir, 'eslint.config.ts'), 'export default [];\n');
+
+    const result = detectLinter(tmpDir);
+
+    expect(result.linter).toBe('eslint');
+    expect(result.configPath).toBe('eslint.config.ts');
+  });
+
+  it('detects ESLint legacy config (.eslintrc.cjs)', () => {
+    writeFileSync(join(tmpDir, '.eslintrc.cjs'), 'module.exports = {};\n');
+
+    const result = detectLinter(tmpDir);
+
+    expect(result.linter).toBe('eslint');
+    expect(result.configPath).toBe('.eslintrc.cjs');
+  });
+
   it('detects ESLint legacy config (.eslintrc.json)', () => {
     writeFileSync(join(tmpDir, '.eslintrc.json'), '{}\n');
 
@@ -61,6 +79,15 @@ describe('detectLinter', () => {
     expect(result.configPath).toBe('ruff.toml');
   });
 
+  it('detects Ruff via .ruff.toml (dot-prefixed)', () => {
+    writeFileSync(join(tmpDir, '.ruff.toml'), '[lint]\nselect = ["E"]\n');
+
+    const result = detectLinter(tmpDir);
+
+    expect(result.linter).toBe('ruff');
+    expect(result.configPath).toBe('.ruff.toml');
+  });
+
   it('detects Ruff via pyproject.toml containing [tool.ruff]', () => {
     writeFileSync(
       join(tmpDir, 'pyproject.toml'),
@@ -77,6 +104,18 @@ describe('detectLinter', () => {
     writeFileSync(
       join(tmpDir, 'pyproject.toml'),
       '[project]\nname = "foo"\n',
+    );
+
+    const result = detectLinter(tmpDir);
+
+    expect(result.linter).toBe('unknown');
+    expect(result.configPath).toBeNull();
+  });
+
+  it('ignores commented-out [tool.ruff] in pyproject.toml', () => {
+    writeFileSync(
+      join(tmpDir, 'pyproject.toml'),
+      '[project]\nname = "foo"\n# [tool.ruff]\n# select = ["E"]\n',
     );
 
     const result = detectLinter(tmpDir);
@@ -180,5 +219,13 @@ describe('detectLinter', () => {
 
     expect(result.linter).toBe('unknown');
     expect(result.configPath).toBeNull();
+  });
+
+  it('returns distinct objects for unknown results (no shared mutable reference)', () => {
+    const a = detectLinter(tmpDir);
+    const b = detectLinter(tmpDir);
+
+    expect(a).not.toBe(b);
+    expect(a).toEqual(b);
   });
 });
