@@ -74,4 +74,38 @@ describe('about command', () => {
 
     Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
   });
+
+  // ==========================================================================
+  // Star and feedback links (learning_agent-z51p)
+  // ==========================================================================
+
+  it('outputs repo star link in TTY mode', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+
+    registerAboutCommand(program);
+    await program.parseAsync(['node', 'test', 'about']);
+
+    const allOutput = logSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(allOutput).toContain('https://github.com/Nathandela/compound-agent');
+  });
+
+  it('outputs GitHub Discussions link in TTY mode', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+
+    registerAboutCommand(program);
+    await program.parseAsync(['node', 'test', 'about']);
+
+    const allOutput = logSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(allOutput).toContain('https://github.com/Nathandela/compound-agent/discussions');
+  });
+
+  it('suppresses star/feedback links in non-TTY mode', async () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+
+    registerAboutCommand(program);
+    await program.parseAsync(['node', 'test', 'about']);
+
+    const allOutput = logSpy.mock.calls.map((c) => c[0]).join('\n');
+    expect(allOutput).not.toContain('discussions');
+  });
 });

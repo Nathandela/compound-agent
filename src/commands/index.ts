@@ -27,6 +27,7 @@ import { registerRulesCommands } from './rules.js';
 import { registerTestSummaryCommand } from './test-summary.js';
 import { registerVerifyGatesCommand } from './verify-gates.js';
 import { registerAboutCommand } from './about.js';
+import { registerFeedbackCommand } from './feedback.js';
 import { registerKnowledgeCommand } from './knowledge.js';
 import { registerKnowledgeIndexCommand } from './knowledge-index.js';
 import { registerCleanLessonsCommand } from './clean-lessons.js';
@@ -80,6 +81,7 @@ export function registerManagementCommands(program: Command): void {
   registerTestSummaryCommand(program);
   registerVerifyGatesCommand(program);
   registerAboutCommand(program);
+  registerFeedbackCommand(program);
   registerKnowledgeCommand(program);
   registerKnowledgeIndexCommand(program);
   registerCleanLessonsCommand(program);
