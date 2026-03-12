@@ -1,45 +1,61 @@
 # Compound Agent
 
-**Memory. Knowledge. Structure. Accountability. For AI coding agents.**
+> compound-agent is a Claude Code plugin that ships a self-improving development factory into your repository — persistent memory, structured multi-agent workflows, and autonomous loop execution. Fully local. Everything in git.
 
 [![npm version](https://img.shields.io/npm/v/compound-agent)](https://www.npmjs.com/package/compound-agent)
 [![license](https://img.shields.io/npm/l/compound-agent)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue)](https://www.typescriptlang.org/)
 
-- **Memory** -- capture mistakes once, surface them forever
-- **Knowledge** -- hybrid vector search over your project docs
-- **Structure** -- 5-phase workflows with 35+ specialized agents
-- **Accountability** -- git-tracked issues, multi-agent reviews, quality gates
+AI coding agents forget everything between sessions. Compound Agent fixes this at the environment level: it captures mistakes once, retrieves them precisely when relevant, and can hand entire systems to an autonomous loop that processes epic by epic with no human intervention.
 
-Fully local. Fully offline. Everything in git.
+## What gets installed
 
-## Overview
+`npx ca setup` injects a complete development environment into your repository:
 
-AI coding agents forget everything between sessions. Compound Agent fixes this with a three-layer system: issue tracking at the foundation, semantic memory with vector search in the middle, and structured workflows with multi-agent review on top. It captures knowledge from corrections, discoveries, and completed work, then retrieves it precisely when relevant. Every cycle through the loop makes subsequent cycles smarter.
+| Component | What ships |
+|-----------|-----------|
+| 15 slash commands | `/compound:architect`, `cook-it`, `spec-dev`, `plan`, `work`, `review`, `compound`, `learn-that`, `check-that`, and more |
+| 24 agent role skills | Security reviewers, TDD pair, decomposition convoy, spec writers, test analysers, drift detectors, and more |
+| 7 automatic hooks | Fire on session start, prompt submit, tool use, tool failure, pre-compact, phase guard, and session stop |
+| 5 phase skill files | Full workflow instructions for `architect`, `spec-dev`, `cook-it`, `work`, and `review` |
+| 5 deployed docs | Workflow reference, CLI reference, skills guide, integration guide, and overview |
+
+This is not a memory plugin bolted onto a text editor. It is the environment your agents run inside.
+
+## How it works
 
 ```mermaid
-graph LR
-    B[SPEC DEV] --> P[PLAN]
-    P --> W[WORK]
-    W --> R[REVIEW]
-    R --> C[COMPOUND]
-    C --> M[(MEMORY)]
-    M --> P
+flowchart TD
+    A["/compound:architect\nDecompose large system\ninto epics via DDD"] -->|produces epics| L
+
+    subgraph L["Compound Loop — one cycle per epic"]
+        direction LR
+        S[SPEC-DEV] --> P[PLAN]
+        P --> W[WORK]
+        W --> R[REVIEW]
+        R --> C[COMPOUND]
+    end
+
+    C -->|writes lessons| M[(MEMORY\nJSONL + SQLite\n+ embeddings)]
+    M -->|injects context| P
 
     style M fill:#f9f,stroke:#333
+    style A fill:#e8f4fd,stroke:#4a9ede
 ```
+
+Each cycle through the loop makes the next one smarter. The architect step is optional — use it for systems too large for a single feature cycle.
 
 ```mermaid
 block-beta
     columns 1
     block:L3["Workflows"]
-        A["5-phase cycle"] B["35+ specialized agents"] C["Multi-model review"]
+        A["15 slash commands"] B["24 specialized agents"] C["Autonomous loop"]
     end
     block:L2["Semantic Memory"]
-        D["Vector search"] E["Hybrid retrieval"] F["Cross-cutting patterns"]
+        D["Vector search"] E["Hybrid retrieval"] F["Cross-session persistence"]
     end
     block:L1["Foundation"]
-        G["Issue tracking"] H["Git-backed sync"] I["Quality gates"]
+        G["Beads issue tracking"] H["Git-backed sync"] I["Quality gates"]
     end
 
     L3 --> L2
@@ -54,20 +70,128 @@ Capture it once. Compound Agent surfaces it automatically before the agent repea
 **"I explained our auth pattern three sessions ago. Now it's reimplementing from scratch."**
 Architectural decisions persist as searchable lessons. Next session, they inject into context before planning starts.
 
-**"My agent uses pandas when we standardized on Polars months ago."**
+**"My agent uses pandas when we standardised on Polars months ago."**
 Preferences survive across sessions and projects. Once captured, they appear at the right moment.
 
 **"Code reviews keep catching the same class of bugs."**
-35+ specialized review agents (security, performance, architecture, test coverage) run in parallel. Findings feed back as lessons that become test requirements in future work.
+24 specialised review agents (security, performance, architecture, test coverage) run in parallel. Findings feed back as lessons that become test requirements in future work.
 
 **"I have no idea what my agent actually learned or if it's reliable."**
-`ca list` shows all captured knowledge. `ca stats` shows health. `ca wrong <id>` invalidates bad lessons. Everything is git-tracked JSONL -- you can read, diff, and audit it.
+`ca list` shows all captured knowledge. `ca stats` shows health. `ca wrong <id>` invalidates bad lessons. Everything is git-tracked JSONL — you can read, diff, and audit it.
 
 **"I want structured phases, not just 'go build this'."**
 Five workflow phases (spec-dev, plan, work, review, compound) with mandatory gates between them. Each phase searches memory and docs for relevant context before starting.
 
 **"My agent doesn't read the project docs before making decisions."**
-`ca knowledge "auth flow"` runs hybrid search (vector + keyword) over your indexed docs. Agents query it automatically during planning -- ADRs, specs, and standards surface before code gets written.
+`ca knowledge "auth flow"` runs hybrid search (vector + keyword) over your indexed docs. Agents query it automatically during planning — ADRs, specs, and standards surface before code gets written.
+
+**"I want to hand a large system spec to the machine and walk away."**
+`/compound:architect` decomposes it into epics. `ca loop` processes them autonomously.
+
+## Levels of use
+
+### Level 1 — Memory only
+
+Two minutes to set up. Works in any session without changing your existing workflow.
+
+```bash
+# Capture a mistake or preference
+ca learn "Always use Polars, not pandas in this project" --severity high
+ca learn "Auth 401 fix: add X-Request-ID header" --type solution
+
+# Search manually anytime
+ca search "polars"
+
+# Or let hooks surface it automatically — no command needed
+```
+
+### Level 2 — Structured workflow
+
+One command runs all five phases on a single feature: spec-dev, plan, work (TDD + agent team), review (24 agents), and compound (capture lessons).
+
+```bash
+/compound:cook-it "Add rate limiting to the API"
+```
+
+Run phases individually when you want more control:
+
+```bash
+/compound:spec-dev "Add rate limiting"    # Socratic dialogue → EARS spec → Mermaid diagrams
+/compound:plan                            # Tasks enriched by memory search
+/compound:work                            # TDD with agent team
+/compound:review                          # 24 parallel agents with severity gates
+/compound:compound                        # Capture what was learned
+```
+
+### Level 3 — Factory mode
+
+For systems too large for a single feature cycle. `/compound:architect` decomposes the system; `ca loop` processes the resulting epics autonomously.
+
+```bash
+# Step 1: decompose the system into epics
+/compound:architect "Multi-tenant SaaS: auth, billing, API, admin dashboard"
+# → Socratic dialogue → system-level EARS spec → DDD decomposition
+# → N epics with dependency graph, interface contracts, and scope boundaries
+
+# Step 2: generate and run the loop
+ca loop --reviewers claude-sonnet --review-every 3
+./infinity-loop.sh
+# → Processes each epic in dependency order: spec-dev → plan → work → review → compound
+# → Captures lessons after every cycle, improving subsequent cycles
+```
+
+## The infinity loop
+
+`ca loop` generates a bash script that processes your beads epics sequentially, running the full cook-it cycle on each one. No human intervention required between epics.
+
+```bash
+# Generate script for all ready epics
+ca loop
+
+# With periodic review every 3 epics
+ca loop --reviewers claude-sonnet --review-every 3
+
+# Target specific epics
+ca loop --epics beads-abc beads-def beads-ghi --max-retries 2
+
+# Run it
+./infinity-loop.sh
+```
+
+The loop respects beads dependency graphs — it only processes epics whose dependencies are complete. If an epic fails after `--max-retries` attempts, it stops and reports before proceeding.
+
+**Current maturity**: the loop works in production and has been used to ship real projects (including compound-agent itself, via its own loop). Long-duration autonomous runs across many epics are the current area of hardening.
+
+## Automatic hooks
+
+Once installed, seven Claude Code hooks fire without any commands:
+
+| Hook | When it fires | What it does |
+|------|--------------|--------------|
+| `SessionStart` | Every new session | Loads high-severity lessons into context before you type anything |
+| `PreCompact` | Before context compression | Saves phase state so cook-it survives compaction |
+| `UserPromptSubmit` | Every prompt | Injects relevant memory items into context |
+| `PreToolUse` | During cook-it | Enforces phase gates — prevents jumping ahead |
+| `PostToolUse` | After tool success | Clears failure tracking state |
+| `PostToolUseFailure` | After tool failure | Tracks failures; suggests memory search after repeated errors |
+| `Stop` | Session end | Audits session for uncaptured lessons and unclosed issues |
+
+No configuration needed. `npx ca setup` wires them into your `.claude/settings.json`.
+
+## `/compound:architect`
+
+`/compound:architect` is the entry point for anything beyond a single feature. It takes a large system description and produces cook-it-ready epics via a structured 4-phase process:
+
+1. **Socratic** — builds a domain glossary and discovery mindmap; classifies decisions by reversibility
+2. **Spec** — produces system-level EARS requirements, C4 architecture diagrams, and a scenario table
+3. **Decompose** — runs 6 parallel subagents (bounded context mapping, dependency analysis, scope sizing, interface design, STPA hazard analysis, structural-semantic gap analysis) then synthesises into a proposed epic structure
+4. **Materialise** — creates beads epics with scope boundaries, interface contracts, and wired dependencies
+
+Three human approval gates separate the phases. Each output epic is sized for one cook-it cycle and includes an EARS subset for traceability back to the system spec.
+
+```bash
+/compound:architect "Build a data pipeline: ingestion, transformation, storage, and API layer"
+```
 
 ## Installation
 
@@ -103,36 +227,6 @@ If you prefer to configure manually, add to your `package.json`:
 ```
 
 Then run `pnpm install`.
-
-## Quick Start
-
-The five-phase workflow:
-
-```
-1. /compound:spec-dev    -->  Develop precise specifications
-2. /compound:plan        -->  Create tasks enriched by memory search
-3. /compound:work        -->  Execute with agent teams + TDD
-4. /compound:review      -->  Multi-agent review with inter-communication
-5. /compound:compound    -->  Capture what was learned into memory
-```
-
-Or run all phases sequentially:
-
-```
-/compound:cook-it "Add auth to API"
-```
-
-Additional commands:
-
-```
-/compound:learn-that       -->  Capture a lesson from conversation context
-/compound:check-that       -->  Search lessons and apply to current work
-/compound:get-a-phd        -->  Deep research to build agent knowledge
-/compound:agentic-audit    -->  Score codebase against agentic manifesto
-/compound:agentic-setup    -->  Audit then set up agentic infrastructure
-```
-
-Each phase searches memory for relevant past knowledge and injects it into agent context. The compound phase captures new knowledge, closing the loop.
 
 ## CLI Reference
 
@@ -210,7 +304,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca setup` | One-shot setup (hooks + git pre-commit + model) |
 | `ca setup --skip-model` | Setup without model download |
 | `ca setup --uninstall` | Remove all generated files |
-| `ca setup --update` | Regenerate files (preserves user customizations) |
+| `ca setup --update` | Regenerate files (preserves user customisations) |
 | `ca setup --status` | Show installation status |
 | `ca setup --dry-run` | Show what would change without changing |
 | `ca setup claude --status` | Check Claude Code integration health |
@@ -243,7 +337,7 @@ confirmation_boost: confirmed=1.3, unconfirmed=1.0
 ## FAQ
 
 **Q: How is this different from mem0?**
-A: mem0 is a cloud memory layer for general AI agents. Compound Agent is local-first with git-tracked storage and local embeddings -- no API keys or cloud services needed. It also goes beyond memory with structured workflows, multi-agent review, and issue tracking.
+A: mem0 is a cloud memory layer for general AI agents. Compound Agent is local-first with git-tracked storage and local embeddings — no API keys or cloud services needed. It also goes beyond memory with structured workflows, multi-agent review, and issue tracking.
 
 **Q: Does this work offline?**
 A: Yes, completely. Embeddings run locally via node-llama-cpp. No network requests after the initial model download.
@@ -256,6 +350,9 @@ A: The CLI (`ca`) works standalone with any tool. Full hook integration is avail
 
 **Q: What happens if the embedding model isn't available?**
 A: Search gracefully falls back to keyword-only mode. Other commands that require embeddings will tell you what's missing. Run `npx ca doctor` to diagnose issues.
+
+**Q: Is the loop production-ready?**
+A: The loop works and has been used to ship real projects, including compound-agent itself. Long-duration autonomous runs across many epics are the current area of hardening. For 3–5 epic sequences, it is reliable today.
 
 ## Development
 
@@ -303,7 +400,7 @@ Compound Agent builds on ideas and patterns from these projects:
 
 | Project | Influence |
 |---------|-----------|
-| [Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin) | The "compound" philosophy -- each unit of work makes subsequent units easier. Multi-agent review workflows and skills as encoded knowledge. |
+| [Compound Engineering Plugin](https://github.com/EveryInc/compound-engineering-plugin) | The "compound" philosophy — each unit of work makes subsequent units easier. Multi-agent review workflows and skills as encoded knowledge. |
 | [Beads](https://github.com/steveyegge/beads) | Git-backed JSONL + SQLite hybrid storage model, hash-based conflict-free IDs, dependency graphs |
 | [OpenClaw](https://github.com/openclaw/openclaw) | Claude Code integration patterns and hook-based workflow architecture |
 
@@ -311,10 +408,10 @@ Also informed by research into [Reflexion](https://arxiv.org/abs/2303.11366) (ve
 
 ## Contributing
 
-Bug reports and feature requests are welcome via [Issues](https://github.com/Nathandela/compound-agent/issues). Pull requests are not accepted at this time -- see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Bug reports and feature requests are welcome via [Issues](https://github.com/Nathandela/compound-agent/issues). Pull requests are not accepted at this time — see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
 
 ## License
 
-MIT -- see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE) for details.
 
 > The embedding model (EmbeddingGemma-300M) is downloaded on-demand and subject to Google's [Gemma Terms of Use](https://ai.google.dev/gemma/terms). See [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for full dependency license information.
