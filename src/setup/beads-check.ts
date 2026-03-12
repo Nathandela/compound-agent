@@ -30,7 +30,7 @@ export function checkBeadsAvailable(): BeadsCheckResult {
     return {
       available: false,
       message:
-        'Beads CLI not found. Recommended for full workflow (issue tracking, deps, TDD pipeline). Install: https://github.com/Nathandela/beads',
+        'Beads CLI not found. Recommended for full workflow (issue tracking, deps, TDD pipeline).\nInstall: curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash\nOr run: ca install-beads',
     };
   }
 }

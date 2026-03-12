@@ -76,6 +76,8 @@ export function printBeadsFullStatus(check: BeadsFullCheck): void {
     if (check.initialized) {
       console.log(`  Beads health:       ${check.healthy ? 'OK' : `issues found${check.healthMessage ? ` — ${check.healthMessage}` : ''}`}`);
     }
+  } else if (check.healthMessage) {
+    console.log(`                      ${check.healthMessage}`);
   }
 }
 

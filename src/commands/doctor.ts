@@ -98,7 +98,7 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
   const beadsResult = checkBeadsAvailable();
   checks.push(beadsResult.available
     ? { name: 'Beads CLI', status: 'pass' }
-    : { name: 'Beads CLI', status: 'warn', fix: 'Install beads: https://github.com/Nathandela/beads' });
+    : { name: 'Beads CLI', status: 'warn', fix: 'Run: ca install-beads' });
 
   // 10. .gitignore health
   checks.push(checkGitignoreHealth(repoRoot)

@@ -59,7 +59,7 @@ describe('checkBeadsAvailable', () => {
     expect(result.available).toBe(false);
   });
 
-  it('includes install URL in message when bd is not found', () => {
+  it('includes curl install command in message when bd is not found', () => {
     mockedExecSync.mockImplementation(() => {
       throw new Error('not found');
     });
@@ -67,7 +67,19 @@ describe('checkBeadsAvailable', () => {
     const result = checkBeadsAvailable();
 
     expect(result.message).toBeDefined();
-    expect(result.message).toContain('https://github.com/Nathandela/beads');
+    expect(result.message).toContain(
+      'curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash',
+    );
+  });
+
+  it('mentions ca install-beads command when bd is not found', () => {
+    mockedExecSync.mockImplementation(() => {
+      throw new Error('not found');
+    });
+
+    const result = checkBeadsAvailable();
+
+    expect(result.message).toContain('ca install-beads');
   });
 
   it('includes helpful description when bd is not found', () => {
