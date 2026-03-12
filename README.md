@@ -6,7 +6,7 @@
 [![license](https://img.shields.io/npm/l/compound-agent)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue)](https://www.typescriptlang.org/)
 
-AI coding agents forget everything between sessions. Compound Agent fixes this at the environment level: it captures mistakes once, retrieves them precisely when relevant, and can hand entire systems to an autonomous loop that processes epic by epic with no human intervention.
+AI coding agents forget everything between sessions. Each session starts with whatever context was prepared for it — nothing more. Because agents carry no persistent state, that state must live in the codebase itself, and any agent that reads the same well-structured context should be able to pick up where another left off. Compound Agent implements this: it captures mistakes once, retrieves them precisely when relevant, and can hand entire systems to an autonomous loop that processes epic by epic with no human intervention.
 
 ## What gets installed
 
@@ -48,19 +48,31 @@ Each cycle through the loop makes the next one smarter. The architect step is op
 ```mermaid
 block-beta
     columns 1
-    block:L3["Workflows"]
+    block:L3["Workflows  ·  Feedback Loops"]
         A["15 slash commands"] B["24 specialized agents"] C["Autonomous loop"]
     end
-    block:L2["Semantic Memory"]
+    block:L2["Semantic Memory  ·  Codebase Memory"]
         D["Vector search"] E["Hybrid retrieval"] F["Cross-session persistence"]
     end
-    block:L1["Foundation"]
-        G["Beads issue tracking"] H["Git-backed sync"] I["Quality gates"]
+    block:L1["Beads Foundation  ·  Navigable Structure"]
+        G["Issue tracking"] H["Git-backed sync"] I["Dependency graphs"]
     end
 
     L3 --> L2
     L2 --> L1
 ```
+
+## Three principles
+
+These constraints follow from how AI agents work, and each one maps to a layer of the architecture.
+
+| Principle | Without it | Layer |
+|-----------|-----------|-------|
+| **Memory** | Same mistakes every session. Architectural decisions re-derived from scratch. Knowledge locked in human heads where agents cannot reach it. | Semantic Memory |
+| **Feedback loops** | Agents cannot verify their own work. Manual review is the only quality gate. Drift is the default at agent-scale output. | Structured Workflows |
+| **Navigable structure** | Context windows fill with orientation work. Agents make unverifiable assumptions about dependencies and ordering. | Beads Foundation |
+
+The three are not independent. Memory without feedback loops is unreliable. Feedback without navigable structure fires blindly. The system works as a whole or not at all.
 
 ## Is this for you?
 
@@ -160,7 +172,7 @@ ca loop --epics beads-abc beads-def beads-ghi --max-retries 2
 
 The loop respects beads dependency graphs — it only processes epics whose dependencies are complete. If an epic fails after `--max-retries` attempts, it stops and reports before proceeding.
 
-**Current maturity**: the loop works in production and has been used to ship real projects (including compound-agent itself, via its own loop). Long-duration autonomous runs across many epics are the current area of hardening.
+**Current maturity**: the loop works and has been used to ship real projects, including compound-agent itself. Two things still required human involvement: specifications had to be written before the loop started, and a human applied fixes after the first review pass surfaced real problems (missing error handling, a migration gap, insufficient test coverage). Fully unattended long-duration runs across many epics are the current area of hardening.
 
 ## Automatic hooks
 
@@ -180,7 +192,9 @@ No configuration needed. `npx ca setup` wires them into your `.claude/settings.j
 
 ## `/compound:architect`
 
-`/compound:architect` is the entry point for anything beyond a single feature. It takes a large system description and produces cook-it-ready epics via a structured 4-phase process:
+AI agents work best on well-scoped problems. When a task exceeds what fits comfortably in one context window, quality degrades — not from lack of capability but from too many competing concerns pulling in different directions.
+
+`/compound:architect` addresses this before the cook-it cycle begins. It takes a large system description and produces cook-it-ready epics via a structured 4-phase process:
 
 1. **Socratic** — builds a domain glossary and discovery mindmap; classifies decisions by reversibility
 2. **Spec** — produces system-level EARS requirements, C4 architecture diagrams, and a scenario table
@@ -393,6 +407,8 @@ pnpm lint             # Type check + ESLint
 | [docs/MIGRATION.md](https://github.com/Nathandela/compound-agent/blob/main/docs/MIGRATION.md) | Migration guide from learning-agent |
 | [CHANGELOG.md](https://github.com/Nathandela/compound-agent/blob/main/CHANGELOG.md) | Version history |
 | [AGENTS.md](https://github.com/Nathandela/compound-agent/blob/main/AGENTS.md) | Agent workflow instructions |
+
+The most direct way to explore the system is to open this repository with an AI agent and ask it to walk you through the design — the project is structured precisely for that.
 
 ## Acknowledgments
 

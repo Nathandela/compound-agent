@@ -7,6 +7,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.5] - 2026-03-12
+
+### Added
+
+- **`ca feedback` command**: Surfaces the GitHub Discussions URL for bug reports and feature requests. `ca feedback --open` opens the page directly in the browser. Cross-platform (macOS `open`, Windows `start`, Linux `xdg-open`).
+- **Star and feedback prompt in `ca about`**: TTY sessions now see a star-us link and the GitHub Discussions URL after the changelog output.
+
+### Changed
+
+- **README overhaul**: Complete rewrite to present compound-agent as a full agentic development environment rather than a memory plugin.
+  - New thesis-driven one-liner that names category, mechanism, and benefit
+  - "What gets installed" inventory table (15 commands, 24 agent role skills, 7 hooks, 5 phase skills, 5 docs)
+  - Three principles section mapping each architecture layer to the problem it solves (Memory / Feedback Loops / Navigable Structure)
+  - "Agents are interchangeable" design principle explained in the overview
+  - Levels of use replacing flat Quick Start: memory-only, structured workflow, and factory mode with code examples
+  - `/compound:architect` promoted to its own section with 4-phase description and context-window motivation
+  - Infinity loop elevated from CLI table row to its own section with full flag examples and honest maturity note
+  - Automatic hooks table with per-hook descriptions
+  - Architecture diagram updated to reflect three-principle mapping and accurate counts
+  - Compound loop diagram updated with architect as optional upstream entry point
+  - "Open with an AI agent" entry point in the Documentation section
+
 ## [1.7.4] - 2026-03-11
 
 ### Added
