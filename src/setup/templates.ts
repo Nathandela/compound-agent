@@ -234,7 +234,7 @@ This project uses compound-agent for session memory via **CLI commands**.
 | Command | Purpose |
 |---------|---------|
 | \`npx ca search "query"\` | Search lessons - MUST call before architectural decisions; use anytime you need context |
-| \`npx ca knowledge "query"\` | Ask the project docs any question - MUST call before architectural decisions; use freely |
+| \`npx ca knowledge "query"\` | Semantic search over project docs - MUST call before architectural decisions; use keyword phrases, not questions |
 | \`npx ca learn "insight"\` | Capture lessons - use AFTER corrections or discoveries |
 | \`npx ca list\` | List all stored lessons |
 | \`npx ca show <id>\` | Show details of a specific lesson |
