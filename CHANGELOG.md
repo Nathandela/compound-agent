@@ -7,6 +7,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.6] - 2026-03-12
+
+### Added
+
+- **`ca install-beads` command**: Standalone subcommand to install the beads CLI via the official script. Includes a platform guard (skips on Windows with `exitCode 1`), an "already installed" short-circuit, a `--yes` flag to bypass the confirmation hint (safe: never runs `curl | bash` without explicit opt-in), `spawnSync` with a 60-second timeout, and a post-install shell-reload warning. Non-TTY mode without `--yes` prints the install command as a copy-pasteable hint rather than silently doing nothing.
+
+### Fixed
+
+- **Beads hint display**: `printBeadsFullStatus` was silently swallowing the install hint message when the beads CLI was not found. The curl install command is now printed below the "not found" line.
+- **Beads hint text**: `checkBeadsAvailable` now returns the actual `curl -sSL ... | bash` install command in its message instead of a bare repo URL.
+- **Doctor fix message**: `ca doctor` now shows `Run: ca install-beads` for the missing-beads check instead of pointing to a URL.
+- **`ca knowledge` description**: Reframed from "Ask the project docs any question" to "Semantic search over project docs — use keyword phrases, not questions" in both the live prime template and the setup template, reflecting the underlying embedding RAG retrieval mechanism.
+
 ## [1.7.5] - 2026-03-12
 
 ### Added

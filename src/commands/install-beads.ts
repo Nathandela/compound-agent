@@ -7,6 +7,8 @@
 import { spawnSync } from 'node:child_process';
 import type { Command } from 'commander';
 
+import { checkBeadsAvailable } from '../setup/index.js';
+
 const INSTALL_SCRIPT_URL =
   'https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh';
 const INSTALL_CMD = `curl -sSL ${INSTALL_SCRIPT_URL} | bash`;
@@ -19,19 +21,18 @@ export function registerInstallBeadsCommand(program: Command): void {
     .action((opts: { yes?: boolean }) => {
       if (process.platform === 'win32') {
         console.error('Beads installation is not supported on Windows.');
+        process.exitCode = 1;
+        return;
+      }
+
+      if (checkBeadsAvailable().available) {
+        console.log('Beads CLI (bd) is already installed.');
         return;
       }
 
       console.log(`Install script: ${INSTALL_SCRIPT_URL}`);
 
-      if (!opts.yes && !process.stdout.isTTY) {
-        console.log(`Run manually: ${INSTALL_CMD}`);
-        return;
-      }
-
       if (!opts.yes) {
-        // Interactive TTY without --yes: print hint and return
-        // (no readline prompt implemented — use --yes to proceed)
         console.log(`Run manually: ${INSTALL_CMD}`);
         return;
       }
@@ -44,11 +45,13 @@ export function registerInstallBeadsCommand(program: Command): void {
 
       if (result.error) {
         console.error(`Installation error: ${result.error.message}`);
+        process.exitCode = 1;
         return;
       }
 
       if (result.status !== 0) {
         console.error(`Install error: process exited with code ${result.status}.`);
+        process.exitCode = 1;
         return;
       }
 
