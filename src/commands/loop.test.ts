@@ -454,6 +454,97 @@ describe('generateLoopScript', () => {
   });
 
   // ========================================================================
+  // --improve integration (improvement phase after epic loop)
+  // ========================================================================
+
+  it('does not include improvement phase by default', () => {
+    const script = generateLoopScript({ maxRetries: 1, model: 'claude-opus-4-6' });
+    expect(script).not.toContain('get_topics');
+    expect(script).not.toContain('detect_improve_marker');
+    expect(script).not.toContain('build_improve_prompt');
+  });
+
+  it('includes improvement phase when improve option is set', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      improve: { maxIters: 3, timeBudget: 0 },
+    });
+    expect(script).toContain('get_topics');
+    expect(script).toContain('detect_improve_marker');
+    expect(script).toContain('build_improve_prompt');
+  });
+
+  it('improvement phase appears after main loop', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      improve: { maxIters: 3, timeBudget: 0 },
+    });
+    const mainLoopEnd = script.indexOf('Loop finished');
+    const improveStart = script.indexOf('Improve loop starting');
+    expect(mainLoopEnd).toBeGreaterThan(-1);
+    expect(improveStart).toBeGreaterThan(-1);
+    expect(improveStart).toBeGreaterThan(mainLoopEnd);
+  });
+
+  it('improvement phase uses IMPROVED/NO_IMPROVEMENT/FAILED markers', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      improve: { maxIters: 3, timeBudget: 0 },
+    });
+    expect(script).toContain('"^IMPROVED$"');
+    expect(script).toContain('"^NO_IMPROVEMENT$"');
+    expect(script).toContain('"^FAILED$"');
+  });
+
+  it('improvement phase includes git tag and reset', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      improve: { maxIters: 3, timeBudget: 0 },
+    });
+    expect(script).toContain('git tag "$TAG"');
+    expect(script).toContain('git reset --hard "$TAG"');
+  });
+
+  it('passes /bin/bash -n with improvement phase', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      improve: { maxIters: 5, timeBudget: 600 },
+    });
+    const tmpFile = join('/tmp', `loop-improve-syntax-${Date.now()}.sh`);
+    writeFileSync(tmpFile, script);
+    try {
+      execSync(`/bin/bash -n "${tmpFile}"`, { encoding: 'utf-8' });
+    } finally {
+      try { execSync(`rm -f "${tmpFile}"`); } catch { /* cleanup */ }
+    }
+  });
+
+  it('passes /bin/bash -n with both review and improvement phases', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      maxReviewCycles: 3,
+      reviewBlocking: false,
+      reviewModel: 'claude-opus-4-6',
+      reviewEvery: 0,
+      improve: { maxIters: 3, timeBudget: 0 },
+    });
+    const tmpFile = join('/tmp', `loop-review-improve-syntax-${Date.now()}.sh`);
+    writeFileSync(tmpFile, script);
+    try {
+      execSync(`/bin/bash -n "${tmpFile}"`, { encoding: 'utf-8' });
+    } finally {
+      try { execSync(`rm -f "${tmpFile}"`); } catch { /* cleanup */ }
+    }
+  });
+
+  // ========================================================================
   // Dependency-aware epic selection (R29-R30)
   // ========================================================================
 

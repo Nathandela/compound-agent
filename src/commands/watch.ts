@@ -35,6 +35,7 @@ export interface StreamEvent {
 interface WatchOptions {
   epic?: string;
   follow?: boolean;
+  improve?: boolean;
 }
 
 // ============================================================================
@@ -105,7 +106,7 @@ export function formatStreamEvent(event: StreamEvent): string | null {
 
     case 'result': {
       const text = typeof event.result === 'string' ? event.result : '';
-      const markers = ['EPIC_COMPLETE', 'EPIC_FAILED', 'HUMAN_REQUIRED'];
+      const markers = ['EPIC_COMPLETE', 'EPIC_FAILED', 'HUMAN_REQUIRED', 'NO_IMPROVEMENT', 'IMPROVED', 'FAILED'];
       const found = markers.find(m => text.includes(m));
       if (found) {
         // Extract just the line containing the marker, truncate to 120 chars
@@ -256,6 +257,25 @@ async function handleWatch(cmd: Command, options: WatchOptions): Promise<void> {
       process.exitCode = 1;
       return;
     }
+  } else if (options.improve) {
+    // Find latest improvement trace
+    if (existsSync(logDir)) {
+      try {
+        const files = readdirSync(logDir)
+          .filter(f => f.startsWith('trace_improve_') && f.endsWith('.jsonl'))
+          .sort()
+          .reverse();
+        const first = files[0];
+        if (first) traceFile = join(logDir, first);
+      } catch {
+        // Directory read error
+      }
+    }
+    if (!traceFile) {
+      out.info('No improvement trace found. Run `ca improve` to generate an improvement loop script first.');
+      process.exitCode = 0;
+      return;
+    }
   } else {
     traceFile = findLatestTraceFile(logDir);
 
@@ -282,6 +302,7 @@ export function registerWatchCommand(program: Command): void {
     .command('watch')
     .description('Tail and pretty-print live trace from infinity loop sessions')
     .option('--epic <id>', 'Watch a specific epic trace')
+    .option('--improve', 'Watch improvement loop traces')
     .option('--no-follow', 'Print existing trace and exit (no live tail)')
     .action(async function (this: Command, options: WatchOptions) {
       await handleWatch(this, options);

@@ -28,6 +28,14 @@ import {
   buildImplementerPhase,
   buildReviewLoop,
 } from './loop-review-templates.js';
+import {
+  buildTopicDiscovery,
+  buildImprovePrompt,
+  buildImproveMarkerDetection,
+  buildImproveObservability,
+  buildImproveMainLoop,
+} from './improve-templates.js';
+import type { ImproveMainLoopOptions } from './improve-templates.js';
 import { VALID_LOOP_REVIEWERS } from '../config/index.js';
 import { out } from './shared.js';
 
@@ -49,6 +57,7 @@ export interface LoopScriptOptions {
   reviewBlocking?: boolean;
   reviewModel?: string;
   reviewEvery?: number;
+  improve?: ImproveMainLoopOptions;
 }
 
 interface LoopOptions {
@@ -62,6 +71,9 @@ interface LoopOptions {
   maxReviewCycles?: string;
   reviewBlocking?: boolean;
   reviewModel?: string;
+  improve?: boolean;
+  improveMaxIters?: string;
+  improveTimeBudget?: string;
 }
 
 function buildScriptHeader(timestamp: string, maxRetries: number, model: string, epicIds: string): string {
@@ -193,6 +205,18 @@ export function generateLoopScript(options: LoopScriptOptions): string {
 
   script += buildMainLoop(hasReview ? { hasReview: true, reviewEvery: options.reviewEvery ?? 0 } : undefined);
 
+  if (options.improve) {
+    script += '\n# Improvement phase (runs after epic loop completes successfully)\n';
+    script += 'if [ $FAILED -eq 0 ]; then\n';
+    script += '  log "Epic loop completed successfully, starting improvement phase"\n';
+    script += buildTopicDiscovery();
+    script += buildImprovePrompt();
+    script += buildImproveMarkerDetection();
+    script += buildImproveObservability();
+    script += buildImproveMainLoop(options.improve);
+    script += '\nfi\n';
+  }
+
   return script;
 }
 
@@ -218,6 +242,9 @@ async function handleLoop(cmd: Command, options: LoopOptions): Promise<void> {
   const reviewEvery = Number(options.reviewEvery ?? 0);
   const maxReviewCycles = Number(options.maxReviewCycles ?? 3);
 
+  const improveMaxIters = Number(options.improveMaxIters ?? 5);
+  const improveTimeBudget = Number(options.improveTimeBudget ?? 0);
+
   let script: string;
   try {
     script = generateLoopScript({
@@ -229,6 +256,7 @@ async function handleLoop(cmd: Command, options: LoopOptions): Promise<void> {
       maxReviewCycles,
       reviewBlocking: options.reviewBlocking,
       reviewModel: options.reviewModel ?? DEFAULT_MODEL,
+      improve: options.improve ? { maxIters: improveMaxIters, timeBudget: improveTimeBudget } : undefined,
     });
   } catch (err) {
     out.error((err as Error).message);
@@ -262,6 +290,9 @@ export function registerLoopCommands(program: Command): void {
     .option('--max-review-cycles <n>', 'Max review/fix iterations', '3')
     .option('--review-blocking', 'Fail loop if review not approved after max cycles')
     .option('--review-model <model>', 'Model for implementer fix sessions', DEFAULT_MODEL)
+    .option('--improve', 'Run improvement phase after all epics complete')
+    .option('--improve-max-iters <n>', 'Max improvement iterations per topic', '5')
+    .option('--improve-time-budget <seconds>', 'Total improvement time budget, 0=unlimited', '0')
     .action(async function (this: Command, options: LoopOptions) {
       await handleLoop(this, options);
     });

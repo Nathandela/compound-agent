@@ -141,6 +141,50 @@ describe('formatStreamEvent', () => {
     expect(output).toMatch(/5,?678/);
     expect(output).toContain('final');
   });
+
+  // Improvement loop markers
+  it('detects IMPROVED marker in result events', () => {
+    const event: StreamEvent = {
+      type: 'result',
+      result: 'Some output\nIMPROVED\nDone',
+    };
+    const output = formatStreamEvent(event);
+    expect(output).toContain('MARKER');
+    expect(output).toContain('IMPROVED');
+  });
+
+  it('detects NO_IMPROVEMENT marker in result events', () => {
+    const event: StreamEvent = {
+      type: 'result',
+      result: 'NO_IMPROVEMENT',
+    };
+    const output = formatStreamEvent(event);
+    expect(output).toContain('MARKER');
+    expect(output).toContain('NO_IMPROVEMENT');
+  });
+
+  it('detects FAILED marker in result events', () => {
+    const event: StreamEvent = {
+      type: 'result',
+      result: 'FAILED',
+    };
+    const output = formatStreamEvent(event);
+    expect(output).toContain('MARKER');
+    expect(output).toContain('FAILED');
+  });
+
+  it('detects NO_IMPROVEMENT before IMPROVED (substring safety)', () => {
+    const event: StreamEvent = {
+      type: 'result',
+      result: 'NO_IMPROVEMENT',
+    };
+    const output = formatStreamEvent(event);
+    expect(output).toContain('NO_IMPROVEMENT');
+    // Must NOT match just "IMPROVED" for a NO_IMPROVEMENT result
+    // The marker line itself should say NO_IMPROVEMENT, not IMPROVED
+    const markerContent = output!.split('MARKER')[1];
+    expect(markerContent).toContain('NO_IMPROVEMENT');
+  });
 });
 
 // ============================================================================
@@ -224,5 +268,15 @@ describe('ca watch CLI', { tags: ['integration'] }, () => {
   it('rejects invalid epic ID with shell metacharacters', () => {
     const { combined } = runCli('watch --epic "$(bad)" --no-follow');
     expect(combined).toMatch(/invalid|epic/i);
+  });
+
+  it('accepts --improve flag', () => {
+    const { combined } = runCli('watch --help');
+    expect(combined).toMatch(/--improve/);
+  });
+
+  it('exits gracefully when no improvement trace exists', () => {
+    const { combined } = runCli('watch --improve --no-follow');
+    expect(combined).toMatch(/no improvement trace|no active|not found/i);
   });
 });

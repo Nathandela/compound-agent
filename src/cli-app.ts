@@ -10,6 +10,7 @@ import {
   registerRetrievalCommands,
   registerSetupCommands,
 } from './commands/index.js';
+import { registerImproveCommands } from './commands/improve.js';
 import { registerLoopCommands } from './commands/loop.js';
 import { registerWatchCommand } from './commands/watch.js';
 import { VERSION } from './version.js';
@@ -71,6 +72,7 @@ export function createProgram(): Command {
   registerManagementCommands(program);
   registerSetupCommands(program);
   registerCompoundCommands(program);
+  registerImproveCommands(program);
   registerLoopCommands(program);
   registerWatchCommand(program);
   registerPhaseCheckCommand(program);
