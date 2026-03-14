@@ -88,8 +88,9 @@ describe('buildImprovePrompt', () => {
     expect(buildImprovePrompt()).toMatch(/build_improve_prompt\s*\(\)/);
   });
 
-  it('reads the .md file content via cat', () => {
-    expect(buildImprovePrompt()).toContain('cat');
+  it('reads the .md file content via cat (streamed, not interpolated in heredoc)', () => {
+    const output = buildImprovePrompt();
+    expect(output).toContain('cat "$program_file"');
   });
 
   it('includes IMPROVED marker instruction', () => {
@@ -130,8 +131,8 @@ describe('buildImproveSessionRunner', () => {
     expect(buildImproveSessionRunner()).toContain('--verbose');
   });
 
-  it('creates trace file with trace_improve_ prefix', () => {
-    expect(buildImproveSessionRunner()).toContain('trace_improve_');
+  it('writes to $TRACEFILE for trace logging', () => {
+    expect(buildImproveSessionRunner()).toContain('$TRACEFILE');
   });
 
   it('calls build_improve_prompt', () => {
@@ -289,10 +290,82 @@ describe('buildImproveMainLoop', () => {
     expect(output).toContain('FAILED_TOPICS');
   });
 
-  it('exits 0 on success, 1 on any failure', () => {
+  it('standalone mode exits 0 on success, 1 on any failure', () => {
     const output = buildImproveMainLoop(defaultOpts);
     expect(output).toContain('exit 0');
     expect(output).toContain('exit 1');
+  });
+
+  // --- C2: embedded mode (for ca loop --improve) ---
+  it('embedded mode does not call exit', () => {
+    const output = buildImproveMainLoop({ ...defaultOpts, embedded: true });
+    expect(output).not.toContain('exit 0');
+    expect(output).not.toContain('exit 1');
+  });
+
+  it('embedded mode sets IMPROVE_RESULT variable instead of exit', () => {
+    const output = buildImproveMainLoop({ ...defaultOpts, embedded: true });
+    expect(output).toContain('IMPROVE_RESULT=');
+  });
+
+  it('embedded mode passes bash -n syntax check', () => {
+    assertBashSyntax(buildImproveMainLoop({ ...defaultOpts, embedded: true }), 'improve-main-loop-embedded');
+  });
+
+  // --- C3: dry-run must not create git tags ---
+  it('dry-run check occurs before git tag creation', () => {
+    const output = buildImproveMainLoop(defaultOpts);
+    const dryRunPos = output.indexOf('IMPROVE_DRY_RUN');
+    const gitTagPos = output.indexOf('git tag');
+    expect(dryRunPos).toBeGreaterThan(-1);
+    expect(gitTagPos).toBeGreaterThan(-1);
+    expect(dryRunPos).toBeLessThan(gitTagPos);
+  });
+
+  // --- H1: tag lifecycle ---
+  it('uses git tag -f to avoid collision on re-run', () => {
+    const output = buildImproveMainLoop(defaultOpts);
+    expect(output).toContain('git tag -f');
+  });
+
+  it('deletes tag on successful improvement (no tag pollution)', () => {
+    const output = buildImproveMainLoop(defaultOpts);
+    // The improved case should also delete the tag
+    const improvedCase = output.slice(output.indexOf('(improved)'));
+    const nextCase = improvedCase.indexOf('(no_improvement)');
+    const improvedBlock = improvedCase.slice(0, nextCase);
+    expect(improvedBlock).toContain('git tag -d');
+  });
+
+  // --- H2: git clean on rollback ---
+  it('runs git clean -fd after git reset --hard on rollback', () => {
+    const output = buildImproveMainLoop(defaultOpts);
+    // Every git reset --hard should be followed by git clean -fd
+    const resetPositions = [...output.matchAll(/git reset --hard/g)].map(m => m.index);
+    const cleanPositions = [...output.matchAll(/git clean -fd/g)].map(m => m.index);
+    expect(cleanPositions.length).toBeGreaterThanOrEqual(resetPositions.length);
+  });
+
+  // --- H3: worktree-clean preflight ---
+  it('checks for clean worktree before starting improve loop', () => {
+    const output = buildImproveMainLoop(defaultOpts);
+    expect(output).toContain('git diff --quiet');
+  });
+
+  // --- H5: NO_IMPROVEMENT is not counted as failure ---
+  it('distinguishes NO_IMPROVEMENT from FAILED in topic result', () => {
+    const output = buildImproveMainLoop(defaultOpts);
+    // Topics with only NO_IMPROVEMENT should not increment FAILED_TOPICS
+    expect(output).toContain('SKIPPED_TOPICS');
+  });
+
+  // --- M1: commit verification on IMPROVED ---
+  it('warns if uncommitted changes detected after IMPROVED marker', () => {
+    const output = buildImproveMainLoop(defaultOpts);
+    const improvedCase = output.slice(output.indexOf('(improved)'));
+    const nextCase = improvedCase.indexOf('(no_improvement)');
+    const improvedBlock = improvedCase.slice(0, nextCase);
+    expect(improvedBlock).toContain('git diff --quiet');
   });
 });
 

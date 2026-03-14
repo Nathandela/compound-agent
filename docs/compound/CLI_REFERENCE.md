@@ -109,7 +109,7 @@ npx ca loop                    # Generate infinity loop script for autonomous pr
 npx ca loop --epics epic-1 epic-2
 npx ca loop --output my-loop.sh
 npx ca loop --max-retries 5
-npx ca loop --model claude-opus-4-6
+npx ca loop --model claude-opus-4-6[1m]
 npx ca loop --force            # Overwrite existing script
 ```
 

@@ -19,16 +19,10 @@ import {
   buildImproveMainLoop,
 } from './improve-templates.js';
 import { buildStreamExtractor } from './loop-templates.js';
-import { out } from './shared.js';
+import { DEFAULT_LOOP_MODEL, MODEL_PATTERN, out } from './shared.js';
 
 /** Safe pattern for topic names */
 export const TOPIC_NAME_PATTERN = /^[a-zA-Z0-9_-]+$/;
-
-/** Default Claude model */
-const DEFAULT_MODEL = 'claude-opus-4-6';
-
-/** Safe pattern for model names: alphanumeric, hyphens, underscores, dots, colons, slashes */
-const MODEL_PATTERN = /^[a-zA-Z0-9_.:/-]+$/;
 
 export interface ImproveScriptOptions {
   topics?: string[];        // specific topics to run (default: all improve/*.md)
@@ -45,7 +39,6 @@ interface ImproveOptions {
   model?: string;
   force?: boolean;
   dryRun?: boolean;
-  init?: boolean;
 }
 
 function buildImproveScriptHeader(timestamp: string, maxIters: number, timeBudget: number, model: string, topicFilter: string): string {
@@ -127,41 +120,31 @@ async function handleImprove(cmd: Command, options: ImproveOptions): Promise<voi
   void cmd;
 
   const maxIters = Number(options.maxIters ?? 5);
-  if (!Number.isInteger(maxIters) || maxIters <= 0) {
-    out.error(`Invalid --max-iters: must be a positive integer, got "${options.maxIters}"`);
-    process.exitCode = 1;
-    return;
-  }
-
   const timeBudget = Number(options.timeBudget ?? 0);
-  if (!Number.isInteger(timeBudget) || timeBudget < 0) {
-    out.error(`Invalid --time-budget: must be a non-negative integer, got "${options.timeBudget}"`);
-    process.exitCode = 1;
-    return;
-  }
 
   const scriptOptions: ImproveScriptOptions = {
     topics: options.topics,
     maxIters,
     timeBudget,
-    model: options.model ?? DEFAULT_MODEL,
+    model: options.model ?? DEFAULT_LOOP_MODEL,
   };
 
-  // Dry-run: validate and print plan, don't write file
+  // Validate early (shared between dry-run and normal paths)
+  try {
+    validateImproveOptions(scriptOptions);
+  } catch (err) {
+    out.error((err as Error).message);
+    process.exitCode = 1;
+    return;
+  }
+
+  // Dry-run: print plan, don't write file
   if (options.dryRun) {
-    try {
-      validateImproveOptions(scriptOptions);
-    } catch (err) {
-      out.error((err as Error).message);
-      process.exitCode = 1;
-      return;
-    }
     out.info('Dry run - improvement loop plan:');
     out.info(`  Topics: ${scriptOptions.topics?.join(', ') ?? '(all improve/*.md)'}`);
     out.info(`  Max iterations per topic: ${scriptOptions.maxIters}`);
     out.info(`  Time budget: ${scriptOptions.timeBudget === 0 ? 'unlimited' : `${scriptOptions.timeBudget}s`}`);
     out.info(`  Model: ${scriptOptions.model}`);
-    // Check for improve/*.md files (informational)
     if (existsSync('improve')) {
       out.info('  improve/ directory exists');
     } else {
@@ -197,14 +180,42 @@ async function handleImprove(cmd: Command, options: ImproveOptions): Promise<voi
   out.info('Preview with: IMPROVE_DRY_RUN=1 ' + outputPath);
 }
 
+const EXAMPLE_PROGRAM = `# Linting
+
+## What to improve
+Find and fix lint violations in the codebase.
+
+## How to find work
+Run the project linter and look for violations:
+\`\`\`bash
+pnpm lint 2>&1 | head -50
+\`\`\`
+
+## How to validate
+After fixing, run the linter again and confirm fewer violations:
+\`\`\`bash
+pnpm lint
+pnpm test
+\`\`\`
+`;
+
 async function handleImproveInit(cmd: Command): Promise<void> {
   void cmd;
-  out.info('Create improve/*.md files to define improvement programs.');
-  out.info('Each .md file becomes a "topic" the improvement loop will iterate on.');
-  out.info('');
-  out.info('Example: improve/linting.md');
-  out.info('  Describes how to find and fix lint issues in the codebase.');
-  out.info('');
+
+  const improveDir = 'improve';
+  const examplePath = resolve(improveDir, 'example.md');
+
+  if (existsSync(examplePath)) {
+    out.info(`improve/ directory already exists with ${examplePath}`);
+    out.info('Add more .md files to define additional improvement topics.');
+    return;
+  }
+
+  await mkdir(improveDir, { recursive: true });
+  await writeFile(examplePath, EXAMPLE_PROGRAM, 'utf-8');
+
+  out.success(`Created ${examplePath}`);
+  out.info('Edit this file or add more .md files to define improvement topics.');
   out.info('Then run: ca improve');
 }
 
@@ -219,7 +230,7 @@ export function registerImproveCommands(program: Command): void {
     .option('-o, --output <path>', 'Output script path', './improvement-loop.sh')
     .option('--max-iters <n>', 'Max iterations per topic', '5')
     .option('--time-budget <seconds>', 'Total time budget, 0=unlimited', '0')
-    .option('--model <model>', 'Claude model to use', DEFAULT_MODEL)
+    .option('--model <model>', 'Claude model to use', DEFAULT_LOOP_MODEL)
     .option('--force', 'Overwrite existing script')
     .option('--dry-run', 'Validate and print plan without generating')
     .action(async function (this: Command, options: ImproveOptions) {

@@ -505,8 +505,55 @@ describe('generateLoopScript', () => {
       model: 'claude-opus-4-6',
       improve: { maxIters: 3, timeBudget: 0 },
     });
-    expect(script).toContain('git tag "$TAG"');
+    expect(script).toContain('git tag -f');
     expect(script).toContain('git reset --hard "$TAG"');
+  });
+
+  // C1: improvement phase is reachable (no exit before it)
+  it('improvement phase is reachable — no exit before improvement block', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      improve: { maxIters: 3, timeBudget: 0 },
+    });
+    // Find the "Loop finished" log (end of main loop) and the improvement start
+    const loopFinishedPos = script.indexOf('Loop finished');
+    const improveStartPos = script.indexOf('Improve loop starting');
+    // There should be no 'exit 0' or 'exit 1' between main loop end and improvement start
+    const between = script.slice(loopFinishedPos, improveStartPos);
+    expect(between).not.toMatch(/exit [01]/);
+  });
+
+  // C2: improvement phase does not call exit when embedded in loop
+  it('improvement phase uses embedded mode (no exit calls)', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      improve: { maxIters: 3, timeBudget: 0 },
+    });
+    // The improve loop section should not have its own exit calls
+    const improveStart = script.indexOf('Improve loop starting');
+    const improveSection = script.slice(improveStart);
+    // The final exit is from the outer script, but the improvement section itself
+    // should set IMPROVE_RESULT, not call exit
+    expect(improveSection).toContain('IMPROVE_RESULT=');
+  });
+
+  // H4: invalid improve sub-options are rejected
+  it('rejects invalid improve maxIters (NaN)', () => {
+    expect(() => generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      improve: { maxIters: NaN, timeBudget: 0 },
+    })).toThrow(/maxIters/i);
+  });
+
+  it('rejects invalid improve timeBudget (negative)', () => {
+    expect(() => generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      improve: { maxIters: 3, timeBudget: -1 },
+    })).toThrow(/timeBudget/i);
   });
 
   it('passes /bin/bash -n with improvement phase', () => {

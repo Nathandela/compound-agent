@@ -67,3 +67,13 @@ export const RELEVANCE_DECIMAL_PLACES = 2;
 
 /** Indentation for JSON pretty-printing */
 export const JSON_INDENT_SPACES = 2;
+
+// ============================================================================
+// Loop / Improve Shared Constants
+// ============================================================================
+
+/** Default Claude model for loop and improve sessions (1M context for autonomous work) */
+export const DEFAULT_LOOP_MODEL = 'claude-opus-4-6[1m]';
+
+/** Safe pattern for model names: alphanumeric, hyphens, underscores, dots, colons, slashes, brackets */
+export const MODEL_PATTERN = /^[a-zA-Z0-9_.:[\]/-]+$/;

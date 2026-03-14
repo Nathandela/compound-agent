@@ -182,8 +182,8 @@ spawn_reviewers() {
     case "$reviewer" in
       (claude-sonnet|claude-opus)
         local model_name
-        if [ "$reviewer" = "claude-sonnet" ]; then model_name="claude-sonnet-4-6"
-        else model_name="claude-opus-4-6"; fi
+        if [ "$reviewer" = "claude-sonnet" ]; then model_name="claude-sonnet-4-6[1m]"
+        else model_name="claude-opus-4-6[1m]"; fi
         local sid=""
         sid=$(read_session_id "$reviewer" "$REVIEW_DIR/sessions.json")
         if [ "$cycle" -eq 1 ]; then

@@ -37,16 +37,10 @@ import {
 } from './improve-templates.js';
 import type { ImproveMainLoopOptions } from './improve-templates.js';
 import { VALID_LOOP_REVIEWERS } from '../config/index.js';
-import { out } from './shared.js';
+import { DEFAULT_LOOP_MODEL, MODEL_PATTERN, out } from './shared.js';
 
 /** Safe pattern for epic IDs in loop scripts: extends cli-utils EPIC_ID_PATTERN with dots for version-like IDs */
 export const LOOP_EPIC_ID_PATTERN = /^[a-zA-Z0-9_.-]+$/;
-
-/** Default Claude model for loop sessions */
-const DEFAULT_MODEL = 'claude-opus-4-6';
-
-/** Safe pattern for model names: alphanumeric, hyphens, underscores, dots, colons */
-const MODEL_PATTERN = /^[a-zA-Z0-9_.:/-]+$/;
 
 export interface LoopScriptOptions {
   epics?: string[];
@@ -170,6 +164,14 @@ function validateOptions(options: LoopScriptOptions): void {
       throw new Error(`Invalid maxReviewCycles: must be a positive integer, got ${options.maxReviewCycles}`);
     }
   }
+  if (options.improve) {
+    if (!Number.isInteger(options.improve.maxIters) || options.improve.maxIters <= 0) {
+      throw new Error(`Invalid improve maxIters: must be a positive integer, got ${options.improve.maxIters}`);
+    }
+    if (!Number.isInteger(options.improve.timeBudget) || options.improve.timeBudget < 0) {
+      throw new Error(`Invalid improve timeBudget: must be a non-negative integer, got ${options.improve.timeBudget}`);
+    }
+  }
 }
 
 /**
@@ -192,7 +194,7 @@ export function generateLoopScript(options: LoopScriptOptions): string {
       reviewers: options.reviewers!,
       maxReviewCycles: options.maxReviewCycles ?? 3,
       reviewBlocking: options.reviewBlocking ?? false,
-      reviewModel: options.reviewModel ?? DEFAULT_MODEL,
+      reviewModel: options.reviewModel ?? DEFAULT_LOOP_MODEL,
       reviewEvery: options.reviewEvery ?? 0,
     });
     script += buildReviewerDetection();
@@ -203,7 +205,11 @@ export function generateLoopScript(options: LoopScriptOptions): string {
     script += buildReviewLoop();
   }
 
-  script += buildMainLoop(hasReview ? { hasReview: true, reviewEvery: options.reviewEvery ?? 0 } : undefined);
+  const hasImprove = !!options.improve;
+  script += buildMainLoop(
+    hasReview ? { hasReview: true, reviewEvery: options.reviewEvery ?? 0 } : undefined,
+    hasImprove, // skipExit when improvement phase follows
+  );
 
   if (options.improve) {
     script += '\n# Improvement phase (runs after epic loop completes successfully)\n';
@@ -213,8 +219,10 @@ export function generateLoopScript(options: LoopScriptOptions): string {
     script += buildImprovePrompt();
     script += buildImproveMarkerDetection();
     script += buildImproveObservability();
-    script += buildImproveMainLoop(options.improve);
+    script += buildImproveMainLoop({ ...options.improve, embedded: true });
     script += '\nfi\n';
+    // Final exit: check both loop and improvement results
+    script += '[ $FAILED -eq 0 ] && [ "${IMPROVE_RESULT:-0}" -eq 0 ] && exit 0 || exit 1\n';
   }
 
   return script;
@@ -250,12 +258,12 @@ async function handleLoop(cmd: Command, options: LoopOptions): Promise<void> {
     script = generateLoopScript({
       epics: options.epics,
       maxRetries,
-      model: options.model ?? DEFAULT_MODEL,
+      model: options.model ?? DEFAULT_LOOP_MODEL,
       reviewers: options.reviewers,
       reviewEvery,
       maxReviewCycles,
       reviewBlocking: options.reviewBlocking,
-      reviewModel: options.reviewModel ?? DEFAULT_MODEL,
+      reviewModel: options.reviewModel ?? DEFAULT_LOOP_MODEL,
       improve: options.improve ? { maxIters: improveMaxIters, timeBudget: improveTimeBudget } : undefined,
     });
   } catch (err) {
@@ -283,13 +291,13 @@ export function registerLoopCommands(program: Command): void {
     .option('--epics <ids...>', 'Specific epic IDs to process')
     .option('-o, --output <path>', 'Output script path', './infinity-loop.sh')
     .option('--max-retries <n>', 'Max retries per epic on failure', '1')
-    .option('--model <model>', 'Claude model to use', DEFAULT_MODEL)
+    .option('--model <model>', 'Claude model to use', DEFAULT_LOOP_MODEL)
     .option('--force', 'Overwrite existing script')
     .option('--review-every <n>', 'Review every N completed epics (0=end-only)', '0')
     .option('--reviewers <names...>', 'Reviewers to use (claude-sonnet claude-opus gemini codex)')
     .option('--max-review-cycles <n>', 'Max review/fix iterations', '3')
     .option('--review-blocking', 'Fail loop if review not approved after max cycles')
-    .option('--review-model <model>', 'Model for implementer fix sessions', DEFAULT_MODEL)
+    .option('--review-model <model>', 'Model for implementer fix sessions', DEFAULT_LOOP_MODEL)
     .option('--improve', 'Run improvement phase after all epics complete')
     .option('--improve-max-iters <n>', 'Max improvement iterations per topic', '5')
     .option('--improve-time-budget <seconds>', 'Total improvement time budget, 0=unlimited', '0')

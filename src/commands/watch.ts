@@ -242,7 +242,7 @@ async function handleWatch(cmd: Command, options: WatchOptions): Promise<void> {
     if (existsSync(logDir)) {
       try {
         const files = readdirSync(logDir)
-          .filter(f => f.startsWith(`trace_${options.epic}`) && f.endsWith('.jsonl'))
+          .filter(f => f.startsWith(`trace_${options.epic}-`) && f.endsWith('.jsonl'))
           .sort()
           .reverse();
         const first = files[0];

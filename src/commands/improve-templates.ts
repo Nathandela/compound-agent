@@ -48,14 +48,17 @@ build_improve_prompt() {
     return 1
   fi
 
-  local program_content
-  program_content=$(cat "$program_file")
-
-  cat <<IMPROVE_PROMPT_EOF
+  # Stream static parts via quoted heredoc (no expansion) + file content via cat
+  # Avoids heredoc delimiter collision if .md file contains the delimiter string
+  cat <<'IMPROVE_PROMPT_HEADER'
 You are running in an autonomous improvement loop. Your task is to make ONE improvement to the codebase.
 
 ## Your Program
-$program_content
+IMPROVE_PROMPT_HEADER
+
+  cat "$program_file"
+
+  cat <<'IMPROVE_PROMPT_FOOTER'
 
 ## Rules
 - Make ONE focused improvement per iteration.
@@ -69,7 +72,7 @@ $program_content
 - Do NOT ask questions -- there is no human.
 - Commit your changes before outputting the marker.
 - You can inspect what changed with git diff before committing.
-IMPROVE_PROMPT_EOF
+IMPROVE_PROMPT_FOOTER
 }
 `;
 }
@@ -136,10 +139,9 @@ log_improve_result() {
 
 export function buildImproveSessionRunner(): string {
   return `
-    # Session runner for trace_improve_ prefixed trace files
+    # Run claude session with two-scope logging
     PROMPT=$(build_improve_prompt "$TOPIC")
 
-    # Two-scope logging: stream-json to trace JSONL, extracted text to macro log
     claude --dangerously-skip-permissions \\
            --model "$MODEL" \\
            --output-format stream-json \\
@@ -162,6 +164,7 @@ export function buildImproveSessionRunner(): string {
 export interface ImproveMainLoopOptions {
   maxIters: number;
   timeBudget: number; // seconds, 0 = unlimited
+  embedded?: boolean; // true when used inside ca loop --improve (no exit calls)
 }
 
 function buildImproveIterationBody(): string {
@@ -169,13 +172,19 @@ function buildImproveIterationBody(): string {
 
     case "$MARKER" in
       (improved)
+        # Verify the agent actually committed
+        if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+          log "WARN: Uncommitted changes detected after IMPROVED marker"
+        fi
         log "Topic $TOPIC improved (iter $ITER)"
         TOPIC_IMPROVED=$((TOPIC_IMPROVED + 1))
         CONSECUTIVE_NO_IMPROVE=0
+        git tag -d "$TAG" 2>/dev/null || true
         ;;
       (no_improvement)
         log "Topic $TOPIC: no improvement (iter $ITER), reverting"
         git reset --hard "$TAG"
+        git clean -fd 2>/dev/null || true
         git tag -d "$TAG" 2>/dev/null || true
         CONSECUTIVE_NO_IMPROVE=$((CONSECUTIVE_NO_IMPROVE + 1))
         if [ $CONSECUTIVE_NO_IMPROVE -ge 2 ]; then
@@ -186,13 +195,17 @@ function buildImproveIterationBody(): string {
       (failed)
         log "Topic $TOPIC failed (iter $ITER), reverting"
         git reset --hard "$TAG"
+        git clean -fd 2>/dev/null || true
         git tag -d "$TAG" 2>/dev/null || true
+        TOPIC_FAILED=1
         break
         ;;
       (*)
         log "Topic $TOPIC: no marker detected (iter $ITER), reverting"
         git reset --hard "$TAG"
+        git clean -fd 2>/dev/null || true
         git tag -d "$TAG" 2>/dev/null || true
+        TOPIC_FAILED=1
         break
         ;;
     esac
@@ -203,23 +216,37 @@ function buildImproveIterationBody(): string {
   if [ $TOPIC_IMPROVED -gt 0 ]; then
     IMPROVED_COUNT=$((IMPROVED_COUNT + TOPIC_IMPROVED))
     log_improve_result "$TOPIC" "improved" "$TOPIC_IMPROVED" "$TOPIC_DURATION"
-  else
+  elif [ $TOPIC_FAILED -eq 1 ]; then
     FAILED_TOPICS=$((FAILED_TOPICS + 1))
+    log_improve_result "$TOPIC" "failed" "0" "$TOPIC_DURATION"
+  else
+    SKIPPED_TOPICS=$((SKIPPED_TOPICS + 1))
     log_improve_result "$TOPIC" "no_improvement" "0" "$TOPIC_DURATION"
   fi
 done`;
 }
 
 export function buildImproveMainLoop(options: ImproveMainLoopOptions): string {
+  const embedded = options.embedded ?? false;
+
   return `
 # Improve loop
 MAX_ITERS=${options.maxIters}
 TIME_BUDGET=${options.timeBudget}
 IMPROVED_COUNT=0
 FAILED_TOPICS=0
+SKIPPED_TOPICS=0
 IMPROVE_START=$(date +%s)
 
-TOPICS=$(get_topics) || { log "No topics found, exiting"; exit 0; }
+# Worktree-clean preflight: refuse to run with dirty working tree
+if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+  log "ERROR: Working tree is dirty. Commit or stash changes before running the improvement loop."
+  log "  git status:"
+  git status --short
+  ${embedded ? 'IMPROVE_RESULT=1' : 'exit 1'}
+fi
+
+TOPICS=$(get_topics) || { log "No topics found, exiting"; ${embedded ? 'IMPROVE_RESULT=0' : 'exit 0'}; }
 log "Improve loop starting"
 log "Config: max_iters=$MAX_ITERS time_budget=$TIME_BUDGET model=$MODEL"
 log "Topics: $TOPICS"
@@ -227,6 +254,7 @@ log "Topics: $TOPICS"
 for TOPIC in $TOPICS; do
   log "Starting topic: $TOPIC"
   TOPIC_IMPROVED=0
+  TOPIC_FAILED=0
   CONSECUTIVE_NO_IMPROVE=0
   TOPIC_START=$(date +%s)
 
@@ -243,30 +271,31 @@ for TOPIC in $TOPICS; do
       fi
     fi
 
+    # Dry-run check BEFORE any side effects (tags, sessions)
+    if [ -n "\${IMPROVE_DRY_RUN:-}" ]; then
+      log "[DRY RUN] Would run claude session for $TOPIC (iter $ITER)"
+      TOPIC_IMPROVED=$((TOPIC_IMPROVED + 1))
+      continue
+    fi
+
     TS=$(timestamp)
     LOGFILE="$LOG_DIR/loop_improve_\${TOPIC}-\${TS}.log"
     TRACEFILE="$LOG_DIR/trace_improve_\${TOPIC}-\${TS}.jsonl"
     TAG="improve/\${TOPIC}/iter-\${ITER}/pre"
 
-    git tag "$TAG"
+    git tag -f "$TAG"
     write_improve_status "running" "$TOPIC" "$ITER"
     ln -sf "$(basename "$TRACEFILE")" "$LOG_DIR/.latest"
 
     log "Iteration $ITER/$MAX_ITERS for $TOPIC"
 
-    if [ -n "\${IMPROVE_DRY_RUN:-}" ]; then
-      log "[DRY RUN] Would run claude session for $TOPIC"
-      TOPIC_IMPROVED=$((TOPIC_IMPROVED + 1))
-      continue
-    fi
-
 ` + buildImproveIterationBody() + `
 
 # Summary
 TOTAL_DURATION=$(( $(date +%s) - IMPROVE_START ))
-echo "{\\"type\\":\\"summary\\",\\"improved\\":$IMPROVED_COUNT,\\"failed_topics\\":$FAILED_TOPICS,\\"total_duration_s\\":$TOTAL_DURATION}" >> "$IMPROVE_EXEC_LOG"
+echo "{\\"type\\":\\"summary\\",\\"improved\\":$IMPROVED_COUNT,\\"failed_topics\\":$FAILED_TOPICS,\\"skipped_topics\\":$SKIPPED_TOPICS,\\"total_duration_s\\":$TOTAL_DURATION}" >> "$IMPROVE_EXEC_LOG"
 write_improve_status "idle"
-log "Improve loop finished. Improvements: $IMPROVED_COUNT, Failed topics: $FAILED_TOPICS"
-[ $FAILED_TOPICS -eq 0 ] && exit 0 || exit 1
+log "Improve loop finished. Improvements: $IMPROVED_COUNT, Failed topics: $FAILED_TOPICS, Skipped: $SKIPPED_TOPICS"
+${embedded ? 'IMPROVE_RESULT=$( [ $FAILED_TOPICS -eq 0 ] && echo 0 || echo 1 )' : '[ $FAILED_TOPICS -eq 0 ] && exit 0 || exit 1'}
 `;
 }

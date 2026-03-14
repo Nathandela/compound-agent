@@ -340,7 +340,7 @@ fi
   };
 }
 
-export function buildMainLoop(reviewOptions?: MainLoopReviewOptions): string {
+export function buildMainLoop(reviewOptions?: MainLoopReviewOptions, skipExit?: boolean): string {
   const { counterInit, periodic, final } = buildReviewTriggers(
     reviewOptions?.hasReview ?? false,
     reviewOptions?.reviewEvery ?? 0,
@@ -420,5 +420,5 @@ TOTAL_DURATION=$(( $(date +%s) - LOOP_START ))
 echo "{\\"type\\":\\"summary\\",\\"completed\\":$COMPLETED,\\"failed\\":$FAILED,\\"skipped\\":$SKIPPED,\\"total_duration_s\\":$TOTAL_DURATION}" >> "$EXEC_LOG"
 write_status "idle"
 log "Loop finished. Completed: $COMPLETED, Failed: $FAILED, Skipped: $SKIPPED"
-[ $FAILED -eq 0 ] && exit 0 || exit 1`;
+${skipExit ? '' : '[ $FAILED -eq 0 ] && exit 0 || exit 1'}`;
 }
