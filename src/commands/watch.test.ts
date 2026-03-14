@@ -239,6 +239,48 @@ describe('findLatestTraceFile', () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // --- P2: prefix filter for --improve ---
+  it('filters by prefix when provided', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'watch-test-'));
+    try {
+      writeFileSync(join(dir, 'trace_epic-2026-03-02.jsonl'), '{}');
+      writeFileSync(join(dir, 'trace_improve_lint-2026-03-02.jsonl'), '{}');
+      const result = findLatestTraceFile(dir, 'trace_improve_');
+      expect(result).toContain('trace_improve_lint-2026-03-02.jsonl');
+      expect(result).not.toContain('trace_epic');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('uses .latest symlink when it matches prefix filter', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'watch-test-'));
+    try {
+      writeFileSync(join(dir, 'trace_improve_a-2026-03-01.jsonl'), '{}');
+      writeFileSync(join(dir, 'trace_improve_z-2026-03-02.jsonl'), '{}');
+      // .latest points to the a file (older by name but current by symlink)
+      symlinkSync('trace_improve_a-2026-03-01.jsonl', join(dir, '.latest'));
+      const result = findLatestTraceFile(dir, 'trace_improve_');
+      expect(result).toContain('trace_improve_a-2026-03-01.jsonl');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('ignores .latest symlink when it does not match prefix filter', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'watch-test-'));
+    try {
+      writeFileSync(join(dir, 'trace_epic-2026-03-02.jsonl'), '{}');
+      writeFileSync(join(dir, 'trace_improve_lint-2026-03-01.jsonl'), '{}');
+      // .latest points to an epic trace, not an improve trace
+      symlinkSync('trace_epic-2026-03-02.jsonl', join(dir, '.latest'));
+      const result = findLatestTraceFile(dir, 'trace_improve_');
+      expect(result).toContain('trace_improve_lint-2026-03-01.jsonl');
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
 
 // ============================================================================

@@ -184,7 +184,7 @@ function buildImproveIterationBody(): string {
       (no_improvement)
         log "Topic $TOPIC: no improvement (iter $ITER), reverting"
         git reset --hard "$TAG"
-        git clean -fd 2>/dev/null || true
+        git clean -fd -e "$LOG_DIR/" 2>/dev/null || true
         git tag -d "$TAG" 2>/dev/null || true
         CONSECUTIVE_NO_IMPROVE=$((CONSECUTIVE_NO_IMPROVE + 1))
         if [ $CONSECUTIVE_NO_IMPROVE -ge 2 ]; then
@@ -195,7 +195,7 @@ function buildImproveIterationBody(): string {
       (failed)
         log "Topic $TOPIC failed (iter $ITER), reverting"
         git reset --hard "$TAG"
-        git clean -fd 2>/dev/null || true
+        git clean -fd -e "$LOG_DIR/" 2>/dev/null || true
         git tag -d "$TAG" 2>/dev/null || true
         TOPIC_FAILED=1
         break
@@ -203,7 +203,7 @@ function buildImproveIterationBody(): string {
       (*)
         log "Topic $TOPIC: no marker detected (iter $ITER), reverting"
         git reset --hard "$TAG"
-        git clean -fd 2>/dev/null || true
+        git clean -fd -e "$LOG_DIR/" 2>/dev/null || true
         git tag -d "$TAG" 2>/dev/null || true
         TOPIC_FAILED=1
         break
@@ -229,6 +229,12 @@ done`;
 export function buildImproveMainLoop(options: ImproveMainLoopOptions): string {
   const embedded = options.embedded ?? false;
 
+  // In embedded mode, use if/else so the dirty-worktree guard prevents fallthrough
+  const guardOpen = embedded
+    ? 'IMPROVE_RESULT=1\nelse'
+    : 'exit 1\nfi';
+  const guardClose = embedded ? 'fi' : '';
+
   return `
 # Improve loop
 MAX_ITERS=${options.maxIters}
@@ -243,8 +249,7 @@ if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; th
   log "ERROR: Working tree is dirty. Commit or stash changes before running the improvement loop."
   log "  git status:"
   git status --short
-  ${embedded ? 'IMPROVE_RESULT=1' : 'exit 1'}
-fi
+  ${guardOpen}
 
 TOPICS=$(get_topics) || { log "No topics found, exiting"; ${embedded ? 'IMPROVE_RESULT=0' : 'exit 0'}; }
 log "Improve loop starting"
@@ -297,5 +302,6 @@ echo "{\\"type\\":\\"summary\\",\\"improved\\":$IMPROVED_COUNT,\\"failed_topics\
 write_improve_status "idle"
 log "Improve loop finished. Improvements: $IMPROVED_COUNT, Failed topics: $FAILED_TOPICS, Skipped: $SKIPPED_TOPICS"
 ${embedded ? 'IMPROVE_RESULT=$( [ $FAILED_TOPICS -eq 0 ] && echo 0 || echo 1 )' : '[ $FAILED_TOPICS -eq 0 ] && exit 0 || exit 1'}
+${guardClose}
 `;
 }

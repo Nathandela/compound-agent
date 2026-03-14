@@ -367,6 +367,30 @@ describe('buildImproveMainLoop', () => {
     const improvedBlock = improvedCase.slice(0, nextCase);
     expect(improvedBlock).toContain('git diff --quiet');
   });
+
+  // --- P1: git clean must exclude LOG_DIR ---
+  it('git clean on rollback excludes $LOG_DIR to prevent crash', () => {
+    const output = buildImproveMainLoop(defaultOpts);
+    const cleanCalls = [...output.matchAll(/git clean -fd[^\n]*/g)].map(m => m[0]);
+    expect(cleanCalls.length).toBeGreaterThan(0);
+    for (const call of cleanCalls) {
+      expect(call).toContain('$LOG_DIR');
+    }
+  });
+
+  // --- P1: embedded dirty-worktree guard must abort ---
+  it('embedded mode dirty-worktree guard prevents loop body from running', () => {
+    const output = buildImproveMainLoop({ ...defaultOpts, embedded: true });
+    const guardPos = output.indexOf('IMPROVE_RESULT=1');
+    expect(guardPos).toBeGreaterThan(-1);
+    // After the guard sets IMPROVE_RESULT=1, there must be an 'else' before get_topics
+    // so that the loop body only runs when the worktree is clean
+    const afterGuard = output.slice(guardPos);
+    const elsePos = afterGuard.indexOf('else');
+    const getTopicsPos = afterGuard.indexOf('get_topics');
+    expect(elsePos).toBeGreaterThan(-1);
+    expect(elsePos).toBeLessThan(getTopicsPos);
+  });
 });
 
 // ========================================================================

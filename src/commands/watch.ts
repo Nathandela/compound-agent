@@ -130,7 +130,7 @@ export function formatStreamEvent(event: StreamEvent): string | null {
  * Find the latest trace JSONL file in the given directory.
  * Checks for .latest symlink first, then falls back to sorting by name.
  */
-export function findLatestTraceFile(logDir: string): string | null {
+export function findLatestTraceFile(logDir: string, prefix = 'trace_'): string | null {
   if (!existsSync(logDir)) return null;
 
   // Check for .latest symlink
@@ -139,16 +139,16 @@ export function findLatestTraceFile(logDir: string): string | null {
     try {
       const target = readlinkSync(latestPath);
       const resolved = resolve(logDir, target);
-      if (existsSync(resolved)) return resolved;
+      if (existsSync(resolved) && target.startsWith(prefix)) return resolved;
     } catch {
       // Not a symlink or broken, fall through
     }
   }
 
-  // Fallback: find most recent trace_*.jsonl
+  // Fallback: find most recent matching trace file
   try {
     const files = readdirSync(logDir)
-      .filter(f => f.startsWith('trace_') && f.endsWith('.jsonl'))
+      .filter(f => f.startsWith(prefix) && f.endsWith('.jsonl'))
       .sort()
       .reverse();
     const first = files[0];
@@ -258,19 +258,7 @@ async function handleWatch(cmd: Command, options: WatchOptions): Promise<void> {
       return;
     }
   } else if (options.improve) {
-    // Find latest improvement trace
-    if (existsSync(logDir)) {
-      try {
-        const files = readdirSync(logDir)
-          .filter(f => f.startsWith('trace_improve_') && f.endsWith('.jsonl'))
-          .sort()
-          .reverse();
-        const first = files[0];
-        if (first) traceFile = join(logDir, first);
-      } catch {
-        // Directory read error
-      }
-    }
+    traceFile = findLatestTraceFile(logDir, 'trace_improve_');
     if (!traceFile) {
       out.info('No improvement trace found. Run `ca improve` to generate an improvement loop script first.');
       process.exitCode = 0;
