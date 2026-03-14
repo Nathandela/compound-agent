@@ -62,6 +62,17 @@ describe('buildTopicDiscovery', () => {
     expect(output).toContain('basename');
     expect(output).toContain('.md');
   });
+
+  it('uses TOPIC_FILTER when set to select specific topics', () => {
+    const output = buildTopicDiscovery();
+    expect(output).toContain('TOPIC_FILTER');
+  });
+
+  it('warns when a filtered topic file is missing', () => {
+    const output = buildTopicDiscovery();
+    expect(output).toContain('WARN');
+    expect(output).toContain('not found');
+  });
 });
 
 // ========================================================================

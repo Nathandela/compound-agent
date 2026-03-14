@@ -8,12 +8,23 @@ export function buildTopicDiscovery(): string {
 get_topics() {
   local improve_dir="\${IMPROVE_DIR:-improve}"
   local topics=""
-  for f in "$improve_dir"/*.md; do
-    [ -f "$f" ] || continue
-    local topic
-    topic=$(basename "$f" .md)
-    topics="$topics $topic"
-  done
+  if [ -n "$TOPIC_FILTER" ]; then
+    # Use explicit topic list from CLI --topics
+    for topic in $TOPIC_FILTER; do
+      if [ -f "$improve_dir/\${topic}.md" ]; then
+        topics="$topics $topic"
+      else
+        log "WARN: $improve_dir/\${topic}.md not found, skipping"
+      fi
+    done
+  else
+    for f in "$improve_dir"/*.md; do
+      [ -f "$f" ] || continue
+      local topic
+      topic=$(basename "$f" .md)
+      topics="$topics $topic"
+    done
+  fi
   topics="\${topics# }"
   if [ -z "$topics" ]; then
     log "No improve/*.md files found"
