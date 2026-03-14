@@ -16,9 +16,13 @@ import { createFullLesson, createQuickLesson } from '../test-utils.js';
 import { checkForUpdate } from '../update-check.js';
 import { getPrimeContext } from './management-prime.js';
 
-vi.mock('../update-check.js', () => ({
-  checkForUpdate: vi.fn(),
-}));
+vi.mock('../update-check.js', async () => {
+  const actual = await vi.importActual('../update-check.js');
+  return {
+    ...actual,
+    checkForUpdate: vi.fn(),
+  };
+});
 
 // Token estimation: ~4 chars per token for English text
 function estimateTokens(text: string): number {
@@ -582,8 +586,16 @@ describe('Prime Command', () => {
   // ============================================================================
 
   describe('update notification in prime', () => {
+    const originalIsTTY = process.stdout.isTTY;
+
+    beforeEach(() => {
+      // Prime update checks only run in non-TTY (complement of shouldCheckForUpdate).
+      Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+    });
+
     afterEach(() => {
       vi.mocked(checkForUpdate).mockReset();
+      Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
     });
 
     it('includes update section when update is available', async () => {
@@ -631,7 +643,49 @@ describe('Prime Command', () => {
 
       expect(output).toContain('1.7.2');
       expect(output).toContain('1.8.0');
-      expect(output).toContain('pnpm update --latest compound-agent');
+      expect(output).toContain('pnpm add -D compound-agent@latest');
+    });
+
+    it('passes correct cache path to checkForUpdate', async () => {
+      vi.mocked(checkForUpdate).mockResolvedValue(null);
+
+      await getPrimeContext(tempDir);
+
+      expect(checkForUpdate).toHaveBeenCalledWith(
+        expect.stringContaining('.claude/.cache'),
+      );
+    });
+
+    it('skips update check when CI env var is set', async () => {
+      const originalCI = process.env['CI'];
+      process.env['CI'] = 'true';
+      vi.mocked(checkForUpdate).mockResolvedValue({
+        current: '1.7.2',
+        latest: '1.8.0',
+        updateAvailable: true,
+      });
+
+      const output = await getPrimeContext(tempDir);
+
+      expect(output).not.toContain('Update Available');
+      expect(checkForUpdate).not.toHaveBeenCalled();
+      process.env['CI'] = originalCI;
+    });
+
+    it('skips update check when NO_UPDATE_NOTIFIER is set', async () => {
+      const original = process.env['NO_UPDATE_NOTIFIER'];
+      process.env['NO_UPDATE_NOTIFIER'] = '1';
+      vi.mocked(checkForUpdate).mockResolvedValue({
+        current: '1.7.2',
+        latest: '1.8.0',
+        updateAvailable: true,
+      });
+
+      const output = await getPrimeContext(tempDir);
+
+      expect(output).not.toContain('Update Available');
+      expect(checkForUpdate).not.toHaveBeenCalled();
+      process.env['NO_UPDATE_NOTIFIER'] = original;
     });
   });
 });

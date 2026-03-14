@@ -23,20 +23,20 @@ const CACHE_FILENAME = 'update-check.json';
 
 /**
  * Fetch the latest published version of a package from the npm registry.
+ * Uses the dist-tags endpoint (~100 bytes) instead of the full manifest.
  * Returns null on any error.
  */
 export async function fetchLatestVersion(
   packageName: string = 'compound-agent',
 ): Promise<string | null> {
   try {
-    const res = await fetch(`https://registry.npmjs.org/${packageName}`, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
+    const res = await fetch(
+      `https://registry.npmjs.org/-/package/${packageName}/dist-tags`,
+      { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) },
+    );
     if (!res.ok) return null;
-    const data = await res.json();
-    const tags = (data as Record<string, unknown>)['dist-tags'];
-    if (typeof tags !== 'object' || tags === null) return null;
-    const latest = (tags as Record<string, unknown>)['latest'];
+    const data = (await res.json()) as Record<string, unknown>;
+    const latest = data['latest'];
     return typeof latest === 'string' ? latest : null;
   } catch {
     return null;
@@ -88,13 +88,54 @@ export async function checkForUpdate(
 }
 
 /**
- * Format a human-readable update notification string.
+ * Returns true when the major version of `latest` exceeds that of `current`.
+ */
+export function isMajorUpdate(current: string, latest: string): boolean {
+  return parseInt(latest.split('.')[0]!, 10) > parseInt(current.split('.')[0]!, 10);
+}
+
+/**
+ * Format a human-readable update notification string (plain text, for TTY).
+ * Major updates get an urgency label; shows both global and dev-dep commands.
  */
 export function formatUpdateNotification(
   current: string,
   latest: string,
 ): string {
-  return `Update available: ${current} -> ${latest}\nRun: pnpm update --latest compound-agent`;
+  const label = isMajorUpdate(current, latest) ? 'Major update' : 'Update available';
+  const warning = isMajorUpdate(current, latest)
+    ? '\n  May contain breaking changes -- check the changelog.'
+    : '';
+  return [
+    `${label}: ${current} -> ${latest}${warning}`,
+    `Run: npm update -g compound-agent        (global)`,
+    `     pnpm add -D compound-agent@latest   (dev dependency)`,
+  ].join('\n');
+}
+
+/**
+ * Format an update notification in markdown (for non-TTY / prime output).
+ */
+export function formatUpdateNotificationMarkdown(
+  current: string,
+  latest: string,
+): string {
+  const urgency = isMajorUpdate(current, latest)
+    ? ' (MAJOR - may contain breaking changes)'
+    : '';
+  return `\n---\n# Update Available\ncompound-agent v${latest} is available (current: v${current})${urgency}.\nRun: \`npm update -g compound-agent\` (global) or \`pnpm add -D compound-agent@latest\` (dev dependency)\n`;
+}
+
+/**
+ * Determine whether an update check should run.
+ * Skips non-TTY, CI environments, and explicit opt-outs.
+ */
+export function shouldCheckForUpdate(): boolean {
+  if (!process.stdout.isTTY) return false;
+  if (process.env['CI']) return false;
+  if (process.env['NO_UPDATE_NOTIFIER']) return false;
+  if (process.env['NODE_ENV'] === 'test') return false;
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,10 +145,17 @@ export function formatUpdateNotification(
 /**
  * Returns true if version a is strictly greater than version b.
  * Handles standard MAJOR.MINOR.PATCH semver format.
+ * Pre-release suffixes (e.g. "2.0.0-beta.1") are stripped before comparison
+ * so that pre-releases are never promoted over stable releases.
  */
 function semverGt(a: string, b: string): boolean {
   const parse = (v: string): [number, number, number] => {
-    const parts = v.split('.').map(n => parseInt(n, 10) || 0);
+    // Strip pre-release suffix: "2.0.0-beta.1" -> "2.0.0"
+    const clean = v.split('-')[0]!;
+    const parts = clean.split('.').map(n => {
+      const num = parseInt(n, 10);
+      return isNaN(num) ? 0 : num;
+    });
     return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
   };
   const [aMaj, aMin, aPat] = parse(a);
@@ -124,7 +172,7 @@ function readCache(cachePath: string): CacheData | null {
 
     const raw = readFileSync(cachePath, 'utf-8');
     const data = JSON.parse(raw) as CacheData;
-    if (!data.latest) return null;
+    if (typeof data.latest !== 'string' || !data.latest) return null;
     return data;
   } catch {
     return null;

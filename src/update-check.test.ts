@@ -34,8 +34,14 @@ const mockedMkdirSync = vi.mocked(mkdirSync);
 const mockedStatSync = vi.mocked(statSync);
 
 // Dynamic import after mocks are in place.
-const { fetchLatestVersion, checkForUpdate, formatUpdateNotification } =
-  await import('./update-check.js');
+const {
+  fetchLatestVersion,
+  checkForUpdate,
+  formatUpdateNotification,
+  formatUpdateNotificationMarkdown,
+  isMajorUpdate,
+  shouldCheckForUpdate,
+} = await import('./update-check.js');
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -69,7 +75,7 @@ describe('fetchLatestVersion', () => {
   });
 
   it('returns version string on successful fetch', async () => {
-    mockFetchOk({ 'dist-tags': { latest: '2.0.0' } });
+    mockFetchOk({ latest: '2.0.0' });
 
     const version = await fetchLatestVersion('compound-agent');
 
@@ -111,7 +117,7 @@ describe('fetchLatestVersion', () => {
   });
 
   it('uses a 3-second timeout via AbortSignal', async () => {
-    mockFetchOk({ 'dist-tags': { latest: '2.0.0' } });
+    mockFetchOk({ latest: '2.0.0' });
 
     await fetchLatestVersion('compound-agent');
 
@@ -123,13 +129,22 @@ describe('fetchLatestVersion', () => {
   });
 
   it('defaults to "compound-agent" when no package name is provided', async () => {
-    mockFetchOk({ 'dist-tags': { latest: '3.0.0' } });
+    mockFetchOk({ latest: '3.0.0' });
 
     const version = await fetchLatestVersion();
 
     expect(version).toBe('3.0.0');
     const url = vi.mocked(fetch).mock.calls[0][0] as string;
     expect(url).toContain('compound-agent');
+  });
+
+  it('uses the dist-tags endpoint (not full manifest)', async () => {
+    mockFetchOk({ latest: '2.0.0' });
+
+    await fetchLatestVersion('compound-agent');
+
+    const url = vi.mocked(fetch).mock.calls[0][0] as string;
+    expect(url).toBe('https://registry.npmjs.org/-/package/compound-agent/dist-tags');
   });
 });
 
@@ -153,7 +168,7 @@ describe('checkForUpdate', () => {
     mockedStatSync.mockImplementation(() => {
       throw new Error('ENOENT');
     });
-    mockFetchOk({ 'dist-tags': { latest: '2.0.0' } });
+    mockFetchOk({ latest: '2.0.0' });
 
     const result = await checkForUpdate(cacheDir);
 
@@ -167,7 +182,7 @@ describe('checkForUpdate', () => {
     mockedStatSync.mockImplementation(() => {
       throw new Error('ENOENT');
     });
-    mockFetchOk({ 'dist-tags': { latest: '1.5.0' } });
+    mockFetchOk({ latest: '1.5.0' });
 
     const result = await checkForUpdate(cacheDir);
 
@@ -183,7 +198,7 @@ describe('checkForUpdate', () => {
     mockedStatSync.mockImplementation(() => {
       throw new Error('ENOENT');
     });
-    mockFetchOk({ 'dist-tags': { latest: '1.4.0' } });
+    mockFetchOk({ latest: '1.4.0' });
 
     const result = await checkForUpdate(cacheDir);
 
@@ -215,7 +230,7 @@ describe('checkForUpdate', () => {
     mockedReadFileSync.mockReturnValue(
       JSON.stringify({ latest: '1.5.0' }),
     );
-    mockFetchOk({ 'dist-tags': { latest: '2.1.0' } });
+    mockFetchOk({ latest: '2.1.0' });
 
     const result = await checkForUpdate(cacheDir);
 
@@ -228,7 +243,7 @@ describe('checkForUpdate', () => {
     mockedStatSync.mockImplementation(() => {
       throw new Error('ENOENT');
     });
-    mockFetchOk({ 'dist-tags': { latest: '2.0.0' } });
+    mockFetchOk({ latest: '2.0.0' });
 
     const result = await checkForUpdate(cacheDir);
 
@@ -241,7 +256,7 @@ describe('checkForUpdate', () => {
     const now = new Date();
     mockedStatSync.mockReturnValue({ mtimeMs: now.getTime() } as ReturnType<typeof statSync>);
     mockedReadFileSync.mockReturnValue('not valid json{{{');
-    mockFetchOk({ 'dist-tags': { latest: '2.0.0' } });
+    mockFetchOk({ latest: '2.0.0' });
 
     const result = await checkForUpdate(cacheDir);
 
@@ -266,7 +281,7 @@ describe('checkForUpdate', () => {
     mockedStatSync.mockImplementation(() => {
       throw new Error('ENOENT');
     });
-    mockFetchOk({ 'dist-tags': { latest: '2.0.0' } });
+    mockFetchOk({ latest: '2.0.0' });
 
     await checkForUpdate(cacheDir);
 
@@ -283,6 +298,20 @@ describe('checkForUpdate', () => {
 // formatUpdateNotification
 // ---------------------------------------------------------------------------
 
+describe('isMajorUpdate', () => {
+  it('returns true when major version increases', () => {
+    expect(isMajorUpdate('1.5.0', '2.0.0')).toBe(true);
+  });
+
+  it('returns false for minor bump', () => {
+    expect(isMajorUpdate('1.5.0', '1.6.0')).toBe(false);
+  });
+
+  it('returns false for patch bump', () => {
+    expect(isMajorUpdate('1.5.0', '1.5.1')).toBe(false);
+  });
+});
+
 describe('formatUpdateNotification', () => {
   it('returns formatted string with both versions', () => {
     const output = formatUpdateNotification('1.5.0', '2.0.0');
@@ -291,9 +320,100 @@ describe('formatUpdateNotification', () => {
     expect(output).toContain('2.0.0');
   });
 
-  it('contains "pnpm update --latest compound-agent" instruction', () => {
-    const output = formatUpdateNotification('1.5.0', '2.0.0');
+  it('shows both global and dev-dependency update commands', () => {
+    const output = formatUpdateNotification('1.5.0', '1.6.0');
 
-    expect(output).toContain('pnpm update --latest compound-agent');
+    expect(output).toContain('npm update -g compound-agent');
+    expect(output).toContain('pnpm add -D compound-agent@latest');
+  });
+
+  it('labels major updates differently from minor/patch', () => {
+    const major = formatUpdateNotification('1.5.0', '2.0.0');
+    const minor = formatUpdateNotification('1.5.0', '1.6.0');
+
+    expect(major).toContain('Major update');
+    expect(major).toContain('breaking changes');
+    expect(minor).not.toContain('Major update');
+    expect(minor).toContain('Update available');
+  });
+
+  it('classifies patch bump as "Update available" (not major)', () => {
+    const patch = formatUpdateNotification('1.5.0', '1.5.1');
+
+    expect(patch).toContain('Update available');
+    expect(patch).not.toContain('Major update');
+  });
+});
+
+describe('formatUpdateNotificationMarkdown', () => {
+  it('returns markdown with backtick-wrapped commands', () => {
+    const output = formatUpdateNotificationMarkdown('1.5.0', '1.6.0');
+
+    expect(output).toContain('`npm update -g compound-agent`');
+    expect(output).toContain('`pnpm add -D compound-agent@latest`');
+  });
+
+  it('includes MAJOR label for major version bumps', () => {
+    const output = formatUpdateNotificationMarkdown('1.5.0', '2.0.0');
+
+    expect(output).toContain('MAJOR');
+    expect(output).toContain('breaking changes');
+  });
+
+  it('prefixes versions with v', () => {
+    const output = formatUpdateNotificationMarkdown('1.5.0', '1.6.0');
+
+    expect(output).toContain('v1.6.0');
+    expect(output).toContain('v1.5.0');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// shouldCheckForUpdate
+// ---------------------------------------------------------------------------
+
+describe('shouldCheckForUpdate', () => {
+  const originalEnv = { ...process.env };
+  const originalIsTTY = process.stdout.isTTY;
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+    Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
+  });
+
+  it('returns true in normal TTY environment', () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    delete process.env['CI'];
+    delete process.env['NO_UPDATE_NOTIFIER'];
+    delete process.env['NODE_ENV'];
+
+    expect(shouldCheckForUpdate()).toBe(true);
+  });
+
+  it('returns false when not a TTY', () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: false, configurable: true });
+
+    expect(shouldCheckForUpdate()).toBe(false);
+  });
+
+  it('returns false when CI env var is set', () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    process.env['CI'] = 'true';
+
+    expect(shouldCheckForUpdate()).toBe(false);
+  });
+
+  it('returns false when NO_UPDATE_NOTIFIER is set', () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    process.env['NO_UPDATE_NOTIFIER'] = '1';
+
+    expect(shouldCheckForUpdate()).toBe(false);
+  });
+
+  it('returns false when NODE_ENV is test', () => {
+    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
+    process.env['NODE_ENV'] = 'test';
+
+    expect(shouldCheckForUpdate()).toBe(false);
   });
 });

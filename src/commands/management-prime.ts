@@ -12,7 +12,7 @@ import { getRepoRoot } from '../cli-utils.js';
 import { loadSessionLessons } from '../memory/retrieval/index.js';
 import { syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem, Source } from '../memory/index.js';
-import { checkForUpdate } from '../update-check.js';
+import { checkForUpdate, formatUpdateNotificationMarkdown } from '../update-check.js';
 import { getPhaseState } from './phase-check.js';
 /**
  * Beads-style trust language template.
@@ -169,18 +169,14 @@ ${formattedLessons}
   }
 
   // Append update notification when NOT in a TTY.
-  // In a TTY session, runProgram() already prints a post-command update notice,
-  // so we skip it here to avoid duplication. In non-TTY contexts (Claude Code
-  // session context), prime is the only place that can surface this.
-  if (!process.stdout.isTTY) {
+  // This is intentionally the complement of shouldCheckForUpdate() in cli-app.ts:
+  // TTY sessions get notifications from runProgram(); non-TTY contexts (Claude Code
+  // session context) get them here. CI and explicit opt-outs are respected in both paths.
+  if (!process.stdout.isTTY && !process.env['CI'] && !process.env['NO_UPDATE_NOTIFIER']) {
     try {
       const updateResult = await checkForUpdate(join(root, '.claude', '.cache'));
       if (updateResult?.updateAvailable) {
-        output += `
----
-# Update Available
-compound-agent v${updateResult.latest} is available (current: v${updateResult.current}). Run \`pnpm update --latest compound-agent\` to update.
-`;
+        output += formatUpdateNotificationMarkdown(updateResult.current, updateResult.latest);
       }
     } catch {
       // Non-fatal: update check failure should never block prime

@@ -9,11 +9,16 @@ vi.mock('../memory/storage/index.js', () => ({
   closeDb: vi.fn(),
 }));
 
+vi.mock('../cli-utils.js', () => ({
+  getRepoRoot: vi.fn(() => '/tmp/fake-repo'),
+}));
+
 vi.mock('../update-check.js', () => ({
   checkForUpdate: vi.fn().mockResolvedValue(null),
   formatUpdateNotification: vi.fn(
-    (current: string, latest: string) => `Update available: ${current} -> ${latest}\nRun: pnpm update --latest compound-agent`,
+    (current: string, latest: string) => `Update available: ${current} -> ${latest}\nRun: npm update -g compound-agent        (global)\n     pnpm add -D compound-agent@latest   (dev dependency)`,
   ),
+  shouldCheckForUpdate: vi.fn().mockReturnValue(true),
 }));
 
 describe('runProgram', () => {
@@ -43,16 +48,15 @@ describe('runProgram', () => {
     expect(closeDb).toHaveBeenCalledTimes(1);
   });
 
-  it('prints update notification when TTY and update available', async () => {
-    const { checkForUpdate } = await import('../update-check.js');
+  it('prints update notification when update available', async () => {
+    const { checkForUpdate, shouldCheckForUpdate } = await import('../update-check.js');
+    vi.mocked(shouldCheckForUpdate).mockReturnValue(true);
     vi.mocked(checkForUpdate).mockResolvedValue({
       current: '1.5.0',
       latest: '2.0.0',
       updateAvailable: true,
     });
 
-    const originalIsTTY = process.stdout.isTTY;
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const { runProgram } = await import('../cli-app.js');
@@ -62,21 +66,18 @@ describe('runProgram', () => {
 
     await runProgram(program, ['node', 'ca', 'test']);
 
-    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm update --latest compound-agent'));
-
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
+    expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('pnpm add -D compound-agent@latest'));
   });
 
   it('does not print notification when no update available', async () => {
-    const { checkForUpdate } = await import('../update-check.js');
+    const { checkForUpdate, shouldCheckForUpdate } = await import('../update-check.js');
+    vi.mocked(shouldCheckForUpdate).mockReturnValue(true);
     vi.mocked(checkForUpdate).mockResolvedValue({
       current: '2.0.0',
       latest: '2.0.0',
       updateAvailable: false,
     });
 
-    const originalIsTTY = process.stdout.isTTY;
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 
     const { runProgram } = await import('../cli-app.js');
@@ -87,16 +88,12 @@ describe('runProgram', () => {
     await runProgram(program, ['node', 'ca', 'test']);
 
     expect(logSpy).not.toHaveBeenCalledWith(expect.stringContaining('pnpm update'));
-
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
   });
 
   it('swallows update check errors silently', async () => {
-    const { checkForUpdate } = await import('../update-check.js');
+    const { checkForUpdate, shouldCheckForUpdate } = await import('../update-check.js');
+    vi.mocked(shouldCheckForUpdate).mockReturnValue(true);
     vi.mocked(checkForUpdate).mockRejectedValue(new Error('network failure'));
-
-    const originalIsTTY = process.stdout.isTTY;
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true });
 
     const { runProgram } = await import('../cli-app.js');
     const program = new Command();
@@ -105,8 +102,20 @@ describe('runProgram', () => {
 
     // Should not throw despite checkForUpdate failing
     await expect(runProgram(program, ['node', 'ca', 'test'])).resolves.toBeUndefined();
+  });
 
-    Object.defineProperty(process.stdout, 'isTTY', { value: originalIsTTY, configurable: true });
+  it('skips update check entirely when shouldCheckForUpdate returns false', async () => {
+    const { checkForUpdate, shouldCheckForUpdate } = await import('../update-check.js');
+    vi.mocked(shouldCheckForUpdate).mockReturnValue(false);
+
+    const { runProgram } = await import('../cli-app.js');
+    const program = new Command();
+    program.exitOverride();
+    program.command('test').action(async () => {});
+
+    await runProgram(program, ['node', 'ca', 'test']);
+
+    expect(checkForUpdate).not.toHaveBeenCalled();
   });
 
   it('releases resources when a command fails', async () => {
