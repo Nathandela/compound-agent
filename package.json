@@ -1,6 +1,6 @@
 {
   "name": "compound-agent",
-  "version": "1.7.6",
+  "version": "1.8.0",
   "description": "Semantically-intelligent workflow plugin for Claude Code",
   "type": "module",
   "main": "./dist/index.js",

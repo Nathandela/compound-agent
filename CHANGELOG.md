@@ -7,6 +7,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-03-15
+
+### Added
+
+- **`ca improve` command**: Generates a bash script that autonomously improves the codebase using `improve/*.md` program files. Each program defines what to improve, how to find work, and how to validate changes. Options: `--topics` (filter specific topics), `--max-iters` (iterations per topic, default 5), `--time-budget` (total seconds, 0=unlimited), `--model`, `--force`, `--dry-run`. Includes `ca improve init` subcommand to scaffold an example program file.
+- **`ca watch` command**: Tails and pretty-prints live trace JSONL from infinity loop and improvement loop sessions. Supports `--epic <id>` to watch a specific epic, `--improve` to watch improvement loop traces, and `--no-follow` to print existing trace and exit. Formats tool calls, thinking blocks, token usage, and result markers into a compact, color-coded stream.
+
+### Fixed
+
+- **`git clean` scoping in improvement loop**: Bare `git clean -fd` on rollback was removing all untracked files including the script's own log directory, causing crashes. All three rollback paths now use `git clean -fd -e "$LOG_DIR/"` to exclude agent logs.
+- **Embedded dirty-worktree guard fallthrough**: In embedded mode (when improvement loop runs inside `ca loop --improve`), setting `IMPROVE_RESULT=1` on a dirty worktree did not prevent the loop body from executing. Restructured to use `if/else` so the loop body only runs inside the `else` branch.
+- **`ca watch --improve` ignoring `.latest` symlink**: The `--improve` code path had inline logic that only did reverse filename sort, bypassing the `.latest` symlink that the improvement loop maintains. Refactored `findLatestTraceFile()` with a `prefix` parameter to unify both code paths.
+- **`--topics` flag ignored in `get_topics()`**: The `TOPIC_FILTER` variable from the CLI `--topics` flag was not used in the generated bash `get_topics()` function, causing all topics to run regardless of filtering.
+- **Update-check hardening**: Switched to a lightweight npm registry endpoint, added CI environment guards, and corrected the update command shown to users.
+
 ## [1.7.6] - 2026-03-12
 
 ### Added

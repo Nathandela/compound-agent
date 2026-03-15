@@ -174,6 +174,35 @@ The loop respects beads dependency graphs — it only processes epics whose depe
 
 **Current maturity**: the loop works and has been used to ship real projects, including compound-agent itself. Two things still required human involvement: specifications had to be written before the loop started, and a human applied fixes after the first review pass surfaced real problems (missing error handling, a migration gap, insufficient test coverage). Fully unattended long-duration runs across many epics are the current area of hardening.
 
+## The improvement loop
+
+`ca improve` generates a bash script that iterates over `improve/*.md` program files, spawning Claude Code sessions to make focused improvements. Each program file defines what to improve, how to find work, and how to validate changes.
+
+```bash
+# Scaffold an example program file
+ca improve init
+# Creates improve/example.md with a linting template
+
+# Generate the improvement script
+ca improve
+
+# Filter to specific topics
+ca improve --topics lint tests --max-iters 3
+
+# Preview without generating
+ca improve --dry-run
+
+# Run the generated script
+./improvement-loop.sh
+
+# Preview without executing Claude sessions
+IMPROVE_DRY_RUN=1 ./improvement-loop.sh
+```
+
+Each iteration makes one focused improvement, commits it, and moves on. If an iteration finds nothing to improve or fails validation, it reverts cleanly and moves to the next topic. The loop tracks consecutive no-improvement results and stops early to avoid diminishing returns.
+
+Monitor progress with `ca watch --improve` to see live trace output from improvement sessions.
+
 ## Automatic hooks
 
 Once installed, seven Claude Code hooks fire without any commands:
@@ -303,6 +332,17 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca loop --max-review-cycles <n>` | Max review/fix iterations (default: 3) |
 | `ca loop --review-blocking` | Fail loop if review not approved after max cycles |
 | `ca loop --review-model <model>` | Model for implementer fix sessions (default: claude-opus-4-6) |
+| `ca improve` | Generate improvement loop script from `improve/*.md` programs |
+| `ca improve --topics <names...>` | Run only specific topics |
+| `ca improve --max-iters <n>` | Max iterations per topic (default: 5) |
+| `ca improve --time-budget <seconds>` | Total time budget, 0=unlimited (default: 0) |
+| `ca improve --dry-run` | Validate and print plan without generating |
+| `ca improve --force` | Overwrite existing script |
+| `ca improve init` | Scaffold an example `improve/*.md` program file |
+| `ca watch` | Tail and pretty-print live trace from loop sessions |
+| `ca watch --epic <id>` | Watch a specific epic trace |
+| `ca watch --improve` | Watch improvement loop traces |
+| `ca watch --no-follow` | Print existing trace and exit (no live tail) |
 
 ### Knowledge
 

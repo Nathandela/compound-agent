@@ -1,6 +1,6 @@
 ---
-version: "1.7.4"
-last-updated: "2026-03-11"
+version: "1.8.0"
+last-updated: "2026-03-15"
 summary: "Complete CLI command reference for compound-agent"
 ---
 
@@ -111,6 +111,29 @@ npx ca loop --output my-loop.sh
 npx ca loop --max-retries 5
 npx ca loop --model claude-opus-4-6[1m]
 npx ca loop --force            # Overwrite existing script
+```
+
+## Improve command
+
+```bash
+npx ca improve                           # Generate improvement loop script
+npx ca improve --topics lint tests       # Run only specific topics
+npx ca improve --max-iters 3             # Max iterations per topic (default: 5)
+npx ca improve --time-budget 3600        # Total time budget in seconds (0=unlimited)
+npx ca improve --model claude-sonnet-4-6 # Choose model
+npx ca improve --output my-improve.sh    # Custom output path
+npx ca improve --force                   # Overwrite existing script
+npx ca improve --dry-run                 # Validate and print plan without generating
+npx ca improve init                      # Scaffold example improve/*.md program file
+```
+
+## Watch command
+
+```bash
+npx ca watch                             # Tail live trace from latest loop session
+npx ca watch --epic <id>                 # Watch a specific epic trace
+npx ca watch --improve                   # Watch improvement loop traces
+npx ca watch --no-follow                 # Print existing trace and exit
 ```
 
 ## Health, audit, and verification commands
