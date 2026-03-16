@@ -454,6 +454,42 @@ describe('generateLoopScript', () => {
   });
 
   // ========================================================================
+  // R4: review phase error isolation
+  // ========================================================================
+
+  it('wraps periodic run_review_phase call with error trapping', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      reviewEvery: 2,
+    });
+    // run_review_phase should NOT be called bare — it must be wrapped so failures don't kill the loop
+    // Pattern: if ! run_review_phase ...; then log WARN ... fi  OR  run_review_phase ... || log WARN ...
+    expect(script).toMatch(/run_review_phase\s+"periodic".*\|\|\s*log|if\s+!\s+run_review_phase\s+"periodic"/s);
+  });
+
+  it('wraps final run_review_phase call with error trapping', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      reviewEvery: 2,
+    });
+    expect(script).toMatch(/run_review_phase\s+"final".*\|\|\s*log|if\s+!\s+run_review_phase\s+"final"/s);
+  });
+
+  it('wraps final run_review_phase when reviewEvery=0', () => {
+    const script = generateLoopScript({
+      maxRetries: 1,
+      model: 'claude-opus-4-6',
+      reviewers: ['claude-sonnet'],
+      reviewEvery: 0,
+    });
+    expect(script).toMatch(/run_review_phase\s+"final".*\|\|\s*log|if\s+!\s+run_review_phase\s+"final"/s);
+  });
+
+  // ========================================================================
   // --improve integration (improvement phase after epic loop)
   // ========================================================================
 

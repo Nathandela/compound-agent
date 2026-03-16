@@ -51,24 +51,30 @@ detect_reviewers() {
   for reviewer in $REVIEW_REVIEWERS; do
     case "$reviewer" in
       (claude-sonnet|claude-opus)
-        if command -v claude >/dev/null 2>&1; then
-          AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS $reviewer"
-        else
+        if ! command -v claude >/dev/null 2>&1; then
           log "WARN: claude CLI not found, skipping $reviewer"
+        elif ! claude --version >/dev/null 2>&1; then
+          log "WARN: claude CLI not healthy, skipping $reviewer (health check failed)"
+        else
+          AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS $reviewer"
         fi
         ;;
       (gemini)
-        if command -v gemini >/dev/null 2>&1; then
-          AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS gemini"
-        else
+        if ! command -v gemini >/dev/null 2>&1; then
           log "WARN: gemini CLI not found, skipping gemini"
+        elif ! gemini --version >/dev/null 2>&1; then
+          log "WARN: gemini CLI not healthy, skipping gemini (health check failed)"
+        else
+          AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS gemini"
         fi
         ;;
       (codex)
-        if command -v codex >/dev/null 2>&1; then
-          AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS codex"
-        else
+        if ! command -v codex >/dev/null 2>&1; then
           log "WARN: codex CLI not found, skipping codex"
+        elif ! codex --version >/dev/null 2>&1; then
+          log "WARN: codex CLI not healthy, skipping codex (health check failed)"
+        else
+          AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS codex"
         fi
         ;;
     esac
@@ -98,7 +104,7 @@ init_review_sessions() {
       (claude-sonnet|claude-opus)
         local existing=""
         if [ "$HAS_JQ" = true ]; then
-          existing=$(jq -r ".[\\"$reviewer\\"] // empty" "$sessions_file" 2>/dev/null)
+          existing=$(cat "$sessions_file" | jq -r ".[\\"$reviewer\\"] // empty" 2>/dev/null)
         else
           existing=$(python3 -c "
 import json, sys
@@ -110,7 +116,7 @@ print(d.get('$reviewer', ''))" 2>/dev/null || echo "")
           sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
           if [ "$HAS_JQ" = true ]; then
             local tmp
-            tmp=$(jq --arg k "$reviewer" --arg v "$sid" '. + {($k): $v}' "$sessions_file")
+            tmp=$(cat "$sessions_file" | jq --arg k "$reviewer" --arg v "$sid" '. + {($k): $v}')
             echo "$tmp" > "$sessions_file"
           else
             python3 -c "
@@ -163,7 +169,7 @@ export function buildSpawnReviewers(): string {
 read_session_id() {
   local reviewer="$1" sessions_file="$2"
   if [ "$HAS_JQ" = true ]; then
-    jq -r ".[\\"$reviewer\\"] // empty" "$sessions_file" 2>/dev/null
+    cat "$sessions_file" | jq -r ".[\\"$reviewer\\"] // empty" 2>/dev/null
   else
     python3 -c "
 import json
