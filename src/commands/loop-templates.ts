@@ -319,7 +319,7 @@ function buildReviewTriggers(hasReview: boolean, reviewEvery: number): {
     COMPLETED_SINCE_REVIEW=$((COMPLETED_SINCE_REVIEW + 1))
     if [ "$COMPLETED_SINCE_REVIEW" -ge "$REVIEW_EVERY" ]; then
       REVIEW_DIFF_RANGE="$REVIEW_BASE_SHA..HEAD"
-      run_review_phase "periodic"
+      run_review_phase "periodic" || log "WARN: review phase (periodic) failed, continuing"
       COMPLETED_SINCE_REVIEW=0
       REVIEW_BASE_SHA=$(git rev-parse HEAD)
     fi`
@@ -328,13 +328,13 @@ function buildReviewTriggers(hasReview: boolean, reviewEvery: number): {
       ? `
 if [ "$COMPLETED_SINCE_REVIEW" -gt 0 ]; then
   REVIEW_DIFF_RANGE="$REVIEW_BASE_SHA..HEAD"
-  run_review_phase "final"
+  run_review_phase "final" || log "WARN: review phase (final) failed, continuing"
 fi
 `
       : `
 if [ "$COMPLETED" -gt 0 ]; then
   REVIEW_DIFF_RANGE="$REVIEW_BASE_SHA..HEAD"
-  run_review_phase "final"
+  run_review_phase "final" || log "WARN: review phase (final) failed, continuing"
 fi
 `,
   };

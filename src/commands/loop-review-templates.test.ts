@@ -419,3 +419,61 @@ describe('full review script composition', () => {
     assertBashSyntax(full, 'full-composition');
   });
 });
+
+// ========================================================================
+// R1: jq calls use stdin piping, not file arguments
+// ========================================================================
+
+describe('jq stdin piping (R1)', () => {
+  it('buildSessionIdManagement uses cat pipe for jq reads', () => {
+    const output = buildSessionIdManagement();
+    // No single line should have jq with "$sessions_file" as a file arg
+    // [^|\n]* prevents cross-line matching
+    expect(output).not.toMatch(/jq\s+[^|\n]*"\$sessions_file"/);
+    expect(output).toMatch(/cat\s+"\$sessions_file"\s*\|\s*jq/);
+  });
+
+  it('buildSessionIdManagement uses cat pipe for jq writes', () => {
+    const output = buildSessionIdManagement();
+    // The write path should also pipe via cat
+    expect(output).toMatch(/cat\s+"\$sessions_file"\s*\|\s*jq\s+--arg/);
+  });
+
+  it('buildSpawnReviewers read_session_id uses cat pipe for jq', () => {
+    const output = buildSpawnReviewers();
+    expect(output).not.toMatch(/jq\s+[^|\n]*"\$sessions_file"/);
+    expect(output).toMatch(/cat\s+"\$sessions_file"\s*\|\s*jq/);
+  });
+});
+
+// ========================================================================
+// R2/R3: detect_reviewers auth health checks
+// ========================================================================
+
+describe('detect_reviewers auth health checks (R2/R3)', () => {
+  it('probes claude CLI beyond command -v', () => {
+    const output = buildReviewerDetection();
+    // After finding the binary, should run a health check command
+    expect(output).toContain('command -v claude');
+    // Should have a probe/health check after binary check
+    expect(output).toMatch(/claude\s+.*--version|claude\s+.*--help|claude\s+-p/);
+  });
+
+  it('probes gemini CLI beyond command -v', () => {
+    const output = buildReviewerDetection();
+    expect(output).toContain('command -v gemini');
+    expect(output).toMatch(/gemini\s+.*--version|gemini\s+.*--help|gemini\s+-p/);
+  });
+
+  it('probes codex CLI beyond command -v', () => {
+    const output = buildReviewerDetection();
+    expect(output).toContain('command -v codex');
+    expect(output).toMatch(/codex\s+.*--version|codex\s+.*--help|codex\s+exec/);
+  });
+
+  it('logs warning with reason when health check fails', () => {
+    const output = buildReviewerDetection();
+    // Should mention auth/config failure in warning
+    expect(output).toMatch(/WARN:.*not (authenticated|responding|healthy|ready)|WARN:.*health check failed/i);
+  });
+});
