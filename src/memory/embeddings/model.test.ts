@@ -19,10 +19,13 @@ import {
   resolveModel,
 } from './model.js';
 
-// Skip-gate uses isModelAvailable() only (fs.existsSync, zero native memory).
-// Never call isModelUsable() at module top-level — it loads ~400MB of native memory.
+// Check if embedding tests should be skipped (env var or model unavailable)
 const modelAvailable = isModelAvailable();
-const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
+const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
+const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
+
+// Keep tests isolated from module-level probe above.
+clearUsabilityCache();
 
 describe('embedding model resolution', () => {
   describe('MODEL_URI', () => {

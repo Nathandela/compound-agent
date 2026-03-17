@@ -308,7 +308,7 @@ export function daysAgo(days: number): string {
  * const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
  * it.skipIf(skipEmbedding)('test...', async () => { ... });
  *
- * // NEVER call isModelUsable() at module top-level — it loads ~400MB
+ * // NEVER call isModelUsable() at module top-level — it loads ~150MB
  * // of native memory that leaks when vitest workers SIGABRT during disposal.
  * ```
  */

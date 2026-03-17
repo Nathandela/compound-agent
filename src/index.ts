@@ -35,7 +35,7 @@
  *
  * ### Embedding Model
  * - **Acquired:** Lazily on first embedding call (embedText, embedTexts, searchVector)
- * - **Memory:** ~400MB RAM for the EmbeddingGemma model
+ * - **Memory:** ~150MB RAM for the EmbeddingGemma model
  * - **Cleanup:** Call `unloadEmbedding()` before process exit
  *
  * ### Recommended Cleanup Pattern

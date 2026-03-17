@@ -10,7 +10,7 @@ import { appendLesson } from '../memory/storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
 import { cleanupCliTestDir, createQuickLesson, runCli, setupCliTestDir, shouldSkipEmbeddingTests } from '../test-utils.js';
 
-// SAFETY: Never call isModelUsable() at module top-level — causes ~400MB native memory leak.
+// SAFETY: Never call isModelUsable() at module top-level — causes ~150MB native memory leak.
 const modelAvailable = isModelAvailable();
 const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
 

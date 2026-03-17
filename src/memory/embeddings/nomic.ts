@@ -2,12 +2,12 @@
  * Text embedding via node-llama-cpp with EmbeddingGemma model
  *
  * **Resource lifecycle:**
- * - Model is loaded lazily on first embedding call (~400MB in memory)
+ * - Model is loaded lazily on first embedding call (~150MB in memory)
  * - Once loaded, the model remains in memory until `unloadEmbedding()` is called
  * - Loading is slow (~1-3s); keeping loaded improves subsequent call performance
  *
  * **Memory usage:**
- * - Embedding model: ~400MB RAM when loaded
+ * - Embedding model: ~150MB RAM when loaded
  * - Embeddings themselves: ~3KB per embedding (768 dimensions x 4 bytes)
  *
  * @see {@link unloadEmbedding} for releasing memory
@@ -31,7 +31,7 @@ let modelInstance: LlamaModel | null = null;
  * Get the LlamaEmbeddingContext instance for generating embeddings.
  *
  * **Lazy loading behavior:**
- * - First call loads the embedding model (~400MB) into memory
+ * - First call loads the embedding model (~150MB) into memory
  * - Loading takes ~1-3 seconds depending on hardware
  * - Subsequent calls return the cached instance immediately
  * - Downloads model automatically if not present
@@ -107,26 +107,29 @@ export async function unloadEmbeddingResources(): Promise<void> {
   llamaInstance = null;
   pendingInit = null;
 
-  // Dispose sequentially inner-to-outer (context → model → llama).
-  // Concurrent disposal via Promise.allSettled caused SIGABRT when the
-  // model was freed while the context still held a reference to it.
+  const disposals: Promise<unknown>[] = [];
+
   if (context) {
-    try { await context.dispose(); } catch { /* ignore cleanup errors */ }
+    disposals.push(context.dispose());
   }
   if (model) {
-    try { await model.dispose(); } catch { /* ignore cleanup errors */ }
+    disposals.push(model.dispose());
   }
   if (llama) {
-    try { await llama.dispose(); } catch { /* ignore cleanup errors */ }
+    disposals.push(llama.dispose());
+  }
+
+  if (disposals.length > 0) {
+    await Promise.allSettled(disposals);
   }
 }
 
 /**
- * Unload the embedding context to free memory (~400MB).
+ * Unload the embedding context to free memory (~150MB).
  *
  * **Resource lifecycle:**
  * - Disposes the underlying LlamaEmbeddingContext
- * - Releases ~400MB of RAM used by the model
+ * - Releases ~150MB of RAM used by the model
  * - After unloading, subsequent embedding calls will reload the model
  *
  * **When to call:**
@@ -171,7 +174,7 @@ export function unloadEmbedding(): void {
  *
  * The model loads lazily on the first embedText/embedTexts call inside
  * the callback (via the existing singleton). After the callback completes
- * or throws, all native resources (~400MB) are disposed.
+ * or throws, all native resources (~150MB) are disposed.
  *
  * Use this instead of manually pairing embedText with unloadEmbeddingResources.
  */
@@ -186,7 +189,7 @@ export async function withEmbedding<T>(fn: () => Promise<T>): Promise<T> {
 /**
  * Embed a single text string into a vector.
  *
- * **Lazy loading:** First call loads the embedding model (~400MB, ~1-3s).
+ * **Lazy loading:** First call loads the embedding model (~150MB, ~1-3s).
  * Subsequent calls use the cached model and complete in milliseconds.
  *
  * @param text - The text to embed
@@ -214,7 +217,7 @@ export async function embedText(text: string): Promise<Float32Array> {
 /**
  * Embed multiple texts into vectors.
  *
- * **Lazy loading:** First call loads the embedding model (~400MB, ~1-3s).
+ * **Lazy loading:** First call loads the embedding model (~150MB, ~1-3s).
  * Subsequent calls use the cached model.
  *
  * **Note:** Texts are embedded sequentially (node-llama-cpp uses a mutex lock).

@@ -25,7 +25,7 @@ export default defineWorkspace([
       exclude: ['src/memory/embeddings/**/*.test.ts', ...integrationFiles],
       pool: 'threads',
       poolOptions: {
-        threads: { minThreads: 1, maxThreads: 2 },
+        threads: { minThreads: 2, maxThreads: 4 },
       },
       isolate: true,
     },
