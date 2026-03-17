@@ -9,7 +9,7 @@ Compound-agent manages two resources that persist in memory:
 | Resource | When Loaded | Memory Usage | Cleanup Function |
 |----------|-------------|--------------|------------------|
 | SQLite Database | First DB operation | ~few KB | `closeDb()` |
-| Embedding Model | First embedding call | ~150MB RAM (~278MB on disk) | `unloadEmbedding()` |
+| Embedding Model | First embedding call | ~400MB RAM (~278MB on disk) | `unloadEmbedding()` |
 
 Both resources use **lazy loading** - they are only acquired when first needed, not on import.
 
@@ -66,7 +66,7 @@ async function main() {
 ```
 Import module          --> No model loaded
   |
-First embedding call   --> Model loaded (~1-3 seconds, ~150MB RAM)
+First embedding call   --> Model loaded (~1-3 seconds, ~400MB RAM)
 (embedText, embedTexts,
  searchVector, etc.)
   |
@@ -212,7 +212,7 @@ Failing to clean up will **not corrupt data**, but may cause:
 
 | Issue | Impact |
 |-------|--------|
-| Memory leaks | ~150MB not freed in long-running processes |
+| Memory leaks | ~400MB not freed in long-running processes |
 | Unclean exit | Some environments warn about open handles |
 | File locks | SQLite WAL files may persist longer than needed |
 
@@ -245,7 +245,7 @@ The SQLite database is stored at `.claude/.cache/lessons.sqlite`. The directory 
 
 3. **Download model proactively** - Run `download-model` during setup, not on first use
 
-4. **Monitor memory in production** - The ~150MB embedding model is significant
+4. **Monitor memory in production** - The ~400MB embedding model is significant
 
 5. **Order matters** - Unload embedding before closing database (though either order works)
 

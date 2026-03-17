@@ -8,18 +8,16 @@
 import { afterAll, describe, expect, it } from 'vitest';
 
 import { shouldSkipEmbeddingTests } from '../../test-utils.js';
-import { isModelUsable } from './model.js';
 
-import { embedText, embedTexts, getEmbedding, isModelAvailable, unloadEmbedding } from './nomic.js';
+import { embedText, embedTexts, getEmbedding, isModelAvailable, unloadEmbeddingResources } from './nomic.js';
 
-// Check if embedding tests should be skipped (env var, model unavailable, or runtime unusable)
-const modelAvailable = isModelAvailable();
-const modelUsability = modelAvailable ? await isModelUsable() : { usable: false as const };
-const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable, modelUsability.usable);
+// Skip-gate uses isModelAvailable() only (fs.existsSync, zero native memory).
+// Never call isModelUsable() at module top-level — it loads ~400MB of native memory.
+const skipEmbedding = shouldSkipEmbeddingTests(isModelAvailable());
 
 describe('embeddings', () => {
-  afterAll(() => {
-    unloadEmbedding();
+  afterAll(async () => {
+    await unloadEmbeddingResources();
   });
 
   describe('embedText', () => {
