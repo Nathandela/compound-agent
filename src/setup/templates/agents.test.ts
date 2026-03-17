@@ -23,8 +23,8 @@ const EXTERNAL_REVIEWER_FILENAMES = [
 const ALL_FILENAMES = [...THIN_WRAPPER_FILENAMES, ...LESSONS_FILENAMES, ...EXTERNAL_REVIEWER_FILENAMES];
 
 describe('AGENT_TEMPLATES', () => {
-  it('has exactly 10 entries (6 thin wrappers + 2 lessons + 2 external reviewers)', () => {
-    expect(Object.keys(AGENT_TEMPLATES)).toHaveLength(10);
+  it('has exactly 11 entries (7 thin wrappers + 2 lessons + 2 external reviewers)', () => {
+    expect(Object.keys(AGENT_TEMPLATES)).toHaveLength(11);
   });
 
   it('every key ends with .md', () => {
