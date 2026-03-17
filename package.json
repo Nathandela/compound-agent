@@ -17,6 +17,7 @@
   },
   "files": [
     "dist",
+    "docs/assets",
     "docs/research",
     "scripts/postinstall.mjs",
     "CHANGELOG.md",

@@ -6,6 +6,10 @@
 [![license](https://img.shields.io/npm/l/compound-agent)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue)](https://www.typescriptlang.org/)
 
+<p align="center">
+  <img src="docs/assets/diagram-4.png" alt="Compound-agent ecosystem overview: Architect phase decomposes work via Socratic dialogue into a dependency graph. ca loop chains tasks with cross-model review, retry, and fresh sessions. Scenario evaluation validates changes with iterative refinement. All backed by persistent memory (lessons + knowledge across all sessions) and verification gates (tests, lint, type checks on every task)." width="700">
+</p>
+
 AI coding agents forget everything between sessions. Each session starts with whatever context was prepared for it — nothing more. Because agents carry no persistent state, that state must live in the codebase itself, and any agent that reads the same well-structured context should be able to pick up where another left off. Compound Agent implements this: it captures mistakes once, retrieves them precisely when relevant, and can hand entire systems to an autonomous loop that processes epic by epic with no human intervention.
 
 ## What gets installed
@@ -24,43 +28,22 @@ This is not a memory plugin bolted onto a text editor. It is the environment you
 
 ## How it works
 
-```mermaid
-flowchart TD
-    A["/compound:architect\nDecompose large system\ninto epics via DDD"] -->|produces epics| L
+Two memory systems persist across sessions:
 
-    subgraph L["Compound Loop — one cycle per epic"]
-        direction LR
-        S[SPEC-DEV] --> P[PLAN]
-        P --> W[WORK]
-        W --> R[REVIEW]
-        R --> C[COMPOUND]
-    end
+<p align="center">
+  <img src="docs/assets/diagram-1.png" alt="A task session between two memory systems: Lessons (JSONL + SQLite with semantic + keyword search) are retrieved before and captured after each task. Knowledge (project docs chunked and embedded) is queried on demand." width="700">
+</p>
 
-    C -->|writes lessons| M[(MEMORY\nJSONL + SQLite\n+ embeddings)]
-    M -->|injects context| P
+- **Lessons** — mistakes, corrections, and patterns stored as git-tracked JSONL, indexed in SQLite FTS5 with local embeddings for hybrid search. Retrieved at the start of each task, captured at the end.
+- **Knowledge** — project documentation chunked and embedded for semantic retrieval. Any phase can query it on demand.
 
-    style M fill:#f9f,stroke:#333
-    style A fill:#e8f4fd,stroke:#4a9ede
-```
+Each task runs through five phases, with review findings looping back to rework. Each phase runs as its own slash command so instructions are re-injected fresh (surviving context compaction):
+
+<p align="center">
+  <img src="docs/assets/diagram-2.png" alt="Inside a task: five phases (Spec, Plan, Work, Review, Compound) connected in sequence with a feedback loop from Review back to Work. Each phase runs as its own slash command with fresh instructions. Lessons are retrieved at start and captured at end. Knowledge is queryable from any phase." width="700">
+</p>
 
 Each cycle through the loop makes the next one smarter. The architect step is optional — use it for systems too large for a single feature cycle.
-
-```mermaid
-block-beta
-    columns 1
-    block:L3["Workflows  ·  Feedback Loops"]
-        A["15 slash commands"] B["24 specialized agents"] C["Autonomous loop"]
-    end
-    block:L2["Semantic Memory  ·  Codebase Memory"]
-        D["Vector search"] E["Hybrid retrieval"] F["Cross-session persistence"]
-    end
-    block:L1["Beads Foundation  ·  Navigable Structure"]
-        G["Issue tracking"] H["Git-backed sync"] I["Dependency graphs"]
-    end
-
-    L3 --> L2
-    L2 --> L1
-```
 
 ## Three principles
 
@@ -153,6 +136,10 @@ ca loop --reviewers claude-sonnet --review-every 3
 ```
 
 ## The infinity loop
+
+<p align="center">
+  <img src="docs/assets/diagram-3.png" alt="ca loop chains tasks in dependency order: Task 1 through Task 4, each running a full cycle in a fresh session. Cross-model review (R) gates between tasks. Failed tasks retry automatically. Tasks can escalate to human-required. Generated bash script with deterministic orchestration." width="700">
+</p>
 
 `ca loop` generates a bash script that processes your beads epics sequentially, running the full cook-it cycle on each one. No human intervention required between epics.
 
