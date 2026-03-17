@@ -16,6 +16,7 @@ import {
   removeCompoundAgentHook,
   writeClaudeSettings,
 } from './claude-helpers.js';
+import { cleanGeminiCompoundFiles } from './gemini.js';
 import { GENERATED_MARKER } from './primitives.js';
 import { LEGACY_ROOT_SLASH_COMMANDS } from './templates.js';
 
@@ -101,6 +102,18 @@ export async function runUninstall(repoRoot: string, dryRun: boolean): Promise<s
       if (content.includes('compound-agent:claude-ref:start')) {
         actions.push('Removed compound-agent reference from CLAUDE.md');
       }
+    }
+  }
+
+  // Remove compound-managed files from .gemini/
+  if (!dryRun) {
+    const geminiActions = await cleanGeminiCompoundFiles(repoRoot);
+    actions.push(...geminiActions);
+  } else {
+    // Check what would be cleaned
+    const gemDir = join(repoRoot, '.gemini');
+    if (existsSync(gemDir)) {
+      actions.push('Would clean compound files from .gemini/');
     }
   }
 

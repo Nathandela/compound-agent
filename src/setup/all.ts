@@ -24,7 +24,8 @@ import {
   writeClaudeSettings,
 } from './claude-helpers.js';
 import { ensureGitignore, type GitignoreResult } from './gitignore.js';
-import { installGeminiAdapter } from './gemini.js';
+import { cleanGeminiCompoundFiles, hasGeminiCompoundFiles, installGeminiAdapter } from './gemini.js';
+import { enableGemini, isGeminiEnabled } from '../config/index.js';
 import { installPreCommitHook, installPostCommitHook, type HookInstallResult } from './hooks.js';
 import {
   createPluginManifest,
@@ -173,8 +174,17 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   // 11. Configure Claude settings (hooks in settings.json)
   const { hooks } = await configureClaudeSettings();
 
-  // 11b. Install Gemini CLI compatibility hooks
-  await installGeminiAdapter({ dryRun: false, json: true });
+  // 11b. Install Gemini CLI compatibility hooks (only if opted in)
+  // Migration: auto-enable if .gemini/ compound files already exist from before opt-in was added
+  if (!await isGeminiEnabled(repoRoot) && hasGeminiCompoundFiles(repoRoot)) {
+    await enableGemini(repoRoot);
+  }
+  if (await isGeminiEnabled(repoRoot)) {
+    await installGeminiAdapter(repoRoot, { silent: true });
+  } else {
+    const cleaned = await cleanGeminiCompoundFiles(repoRoot);
+    for (const action of cleaned) console.log(`  ${action}`);
+  }
 
   // 12. Ensure .gitignore has required patterns
   const gitignore = await ensureGitignore(repoRoot);
@@ -338,7 +348,17 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
   let configUpdated = false;
   if (!dryRun) {
     const { hooks } = await configureClaudeSettings();
-    await installGeminiAdapter({ dryRun: false, json: true });
+    // Migration: auto-enable if .gemini/ compound files already exist
+    if (!await isGeminiEnabled(repoRoot) && hasGeminiCompoundFiles(repoRoot)) {
+      await enableGemini(repoRoot);
+    }
+    // Install or clean Gemini adapter based on opt-in config
+    if (await isGeminiEnabled(repoRoot)) {
+      await installGeminiAdapter(repoRoot, { silent: true });
+    } else {
+      const cleaned = await cleanGeminiCompoundFiles(repoRoot);
+      for (const action of cleaned) console.log(`  ${action}`);
+    }
     configUpdated = hooks;
   }
 

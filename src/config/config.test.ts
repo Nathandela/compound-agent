@@ -10,6 +10,9 @@ import {
   getExternalReviewers,
   enableReviewer,
   disableReviewer,
+  isGeminiEnabled,
+  enableGemini,
+  disableGemini,
   CONFIG_FILENAME,
   VALID_REVIEWERS,
   VALID_LOOP_REVIEWERS,
@@ -219,5 +222,80 @@ describe('disableReviewer', () => {
 
     const reviewers = await getExternalReviewers(tempDir);
     expect(reviewers).toEqual(['codex']);
+  });
+});
+
+// ── Gemini adapter opt-in ─────────────────────────────────────────────
+
+describe('isGeminiEnabled', () => {
+  it('returns false when no config exists', async () => {
+    expect(await isGeminiEnabled(tempDir)).toBe(false);
+  });
+
+  it('returns false when gemini field is absent', async () => {
+    await writeConfig(tempDir, { externalReviewers: [] });
+    expect(await isGeminiEnabled(tempDir)).toBe(false);
+  });
+
+  it('returns true when gemini is true', async () => {
+    await writeConfig(tempDir, { gemini: true });
+    expect(await isGeminiEnabled(tempDir)).toBe(true);
+  });
+
+  it('returns false when gemini is false', async () => {
+    await writeConfig(tempDir, { gemini: false });
+    expect(await isGeminiEnabled(tempDir)).toBe(false);
+  });
+
+  it('returns false when gemini is a non-boolean value', async () => {
+    const configPath = join(tempDir, '.claude', CONFIG_FILENAME);
+    await writeFile(configPath, JSON.stringify({ gemini: 'yes' }), 'utf-8');
+    expect(await isGeminiEnabled(tempDir)).toBe(false);
+  });
+});
+
+describe('enableGemini', () => {
+  it('sets gemini to true and returns true on first enable', async () => {
+    const result = await enableGemini(tempDir);
+    expect(result).toBe(true);
+    expect(await isGeminiEnabled(tempDir)).toBe(true);
+  });
+
+  it('returns false when already enabled', async () => {
+    await enableGemini(tempDir);
+    const result = await enableGemini(tempDir);
+    expect(result).toBe(false);
+  });
+
+  it('preserves existing config fields', async () => {
+    await writeConfig(tempDir, { externalReviewers: ['codex'] });
+    await enableGemini(tempDir);
+
+    const config = await readConfig(tempDir);
+    expect(config.gemini).toBe(true);
+    expect(config.externalReviewers).toEqual(['codex']);
+  });
+});
+
+describe('disableGemini', () => {
+  it('removes gemini key and returns true when was enabled', async () => {
+    await enableGemini(tempDir);
+    const result = await disableGemini(tempDir);
+    expect(result).toBe(true);
+    expect(await isGeminiEnabled(tempDir)).toBe(false);
+  });
+
+  it('returns false when already disabled', async () => {
+    const result = await disableGemini(tempDir);
+    expect(result).toBe(false);
+  });
+
+  it('preserves existing config fields and removes gemini key', async () => {
+    await writeConfig(tempDir, { gemini: true, externalReviewers: ['codex'] });
+    await disableGemini(tempDir);
+
+    const config = await readConfig(tempDir);
+    expect(config.gemini).toBeUndefined();
+    expect(config.externalReviewers).toEqual(['codex']);
   });
 });

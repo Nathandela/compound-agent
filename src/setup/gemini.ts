@@ -7,13 +7,14 @@
  */
 
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
 import { formatError } from '../cli-error-format.js';
 import { out } from '../commands/index.js';
 import { getRepoRoot } from '../cli-utils.js';
+import { enableGemini, disableGemini } from '../config/index.js';
 import { WORKFLOW_COMMANDS, PHASE_SKILLS, AGENT_ROLE_SKILLS } from './templates/index.js';
 
 // ============================================================================
@@ -77,6 +78,13 @@ const SETTINGS_JSON = {
   },
 };
 
+/** Derive compound hook names from SETTINGS_JSON to keep cleanup in sync. */
+const COMPOUND_SETTINGS_HOOK_NAMES = new Set(
+  Object.values(SETTINGS_JSON.hooks).flatMap(entries =>
+    entries.flatMap(entry => entry.hooks.map(h => h.name))
+  )
+);
+
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -91,19 +99,41 @@ function stripFrontmatter(content: string): string {
   return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n*/, '');
 }
 
+/**
+ * Write settings.json, merging compound hooks into existing per-type arrays
+ * without overwriting user-defined hooks in the same category.
+ */
 async function writeSettings(geminiDir: string): Promise<void> {
   const settingsPath = join(geminiDir, 'settings.json');
-  let settings = SETTINGS_JSON as Record<string, unknown>;
+  let settings: Record<string, unknown> = { hooks: { ...SETTINGS_JSON.hooks } };
+
   if (existsSync(settingsPath)) {
     try {
       const existing = JSON.parse(await readFile(settingsPath, 'utf8')) as Record<string, unknown>;
-      settings = {
-        ...existing,
-        hooks: {
-          ...(existing.hooks as Record<string, unknown> | undefined),
-          ...SETTINGS_JSON.hooks,
-        },
-      };
+      const existingHooks = existing.hooks as Record<string, unknown[]> | undefined;
+
+      if (existingHooks) {
+        // Merge at the per-type array level: remove old compound entries, then append new ones
+        const mergedHooks: Record<string, unknown[]> = { ...existingHooks };
+        for (const [hookType, compoundEntries] of Object.entries(SETTINGS_JSON.hooks)) {
+          const existing = mergedHooks[hookType];
+          if (Array.isArray(existing)) {
+            // Filter out old compound entries, then append fresh ones
+            const userEntries = existing.filter((entry: unknown) => {
+              const e = entry as Record<string, unknown>;
+              const innerHooks = e.hooks as Array<Record<string, unknown>> | undefined;
+              if (!Array.isArray(innerHooks)) return true;
+              return !innerHooks.some(h => COMPOUND_SETTINGS_HOOK_NAMES.has(h.name as string));
+            });
+            mergedHooks[hookType] = [...userEntries, ...compoundEntries];
+          } else {
+            mergedHooks[hookType] = compoundEntries;
+          }
+        }
+        settings = { ...existing, hooks: mergedHooks };
+      } else {
+        settings = { ...existing, hooks: { ...SETTINGS_JSON.hooks } };
+      }
     } catch {
       // Can't parse existing - overwrite
     }
@@ -145,19 +175,108 @@ async function writeSkills(geminiDir: string): Promise<void> {
 }
 
 // ============================================================================
+// Cleanup (remove compound-managed files only)
+// ============================================================================
+
+/** Hook filenames managed by compound-agent. */
+const COMPOUND_HOOK_NAMES = Object.keys(HOOKS);
+
+/**
+ * Remove compound-managed files from .gemini/ while preserving user content.
+ * Cleans: hooks/ca-*.sh, commands/compound/, skills/compound-*, compound entries in settings.json.
+ */
+export async function cleanGeminiCompoundFiles(repoRoot: string): Promise<string[]> {
+  const gemDir = join(repoRoot, '.gemini');
+  if (!existsSync(gemDir)) return [];
+
+  const actions: string[] = [];
+
+  // Remove hook scripts
+  for (const hookFile of COMPOUND_HOOK_NAMES) {
+    const hookPath = join(gemDir, 'hooks', hookFile);
+    if (existsSync(hookPath)) {
+      await rm(hookPath);
+      actions.push(`Removed .gemini/hooks/${hookFile}`);
+    }
+  }
+
+  // Remove commands/compound/ directory
+  const compoundCmdsDir = join(gemDir, 'commands', 'compound');
+  if (existsSync(compoundCmdsDir)) {
+    await rm(compoundCmdsDir, { recursive: true, force: true });
+    actions.push('Removed .gemini/commands/compound/');
+  }
+
+  // Remove skills/compound-* directories
+  const skillsDir = join(gemDir, 'skills');
+  if (existsSync(skillsDir)) {
+    const entries = await readdir(skillsDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && entry.name.startsWith('compound-')) {
+        await rm(join(skillsDir, entry.name), { recursive: true, force: true });
+        actions.push(`Removed .gemini/skills/${entry.name}/`);
+      }
+    }
+  }
+
+  // Remove compound hook entries from settings.json (preserve other keys)
+  const settingsPath = join(gemDir, 'settings.json');
+  if (existsSync(settingsPath)) {
+    try {
+      const settings = JSON.parse(await readFile(settingsPath, 'utf8')) as Record<string, unknown>;
+      const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+      if (hooks) {
+        let removedAny = false;
+        for (const [hookType, entries] of Object.entries(hooks)) {
+          if (Array.isArray(entries)) {
+            const filtered = entries.filter((entry: unknown) => {
+              const e = entry as Record<string, unknown>;
+              const innerHooks = e.hooks as Array<Record<string, unknown>> | undefined;
+              if (!Array.isArray(innerHooks)) return true;
+              return !innerHooks.some(h => COMPOUND_SETTINGS_HOOK_NAMES.has(h.name as string));
+            });
+            if (filtered.length !== entries.length) removedAny = true;
+            hooks[hookType] = filtered;
+            if (filtered.length === 0) delete hooks[hookType];
+          }
+        }
+        if (Object.keys(hooks).length === 0) delete settings.hooks;
+        if (removedAny) {
+          if (Object.keys(settings).length > 0) {
+            await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
+          } else {
+            await rm(settingsPath);
+          }
+          actions.push('Cleaned compound hooks from .gemini/settings.json');
+        }
+      }
+    } catch {
+      // Malformed JSON — skip
+    }
+  }
+
+  return actions;
+}
+
+/**
+ * Check if compound-managed Gemini files exist (for migration detection).
+ */
+export function hasGeminiCompoundFiles(repoRoot: string): boolean {
+  return existsSync(join(repoRoot, '.gemini', 'hooks', 'ca-prime.sh'));
+}
+
+// ============================================================================
 // Installer
 // ============================================================================
 
 export async function installGeminiAdapter(
-  options: { dryRun?: boolean; json?: boolean }
+  repoRoot: string,
+  options: { dryRun?: boolean; silent?: boolean }
 ): Promise<void> {
-  const repoRoot = getRepoRoot();
   const geminiDir = join(repoRoot, '.gemini');
 
   if (options.dryRun) {
-    if (options.json) {
-      console.log(JSON.stringify({ dryRun: true, wouldInstall: true, location: geminiDir }));
-    } else {
+    if (!options.silent) {
       console.log(`Would install gemini hooks and commands to ${geminiDir}`);
     }
     return;
@@ -174,9 +293,7 @@ export async function installGeminiAdapter(
   await writeTomlCommands(geminiDir);
   await writeSkills(geminiDir);
 
-  if (options.json) {
-    console.log(JSON.stringify({ installed: true, location: geminiDir, action: 'created' }));
-  } else {
+  if (!options.silent) {
     out.success('Gemini CLI compatibility hooks installed');
     console.log(`  Location: ${geminiDir}`);
     console.log('  Hooks: SessionStart, BeforeAgent, BeforeTool, AfterTool');
@@ -197,9 +314,31 @@ export function registerGeminiSubcommand(setupCommand: Command): void {
     .description('Install Gemini CLI compatibility hooks (Adapter Pattern)')
     .option('--dry-run', 'Show what would change without writing')
     .option('--json', 'Output as JSON')
-    .action(async (options: { dryRun?: boolean; json?: boolean }) => {
+    .option('--disable', 'Disable Gemini adapter and clean compound files')
+    .action(async (options: { dryRun?: boolean; json?: boolean; disable?: boolean }) => {
       try {
-        await installGeminiAdapter(options);
+        const repoRoot = getRepoRoot();
+
+        if (options.disable) {
+          if (!options.dryRun) {
+            await disableGemini(repoRoot);
+            const actions = await cleanGeminiCompoundFiles(repoRoot);
+            if (options.json) {
+              console.log(JSON.stringify({ disabled: true, cleaned: actions }));
+            } else {
+              out.success('Gemini adapter disabled');
+              for (const action of actions) console.log(`  ${action}`);
+            }
+          } else {
+            console.log(options.json
+              ? JSON.stringify({ dryRun: true, wouldDisable: true })
+              : 'Would disable Gemini adapter and clean compound files');
+          }
+          return;
+        }
+
+        if (!options.dryRun) await enableGemini(repoRoot);
+        await installGeminiAdapter(repoRoot, { dryRun: options.dryRun });
       } catch (err) {
         if (options.json) {
           console.log(JSON.stringify({ error: String(err) }));

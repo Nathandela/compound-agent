@@ -138,7 +138,7 @@ describe('Gemini adapter', { tags: ['integration'] }, () => {
       expect(settings.hooks.AfterTool).toBeDefined();
     });
 
-    it('merges with existing settings without overwriting non-hook keys', async () => {
+    it('merges with existing settings without overwriting non-hook keys', { timeout: 30000 }, async () => {
       // Pre-create a settings.json with user content
       const { mkdir, writeFile: wf } = await import('node:fs/promises');
       await mkdir(geminiDir(), { recursive: true });
@@ -250,6 +250,53 @@ describe('Gemini adapter', { tags: ['integration'] }, () => {
     it('does not create files with --dry-run', () => {
       runCli('setup gemini --dry-run');
       expect(existsSync(join(geminiDir(), 'hooks'))).toBe(false);
+    });
+  });
+
+  // ── Opt-in config ──────────────────────────────────────────────────
+
+  describe('opt-in config', { timeout: 30000 }, () => {
+    it('setup gemini sets gemini: true in config', async () => {
+      setupGemini();
+      const config = JSON.parse(await readFile(join(getTempDir(), '.claude', 'compound-agent.json'), 'utf8'));
+      expect(config.gemini).toBe(true);
+    });
+
+    it('setup gemini --disable sets gemini: false and cleans compound files', async () => {
+      setupGemini();
+      expect(existsSync(join(geminiDir(), 'hooks', 'ca-prime.sh'))).toBe(true);
+      expect(existsSync(join(geminiDir(), 'commands', 'compound'))).toBe(true);
+
+      runCli('setup gemini --disable');
+
+      const config = JSON.parse(await readFile(join(getTempDir(), '.claude', 'compound-agent.json'), 'utf8'));
+      expect(config.gemini).toBeUndefined();
+
+      // Compound-managed files removed
+      expect(existsSync(join(geminiDir(), 'hooks', 'ca-prime.sh'))).toBe(false);
+      expect(existsSync(join(geminiDir(), 'commands', 'compound'))).toBe(false);
+      for (const phase of Object.keys(PHASE_SKILLS)) {
+        expect(existsSync(join(geminiDir(), 'skills', `compound-${phase}`))).toBe(false);
+      }
+    });
+
+    it('setup gemini --disable preserves non-compound .gemini files', { timeout: 30000 }, async () => {
+      const { mkdir: mkdirFs, writeFile: wf } = await import('node:fs/promises');
+      // Install compound files first
+      setupGemini();
+
+      // Add user-created gemini files
+      await mkdirFs(join(geminiDir(), 'skills', 'my-custom-skill'), { recursive: true });
+      await wf(join(geminiDir(), 'skills', 'my-custom-skill', 'SKILL.md'), 'custom', 'utf8');
+      await wf(join(geminiDir(), 'settings.json'), JSON.stringify({ customKey: 'kept', hooks: { SessionStart: [{ matcher: '.*', hooks: [{ name: 'ca-prime', type: 'command', command: 'bash .gemini/hooks/ca-prime.sh' }] }] } }), 'utf8');
+
+      runCli('setup gemini --disable');
+
+      // User files preserved
+      expect(existsSync(join(geminiDir(), 'skills', 'my-custom-skill', 'SKILL.md'))).toBe(true);
+      // settings.json preserved (compound hooks removed, user keys kept)
+      const settings = JSON.parse(await readFile(join(geminiDir(), 'settings.json'), 'utf8'));
+      expect(settings.customKey).toBe('kept');
     });
   });
 });

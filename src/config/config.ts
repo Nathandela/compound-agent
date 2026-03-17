@@ -20,6 +20,7 @@ export type ReviewerName = (typeof VALID_REVIEWERS)[number];
 
 /** Shape of .claude/compound-agent.json */
 export interface CompoundAgentConfig {
+  gemini?: boolean;
   externalReviewers?: string[];
 }
 
@@ -51,12 +52,7 @@ export async function writeConfig(repoRoot: string, config: CompoundAgentConfig)
   await writeFile(configPath(repoRoot), JSON.stringify(config, null, 2) + '\n', 'utf-8');
 }
 
-/**
- * Get the list of enabled external reviewers, filtering out invalid names.
- */
-/**
- * Safely extract the externalReviewers array from config, handling malformed values.
- */
+/** Safely extract the externalReviewers array from config, handling malformed values. */
 function safeReviewerArray(config: CompoundAgentConfig): string[] {
   const raw = config.externalReviewers;
   if (!Array.isArray(raw)) return [];
@@ -91,6 +87,38 @@ export async function disableReviewer(repoRoot: string, name: string): Promise<b
   const reviewers = safeReviewerArray(config);
   if (!reviewers.includes(name)) return false;
   config.externalReviewers = reviewers.filter(r => r !== name);
+  await writeConfig(repoRoot, config);
+  return true;
+}
+
+// ── Gemini adapter opt-in ─────────────────────────────────────────────
+
+/**
+ * Check if Gemini adapter is enabled in config.
+ */
+export async function isGeminiEnabled(repoRoot: string): Promise<boolean> {
+  const config = await readConfig(repoRoot);
+  return config.gemini === true;
+}
+
+/**
+ * Enable Gemini adapter. Returns true if it was enabled, false if already enabled.
+ */
+export async function enableGemini(repoRoot: string): Promise<boolean> {
+  const config = await readConfig(repoRoot);
+  if (config.gemini === true) return false;
+  config.gemini = true;
+  await writeConfig(repoRoot, config);
+  return true;
+}
+
+/**
+ * Disable Gemini adapter. Returns true if it was disabled, false if already disabled.
+ */
+export async function disableGemini(repoRoot: string): Promise<boolean> {
+  const config = await readConfig(repoRoot);
+  if (config.gemini !== true) return false;
+  delete config.gemini;
   await writeConfig(repoRoot, config);
   return true;
 }
