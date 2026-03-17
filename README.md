@@ -240,7 +240,7 @@ npx ca setup --skip-model
 
 - Node.js >= 20
 - ~278MB disk space for the embedding model (one-time download, shared across projects)
-- ~150MB RAM during embedding operations
+- ~400MB RAM during embedding operations
 
 ### pnpm Users
 

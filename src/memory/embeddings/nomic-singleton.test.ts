@@ -162,6 +162,82 @@ describe('embedding singleton coordination', () => {
       // Should not throw
       expect(() => unloadEmbedding()).not.toThrow();
     });
+
+    it('disposes resources sequentially: context → model → llama (S1)', async () => {
+      // Track start/end events to detect concurrent vs sequential execution.
+      // With Promise.allSettled (concurrent), all three would start before any ends.
+      // With sequential awaits, each completes before the next starts.
+      const events: string[] = [];
+      const context = {
+        dispose: vi.fn(async () => {
+          events.push('context:start');
+          await Promise.resolve(); // yield to event loop
+          events.push('context:end');
+        }),
+        getEmbeddingFor: vi.fn(),
+      };
+      const model = {
+        createEmbeddingContext: vi.fn().mockResolvedValue(context),
+        dispose: vi.fn(async () => {
+          events.push('model:start');
+          await Promise.resolve();
+          events.push('model:end');
+        }),
+      };
+      const llama = {
+        loadModel: vi.fn().mockResolvedValue(model),
+        dispose: vi.fn(async () => {
+          events.push('llama:start');
+          await Promise.resolve();
+          events.push('llama:end');
+        }),
+      };
+
+      vi.mocked(resolveModel).mockResolvedValue('/fake/model.gguf');
+      vi.mocked(getLlama).mockResolvedValue(llama as any);
+
+      await getEmbedding();
+      await unloadEmbeddingResources();
+
+      // Sequential: each dispose completes before the next starts
+      expect(events).toEqual([
+        'context:start', 'context:end',
+        'model:start', 'model:end',
+        'llama:start', 'llama:end',
+      ]);
+    });
+
+    it('still disposes model and llama when context.dispose() throws (S3)', async () => {
+      const context = {
+        dispose: vi.fn().mockRejectedValue(new Error('context dispose failed')),
+        getEmbeddingFor: vi.fn(),
+      };
+      const model = {
+        createEmbeddingContext: vi.fn().mockResolvedValue(context),
+        dispose: vi.fn().mockResolvedValue(undefined),
+      };
+      const llama = {
+        loadModel: vi.fn().mockResolvedValue(model),
+        dispose: vi.fn().mockResolvedValue(undefined),
+      };
+
+      vi.mocked(resolveModel).mockResolvedValue('/fake/model.gguf');
+      vi.mocked(getLlama).mockResolvedValue(llama as any);
+
+      await getEmbedding();
+      // Should not throw despite context.dispose() failure
+      await expect(unloadEmbeddingResources()).resolves.toBeUndefined();
+
+      // All three dispose methods were still called
+      expect(context.dispose).toHaveBeenCalledTimes(1);
+      expect(model.dispose).toHaveBeenCalledTimes(1);
+      expect(llama.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips null resources gracefully (S2)', async () => {
+      // Don't initialize — all refs are null
+      await expect(unloadEmbeddingResources()).resolves.toBeUndefined();
+    });
   });
 
   describe('withEmbedding()', () => {
