@@ -8,6 +8,9 @@ dist/
 .claude/.cache/
 .claude/.ca-*.json
 
+# Ephemeral CI probes
+.model-info-rss-probe.ts
+
 # Setup-generated (ca setup dogfooding on source repo)
 .claude/agents/compound/
 .claude/commands/compound/

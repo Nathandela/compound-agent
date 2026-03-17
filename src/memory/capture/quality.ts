@@ -9,7 +9,7 @@
  * Strategy: capture aggressively, prune later.
  */
 
-import { isModelAvailable } from '../embeddings/model.js';
+import { isModelAvailable } from '../embeddings/model-info.js';
 import { findSimilarLessons } from '../search/index.js';
 import { syncIfNeeded } from '../storage/index.js';
 

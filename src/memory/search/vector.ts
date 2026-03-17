@@ -7,7 +7,7 @@
 
 import { readCctPatterns, type CctPattern } from '../../compound/index.js';
 import { embedText } from '../embeddings/index.js';
-import { isModelAvailable } from '../embeddings/model.js';
+import { isModelAvailable } from '../embeddings/model-info.js';
 import { contentHash, getCachedEmbeddingsBulk, getCachedInsightEmbedding, readAllFromSqlite, setCachedEmbedding, setCachedInsightEmbedding, syncIfNeeded } from '../storage/index.js';
 import type { MemoryItem } from '../types.js';
 

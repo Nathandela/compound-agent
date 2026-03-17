@@ -5,7 +5,7 @@
  * Called after `ca init` or index rebuild so the first `ca search` is fast.
  */
 
-import { isModelAvailable } from '../embeddings/model.js';
+import { isModelAvailable } from '../embeddings/model-info.js';
 import { embedText } from '../embeddings/index.js';
 import {
   contentHash,

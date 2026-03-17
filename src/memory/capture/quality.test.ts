@@ -12,7 +12,7 @@ import {
   shouldPropose,
 } from './quality.js';
 
-vi.mock('../embeddings/model.js', () => ({
+vi.mock('../embeddings/model-info.js', () => ({
   isModelAvailable: vi.fn(() => true),
 }));
 
@@ -24,7 +24,7 @@ vi.mock('../storage/index.js', () => ({
   syncIfNeeded: vi.fn(async () => false),
 }));
 
-import { isModelAvailable } from '../embeddings/model.js';
+import { isModelAvailable } from '../embeddings/model-info.js';
 import { findSimilarLessons } from '../search/index.js';
 
 const mockIsModelAvailable = vi.mocked(isModelAvailable);

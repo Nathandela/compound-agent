@@ -33,6 +33,13 @@ vi.mock('../memory/embeddings/nomic.js', () => ({
   embedTexts: vi.fn(),
 }));
 
+vi.mock('../memory/embeddings/model-info.js', () => ({
+  isModelAvailable: vi.fn(() => true),
+  MODEL_URI: 'test',
+  MODEL_FILENAME: 'test.gguf',
+  DEFAULT_MODEL_DIR: '/tmp/test-models',
+}));
+
 vi.mock('../memory/embeddings/model.js', () => ({
   isModelAvailable: vi.fn(() => true),
   isModelUsable: vi.fn(),
@@ -183,9 +190,9 @@ describe('clean-lessons command', () => {
   });
 
   it('fails with error when model unavailable', async () => {
-    // clean-lessons.ts imports via barrel -> nomic.js re-export, so mock nomic's copy
-    const nomic = await import('../memory/embeddings/nomic.js');
-    vi.mocked(nomic.isModelAvailable).mockReturnValue(false);
+    // clean-lessons.ts imports via barrel -> model-info.js, so mock model-info's copy
+    const modelInfo = await import('../memory/embeddings/model-info.js');
+    vi.mocked(modelInfo.isModelAvailable).mockReturnValue(false);
 
     await register();
     await program.parseAsync(['node', 'ca', 'clean-lessons']);

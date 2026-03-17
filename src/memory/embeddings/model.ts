@@ -3,46 +3,23 @@
  *
  * Uses resolveModelFile for automatic download and caching.
  * Model is stored in ~/.node-llama-cpp/models/ by default.
+ *
+ * Lightweight metadata (MODEL_URI, MODEL_FILENAME, DEFAULT_MODEL_DIR,
+ * isModelAvailable) lives in model-info.ts to avoid pulling native deps
+ * into consumers that only need an fs existence check.
  */
 
-import { existsSync } from 'node:fs';
-import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { getLlama, LlamaLogLevel, resolveModelFile } from 'node-llama-cpp';
 
-/**
- * HuggingFace URI for EmbeddingGemma-300M (Q4_0 quantization).
- *
- * - Size: ~278MB
- * - Dimensions: 768 (default), supports MRL truncation to 512/256/128
- * - Context: 2048 tokens
- */
-export const MODEL_URI = 'hf:ggml-org/embeddinggemma-300M-qat-q4_0-GGUF/embeddinggemma-300M-qat-Q4_0.gguf';
+// Re-export lightweight metadata from model-info.ts (zero native imports)
+export { DEFAULT_MODEL_DIR, isModelAvailable, MODEL_FILENAME, MODEL_URI } from './model-info.js';
 
-/**
- * Expected model filename after download.
- * node-llama-cpp uses format: hf_{org}_{filename}
- */
-export const MODEL_FILENAME = 'hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf';
-
-/** Default model directory used by node-llama-cpp */
-const DEFAULT_MODEL_DIR = join(homedir(), '.node-llama-cpp', 'models');
+// Local import for use within this module (re-export doesn't bind locally)
+import { DEFAULT_MODEL_DIR, isModelAvailable, MODEL_FILENAME, MODEL_URI } from './model-info.js';
 
 /** Cached usability result (per-process) */
 let cachedUsability: UsabilityResult | null = null;
-
-/**
- * Check if the embedding model is available locally (fs existence only).
- *
- * Use this for cheap pre-flight checks (e.g. spawnBackgroundEmbed) where
- * failure is handled gracefully. Use {@link isModelUsable} when you need
- * runtime verification that the model can actually initialize.
- *
- * @returns true if model file exists
- */
-export function isModelAvailable(): boolean {
-  return existsSync(join(DEFAULT_MODEL_DIR, MODEL_FILENAME));
-}
 
 /**
  * Result of checking if the model is usable at runtime.

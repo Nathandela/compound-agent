@@ -48,6 +48,7 @@
     "test:segment": "tsx src/test-utils/run-segment.ts",
     "test:random": "tsx src/test-utils/run-random.ts",
     "test:critical": "vitest run --project unit -- critical",
+    "check:model-info-rss": "node scripts/check-model-info-rss.mjs",
     "lint": "tsc --noEmit && eslint . --max-warnings=0",
     "download-model": "node ./dist/cli.js download-model",
     "prepublishOnly": "pnpm build"

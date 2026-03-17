@@ -473,7 +473,7 @@ describe('vector search', () => {
       await rebuildIndex(tempDir);
 
       // Mock isModelAvailable to return false
-      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(false);
+      vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(false);
 
       const results = await findSimilarLessons(tempDir, 'test query');
       expect(results).toEqual([]);
@@ -485,7 +485,7 @@ describe('vector search', () => {
       await rebuildIndex(tempDir);
 
       // Mock isModelAvailable and embedText
-      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+      vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(true);
       vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
       const results = await findSimilarLessons(tempDir, 'lesson text', { excludeId: 'L001' });
@@ -503,7 +503,7 @@ describe('vector search', () => {
       });
       await rebuildIndex(tempDir);
 
-      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+      vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(true);
       vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockResolvedValue(new Float32Array([1, 0, 0]));
 
       const results = await findSimilarLessons(tempDir, 'test query', { threshold: 0 });
@@ -516,7 +516,7 @@ describe('vector search', () => {
       await appendLesson(tempDir, createQuickLesson('L002', 'distant match'));
       await rebuildIndex(tempDir);
 
-      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+      vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(true);
 
       vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(async (text: string) => {
         if (text === 'close match') return [0.99, 0.1, 0];
@@ -537,7 +537,7 @@ describe('vector search', () => {
       await appendLesson(tempDir, createQuickLesson('L003', 'distant match'));
       await rebuildIndex(tempDir);
 
-      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+      vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(true);
       vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(
         async (text: string) => {
           if (text === 'exact match') return [1, 0, 0];
@@ -565,7 +565,7 @@ describe('vector search', () => {
       );
       await rebuildIndex(tempDir);
 
-      vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+      vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(true);
       vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(
         async (text: string) => {
           if (text.includes('Polars')) return [1, 0, 0];

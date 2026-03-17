@@ -32,7 +32,7 @@ describe('preWarmLessonEmbeddings', () => {
     await appendLesson(tempDir, createQuickLesson('L001', 'test lesson'));
     await rebuildIndex(tempDir);
 
-    vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(false);
+    vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(false);
 
     const result = await preWarmLessonEmbeddings(tempDir);
     expect(result).toEqual({ embedded: 0, skipped: 0 });
@@ -49,7 +49,7 @@ describe('preWarmLessonEmbeddings', () => {
     setCachedEmbedding(tempDir, 'L001', new Float32Array([1, 0, 0]), hash1);
     setCachedEmbedding(tempDir, 'L002', new Float32Array([0, 1, 0]), hash2);
 
-    vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+    vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(true);
     const embedMock = vi.fn();
     vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
@@ -62,7 +62,7 @@ describe('preWarmLessonEmbeddings', () => {
     await appendLesson(tempDir, createQuickLesson('L001', 'uncached lesson'));
     await rebuildIndex(tempDir);
 
-    vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+    vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(true);
     const embedMock = vi.fn().mockResolvedValue(new Float32Array([1, 0, 0]));
     vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
@@ -82,7 +82,7 @@ describe('preWarmLessonEmbeddings', () => {
     // Cache with a stale hash
     setCachedEmbedding(tempDir, 'L001', new Float32Array([0.1, 0.1, 0.1]), 'stale_hash');
 
-    vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+    vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(true);
     const embedMock = vi.fn().mockResolvedValue(new Float32Array([1, 0, 0]));
     vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
@@ -105,7 +105,7 @@ describe('preWarmLessonEmbeddings', () => {
     });
     await rebuildIndex(tempDir);
 
-    vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+    vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(true);
     const embedMock = vi.fn().mockResolvedValue(new Float32Array([1, 0, 0]));
     vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
@@ -126,7 +126,7 @@ describe('preWarmLessonEmbeddings', () => {
     const hash1 = contentHash('trigger for already cached', 'already cached');
     setCachedEmbedding(tempDir, 'L001', new Float32Array([1, 0, 0]), hash1);
 
-    vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+    vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(true);
     const embedMock = vi.fn().mockResolvedValue(new Float32Array([0, 1, 0]));
     vi.spyOn(await import('../embeddings/nomic.js'), 'embedText').mockImplementation(embedMock);
 
@@ -136,7 +136,7 @@ describe('preWarmLessonEmbeddings', () => {
   });
 
   it('returns zeros for empty database', async () => {
-    vi.spyOn(await import('../embeddings/model.js'), 'isModelAvailable').mockReturnValue(true);
+    vi.spyOn(await import('../embeddings/model-info.js'), 'isModelAvailable').mockReturnValue(true);
 
     const result = await preWarmLessonEmbeddings(tempDir);
     expect(result).toEqual({ embedded: 0, skipped: 0 });
