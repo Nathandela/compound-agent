@@ -1164,5 +1164,18 @@ When evaluating trade-offs, consider:
 2. **Blast radius**: How many components does this affect?
 3. **Evidence**: What data supports each option?
 4. **Alignment**: Which option best serves the stated goal?
+
+---
+
+## Scenario Table Generation Rules
+
+For each category, generate scenarios using these rules:
+- **Happy**: At least one happy scenario per EARS requirement
+- **Error**: At least one error scenario per EARS requirement
+- **Boundary**: For quantified parameters: min, max, and just-beyond values
+- **Combinatorial**: For multi-parameter requirements: pairwise (2-way) coverage
+- **Adversarial**: For external interfaces: one scenario per applicable STRIDE category; from state diagrams: each transition + at least one invalid transition
+
+From sequence diagrams: one scenario per message path including alt/opt fragments.
 `,
 };

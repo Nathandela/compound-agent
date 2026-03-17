@@ -146,7 +146,7 @@ describe('Spec Dev Phase Integration', () => {
 
     it('warns against persisting throwaway validation code in pitfalls', () => {
       const pitfalls = specDevSkill.split('## Common Pitfalls')[1]?.split('##')[0] || '';
-      expect(pitfalls).toMatch(/persist.*validation|throwaway.*code|validation.*code.*persist/i);
+      expect(pitfalls).toMatch(/persist.*validation|validation.*code.*persist/i);
     });
   });
 
