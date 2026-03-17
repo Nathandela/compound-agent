@@ -95,6 +95,61 @@ describe('Spec Dev Phase Integration', () => {
     });
   });
 
+  describe('hypothesis validation protocol (R1-R7)', () => {
+    // R1: Proactive validation instruction
+    it('instructs Claude to validate assumptions with executable code', () => {
+      expect(specDevSkill).toMatch(/validat.*assumption/i);
+      expect(specDevSkill).toMatch(/executable|throwaway|probe/i);
+    });
+
+    // R2: 5-step validation cycle
+    it('describes the 5-step validation cycle', () => {
+      expect(specDevSkill).toMatch(/hypothesis/i);
+      expect(specDevSkill).toMatch(/execute.*script|run.*script/i);
+      expect(specDevSkill).toMatch(/delete.*script|clean.*up/i);
+      expect(specDevSkill).toMatch(/validation log/i);
+    });
+
+    // R3: Phase-specific guidance
+    it('includes phase-specific validation guidance', () => {
+      // Explore: library capabilities, API availability
+      expect(specDevSkill).toMatch(/librar.*capabilit|API.*availab/i);
+      // Understand: edge case behavior, integration compatibility
+      expect(specDevSkill).toMatch(/edge case|integration.*compat/i);
+      // Specify: performance bounds, architecture feasibility
+      expect(specDevSkill).toMatch(/performance.*bound|architecture.*feasib/i);
+    });
+
+    // R4: Validation Log format
+    it('prescribes a Validation Log table format', () => {
+      expect(specDevSkill).toContain('Validation Log');
+      expect(specDevSkill).toContain('Hypothesis');
+      expect(specDevSkill).toContain('Impact on Spec');
+    });
+
+    // R5: Cleanup enforcement
+    it('enforces cleanup of validation scripts', () => {
+      expect(specDevSkill).toMatch(/delete.*script|remove.*script|clean.*up.*script/i);
+    });
+
+    // R6: Quality criteria updated
+    it('includes validation check in quality criteria', () => {
+      const qualityCriteria = specDevSkill.split('## Quality Criteria')[1] || '';
+      expect(qualityCriteria).toMatch(/assumption.*validat|validat.*assumption/i);
+    });
+
+    // R7: Pitfall warnings
+    it('warns against assuming without validating in pitfalls', () => {
+      const pitfalls = specDevSkill.split('## Common Pitfalls')[1]?.split('##')[0] || '';
+      expect(pitfalls).toMatch(/assum.*without.*validat|unvalidated.*assumption/i);
+    });
+
+    it('warns against persisting throwaway validation code in pitfalls', () => {
+      const pitfalls = specDevSkill.split('## Common Pitfalls')[1]?.split('##')[0] || '';
+      expect(pitfalls).toMatch(/persist.*validation|throwaway.*code|validation.*code.*persist/i);
+    });
+  });
+
   describe('cross-template consistency', () => {
     it('both command and skill reference npx ca search', () => {
       // Command is thin but the skill has the detail
