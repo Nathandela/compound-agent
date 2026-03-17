@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { isModelAvailable, unloadEmbedding } from './nomic.js';
+import { isModelAvailable, unloadEmbeddingResources } from './nomic.js';
 import { openKnowledgeDb, closeKnowledgeDb } from '../storage/sqlite-knowledge/connection.js';
 import { shouldSkipEmbeddingTests } from '../../test-utils.js';
 import { getUnembeddedChunkCount } from '../knowledge/embed-chunks.js';
@@ -39,7 +39,7 @@ describe('indexDocs - embed integration', () => {
   afterEach(async () => {
     closeKnowledgeDb();
     await rm(repoRoot, { recursive: true, force: true });
-    unloadEmbedding();
+    await unloadEmbeddingResources();
   });
 
   it.skipIf(skipEmbedding)('embeds chunks when embed: true and model available', async () => {

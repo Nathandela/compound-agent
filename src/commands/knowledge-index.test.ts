@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { Command } from 'commander';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { unloadEmbedding } from '../memory/embeddings/index.js';
+import { unloadEmbeddingResources } from '../memory/embeddings/index.js';
 import { openKnowledgeDb, closeKnowledgeDb } from '../memory/storage/sqlite-knowledge/connection.js';
 import { registerKnowledgeIndexCommand } from './knowledge-index.js';
 
@@ -40,7 +40,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  unloadEmbedding();
+  await unloadEmbeddingResources();
   closeKnowledgeDb();
   vi.restoreAllMocks();
   const { rm } = await import('node:fs/promises');

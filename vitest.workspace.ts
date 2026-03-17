@@ -25,6 +25,8 @@ export default defineWorkspace([
       exclude: ['src/memory/embeddings/**/*.test.ts', ...integrationFiles],
       pool: 'threads',
       poolOptions: {
+        // Stopgap: reduced from 4→2 to limit native module memory duplication.
+        // Revisit after E2 (Import Graph Decoupling, learning_agent-863u).
         threads: { minThreads: 1, maxThreads: 2 },
       },
       isolate: true,

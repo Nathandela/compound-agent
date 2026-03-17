@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { isModelAvailable, unloadEmbedding } from './nomic.js';
+import { isModelAvailable, unloadEmbeddingResources } from './nomic.js';
 import { getCachedChunkEmbedding } from '../storage/sqlite-knowledge/cache.js';
 import { closeKnowledgeDb, openKnowledgeDb } from '../storage/sqlite-knowledge/connection.js';
 import { upsertChunks } from '../storage/sqlite-knowledge/sync.js';
@@ -62,8 +62,8 @@ afterEach(async () => {
 // ---------------------------------------------------------------------------
 
 describe('embedChunks', () => {
-  afterAll(() => {
-    unloadEmbedding();
+  afterAll(async () => {
+    await unloadEmbeddingResources();
   });
 
   it.skipIf(skipEmbedding)('embeds all unembedded chunks and returns correct stats', async () => {
