@@ -12,6 +12,14 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 import { cleanStaleArtifacts } from './stale-cleanup.js';
+import { WORKFLOW_COMMANDS, AGENT_TEMPLATES, PHASE_SKILLS, AGENT_ROLE_SKILLS, DOC_TEMPLATES } from './templates/index.js';
+
+// Derive valid keys from live registries to avoid hardcoding
+const VALID_CMD = Object.keys(WORKFLOW_COMMANDS)[0]; // e.g. 'plan.md'
+const VALID_AGENT = Object.keys(AGENT_TEMPLATES)[0]; // e.g. 'repo-analyst.md'
+const VALID_PHASE = Object.keys(PHASE_SKILLS)[0]; // e.g. 'spec-dev'
+const VALID_ROLE = Object.keys(AGENT_ROLE_SKILLS)[0]; // e.g. 'context-analyzer'
+const VALID_DOC = Object.keys(DOC_TEMPLATES)[0]; // e.g. 'README.md'
 
 let tempDir: string;
 
@@ -55,12 +63,12 @@ describe('commands cleanup', () => {
   });
 
   it('S2: keeps .md file that IS in WORKFLOW_COMMANDS', async () => {
-    await createFile(`${cmdDir}/plan.md`);
+    await createFile(`${cmdDir}/${VALID_CMD}`);
 
     const removed = await cleanStaleArtifacts(tempDir, false);
 
-    expect(removed).not.toContain('.claude/commands/compound/plan.md');
-    expect(existsSync(join(tempDir, cmdDir, 'plan.md'))).toBe(true);
+    expect(removed).not.toContain(`.claude/commands/compound/${VALID_CMD}`);
+    expect(existsSync(join(tempDir, cmdDir, VALID_CMD))).toBe(true);
   });
 
   it('S3: empty commands/ directory causes no error', async () => {
@@ -106,12 +114,12 @@ describe('agents cleanup', () => {
   });
 
   it('keeps .md file that IS in AGENT_TEMPLATES', async () => {
-    await createFile(`${agentDir}/repo-analyst.md`);
+    await createFile(`${agentDir}/${VALID_AGENT}`);
 
     const removed = await cleanStaleArtifacts(tempDir, false);
 
-    expect(removed).not.toContain('.claude/agents/compound/repo-analyst.md');
-    expect(existsSync(join(tempDir, agentDir, 'repo-analyst.md'))).toBe(true);
+    expect(removed).not.toContain(`.claude/agents/compound/${VALID_AGENT}`);
+    expect(existsSync(join(tempDir, agentDir, VALID_AGENT))).toBe(true);
   });
 
   it('skips non-.md files in agents/', async () => {
@@ -149,12 +157,12 @@ describe('skills phase cleanup', () => {
   });
 
   it('keeps directory that IS in PHASE_SKILLS', async () => {
-    await createDir(`${skillsDir}/spec-dev`);
+    await createDir(`${skillsDir}/${VALID_PHASE}`);
 
     const removed = await cleanStaleArtifacts(tempDir, false);
 
-    expect(removed).not.toContain('.claude/skills/compound/spec-dev');
-    expect(existsSync(join(tempDir, skillsDir, 'spec-dev'))).toBe(true);
+    expect(removed).not.toContain(`.claude/skills/compound/${VALID_PHASE}`);
+    expect(existsSync(join(tempDir, skillsDir, VALID_PHASE))).toBe(true);
   });
 
   it('skips non-directory entries in skills/', async () => {
@@ -183,12 +191,12 @@ describe('skills agent-role cleanup', () => {
   });
 
   it('keeps directory that IS in AGENT_ROLE_SKILLS', async () => {
-    await createDir(`${agentsSkillDir}/test-writer`);
+    await createDir(`${agentsSkillDir}/${VALID_ROLE}`);
 
     const removed = await cleanStaleArtifacts(tempDir, false);
 
-    expect(removed).not.toContain('.claude/skills/compound/agents/test-writer');
-    expect(existsSync(join(tempDir, agentsSkillDir, 'test-writer'))).toBe(true);
+    expect(removed).not.toContain(`.claude/skills/compound/agents/${VALID_ROLE}`);
+    expect(existsSync(join(tempDir, agentsSkillDir, VALID_ROLE))).toBe(true);
   });
 
   it('skips non-directory entries in agents/', async () => {
@@ -226,12 +234,12 @@ describe('docs cleanup', () => {
   });
 
   it('keeps file that IS in DOC_TEMPLATES', async () => {
-    await createFile(`${docsDir}/README.md`);
+    await createFile(`${docsDir}/${VALID_DOC}`);
 
     const removed = await cleanStaleArtifacts(tempDir, false);
 
-    expect(removed).not.toContain('docs/compound/README.md');
-    expect(existsSync(join(tempDir, docsDir, 'README.md'))).toBe(true);
+    expect(removed).not.toContain(`docs/compound/${VALID_DOC}`);
+    expect(existsSync(join(tempDir, docsDir, VALID_DOC))).toBe(true);
   });
 });
 
@@ -278,12 +286,12 @@ describe('return value', () => {
   });
 
   it('returns empty array when nothing is stale', async () => {
-    // Only valid entries
-    await createFile('.claude/commands/compound/plan.md');
-    await createFile('.claude/agents/compound/repo-analyst.md');
-    await createDir('.claude/skills/compound/spec-dev');
-    await createDir('.claude/skills/compound/agents/test-writer');
-    await createFile('docs/compound/README.md');
+    // Only valid entries (derived from live registries)
+    await createFile(`.claude/commands/compound/${VALID_CMD}`);
+    await createFile(`.claude/agents/compound/${VALID_AGENT}`);
+    await createDir(`.claude/skills/compound/${VALID_PHASE}`);
+    await createDir(`.claude/skills/compound/agents/${VALID_ROLE}`);
+    await createFile(`docs/compound/${VALID_DOC}`);
 
     const removed = await cleanStaleArtifacts(tempDir, false);
 

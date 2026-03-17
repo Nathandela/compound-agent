@@ -104,6 +104,7 @@ init_review_sessions() {
       (claude-sonnet|claude-opus)
         local existing=""
         if [ "$HAS_JQ" = true ]; then
+          # cat pipe avoids jq file-arg open() which fails under seccomp sandbox
           existing=$(cat "$sessions_file" | jq -r ".[\\"$reviewer\\"] // empty" 2>/dev/null)
         else
           existing=$(python3 -c "
@@ -198,7 +199,7 @@ spawn_reviewers() {
         else
           (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" --output-format text \
                   --resume "$sid" \
-                  -p "Review the latest fixes. If resolved: REVIEW_APPROVED. Otherwise: REVIEW_CHANGES_REQUESTED with findings." \
+                  -p "Review the latest fixes. If all issues are resolved, output REVIEW_APPROVED alone on its own line. Otherwise output REVIEW_CHANGES_REQUESTED on its own line followed by your findings." \
                   > "$report" 2>&1 || true) &
         fi
         pids="$pids $!"
@@ -208,7 +209,7 @@ spawn_reviewers() {
           (portable_timeout "$REVIEW_TIMEOUT" gemini -p "$prompt" -y > "$report" 2>&1 || true) &
         else
           (portable_timeout "$REVIEW_TIMEOUT" gemini --resume latest \
-                  -p "Review the latest fixes. If resolved: REVIEW_APPROVED. Otherwise: REVIEW_CHANGES_REQUESTED with findings." \
+                  -p "Review the latest fixes. If all issues are resolved, output REVIEW_APPROVED alone on its own line. Otherwise output REVIEW_CHANGES_REQUESTED on its own line followed by your findings." \
                   > "$report" 2>&1 || true) &
         fi
         pids="$pids $!"
@@ -263,7 +264,7 @@ Run tests to verify. Output FIXES_APPLIED when done.
 IMPL_PROMPT_EOF
 )
   log "Running implementer session..."
-  claude --model "$REVIEW_MODEL" --output-format text \
+  portable_timeout "$REVIEW_TIMEOUT" claude --model "$REVIEW_MODEL" --output-format text \
          --dangerously-skip-permissions \
          -p "$impl_prompt" > "$implementer_report" 2>&1 || true
   log "Implementer session complete"
@@ -276,6 +277,10 @@ export function buildReviewLoop(): string {
 run_review_phase() {
   local trigger="$1"
   log "Starting review phase (trigger: $trigger)"
+  if [ -z "\${REVIEW_DIFF_RANGE:-}" ]; then
+    log "WARN: REVIEW_DIFF_RANGE not set, using HEAD~1..HEAD"
+    REVIEW_DIFF_RANGE="HEAD~1..HEAD"
+  fi
   local diff_output
   diff_output=$(git diff "$REVIEW_DIFF_RANGE" 2>/dev/null || echo "")
   if [ -z "$diff_output" ]; then

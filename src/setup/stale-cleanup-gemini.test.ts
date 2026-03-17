@@ -13,6 +13,12 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 import { cleanStaleGeminiArtifacts } from './stale-cleanup.js';
+import { WORKFLOW_COMMANDS, PHASE_SKILLS, AGENT_ROLE_SKILLS } from './templates/index.js';
+
+// Derive valid keys from live registries
+const VALID_CMD_STEM = Object.keys(WORKFLOW_COMMANDS)[0].replace(/\.md$/, ''); // e.g. 'plan'
+const VALID_PHASE = Object.keys(PHASE_SKILLS)[0]; // e.g. 'spec-dev'
+const VALID_ROLE = Object.keys(AGENT_ROLE_SKILLS)[0]; // e.g. 'context-analyzer'
 
 let tempDir: string;
 
@@ -54,13 +60,12 @@ describe('cleanStaleGeminiArtifacts', () => {
   // ── S12: valid TOML command kept ─────────────────────────────────────
 
   it('S12: keeps .toml file whose stem matches a WORKFLOW_COMMANDS key', async () => {
-    // 'plan.md' is a key in WORKFLOW_COMMANDS, so 'plan.toml' should be kept
-    await createToml('plan');
+    await createToml(VALID_CMD_STEM);
 
     const removed = await cleanStaleGeminiArtifacts(tempDir, false);
 
-    expect(removed).not.toContain('.gemini/commands/compound/plan.toml');
-    expect(existsSync(join(tempDir, '.gemini', 'commands', 'compound', 'plan.toml'))).toBe(true);
+    expect(removed).not.toContain(`.gemini/commands/compound/${VALID_CMD_STEM}.toml`);
+    expect(existsSync(join(tempDir, '.gemini', 'commands', 'compound', `${VALID_CMD_STEM}.toml`))).toBe(true);
   });
 
   // ── S13: stale phase skill dir removed ───────────────────────────────
@@ -78,13 +83,12 @@ describe('cleanStaleGeminiArtifacts', () => {
   // ── S14: valid phase skill dir kept ──────────────────────────────────
 
   it('S14: keeps compound-<phase> skill dir when phase IS in PHASE_SKILLS', async () => {
-    // 'spec-dev' is a key in PHASE_SKILLS
-    await createSkillDir('compound-spec-dev');
+    await createSkillDir(`compound-${VALID_PHASE}`);
 
     const removed = await cleanStaleGeminiArtifacts(tempDir, false);
 
-    expect(removed).not.toContain('.gemini/skills/compound-spec-dev');
-    expect(existsSync(join(tempDir, '.gemini', 'skills', 'compound-spec-dev'))).toBe(true);
+    expect(removed).not.toContain(`.gemini/skills/compound-${VALID_PHASE}`);
+    expect(existsSync(join(tempDir, '.gemini', 'skills', `compound-${VALID_PHASE}`))).toBe(true);
   });
 
   // ── S15: stale agent role skill dir removed ──────────────────────────
@@ -144,11 +148,10 @@ describe('cleanStaleGeminiArtifacts', () => {
   });
 
   it('handles mix of stale and valid entries in a single pass', async () => {
-    // Valid entries
-    await createToml('plan');
-    await createToml('work');
-    await createSkillDir('compound-spec-dev');
-    await createSkillDir('compound-agent-repo-analyst');
+    // Valid entries (derived from live registries)
+    await createToml(VALID_CMD_STEM);
+    await createSkillDir(`compound-${VALID_PHASE}`);
+    await createSkillDir(`compound-agent-${VALID_ROLE}`);
 
     // Stale entries
     await createToml('brainstorm');
@@ -169,21 +172,19 @@ describe('cleanStaleGeminiArtifacts', () => {
     expect(removed).toHaveLength(4);
 
     // Valid entries still exist
-    expect(existsSync(join(tempDir, '.gemini', 'commands', 'compound', 'plan.toml'))).toBe(true);
-    expect(existsSync(join(tempDir, '.gemini', 'commands', 'compound', 'work.toml'))).toBe(true);
-    expect(existsSync(join(tempDir, '.gemini', 'skills', 'compound-spec-dev'))).toBe(true);
-    expect(existsSync(join(tempDir, '.gemini', 'skills', 'compound-agent-repo-analyst'))).toBe(true);
+    expect(existsSync(join(tempDir, '.gemini', 'commands', 'compound', `${VALID_CMD_STEM}.toml`))).toBe(true);
+    expect(existsSync(join(tempDir, '.gemini', 'skills', `compound-${VALID_PHASE}`))).toBe(true);
+    expect(existsSync(join(tempDir, '.gemini', 'skills', `compound-agent-${VALID_ROLE}`))).toBe(true);
     expect(existsSync(join(tempDir, '.gemini', 'skills', 'my-custom-skill'))).toBe(true);
   });
 
   it('keeps compound-agent-<name> when name IS in AGENT_ROLE_SKILLS', async () => {
-    // 'repo-analyst' is a key in AGENT_ROLE_SKILLS
-    await createSkillDir('compound-agent-repo-analyst');
+    await createSkillDir(`compound-agent-${VALID_ROLE}`);
 
     const removed = await cleanStaleGeminiArtifacts(tempDir, false);
 
-    expect(removed).not.toContain('.gemini/skills/compound-agent-repo-analyst');
-    expect(existsSync(join(tempDir, '.gemini', 'skills', 'compound-agent-repo-analyst'))).toBe(true);
+    expect(removed).not.toContain(`.gemini/skills/compound-agent-${VALID_ROLE}`);
+    expect(existsSync(join(tempDir, '.gemini', 'skills', `compound-agent-${VALID_ROLE}`))).toBe(true);
   });
 
   it('ignores non-.toml files in .gemini/commands/compound/', async () => {

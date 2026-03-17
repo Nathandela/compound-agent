@@ -61,7 +61,8 @@ export async function cleanStaleArtifacts(repoRoot: string, dryRun: boolean): Pr
     recursive: true,
   });
 
-  // 5. Docs: docs/compound/ — all entries, skip 'research'
+  // 5. Docs: docs/compound/ — fully managed directory. Only research/ is user-owned.
+  //    Any file/dir not in DOC_TEMPLATES (and not research/) is removed on --update.
   await cleanDir(repoRoot, ['docs', 'compound'], removed, dryRun, {
     filter: () => true,
     isStale: (name, isDir) => {
@@ -126,7 +127,7 @@ interface CleanOptions {
   filter: (name: string, isDir: boolean) => boolean;
   /** Return true if the entry should be removed. */
   isStale: (name: string, isDir: boolean) => boolean;
-  /** If true, remove directories recursively. */
+  /** Unused -- rm always uses recursive:true for safety. Kept for caller documentation. */
   recursive: boolean;
 }
 
@@ -154,7 +155,7 @@ async function cleanDir(
     const relPath = [...segments, entry.name].join('/');
     removed.push(relPath);
     if (!dryRun) {
-      await rm(join(dirPath, entry.name), { recursive: opts.recursive, force: true });
+      await rm(join(dirPath, entry.name), { recursive: true, force: true });
     }
   }
 }
