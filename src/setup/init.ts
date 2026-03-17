@@ -209,7 +209,7 @@ function printInitJson(ctx: {
     pnpmConfig: ctx.pnpmConfig.isPnpm ? { added: ctx.pnpmConfig.added, alreadyConfigured: ctx.pnpmConfig.alreadyConfigured } : null,
     beadsAvailable: ctx.fullBeads.cliAvailable, beadsInitialized: ctx.fullBeads.initialized, beadsHealthy: ctx.fullBeads.healthy,
     userScope: ctx.scopeResult.isUserScope,
-    upgrade: ctx.upgradeResult ? { isUpgrade: ctx.upgradeResult.isUpgrade, removedCommands: ctx.upgradeResult.removedCommands, strippedHeaders: ctx.upgradeResult.strippedHeaders } : null,
+    upgrade: ctx.upgradeResult ? { isUpgrade: ctx.upgradeResult.isUpgrade, strippedHeaders: ctx.upgradeResult.strippedHeaders } : null,
     gitignore: ctx.gitignoreResult.added,
   }));
 }

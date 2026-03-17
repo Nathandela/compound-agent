@@ -1,9 +1,8 @@
 /**
  * Tests for the upgrade module.
- * Covers: detectExistingInstall, removeDeprecatedCommands, stripGeneratedHeaders, runUpgrade.
+ * Covers: detectExistingInstall, stripGeneratedHeaders, runUpgrade.
  */
 
-import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -12,11 +11,9 @@ import { tmpdir } from 'node:os';
 
 import {
   detectExistingInstall,
-  removeDeprecatedCommands,
   stripGeneratedHeaders,
   upgradeDocVersion,
   runUpgrade,
-  type UpgradeResult,
 } from './upgrade.js';
 
 let tempDir: string;
@@ -46,93 +43,6 @@ describe('detectExistingInstall', () => {
     await mkdir(join(tempDir, '.claude'), { recursive: true });
 
     expect(detectExistingInstall(tempDir)).toBe(false);
-  });
-});
-
-describe('removeDeprecatedCommands', () => {
-  const DEPRECATED = ['search.md', 'list.md', 'show.md', 'stats.md', 'wrong.md', 'learn.md', 'brainstorm.md', 'lfg.md'];
-
-  it('removes all 8 deprecated command files from compound/', async () => {
-    const commandsDir = join(tempDir, '.claude', 'commands', 'compound');
-    await mkdir(commandsDir, { recursive: true });
-
-    for (const f of DEPRECATED) {
-      await writeFile(join(commandsDir, f), 'npx ca search', 'utf-8');
-    }
-
-    const removed = await removeDeprecatedCommands(tempDir);
-
-    expect(removed.sort()).toEqual(DEPRECATED.sort());
-    for (const f of DEPRECATED) {
-      expect(existsSync(join(commandsDir, f))).toBe(false);
-    }
-  });
-
-  it('returns only files that actually existed', async () => {
-    const commandsDir = join(tempDir, '.claude', 'commands', 'compound');
-    await mkdir(commandsDir, { recursive: true });
-
-    // Only create 2 of the 5
-    await writeFile(join(commandsDir, 'search.md'), 'npx ca search', 'utf-8');
-    await writeFile(join(commandsDir, 'stats.md'), 'npx ca stats', 'utf-8');
-
-    const removed = await removeDeprecatedCommands(tempDir);
-
-    expect(removed.sort()).toEqual(['search.md', 'stats.md'].sort());
-  });
-
-  it('returns empty array when compound/ directory does not exist', async () => {
-    const removed = await removeDeprecatedCommands(tempDir);
-    expect(removed).toEqual([]);
-  });
-
-  it('does NOT remove non-deprecated files in compound/', async () => {
-    const commandsDir = join(tempDir, '.claude', 'commands', 'compound');
-    await mkdir(commandsDir, { recursive: true });
-
-    await writeFile(join(commandsDir, 'spec-dev.md'), 'keep me', 'utf-8');
-    await writeFile(join(commandsDir, 'learn-that.md'), 'keep me too', 'utf-8');
-    await writeFile(join(commandsDir, 'search.md'), 'npx ca search', 'utf-8');
-
-    await removeDeprecatedCommands(tempDir);
-
-    expect(existsSync(join(commandsDir, 'spec-dev.md'))).toBe(true);
-    expect(existsSync(join(commandsDir, 'learn-that.md'))).toBe(true);
-    expect(existsSync(join(commandsDir, 'search.md'))).toBe(false);
-  });
-
-  it('skips files that do not contain compound-agent content', async () => {
-    const commandsDir = join(tempDir, '.claude', 'commands', 'compound');
-    await mkdir(commandsDir, { recursive: true });
-
-    // User-authored file with a deprecated name but no compound-agent indicator
-    await writeFile(join(commandsDir, 'search.md'), 'My custom search command for something else', 'utf-8');
-    // Compound-agent file with indicator
-    await writeFile(join(commandsDir, 'list.md'), 'Run npx ca list to see lessons', 'utf-8');
-
-    const removed = await removeDeprecatedCommands(tempDir);
-
-    // Only the compound-agent file should be removed
-    expect(removed).toEqual(['list.md']);
-    expect(existsSync(join(commandsDir, 'search.md'))).toBe(true);
-    expect(existsSync(join(commandsDir, 'list.md'))).toBe(false);
-
-    // Verify user file is untouched
-    const content = await readFile(join(commandsDir, 'search.md'), 'utf-8');
-    expect(content).toBe('My custom search command for something else');
-  });
-
-  it('NEVER touches root-level .claude/commands/ files', async () => {
-    const rootCommandsDir = join(tempDir, '.claude', 'commands');
-    await mkdir(rootCommandsDir, { recursive: true });
-
-    await writeFile(join(rootCommandsDir, 'search.md'), 'user command', 'utf-8');
-
-    await removeDeprecatedCommands(tempDir);
-
-    expect(existsSync(join(rootCommandsDir, 'search.md'))).toBe(true);
-    const content = await readFile(join(rootCommandsDir, 'search.md'), 'utf-8');
-    expect(content).toBe('user command');
   });
 });
 
@@ -232,7 +142,6 @@ describe('runUpgrade', () => {
     const result = await runUpgrade(tempDir);
 
     expect(result.isUpgrade).toBe(false);
-    expect(result.removedCommands).toEqual([]);
     expect(result.strippedHeaders).toBe(0);
     expect(result.docVersionUpdated).toBe(false);
     expect(result.message).toBeDefined();
@@ -249,17 +158,11 @@ describe('runUpgrade', () => {
     expect(result.isUpgrade).toBe(true);
   });
 
-  it('orchestrates removal of deprecated commands and header stripping', async () => {
+  it('orchestrates header stripping during upgrade', async () => {
     // Set up existing install
     const lessonsDir = join(tempDir, '.claude', 'lessons');
     await mkdir(lessonsDir, { recursive: true });
     await writeFile(join(lessonsDir, 'index.jsonl'), '', 'utf-8');
-
-    // Create deprecated commands
-    const cmdDir = join(tempDir, '.claude', 'commands', 'compound');
-    await mkdir(cmdDir, { recursive: true });
-    await writeFile(join(cmdDir, 'search.md'), 'npx ca search', 'utf-8');
-    await writeFile(join(cmdDir, 'list.md'), 'npx ca list', 'utf-8');
 
     // Create files with headers
     const agentDir = join(tempDir, '.claude', 'agents', 'compound');
@@ -269,7 +172,6 @@ describe('runUpgrade', () => {
     const result = await runUpgrade(tempDir);
 
     expect(result.isUpgrade).toBe(true);
-    expect(result.removedCommands.sort()).toEqual(['list.md', 'search.md'].sort());
     expect(result.strippedHeaders).toBe(1);
     expect(result.message).toBeDefined();
   });
@@ -319,26 +221,6 @@ describe('runUpgrade', () => {
 });
 
 describe('dryRun mode', () => {
-  describe('removeDeprecatedCommands with dryRun: true', () => {
-    it('counts but does not delete', async () => {
-      const commandsDir = join(tempDir, '.claude', 'commands', 'compound');
-      await mkdir(commandsDir, { recursive: true });
-
-      await writeFile(join(commandsDir, 'search.md'), 'npx ca search', 'utf-8');
-      await writeFile(join(commandsDir, 'list.md'), 'npx ca list', 'utf-8');
-      await writeFile(join(commandsDir, 'stats.md'), 'npx ca stats', 'utf-8');
-
-      const removed = await removeDeprecatedCommands(tempDir, true);
-
-      // Should report what would be removed
-      expect(removed.sort()).toEqual(['list.md', 'search.md', 'stats.md'].sort());
-      // Files must still exist on disk
-      expect(existsSync(join(commandsDir, 'search.md'))).toBe(true);
-      expect(existsSync(join(commandsDir, 'list.md'))).toBe(true);
-      expect(existsSync(join(commandsDir, 'stats.md'))).toBe(true);
-    });
-  });
-
   describe('stripGeneratedHeaders with dryRun: true', () => {
     it('counts but does not write', async () => {
       const cmdDir = join(tempDir, '.claude', 'commands', 'compound');
@@ -385,11 +267,6 @@ describe('dryRun mode', () => {
       await mkdir(lessonsDir, { recursive: true });
       await writeFile(join(lessonsDir, 'index.jsonl'), '', 'utf-8');
 
-      // Create deprecated commands
-      const cmdDir = join(tempDir, '.claude', 'commands', 'compound');
-      await mkdir(cmdDir, { recursive: true });
-      await writeFile(join(cmdDir, 'search.md'), 'npx ca search', 'utf-8');
-
       // Create file with generated header
       const agentDir = join(tempDir, '.claude', 'agents', 'compound');
       await mkdir(agentDir, { recursive: true });
@@ -406,12 +283,10 @@ describe('dryRun mode', () => {
 
       // Should report all changes
       expect(result.isUpgrade).toBe(true);
-      expect(result.removedCommands).toEqual(['search.md']);
       expect(result.strippedHeaders).toBe(1);
       expect(result.docVersionUpdated).toBe(true);
 
       // But nothing should have changed on disk
-      expect(existsSync(join(cmdDir, 'search.md'))).toBe(true);
       const agentContent = await readFile(join(agentDir, 'repo-analyst.md'), 'utf-8');
       expect(agentContent).toBe(headerContent);
       const docOnDisk = await readFile(join(docDir, 'README.md'), 'utf-8');
