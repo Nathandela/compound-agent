@@ -374,9 +374,9 @@ Lessons go to \`.claude/lessons/index.jsonl\` through the CLI. MEMORY.md is a di
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
 2. Detect spec drift: compare final implementation against original EARS requirements in the epic description (\`bd show <epic>\`). Note any divergences -- what changed, why, was it justified. If drift reveals a spec was wrong or incomplete, flag that for lesson extraction.
-3. **Decomposition quality assessment**: compare actual implementation against predicted boundaries from architect. Did files cluster as predicted? Were assumptions valid? Rate boundary quality: "This boundary [succeeded/failed] because..." Capture as lesson for future architect runs.
-4. **Assumption tracking**: for each assumption from architect phase, record predicted vs actual volatility. Store with \`npx ca learn\` for calibration.
-5. **Emergence analysis**: if unexpected system behaviors occurred, classify root cause: incomplete interface contract (Garlan), control structure inadequacy (STPA), or scale-induced phase transition. Capture preventive lesson.
+3. **Decomposition quality assessment**: compare actual implementation against predicted boundaries from architect. Did files cluster as predicted? Were assumptions valid? Rate boundary quality: "This boundary [succeeded/failed] because..." Record findings for the pipeline.
+4. **Assumption tracking**: for each assumption from architect phase, record predicted vs actual volatility. Note findings for the pipeline.
+5. **Emergence analysis**: if unexpected system behaviors occurred, classify root cause: incomplete interface contract (Garlan), control structure inadequacy (STPA), or scale-induced phase transition. Note preventive insight for the pipeline.
 3. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with \`team_name\`):
    - Role skills: \`.claude/skills/compound/agents/{context-analyzer,lesson-extractor,pattern-matcher,solution-writer,compounding}/SKILL.md\`
    - For large diffs, deploy MULTIPLE context-analyzers and lesson-extractors
