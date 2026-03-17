@@ -413,6 +413,18 @@ describe('PHASE_SKILLS', () => {
     expect(skill).toMatch(/retries/i);
   });
 
+  // Hypothesis validation protocol (R1-R7)
+  it('spec-dev skill contains hypothesis validation protocol', () => {
+    const skill = PHASE_SKILLS['spec-dev'];
+    expect(skill).toMatch(/hypothesis/i);
+    expect(skill).toContain('Validation Log');
+  });
+
+  it('spec-dev skill contains validation cleanup instruction', () => {
+    const skill = PHASE_SKILLS['spec-dev'];
+    expect(skill).toMatch(/delete.*script|clean.*up.*script/i);
+  });
+
   // Plan: boundary stability, LRM, change coupling
   it('plan skill contains boundary stability check', () => {
     const skill = PHASE_SKILLS.plan;

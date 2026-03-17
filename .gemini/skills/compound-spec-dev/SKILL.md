@@ -21,6 +21,7 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 5. For deep domain knowledge, consider `/get-a-phd`
 6. Build a discovery mindmap (Mermaid `mindmap`) -- makes implicit assumptions visible
 7. Use `AskUserQuestion` to clarify scope and preferences
+8. **Validate assumptions** about library capabilities, API availability, and tooling compatibility using the Hypothesis Validation Protocol below
 
 **Iteration trigger**: If research reveals the problem is fundamentally different, restart Explore.
 
@@ -30,39 +31,26 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 2. Use Mermaid diagrams (`sequenceDiagram`, `stateDiagram-v2`) to expose hidden structure
 3. Detect ambiguities: vague adjectives, unclear pronouns, passive voice, compound requirements. See `references/spec-guide.md` for full checklist
 4. Build a domain glossary for ambiguous terms
-5. **Change volatility**: rate each capability stable/moderate/high. Flag high-volatility areas for modularity investment in architect phase.
-6. **Cynefin classify** each requirement: Clear (apply known solution), Complicated (analyze tradeoffs), Complex (needs safe-to-fail experiments). Complex requirements need experimental validation, not just analysis.
+5. **Change volatility**: rate stable/moderate/high. Flag high-volatility for modularity investment.
+6. **Cynefin classify** each requirement: Clear/Complicated/Complex. Complex needs safe-to-fail experiments, not just analysis.
 7. For composed systems, add **composition EARS**: `When <A> times out, <B> shall...`, `If <A> retries, <B> shall...`
 8. Use `AskUserQuestion` to resolve each ambiguity
+9. **Validate assumptions** about edge case behavior, integration compatibility, and constraint feasibility using the Hypothesis Validation Protocol below
 
 **Iteration trigger**: If specifying reveals missing knowledge, loop back to Explore.
 
 ### Phase 3: Specify
 **Goal**: Produce formal, testable requirements.
-1. Write each requirement using **EARS notation**:
-   - Ubiquitous: `The system shall <action>.`
-   - Event-driven: `When <trigger>, the system shall <action>.`
-   - State-driven: `While <state>, the system shall <action>.`
-   - Unwanted behavior: `If <condition>, then the system shall <action>.`
-   - Optional: `Where <feature>, the system shall <action>.`
-   - Combined ordering: `Where > While > When > If/then > shall`
+1. Write each requirement using **EARS notation** (Ubiquitous, Event-driven, State-driven, Unwanted behavior, Optional -- see `references/spec-guide.md` for templates and ordering)
 2. Verify each requirement: no vague adjectives, edge cases covered, quantities specified, testable
 3. Document trade-offs when requirements conflict (see `references/spec-guide.md`)
 4. Produce architecture diagrams (`erDiagram`, `C4Context`, `flowchart`)
 5. Create ADRs in `docs/decisions/` for significant decisions
-6. **Generate scenario table** from EARS requirements and Mermaid diagrams:
-   - For each EARS requirement: at least one **happy** scenario + one **error** scenario
-   - For quantified parameters: **boundary** scenarios (min, max, just-beyond)
-   - From sequence diagrams: one scenario per message path including alt/opt fragments
-   - From state diagrams: each transition + at least one invalid transition (**adversarial**)
-   - For multi-parameter requirements: **combinatorial** scenarios using pairwise (2-way) coverage
-   - For external interfaces: **adversarial** scenarios per applicable STRIDE category
-   - Use sequential IDs (S1, S2...) and this table format:
+6. **Generate scenario table** from EARS requirements and Mermaid diagrams. Cover `happy`, `error`, `boundary`, `combinatorial`, and `adversarial` categories. Use sequential IDs (S1, S2...):
 
    | ID | Source | Category | Precondition | Trigger | Expected Outcome |
    |----|--------|----------|--------------|---------|------------------|
-
-   Categories: `happy`, `error`, `boundary`, `combinatorial`, `adversarial`
+7. **Validate assumptions** about performance bounds and architecture feasibility using the Hypothesis Validation Protocol below
 
 **Iteration trigger**: If contradictions or gaps emerge, loop back to Understand.
 
@@ -73,12 +61,25 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 4. Capture lessons: `npx ca learn`
 
 ## Memory Integration
-- `npx ca search` before generating approaches
-- `npx ca knowledge` for indexed project docs
+- `npx ca search` and `npx ca knowledge` before generating approaches
 - `npx ca learn` after corrections or discoveries
 
 ## Reference Material
-Read `.claude/skills/compound/spec-dev/references/spec-guide.md` on demand for EARS patterns, Mermaid templates, ambiguity checklists, and trade-off frameworks.
+Read `references/spec-guide.md` on demand for EARS patterns, Mermaid templates, and ambiguity checklists.
+
+## Hypothesis Validation Protocol
+Validate assumptions with executable code before recording as fact:
+1. **State** the hypothesis explicitly
+2. **Write** a minimal throwaway probe script
+3. **Execute** the script and capture output
+4. **Delete** the script immediately -- no validation code persists
+5. **Record** in the Validation Log (table below)
+
+### Validation Log
+End each spec with:
+
+| ID | Phase | Hypothesis | Method | Result | Impact on Spec |
+|----|-------|-----------|--------|--------|---------------|
 
 ## Common Pitfalls
 - Jumping to solutions before exploring the problem
@@ -91,6 +92,8 @@ Read `.claude/skills/compound/spec-dev/references/spec-guide.md` on demand for E
 - Specifying implementation instead of requirements
 - Skipping scenario table generation after EARS requirements
 - Not classifying requirements by Cynefin domain (Complex needs experiments)
+- Assuming without validating -- always probe with throwaway code when feasible
+- Persisting validation code instead of deleting after capture
 
 ## Quality Criteria
 - [ ] Requirements use EARS notation
@@ -103,4 +106,5 @@ Read `.claude/skills/compound/spec-dev/references/spec-guide.md` on demand for E
 - [ ] Spec and scenario table stored in beads epic description
 - [ ] ADRs created for significant decisions
 - [ ] Cynefin classification applied, volatility assessed
+- [ ] Technical assumptions validated with executable probes where feasible
 
