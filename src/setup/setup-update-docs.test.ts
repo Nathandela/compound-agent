@@ -64,8 +64,8 @@ describe('runUpdate doc templates', () => {
         `Expected ${filename} to exist after migration`,
       ).toBe(true);
     }
-    // updated count includes the HOW_TO_COMPOUND removal
-    expect(result.updated).toBeGreaterThanOrEqual(1);
+    // HOW_TO_COMPOUND removal tracked in staleRemoved (dynamic cleanup)
+    expect(result.staleRemoved.length).toBeGreaterThanOrEqual(1);
   });
 
   it('replaces {{VERSION}} and {{DATE}} placeholders in installed docs', async () => {
@@ -116,7 +116,7 @@ describe('runUpdate deprecated path cleanup', () => {
 
     expect(existsSync(skillDir)).toBe(false);
     expect(existsSync(cmdPath)).toBe(false);
-    expect(result.updated).toBeGreaterThanOrEqual(2);
+    expect(result.staleRemoved.length).toBeGreaterThanOrEqual(2);
   });
 
   it('removes deprecated .gemini worktree paths', async () => {
@@ -132,7 +132,7 @@ describe('runUpdate deprecated path cleanup', () => {
 
     expect(existsSync(geminiSkill)).toBe(false);
     expect(existsSync(geminiCmd)).toBe(false);
-    expect(result.updated).toBeGreaterThanOrEqual(2);
+    expect(result.staleRemoved.length).toBeGreaterThanOrEqual(2);
   });
 
   it('no-ops when deprecated paths do not exist', async () => {

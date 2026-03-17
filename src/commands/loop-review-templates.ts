@@ -53,7 +53,7 @@ detect_reviewers() {
       (claude-sonnet|claude-opus)
         if ! command -v claude >/dev/null 2>&1; then
           log "WARN: claude CLI not found, skipping $reviewer"
-        elif ! claude --version >/dev/null 2>&1; then
+        elif ! portable_timeout 10 claude --version >/dev/null 2>&1; then
           log "WARN: claude CLI not healthy, skipping $reviewer (health check failed)"
         else
           AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS $reviewer"
@@ -62,7 +62,7 @@ detect_reviewers() {
       (gemini)
         if ! command -v gemini >/dev/null 2>&1; then
           log "WARN: gemini CLI not found, skipping gemini"
-        elif ! gemini --version >/dev/null 2>&1; then
+        elif ! portable_timeout 10 gemini --version >/dev/null 2>&1; then
           log "WARN: gemini CLI not healthy, skipping gemini (health check failed)"
         else
           AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS gemini"
@@ -71,7 +71,7 @@ detect_reviewers() {
       (codex)
         if ! command -v codex >/dev/null 2>&1; then
           log "WARN: codex CLI not found, skipping codex"
-        elif ! codex --version >/dev/null 2>&1; then
+        elif ! portable_timeout 10 codex --version >/dev/null 2>&1; then
           log "WARN: codex CLI not healthy, skipping codex (health check failed)"
         else
           AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS codex"
@@ -116,8 +116,8 @@ print(d.get('$reviewer', ''))" 2>/dev/null || echo "")
           sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
           if [ "$HAS_JQ" = true ]; then
             local tmp
-            tmp=$(cat "$sessions_file" | jq --arg k "$reviewer" --arg v "$sid" '. + {($k): $v}')
-            echo "$tmp" > "$sessions_file"
+            tmp=$(cat "$sessions_file" | jq --arg k "$reviewer" --arg v "$sid" '. + {($k): $v}' 2>/dev/null)
+            [ -n "$tmp" ] && echo "$tmp" > "$sessions_file"
           else
             python3 -c "
 import json
@@ -294,7 +294,7 @@ run_review_phase() {
     local all_approved=true
     for reviewer in $AVAILABLE_REVIEWERS; do
       local report="$cycle_dir/$reviewer.md"
-      if [ -s "$report" ] && grep -q "^REVIEW_APPROVED" "$report"; then
+      if [ -s "$report" ] && grep -q "^REVIEW_APPROVED$" "$report"; then
         log "$reviewer: APPROVED"
       else
         log "$reviewer: CHANGES_REQUESTED (or no report)"

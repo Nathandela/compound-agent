@@ -102,7 +102,7 @@ export async function cleanStaleGeminiArtifacts(repoRoot: string, dryRun: boolea
   await cleanDir(repoRoot, ['.gemini', 'skills'], removed, dryRun, {
     filter: (name, isDir) => isDir && name.startsWith('compound-'),
     isStale: (name) => {
-      // compound-agent-<role> → check AGENT_ROLE_SKILLS
+      // compound-agent-<role> checked first (longest prefix); phase names must not start with "agent-"
       if (name.startsWith('compound-agent-')) {
         const role = name.slice('compound-agent-'.length);
         return !(role in AGENT_ROLE_SKILLS);
@@ -140,7 +140,12 @@ async function cleanDir(
   const dirPath = join(repoRoot, ...segments);
   if (!existsSync(dirPath)) return;
 
-  const entries = await readdir(dirPath, { withFileTypes: true });
+  let entries;
+  try {
+    entries = await readdir(dirPath, { withFileTypes: true });
+  } catch {
+    return; // Permission denied, not a directory, or removed between check and read
+  }
   for (const entry of entries) {
     const isDir = entry.isDirectory();
     if (!opts.filter(entry.name, isDir)) continue;
