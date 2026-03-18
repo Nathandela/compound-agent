@@ -16,8 +16,7 @@
 
 import type { FeatureExtractionPipeline } from '@huggingface/transformers';
 
-import { isModelAvailable } from './model-info.js';
-import { resolveModel } from './model.js';
+import { isModelAvailable, MODEL_URI } from './model-info.js';
 
 /** Opaque handle to the loaded embedding pipeline. */
 export interface EmbeddingContext {
@@ -52,19 +51,16 @@ export async function getEmbedding(): Promise<EmbeddingContext> {
 
   pendingInit = (async () => {
     try {
-      // Ensure model is downloaded
-      await resolveModel({ cli: false });
-
       // Dynamic import to avoid pulling transformers.js at module load time
       const { pipeline } = await import('@huggingface/transformers');
-      pipelineInstance = await pipeline('feature-extraction', 'nomic-ai/nomic-embed-text-v1.5', {
+      pipelineInstance = await pipeline('feature-extraction', MODEL_URI, {
         dtype: 'q8',
       }) as FeatureExtractionPipeline;
 
       const ctx: EmbeddingContext = {
         async embed(text: string): Promise<Float32Array> {
           const output = await pipelineInstance!(text, { pooling: 'mean', normalize: true });
-          return new Float32Array(output.data as Float64Array);
+          return new Float32Array(output.data as Float32Array);
         },
         async dispose(): Promise<void> {
           if (pipelineInstance?.dispose) {
@@ -95,31 +91,39 @@ export async function getEmbedding(): Promise<EmbeddingContext> {
  * With Transformers.js, cleanup is a single pipeline.dispose() call.
  */
 export async function unloadEmbeddingResources(): Promise<void> {
+  // Capture and synchronously detach all singleton state BEFORE any await.
+  // This prevents a concurrent getEmbedding() call from receiving a reference
+  // to a pipeline that is simultaneously being disposed (dispose-race).
   const pending = pendingInit;
+  const ctx = embeddingContext;
+  const orphan = pipelineInstance;
+
+  pendingInit = null;
+  embeddingContext = null;
+  pipelineInstance = null;
+
+  // Await any in-flight initialization so we don't leak its pipeline.
   if (pending) {
     try {
       await pending;
     } catch {
-      // Ignore initialization failures; dispose any partially created refs below.
+      // Ignore initialization failures; captured refs handle cleanup below.
     }
   }
 
-  const ctx = embeddingContext;
-  embeddingContext = null;
-  pendingInit = null;
-
+  // Dispose the context (which owns the pipeline) or the orphaned pipeline directly.
   if (ctx) {
     await ctx.dispose();
-  } else if (pipelineInstance) {
+  } else if (orphan) {
     // Partial init — pipeline created but context wrapper failed
     try {
-      if (pipelineInstance.dispose) {
-        await pipelineInstance.dispose();
+      if (orphan.dispose) {
+        await orphan.dispose();
       }
     } catch {
-      // Swallow
+      // Swallow — best-effort cleanup
     }
-    pipelineInstance = null;
+    // pipelineInstance already nulled above
   }
 }
 
@@ -127,6 +131,11 @@ export async function unloadEmbeddingResources(): Promise<void> {
  * Unload the embedding pipeline to free memory (~23MB).
  *
  * @see {@link getEmbedding} for loading the model
+ * @deprecated Prefer {@link unloadEmbeddingResources} (async). This synchronous
+ * wrapper fires a floating promise — if the process exits before the native ONNX
+ * backend finishes cleanup, a SIGABRT or segfault may occur. Safe only when
+ * followed by further async work (e.g. inside withEmbedding) that gives Node.js
+ * time to drain the microtask queue.
  */
 export function unloadEmbedding(): void {
   void unloadEmbeddingResources();

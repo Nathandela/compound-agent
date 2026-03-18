@@ -6,7 +6,7 @@ import type { KnowledgeChunk } from '../storage/sqlite-knowledge/types.js';
 import type { GenericScoredItem } from '../search/hybrid.js';
 import { openKnowledgeDb } from '../storage/sqlite-knowledge/connection.js';
 import { searchChunksKeywordScored } from '../storage/sqlite-knowledge/search.js';
-import { embedText, isModelUsable } from '../embeddings/index.js';
+import { embedText, isModelAvailable } from '../embeddings/index.js';
 import { cosineSimilarity } from '../search/vector.js';
 import { mergeHybridScores, CANDIDATE_MULTIPLIER, MIN_HYBRID_SCORE } from '../search/hybrid.js';
 
@@ -117,9 +117,9 @@ export async function searchKnowledge(
   const limit = options?.limit ?? DEFAULT_KNOWLEDGE_LIMIT;
   const candidateLimit = limit * CANDIDATE_MULTIPLIER;
 
-  const usability = await isModelUsable();
+  const modelReady = isModelAvailable();
 
-  if (usability.usable) {
+  if (modelReady) {
     // Hybrid: parallel vector + keyword
     const [vectorResults, keywordResults] = await Promise.all([
       searchKnowledgeVector(repoRoot, query, { limit: candidateLimit }),

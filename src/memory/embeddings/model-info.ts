@@ -10,8 +10,9 @@
  */
 
 import { existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 /**
  * HuggingFace model identifier for nomic-embed-text-v1.5.
@@ -41,18 +42,82 @@ export const MODEL_FILENAME = 'models--nomic-ai--nomic-embed-text-v1.5';
 export const DEFAULT_MODEL_DIR = join(homedir(), '.cache', 'huggingface', 'hub');
 
 /**
+ * Return all candidate directories where the model might be cached.
+ *
+ * Priority order (matches @huggingface/transformers env.js behavior):
+ * 1. TRANSFORMERS_CACHE env var (explicit override)
+ * 2. HF_HOME/hub (HuggingFace home override)
+ * 3. XDG_CACHE_HOME/huggingface/hub (XDG standard)
+ * 4. ~/.cache/huggingface/hub (standard HF Hub path)
+ * 5. @huggingface/transformers package-local .cache/ (Transformers.js default)
+ *
+ * NOTE: This function uses only node:fs, node:os, node:path, node:module —
+ * no native imports. The RSS guard (scripts/check-model-info-rss.mjs) enforces this.
+ */
+function getCandidateModelDirs(): string[] {
+  const dirs: string[] = [];
+
+  if (process.env['TRANSFORMERS_CACHE']) {
+    dirs.push(process.env['TRANSFORMERS_CACHE']);
+  }
+  if (process.env['HF_HOME']) {
+    dirs.push(join(process.env['HF_HOME'], 'hub'));
+  }
+  if (process.env['XDG_CACHE_HOME']) {
+    dirs.push(join(process.env['XDG_CACHE_HOME'], 'huggingface', 'hub'));
+  }
+
+  dirs.push(DEFAULT_MODEL_DIR);
+
+  // Transformers.js package-local .cache/ — the actual default when no env vars are set.
+  // Resolved via require.resolve to avoid importing the package (zero-native contract).
+  try {
+    const _require = createRequire(import.meta.url);
+    const pkgMain = _require.resolve('@huggingface/transformers');
+    // Walk up from the entry point to find the package root (dir with package.json)
+    let dir = dirname(pkgMain);
+    for (let depth = 0; depth < 5; depth++) {
+      if (existsSync(join(dir, 'package.json'))) {
+        dirs.push(join(dir, '.cache'));
+        break;
+      }
+      dir = dirname(dir);
+    }
+  } catch {
+    // @huggingface/transformers not installed or not resolvable — skip
+  }
+
+  return dirs;
+}
+
+/**
  * Check if the embedding model is available locally (fs existence only).
  *
- * Uses the HuggingFace Hub cache structure: checks for the model directory
- * under ~/.cache/huggingface/hub/. The model is downloaded automatically
- * by Transformers.js on first pipeline creation.
+ * Checks all candidate cache locations used by @huggingface/transformers:
+ * the standard HuggingFace Hub path, env-var overrides, and the
+ * package-local .cache/ directory (Transformers.js default).
  *
  * Use this for cheap pre-flight checks (e.g. spawnBackgroundEmbed) where
  * failure is handled gracefully. Use {@link isModelUsable} from model.ts
  * when you need runtime verification that the model can actually initialize.
  *
- * @returns true if model directory exists in HuggingFace cache
+ * @returns true if model directory exists in any known cache location
  */
 export function isModelAvailable(): boolean {
-  return existsSync(join(DEFAULT_MODEL_DIR, MODEL_FILENAME));
+  return getCandidateModelDirs().some((dir) => existsSync(join(dir, MODEL_FILENAME)));
+}
+
+/**
+ * Return the cache directory where the model is currently stored,
+ * or the default HuggingFace Hub path if not found anywhere.
+ *
+ * Used by CLI commands that need to display the model path to users.
+ */
+export function getModelCacheDir(): string {
+  for (const dir of getCandidateModelDirs()) {
+    if (existsSync(join(dir, MODEL_FILENAME))) {
+      return dir;
+    }
+  }
+  return DEFAULT_MODEL_DIR;
 }

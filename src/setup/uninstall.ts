@@ -20,6 +20,27 @@ import { cleanGeminiCompoundFiles } from './gemini.js';
 import { GENERATED_MARKER } from './primitives.js';
 import { LEGACY_ROOT_SLASH_COMMANDS } from './templates.js';
 
+/**
+ * Check compound-agent references in AGENTS.md and CLAUDE.md during a dry run
+ * and append matching actions to the provided list.
+ */
+async function checkDryRunReferences(repoRoot: string, actions: string[]): Promise<void> {
+  const agentsPath = join(repoRoot, 'AGENTS.md');
+  if (existsSync(agentsPath)) {
+    const content = await readFile(agentsPath, 'utf-8');
+    if (content.includes('compound-agent:start')) {
+      actions.push('Removed compound-agent section from AGENTS.md');
+    }
+  }
+  const claudeMdPath = join(repoRoot, '.claude', 'CLAUDE.md');
+  if (existsSync(claudeMdPath)) {
+    const content = await readFile(claudeMdPath, 'utf-8');
+    if (content.includes('compound-agent:claude-ref:start')) {
+      actions.push('Removed compound-agent reference from CLAUDE.md');
+    }
+  }
+}
+
 export async function runUninstall(repoRoot: string, dryRun: boolean): Promise<string[]> {
   const actions: string[] = [];
 
@@ -81,29 +102,15 @@ export async function runUninstall(repoRoot: string, dryRun: boolean): Promise<s
   if (!dryRun) {
     const removed = await removeAgentsSection(repoRoot);
     if (removed) actions.push('Removed compound-agent section from AGENTS.md');
-  } else {
-    const agentsPath = join(repoRoot, 'AGENTS.md');
-    if (existsSync(agentsPath)) {
-      const content = await readFile(agentsPath, 'utf-8');
-      if (content.includes('compound-agent:start')) {
-        actions.push('Removed compound-agent section from AGENTS.md');
-      }
-    }
   }
 
   // Remove CLAUDE.md reference
   if (!dryRun) {
     const removed = await removeClaudeMdReference(repoRoot);
     if (removed) actions.push('Removed compound-agent reference from CLAUDE.md');
-  } else {
-    const claudeMdPath = join(repoRoot, '.claude', 'CLAUDE.md');
-    if (existsSync(claudeMdPath)) {
-      const content = await readFile(claudeMdPath, 'utf-8');
-      if (content.includes('compound-agent:claude-ref:start')) {
-        actions.push('Removed compound-agent reference from CLAUDE.md');
-      }
-    }
   }
+
+  if (dryRun) await checkDryRunReferences(repoRoot, actions);
 
   // Remove compound-managed files from .gemini/
   if (!dryRun) {

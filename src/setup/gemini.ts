@@ -89,6 +89,73 @@ const COMPOUND_SETTINGS_HOOK_NAMES = new Set(
 // Helpers
 // ============================================================================
 
+/** Write settings object to file, or remove the file if settings is empty. */
+async function writeOrRemoveSettings(settingsPath: string, settings: Record<string, unknown>): Promise<void> {
+  if (Object.keys(settings).length > 0) {
+    await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
+  } else {
+    await rm(settingsPath);
+  }
+}
+
+/** Return true if a hook entry belongs to compound-agent. */
+function isCompoundHookEntry(entry: unknown): boolean {
+  const e = entry as Record<string, unknown>;
+  const innerHooks = e.hooks as Array<Record<string, unknown>> | undefined;
+  if (!Array.isArray(innerHooks)) return false;
+  return innerHooks.some(h => COMPOUND_SETTINGS_HOOK_NAMES.has(h.name as string));
+}
+
+/**
+ * Merge compound entries for one hook type into the merged hooks map,
+ * replacing any previously installed compound entries.
+ */
+function mergeHookType(
+  mergedHooks: Record<string, unknown[]>,
+  hookType: string,
+  compoundEntries: unknown[],
+): void {
+  const existing = mergedHooks[hookType];
+  if (Array.isArray(existing)) {
+    const userEntries = existing.filter((entry: unknown) => !isCompoundHookEntry(entry));
+    mergedHooks[hookType] = [...userEntries, ...compoundEntries];
+  } else {
+    mergedHooks[hookType] = compoundEntries;
+  }
+}
+
+/**
+ * Filter compound entries out of one hook type and update the hooks map in place.
+ * Returns true if any entries were removed.
+ */
+function filterHookType(
+  hooks: Record<string, unknown[]>,
+  hookType: string,
+  entries: unknown[],
+): boolean {
+  const filtered = entries.filter((entry: unknown) => !isCompoundHookEntry(entry));
+  const removed = filtered.length !== entries.length;
+  hooks[hookType] = filtered;
+  if (filtered.length === 0) delete hooks[hookType];
+  return removed;
+}
+
+/**
+ * Strip compound hook entries from a parsed settings object.
+ * Returns true if any entries were removed.
+ */
+function stripCompoundHooksFromSettings(settings: Record<string, unknown>): boolean {
+  const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+  if (!hooks) return false;
+  let removedAny = false;
+  for (const [hookType, entries] of Object.entries(hooks)) {
+    if (!Array.isArray(entries)) continue;
+    if (filterHookType(hooks, hookType, entries)) removedAny = true;
+  }
+  if (Object.keys(hooks).length === 0) delete settings.hooks;
+  return removedAny;
+}
+
 function parseDescription(content: string, fallback: string): string {
   const raw = content.match(/description:\s*(.*)/)?.[1] ?? fallback;
   return raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
@@ -116,19 +183,7 @@ async function writeSettings(geminiDir: string): Promise<void> {
         // Merge at the per-type array level: remove old compound entries, then append new ones
         const mergedHooks: Record<string, unknown[]> = { ...existingHooks };
         for (const [hookType, compoundEntries] of Object.entries(SETTINGS_JSON.hooks)) {
-          const existing = mergedHooks[hookType];
-          if (Array.isArray(existing)) {
-            // Filter out old compound entries, then append fresh ones
-            const userEntries = existing.filter((entry: unknown) => {
-              const e = entry as Record<string, unknown>;
-              const innerHooks = e.hooks as Array<Record<string, unknown>> | undefined;
-              if (!Array.isArray(innerHooks)) return true;
-              return !innerHooks.some(h => COMPOUND_SETTINGS_HOOK_NAMES.has(h.name as string));
-            });
-            mergedHooks[hookType] = [...userEntries, ...compoundEntries];
-          } else {
-            mergedHooks[hookType] = compoundEntries;
-          }
+          mergeHookType(mergedHooks, hookType, compoundEntries);
         }
         settings = { ...existing, hooks: mergedHooks };
       } else {
@@ -224,31 +279,9 @@ export async function cleanGeminiCompoundFiles(repoRoot: string): Promise<string
   if (existsSync(settingsPath)) {
     try {
       const settings = JSON.parse(await readFile(settingsPath, 'utf8')) as Record<string, unknown>;
-      const hooks = settings.hooks as Record<string, unknown[]> | undefined;
-      if (hooks) {
-        let removedAny = false;
-        for (const [hookType, entries] of Object.entries(hooks)) {
-          if (Array.isArray(entries)) {
-            const filtered = entries.filter((entry: unknown) => {
-              const e = entry as Record<string, unknown>;
-              const innerHooks = e.hooks as Array<Record<string, unknown>> | undefined;
-              if (!Array.isArray(innerHooks)) return true;
-              return !innerHooks.some(h => COMPOUND_SETTINGS_HOOK_NAMES.has(h.name as string));
-            });
-            if (filtered.length !== entries.length) removedAny = true;
-            hooks[hookType] = filtered;
-            if (filtered.length === 0) delete hooks[hookType];
-          }
-        }
-        if (Object.keys(hooks).length === 0) delete settings.hooks;
-        if (removedAny) {
-          if (Object.keys(settings).length > 0) {
-            await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
-          } else {
-            await rm(settingsPath);
-          }
-          actions.push('Cleaned compound hooks from .gemini/settings.json');
-        }
+      if (stripCompoundHooksFromSettings(settings)) {
+        await writeOrRemoveSettings(settingsPath, settings);
+        actions.push('Cleaned compound hooks from .gemini/settings.json');
       }
     } catch {
       // Malformed JSON — skip
@@ -305,6 +338,24 @@ export async function installGeminiAdapter(
 // Command Registration
 // ============================================================================
 
+/** Handle the --disable flag: disable Gemini adapter and clean compound files. */
+async function handleDisable(repoRoot: string, options: { dryRun?: boolean; json?: boolean }): Promise<void> {
+  if (options.dryRun) {
+    console.log(options.json
+      ? JSON.stringify({ dryRun: true, wouldDisable: true })
+      : 'Would disable Gemini adapter and clean compound files');
+    return;
+  }
+  await disableGemini(repoRoot);
+  const actions = await cleanGeminiCompoundFiles(repoRoot);
+  if (options.json) {
+    console.log(JSON.stringify({ disabled: true, cleaned: actions }));
+  } else {
+    out.success('Gemini adapter disabled');
+    for (const action of actions) console.log(`  ${action}`);
+  }
+}
+
 /**
  * Register the gemini subcommand on an existing setup command.
  */
@@ -320,20 +371,7 @@ export function registerGeminiSubcommand(setupCommand: Command): void {
         const repoRoot = getRepoRoot();
 
         if (options.disable) {
-          if (!options.dryRun) {
-            await disableGemini(repoRoot);
-            const actions = await cleanGeminiCompoundFiles(repoRoot);
-            if (options.json) {
-              console.log(JSON.stringify({ disabled: true, cleaned: actions }));
-            } else {
-              out.success('Gemini adapter disabled');
-              for (const action of actions) console.log(`  ${action}`);
-            }
-          } else {
-            console.log(options.json
-              ? JSON.stringify({ dryRun: true, wouldDisable: true })
-              : 'Would disable Gemini adapter and clean compound files');
-          }
+          await handleDisable(repoRoot, options);
           return;
         }
 

@@ -25,7 +25,7 @@ All 413 packages in the dependency tree use permissive open-source licenses. No 
 | Package | License | Notes |
 |---------|---------|-------|
 | better-sqlite3 | MIT | Bundles SQLite (public domain) |
-| node-llama-cpp | MIT | Wraps llama.cpp (MIT) |
+| onnxruntime-node | MIT | ONNX Runtime for Node.js (used by @huggingface/transformers) |
 | commander | MIT | CLI framework |
 | zod | MIT | Schema validation |
 | chalk | MIT | Terminal colors |
@@ -40,7 +40,7 @@ Key points:
 - The model weights are downloaded directly by the end user
 - compound-agent does not redistribute the model
 - Users should review the Gemma Terms of Use before downloading
-- The model download destination is `~/.node-llama-cpp/models/` (shared across projects)
+- The model download destination is the `@huggingface/transformers` package-local `.cache/` directory
 
 ## Notes
 

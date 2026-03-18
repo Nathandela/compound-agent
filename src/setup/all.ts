@@ -106,6 +106,37 @@ async function configureClaudeSettings(): Promise<{ hooks: boolean }> {
 }
 
 /**
+ * Download model if needed and trigger background embedding.
+ */
+async function downloadModelAndEmbed(skip: boolean): Promise<'downloaded' | 'already_exists' | 'failed' | 'skipped'> {
+  if (skip) return 'skipped';
+  let modelStatus: 'downloaded' | 'already_exists' | 'failed' | 'skipped';
+  try {
+    const alreadyExisted = isModelAvailable();
+    if (!alreadyExisted) {
+      await resolveModel({ cli: false });
+      modelStatus = 'downloaded';
+    } else {
+      modelStatus = 'already_exists';
+    }
+  } catch {
+    modelStatus = 'failed';
+  }
+  if (modelStatus === 'downloaded' || modelStatus === 'already_exists') {
+    try {
+      const { indexAndSpawnEmbed } = await import('../memory/knowledge/embed-background.js');
+      const spawnResult = await indexAndSpawnEmbed(getRepoRoot());
+      if (spawnResult?.spawned) {
+        out.info('Embedding in progress (background). You can start working.');
+      }
+    } catch {
+      // Non-fatal: don't break setup if background embedding fails to spawn
+    }
+  }
+  return modelStatus;
+}
+
+/**
  * Run one-shot setup.
  */
 export async function runSetup(options: { skipModel?: boolean; skipHooks?: boolean }): Promise<SetupResult> {
@@ -187,34 +218,8 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   // 12. Ensure .gitignore has required patterns
   const gitignore = await ensureGitignore(repoRoot);
 
-  // 13. Download model (unless skipped)
-  let modelStatus: 'downloaded' | 'already_exists' | 'failed' | 'skipped' = 'skipped';
-  if (!options.skipModel) {
-    try {
-      const alreadyExisted = isModelAvailable();
-      if (!alreadyExisted) {
-        await resolveModel({ cli: false });
-        modelStatus = 'downloaded';
-      } else {
-        modelStatus = 'already_exists';
-      }
-    } catch {
-      modelStatus = 'failed';
-    }
-  }
-
-  // 14. Trigger background embedding if docs/ exists and model available
-  if (modelStatus === 'downloaded' || modelStatus === 'already_exists') {
-    try {
-      const { indexAndSpawnEmbed } = await import('../memory/knowledge/embed-background.js');
-      const spawnResult = await indexAndSpawnEmbed(repoRoot);
-      if (spawnResult?.spawned) {
-        out.info('Embedding in progress (background). You can start working.');
-      }
-    } catch {
-      // Non-fatal: don't break setup if background embedding fails to spawn
-    }
-  }
+  // 13. Download model (unless skipped) and trigger background embedding
+  const modelStatus = await downloadModelAndEmbed(options.skipModel ?? false);
 
   return {
     lessonsDir,
@@ -232,6 +237,21 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   };
 }
 
+
+/**
+ * Remove legacy root-level slash commands that carry the generated marker.
+ */
+async function removeLegacyRootCommands(repoRoot: string, dryRun: boolean): Promise<void> {
+  for (const filename of LEGACY_ROOT_SLASH_COMMANDS) {
+    const filePath = join(repoRoot, '.claude', 'commands', filename);
+    if (existsSync(filePath)) {
+      const content = await readFile(filePath, 'utf-8');
+      if (content.startsWith(GENERATED_MARKER)) {
+        if (!dryRun) await rm(filePath);
+      }
+    }
+  }
+}
 
 /**
  * Update generated files with latest templates.
@@ -298,15 +318,7 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
   const allStaleRemoved = [...staleRemoved, ...staleGeminiRemoved];
 
   // Migration: clean up legacy root-level slash commands (v1.0; only marker-tagged files)
-  for (const filename of LEGACY_ROOT_SLASH_COMMANDS) {
-    const filePath = join(repoRoot, '.claude', 'commands', filename);
-    if (existsSync(filePath)) {
-      const content = await readFile(filePath, 'utf-8');
-      if (content.startsWith(GENERATED_MARKER)) {
-        if (!dryRun) await rm(filePath);
-      }
-    }
-  }
+  await removeLegacyRootCommands(repoRoot, dryRun);
 
   // Ensure hooks config is current
   let configUpdated = false;

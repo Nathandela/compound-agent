@@ -16,6 +16,10 @@ import type { MemoryItem } from '../types.js';
  * CCT patterns don't have rows in the SQLite lessons table,
  * so setCachedEmbedding (UPDATE-only) is a no-op for them.
  * This Map caches embeddings keyed by "id:contentHash".
+ *
+ * NOTE: This cache is intentionally unbounded. Compound Agent is a CLI tool
+ * (one process per command), so entries are bounded by a single command's
+ * lifetime. Do not use this pattern in long-running servers.
  */
 const cctEmbeddingCache = new Map<string, Float32Array>();
 

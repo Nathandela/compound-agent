@@ -584,7 +584,7 @@ describe('vector search', () => {
     });
 
     // NOTE: Real-embedding tests for findSimilarLessons are omitted here because
-    // this file runs in the unit (threads) pool. Loading the native ~400MB embedding
+    // this file runs in the unit (threads) pool. Loading the native ~23MB embedding
     // model in thread workers causes SIGABRT on cleanup. The mocked tests above
     // cover all logic paths. Real-model integration tests belong in
     // src/memory/embeddings/ where they run in the safe singleFork pool.

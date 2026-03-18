@@ -4,7 +4,7 @@
 
 import type { Command } from 'commander';
 
-import { isModelAvailable, DEFAULT_MODEL_DIR, MODEL_FILENAME, MODEL_URI, resolveModel } from '../memory/embeddings/index.js';
+import { isModelAvailable, MODEL_FILENAME, MODEL_URI, resolveModel, getModelCacheDir } from '../memory/embeddings/index.js';
 
 /**
  * Register the download-model command on the program.
@@ -18,7 +18,7 @@ export function registerDownloadModelCommand(program: Command): void {
       const alreadyExisted = isModelAvailable();
 
       if (alreadyExisted) {
-        const modelDir = `${DEFAULT_MODEL_DIR}/${MODEL_FILENAME}`;
+        const modelDir = `${getModelCacheDir()}/${MODEL_FILENAME}`;
 
         if (options.json) {
           console.log(JSON.stringify({ success: true, model: MODEL_URI, path: modelDir, alreadyExisted: true }));
@@ -36,7 +36,7 @@ export function registerDownloadModelCommand(program: Command): void {
       }
 
       await resolveModel({ cli: !options.json });
-      const modelDir = `${DEFAULT_MODEL_DIR}/${MODEL_FILENAME}`;
+      const modelDir = `${getModelCacheDir()}/${MODEL_FILENAME}`;
 
       if (options.json) {
         console.log(JSON.stringify({ success: true, model: MODEL_URI, path: modelDir, alreadyExisted: false }));

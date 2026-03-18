@@ -240,7 +240,7 @@ npx ca setup --skip-model
 
 - Node.js >= 20
 - ~278MB disk space for the embedding model (one-time download, shared across projects)
-- ~400MB RAM during embedding operations
+- ~23MB RAM during embedding operations (nomic-embed-text-v1.5 via Transformers.js)
 
 ### pnpm Users
 
@@ -251,7 +251,7 @@ If you prefer to configure manually, add to your `package.json`:
 ```json
 {
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "node-llama-cpp"]
+    "onlyBuiltDependencies": ["better-sqlite3", "onnxruntime-node"]
   }
 }
 ```
@@ -381,7 +381,7 @@ confirmation_boost: confirmed=1.3, unconfirmed=1.0
 A: mem0 is a cloud memory layer for general AI agents. Compound Agent is local-first with git-tracked storage and local embeddings — no API keys or cloud services needed. It also goes beyond memory with structured workflows, multi-agent review, and issue tracking.
 
 **Q: Does this work offline?**
-A: Yes, completely. Embeddings run locally via node-llama-cpp. No network requests after the initial model download.
+A: Yes, completely. Embeddings run locally via @huggingface/transformers (Transformers.js). No network requests after the initial model download.
 
 **Q: How much disk space does it need?**
 A: ~278MB for the embedding model (one-time download, shared across projects) plus negligible space for lessons.
@@ -421,7 +421,7 @@ pnpm lint             # Type check + ESLint
 | Build | tsup |
 | Testing | Vitest + fast-check (property tests) |
 | Storage | better-sqlite3 + FTS5 |
-| Embeddings | node-llama-cpp + EmbeddingGemma-300M |
+| Embeddings | @huggingface/transformers + nomic-embed-text-v1.5 (Q8 ONNX) |
 | CLI | Commander.js |
 | Schema | Zod |
 | Issue Tracking | Beads (bd) |

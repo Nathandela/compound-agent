@@ -88,36 +88,39 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
   // 7. SQLite (better-sqlite3)
   checks.push(checkSqliteHealth());
 
-  // 8. pnpm onlyBuiltDependencies config
+  // 8. ONNX Runtime (onnxruntime-node)
+  checks.push(await checkOnnxRuntime());
+
+  // 9. pnpm onlyBuiltDependencies config
   const pnpmCheck = checkPnpmBuildConfig(repoRoot);
   if (pnpmCheck !== null) {
     checks.push(pnpmCheck);
   }
 
-  // 9. Beads CLI available
+  // 10. Beads CLI available
   const beadsResult = checkBeadsAvailable();
   checks.push(beadsResult.available
     ? { name: 'Beads CLI', status: 'pass' }
     : { name: 'Beads CLI', status: 'warn', fix: 'Run: ca install-beads' });
 
-  // 10. .gitignore health
+  // 11. .gitignore health
   checks.push(checkGitignoreHealth(repoRoot)
     ? { name: '.gitignore health', status: 'pass' }
     : { name: '.gitignore health', status: 'warn', fix: 'Run: npx ca setup --update' });
 
-  // 11. Usage documentation
+  // 12. Usage documentation
   const docPath = join(repoRoot, 'docs', 'compound', 'README.md');
   checks.push(existsSync(docPath)
     ? { name: 'Usage documentation', status: 'pass' }
     : { name: 'Usage documentation', status: 'warn', fix: 'Run: npx ca setup' });
 
-  // 12. Beads initialized
+  // 13. Beads initialized
   const beadsDir = join(repoRoot, '.beads');
   checks.push(existsSync(beadsDir)
     ? { name: 'Beads initialized', status: 'pass' }
     : { name: 'Beads initialized', status: 'warn', fix: 'Run: bd init' });
 
-  // 13. Beads healthy
+  // 14. Beads healthy
   if (beadsResult.available && existsSync(beadsDir)) {
     try {
       execFileSync('bd', ['doctor'], { cwd: repoRoot, stdio: 'pipe' });
@@ -127,7 +130,7 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
     }
   }
 
-  // 14. Codebase scope
+  // 15. Codebase scope
   const scope = checkUserScope(repoRoot);
   checks.push(!scope.isUserScope
     ? { name: 'Codebase scope', status: 'pass' }
@@ -152,6 +155,21 @@ function checkSqliteHealth(): DoctorCheck {
     return { name: 'SQLite (better-sqlite3)', status: 'pass' };
   } catch {
     return { name: 'SQLite (better-sqlite3)', status: 'fail', fix: 'Run: pnpm rebuild better-sqlite3 (or npm rebuild better-sqlite3)' };
+  }
+}
+
+async function checkOnnxRuntime(): Promise<DoctorCheck> {
+  try {
+    // onnxruntime-node is a transitive dep via @huggingface/transformers.
+    // No separate @types package — use string cast to bypass TS module resolution.
+    await import('onnxruntime-node' as string);
+    return { name: 'ONNX Runtime (onnxruntime-node)', status: 'pass' };
+  } catch {
+    return {
+      name: 'ONNX Runtime (onnxruntime-node)',
+      status: 'fail',
+      fix: 'Run: pnpm rebuild onnxruntime-node (or npm rebuild onnxruntime-node)',
+    };
   }
 }
 
@@ -183,7 +201,7 @@ export function checkPnpmBuildConfig(repoRoot: string): DoctorCheck | null {
   }
   // Wildcard "*" means all builds are allowed
   if (deps.includes('*')) return { name: 'pnpm build config', status: 'pass' };
-  const required = ['better-sqlite3'];
+  const required = ['better-sqlite3', 'onnxruntime-node'];
   const missing = required.filter(d => !deps.includes(d));
   if (missing.length > 0) {
     return { name: 'pnpm build config', status: 'fail', fix: `Missing from onlyBuiltDependencies: [${missing.join(', ')}]. Run: npx ca setup` };

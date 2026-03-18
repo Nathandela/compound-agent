@@ -26,7 +26,7 @@ For detailed project rules and TDD workflow, see `.claude/CLAUDE.md`.
 |-----------|----------|---------|
 | Types/Schemas | `src/memory/types.ts` | Zod schemas for Lesson and LessonRecord |
 | Storage | `src/memory/storage/` | JSONL append-only + SQLite FTS5 index |
-| Embeddings | `src/memory/embeddings/` | node-llama-cpp with EmbeddingGemma-300M |
+| Embeddings | `src/memory/embeddings/` | @huggingface/transformers with nomic-embed-text-v1.5 (Q8 ONNX) |
 | Search | `src/memory/search/` | Vector similarity + ranking with boosts |
 | Capture | `src/memory/capture/` | Trigger detection + quality filters |
 | Retrieval | `src/memory/retrieval/` | Session-start and plan-time retrieval |
@@ -45,7 +45,7 @@ For detailed project rules and TDD workflow, see `.claude/CLAUDE.md`.
   .cache/
     lessons.sqlite              <- Rebuildable index (.gitignore)
 
-~/.node-llama-cpp/models/       <- Global embedding model cache
+{transformers_package}/.cache/  <- Embedding model cache (Transformers.js local storage)
 ```
 
 ---

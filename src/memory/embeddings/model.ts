@@ -127,7 +127,11 @@ export async function resolveModel(options: { cli?: boolean } = {}): Promise<str
   }) as FeatureExtractionPipeline;
 
   if (p.dispose) {
-    await p.dispose();
+    try {
+        await p.dispose();
+    } catch {
+        // Swallow disposal errors — model was successfully downloaded
+    }
   }
 
   if (cli) {

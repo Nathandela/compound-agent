@@ -27,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **Embedding memory pressure remediation**: Lazy-load native modules (node-llama-cpp, better-sqlite3) behind dynamic `import()`, reducing CLI cold-start RSS. Singleton embedding model uses explicit `dispose()`. Added RSS measurement script and integration tests for memory lifecycle.
+- **Embedding memory pressure remediation**: Lazy-load native modules (@huggingface/transformers (onnxruntime-node), better-sqlite3) behind dynamic `import()`, reducing CLI cold-start RSS. Singleton embedding model uses explicit `dispose()`. Added RSS measurement script and integration tests for memory lifecycle.
 - **Review phase resilience**: Fixed jq stdin pipe handling, added auth health checks, and improved error isolation in loop review templates.
 - **Quality-filter-before-storage test ordering**: Resolved flaky test ordering in compound skill tests.
 - **Merged worktree review findings**: Addressed Opus/Sonnet review findings for worktree merges (loop-review-templates, stale-cleanup tests).
@@ -295,7 +295,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Eliminate double model initialization**: `ca search` now uses `isModelAvailable()` (fs.existsSync, zero cost) instead of `isModelUsable()` which loaded the 278MB native model just to probe availability, then loaded it again for actual embedding
 - **Bulk-read cached embeddings**: `getCachedEmbeddingsBulk()` replaces N individual `getCachedEmbedding()` SQLite queries with a single bulk read
 - **Eliminate redundant JSONL parsing**: `searchVector()` and `findSimilarLessons()` now use `readAllFromSqlite()` after `syncIfNeeded()` instead of re-parsing the JSONL file
-- **Float32Array consistency**: Lesson embedding path now keeps `Float32Array` from node-llama-cpp instead of converting via `Array.from()` (4x memory savings per vector)
+- **Float32Array consistency**: Lesson embedding path now keeps `Float32Array` from the embedding pipeline instead of converting via `Array.from()` (4x memory savings per vector)
 - **Pre-warm lesson embedding cache**: `ca init` now pre-computes embeddings for all lessons with missing or stale cache entries, eliminating cold-start latency on first search
 - **Graceful embedding fallback**: `ca search` falls back to keyword-only search on runtime embedding failures instead of crashing
 

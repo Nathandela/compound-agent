@@ -19,7 +19,7 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const REQUIRED_BUILD_DEPS = ['better-sqlite3'];
+const REQUIRED_BUILD_DEPS = ['better-sqlite3', 'onnxruntime-node'];
 
 /**
  * Core postinstall logic, extracted for testability.

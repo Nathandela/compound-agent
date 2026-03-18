@@ -14,7 +14,6 @@ vi.mock('@huggingface/transformers', () => ({
 
 vi.mock('./model.js', () => ({
   resolveModel: vi.fn(),
-  isModelAvailable: vi.fn(() => true),
 }));
 
 import { pipeline } from '@huggingface/transformers';

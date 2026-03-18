@@ -67,7 +67,7 @@ describe('checkPnpmBuildConfig', () => {
       String(p).endsWith('pnpm-lock.yaml'),
     );
     mockedReadFileSync.mockReturnValue(JSON.stringify({
-      pnpm: { onlyBuiltDependencies: ['better-sqlite3'] },
+      pnpm: { onlyBuiltDependencies: ['better-sqlite3', 'onnxruntime-node'] },
     }));
 
     const result = checkPnpmBuildConfig('/repo');
@@ -80,7 +80,7 @@ describe('checkPnpmBuildConfig', () => {
     mockedExistsSync.mockReturnValue(false);
     mockedReadFileSync.mockReturnValue(JSON.stringify({
       packageManager: 'pnpm@10.0.0',
-      pnpm: { onlyBuiltDependencies: ['better-sqlite3'] },
+      pnpm: { onlyBuiltDependencies: ['better-sqlite3', 'onnxruntime-node'] },
     }));
 
     const result = checkPnpmBuildConfig('/repo');

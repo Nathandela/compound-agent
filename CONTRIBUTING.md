@@ -208,7 +208,7 @@ src/
     jsonl.ts        # JSONL read/write
     sqlite.ts       # SQLite + FTS5
   embeddings/
-    nomic.ts        # node-llama-cpp wrapper
+    nomic.ts        # Transformers.js embedding pipeline (nomic-embed-text-v1.5)
     download.ts     # Model download logic
   search/
     vector.ts       # Cosine similarity search

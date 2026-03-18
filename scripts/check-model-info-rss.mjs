@@ -14,14 +14,19 @@
 
 import { execSync } from 'node:child_process';
 import { writeFileSync, unlinkSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const MAX_DELTA_MB = 10; // model-info.ts should add <1 MB; native adds ~50 MB
-const PROBE_PATH = join(process.cwd(), '.model-info-rss-probe.ts');
+// Use .mts extension so tsx treats the probe as ESM (required for top-level await)
+const PROBE_PATH = join(tmpdir(), '.model-info-rss-probe.mts');
+
+// Absolute path so the probe resolves correctly from tmpdir
+const MODEL_INFO_PATH = join(process.cwd(), 'src/memory/embeddings/model-info.js').replace(/\\/g, '/');
 
 const probeCode = `
 const before = process.memoryUsage().rss;
-await import('./src/memory/embeddings/model-info.js');
+await import(${JSON.stringify('file://' + MODEL_INFO_PATH)});
 const after = process.memoryUsage().rss;
 console.log(JSON.stringify({ deltaMB: (after - before) / 1024 / 1024, totalMB: after / 1024 / 1024 }));
 `;

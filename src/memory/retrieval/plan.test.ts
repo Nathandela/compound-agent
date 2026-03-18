@@ -10,7 +10,7 @@ import { createFullLesson, createQuickLesson, shouldSkipEmbeddingTests } from '.
 
 import { formatLessonsCheck, retrieveForPlan } from './plan.js';
 
-// SAFETY: Never call isModelUsable() at module top-level — causes ~400MB native memory leak.
+// SAFETY: Never call isModelUsable() at module top-level — causes ~23MB native memory leak.
 const modelAvailable = isModelAvailable();
 const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
 
