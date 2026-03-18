@@ -81,7 +81,6 @@
   "devDependencies": {
     "@eslint/js": "^9.39.2",
     "@fast-check/vitest": "0.2.4",
-    "@huggingface/transformers": "3.8.1",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20.11.0",
     "@typescript-eslint/rule-tester": "8.55.0",
@@ -108,8 +107,7 @@
     "onlyBuiltDependencies": [
       "better-sqlite3",
       "node-llama-cpp",
-      "esbuild",
-      "onnxruntime-node"
+      "esbuild"
     ],
     "overrides": {
       "tar": ">=7.5.7",

@@ -7,7 +7,7 @@
  * Usage: npx tsx spike/e4-embedding-spike/bench-llama-server.ts
  */
 
-import { ChildProcess, spawn } from 'node:child_process';
+import { ChildProcess, execFileSync, spawn } from 'node:child_process';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -86,7 +86,6 @@ async function embedViaServer(text: string): Promise<Float32Array> {
 export async function benchLlamaServer(): Promise<BenchmarkResult | null> {
   try {
     // Check if llama-server is available
-    const { execFileSync } = await import('node:child_process');
     try {
       execFileSync('which', ['llama-server']);
     } catch {

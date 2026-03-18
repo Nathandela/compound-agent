@@ -92,7 +92,7 @@ if (results.length > 0) {
 // === Summary ===
 console.log('\n=== Decision Input Summary ===');
 console.log(`Candidates evaluated: ${results.length}`);
-console.log(`Candidates skipped: ${4 - results.length} (missing dependencies)`);
+console.log(`Candidates skipped: ${5 - results.length} (missing dependencies or build failures)`);
 
 const baseline = results.find((r) => r.candidate === 'node-llama-cpp');
 if (baseline) {

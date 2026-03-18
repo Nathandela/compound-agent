@@ -10,9 +10,22 @@
 |-----------|---------------|-----------------|----------------|------|----------------------|
 | **node-llama-cpp (baseline)** | 431.4 | 440 | 9.0 | 768 | — |
 | llama-embedding CLI | 0.0 (parent) | 7,828 | 571.6 | 768 | 1.000000 |
-| **Transformers.js (nomic-embed-text-v1.5)** | **22.7** | **140** | **5.9** | 768 | ~0.02 (different model) |
+| **Transformers.js (nomic-embed-text-v1.5)** | **22.7** | **140*** | **5.9** | 768 | ~0.02 (different model, different vector space — expected) |
 | llama-server (HTTP) | 230.4 | 643 | 10.6 | 768 | 1.000000 |
 | Go + go-llama.cpp (CGo) | N/A | N/A | N/A | N/A | Build failed |
+
+**Notes on RSS Delta:**
+- RSS delta measures memory added to the Node.js parent process only
+- For subprocess candidates (llama-cli, llama-server), the subprocess consumes its own memory (~300-430 MB) not reflected in these numbers
+- Total system memory is NOT reduced by subprocess approaches — they shift memory, not eliminate it
+
+### Benchmark Limitations
+
+- **Sample size**: Only 5 queries per candidate, no variance/stddev reported. Results are indicative, not statistically rigorous.
+- **Transformers.js cold-start**: The pre-flight model availability check warms the OS disk cache before the measured cold-start run. A true first-run (no disk cache) would be slower. The 140ms figure represents a warm-cache cold-start.
+- **Query 0 double-embed**: The harness embeds TEST_QUERIES[0] during cold-start measurement, then re-embeds it in the warm loop. This gives query 0 a slight warm-cache advantage in the per-query average.
+- **Different model comparison**: Transformers.js uses nomic-embed-text-v1.5 (137M params) vs EmbeddingGemma-300M (300M params). Some memory/speed advantage may reflect smaller model size, not just runtime differences.
+- **No `--expose-gc`**: Benchmarks were run without `--expose-gc`, so RSS deltas may include uncollected garbage.
 
 ## Vector Compatibility
 
@@ -113,3 +126,28 @@ The re-embedding requirement is acceptable because:
 | V4 | Work | Different-model has cosine_sim > 0.995 | Benchmark | ~0.02 — REJECTED | Requires re-embedding |
 | V5 | Work | Go CGo bindings build on darwin-arm64 | Build attempt | FAILED — missing headers | Go path not viable |
 | V6 | Work | Transformers.js RSS < 150 MB | Benchmark | 22.7 MB — far exceeds target | Clear winner |
+
+## How to Reproduce
+
+```bash
+# Prerequisites
+brew install llama.cpp          # for llama-embedding and llama-server benchmarks
+pnpm add -D @huggingface/transformers  # for Transformers.js benchmark (temporary)
+
+# Run all benchmarks
+npx tsx spike/e4-embedding-spike/run-all.ts
+
+# Run individual benchmarks
+npx tsx spike/e4-embedding-spike/bench-node-llama.ts
+npx tsx spike/e4-embedding-spike/bench-llama-cli.ts
+npx tsx spike/e4-embedding-spike/bench-llama-server.ts
+npx tsx spike/e4-embedding-spike/bench-transformers-js.ts
+
+# For more accurate RSS measurements, use --expose-gc:
+node --expose-gc node_modules/.bin/tsx spike/e4-embedding-spike/run-all.ts
+
+# Clean up after running
+pnpm remove @huggingface/transformers  # remove spike dependency
+```
+
+**Note:** The embedding model (~278 MB) must be downloaded first: `npx ca download-model`
