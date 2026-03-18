@@ -8,10 +8,12 @@ const integrationFiles = [
   'src/commands/audit.test.ts',
   'src/commands/capture.test.ts',
   'src/commands/compound.test.ts',
+  'src/commands/improve.test.ts',
   'src/commands/loop.test.ts',
   'src/commands/management.test.ts',
   'src/commands/phase-check.cli.test.ts',
   'src/commands/retrieval.test.ts',
+  'src/commands/watch.test.ts',
   'src/setup/setup.test.ts',
 ];
 
@@ -42,6 +44,12 @@ const nativeFiles = [
   'src/memory/knowledge/embed-chunks.test.ts',
   'src/memory/knowledge/indexing.test.ts',
   'src/memory/knowledge/search.test.ts',
+  'src/memory/storage/sqlite-knowledge/cache.test.ts',
+  'src/memory/storage/sqlite-knowledge/connection.test.ts',
+  'src/memory/storage/sqlite-knowledge/schema.test.ts',
+  'src/memory/storage/sqlite-knowledge/search.test.ts',
+  'src/memory/storage/sqlite-knowledge/sync.test.ts',
+  'src/commands/management-prime.test.ts',
   'src/setup/gemini.test.ts',
   'src/setup/sqlite-verify.test.ts',
 ];

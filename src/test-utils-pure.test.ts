@@ -4,8 +4,8 @@
  * Written BEFORE implementation (TDD).
  */
 
-import { readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
@@ -124,6 +124,53 @@ describe('shouldSkipEmbeddingTests', () => {
       if (original !== undefined) process.env.SKIP_EMBEDDING_TESTS = original;
     }
   });
+
+  it('returns true when SKIP_EMBEDDING_TESTS=1', async () => {
+    const { shouldSkipEmbeddingTests } = await import('./test-utils-pure.js');
+    const original = process.env.SKIP_EMBEDDING_TESTS;
+    process.env.SKIP_EMBEDDING_TESTS = '1';
+    try {
+      expect(shouldSkipEmbeddingTests(true)).toBe(true);
+    } finally {
+      if (original !== undefined) process.env.SKIP_EMBEDDING_TESTS = original;
+      else delete process.env.SKIP_EMBEDDING_TESTS;
+    }
+  });
+
+  it('returns false when SKIP_EMBEDDING_TESTS=0 (falsy override)', async () => {
+    const { shouldSkipEmbeddingTests } = await import('./test-utils-pure.js');
+    const original = process.env.SKIP_EMBEDDING_TESTS;
+    process.env.SKIP_EMBEDDING_TESTS = '0';
+    try {
+      expect(shouldSkipEmbeddingTests(true)).toBe(false);
+    } finally {
+      if (original !== undefined) process.env.SKIP_EMBEDDING_TESTS = original;
+      else delete process.env.SKIP_EMBEDDING_TESTS;
+    }
+  });
+
+  it('returns false when SKIP_EMBEDDING_TESTS=false (falsy override)', async () => {
+    const { shouldSkipEmbeddingTests } = await import('./test-utils-pure.js');
+    const original = process.env.SKIP_EMBEDDING_TESTS;
+    process.env.SKIP_EMBEDDING_TESTS = 'false';
+    try {
+      expect(shouldSkipEmbeddingTests(true)).toBe(false);
+    } finally {
+      if (original !== undefined) process.env.SKIP_EMBEDDING_TESTS = original;
+      else delete process.env.SKIP_EMBEDDING_TESTS;
+    }
+  });
+
+  it('returns true when runtimeUsable=false even if modelAvailable=true', async () => {
+    const { shouldSkipEmbeddingTests } = await import('./test-utils-pure.js');
+    const original = process.env.SKIP_EMBEDDING_TESTS;
+    delete process.env.SKIP_EMBEDDING_TESTS;
+    try {
+      expect(shouldSkipEmbeddingTests(true, false)).toBe(true);
+    } finally {
+      if (original !== undefined) process.env.SKIP_EMBEDDING_TESTS = original;
+    }
+  });
 });
 
 describe('daysAgo', () => {
@@ -131,5 +178,68 @@ describe('daysAgo', () => {
     const { daysAgo } = await import('./test-utils-pure.js');
     const result = daysAgo(7);
     expect(new Date(result).getTime()).toBeLessThan(Date.now());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Structural: pure-pool files must not import from test-utils.ts (native)
+// ---------------------------------------------------------------------------
+
+describe('pool classification (structural guard)', () => {
+  /**
+   * Recursively collect all *.test.ts files under a directory.
+   */
+  function collectTestFiles(dir: string): string[] {
+    const entries = readdirSync(dir, { withFileTypes: true });
+    return entries.flatMap((e) => {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) return collectTestFiles(full);
+      if (e.isFile() && e.name.endsWith('.test.ts')) return [full];
+      return [];
+    });
+  }
+
+  it('no pure-pool test file imports from test-utils.ts (only test-utils-pure.ts allowed)', () => {
+    const repoRoot = resolve(__dirname, '..');
+    const workspaceSrc = readFileSync(join(repoRoot, 'vitest.workspace.ts'), 'utf-8');
+
+    // Extract nativeFiles (exact paths) and integrationFiles (may include globs) from workspace config
+    const nativeMatch = workspaceSrc.match(/const nativeFiles\s*=\s*\[([\s\S]*?)\];/);
+    const integrationMatch = workspaceSrc.match(/const integrationFiles\s*=\s*\[([\s\S]*?)\];/);
+    const extractPaths = (block: string) =>
+      [...block.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    const nativePaths = nativeMatch ? extractPaths(nativeMatch[1]) : [];
+    const integrationPaths = integrationMatch ? extractPaths(integrationMatch[1]) : [];
+    const allExcluded = [...nativePaths, ...integrationPaths];
+
+    // Convert patterns to matchers: globs like 'src/cli/**/*.test.ts' → prefix match
+    const isExcluded = (relPath: string): boolean =>
+      allExcluded.some((pattern) => {
+        if (pattern.includes('**')) {
+          // Convert glob to prefix: 'src/cli/**/*.test.ts' → 'src/cli/'
+          const prefix = pattern.split('**')[0];
+          return relPath.startsWith(prefix);
+        }
+        return relPath === pattern || relPath.endsWith('/' + pattern.replace(/^src\//, ''));
+      });
+
+    const srcDir = join(repoRoot, 'src');
+    const allTestFiles = collectTestFiles(srcDir);
+    const violations: string[] = [];
+
+    for (const absPath of allTestFiles) {
+      const relPath = absPath.replace(repoRoot + '/', '');
+      if (relPath.includes('src/memory/embeddings/')) continue; // embedding pool
+      if (isExcluded(relPath)) continue;
+
+      const content = readFileSync(absPath, 'utf-8');
+      // Flag imports that reference test-utils.js but NOT test-utils-pure.js
+      if (/from ['"][^'"]*(?<!-pure)\/test-utils\.js['"]/.test(content) ||
+          /from ['"]\.\.?\/test-utils\.js['"]/.test(content)) {
+        violations.push(relPath);
+      }
+    }
+
+    expect(violations, `Pure-pool files must import test-utils-pure.js, not test-utils.js.\nViolators:\n${violations.join('\n')}`).toEqual([]);
   });
 });

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { createLesson, createQuickLesson, createFullLesson, daysAgo } from './test-utils-pure.js';
+import { createLesson, createQuickLesson, createFullLesson, createSolution, createPattern, createPreference, daysAgo } from './test-utils-pure.js';
 
 describe('test-utils', () => {
   describe('createLesson', () => {
@@ -261,6 +261,49 @@ describe('test-utils', () => {
     it('excludes deleted when not provided', () => {
       const lesson = createFullLesson('F007', 'Test', 'low');
       expect('deleted' in lesson).toBe(false);
+    });
+  });
+
+  describe('createSolution', () => {
+    it('creates a solution with correct type and default trigger', () => {
+      const s = createSolution('S001', 'use memoization');
+      expect(s.id).toBe('S001');
+      expect(s.type).toBe('solution');
+      expect(s.insight).toBe('use memoization');
+      expect(s.trigger).toBe('problem for use memoization');
+    });
+
+    it('respects custom trigger', () => {
+      const s = createSolution('S002', 'use memoization', { trigger: 'when cache is cold' });
+      expect(s.trigger).toBe('when cache is cold');
+    });
+  });
+
+  describe('createPattern', () => {
+    it('creates a pattern with bad/good fields', () => {
+      const p = createPattern('P001', 'avoid callbacks', 'callback(err)', 'await promise');
+      expect(p.type).toBe('pattern');
+      expect(p.pattern.bad).toBe('callback(err)');
+      expect(p.pattern.good).toBe('await promise');
+    });
+
+    it('has "trigger for {insight}" default trigger (not "problem for")', () => {
+      const p = createPattern('P002', 'use const', 'let x', 'const x');
+      expect(p.trigger).toBe('trigger for use const');
+    });
+  });
+
+  describe('createPreference', () => {
+    it('creates a preference with correct type', () => {
+      const pref = createPreference('R001', 'prefer functional style');
+      expect(pref.id).toBe('R001');
+      expect(pref.type).toBe('preference');
+      expect(pref.insight).toBe('prefer functional style');
+    });
+
+    it('has "trigger for {insight}" default trigger', () => {
+      const pref = createPreference('R002', 'prefer tabs');
+      expect(pref.trigger).toBe('trigger for prefer tabs');
     });
   });
 
