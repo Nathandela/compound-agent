@@ -104,7 +104,7 @@ async function walkSupportedFiles(baseDir: string, repoRoot: string): Promise<st
 
 /**
  * Embed indexed chunks using the local model.
- * Uses dynamic imports to avoid loading llama-cpp when not needed.
+ * Uses dynamic imports to avoid loading the embedding pipeline when not needed.
  *
  * @throws Error if model is not usable (caller explicitly requested --embed)
  * @returns Number of chunks embedded
