@@ -12,8 +12,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { closeDb } from '../memory/storage/sqlite/index.js';
 
 // Mock dynamic imports used by the similarity check
-vi.mock('../memory/embeddings/model.js', () => ({
+// capture.ts imports from index.js (barrel), which re-exports from model.js and nomic.js
+vi.mock('../memory/embeddings/index.js', () => ({
   isModelAvailable: vi.fn(() => true),
+  embedText: vi.fn(async () => new Array(768).fill(0)),
+  unloadEmbedding: vi.fn(),
+  withEmbedding: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 vi.mock('../memory/search/vector.js', () => ({
   findSimilarLessons: vi.fn(async () => []),
@@ -21,14 +25,9 @@ vi.mock('../memory/search/vector.js', () => ({
 vi.mock('../memory/storage/sqlite/sync.js', () => ({
   syncIfNeeded: vi.fn(async () => false),
 }));
-vi.mock('../memory/embeddings/nomic.js', () => ({
-  embedText: vi.fn(async () => new Array(768).fill(0)),
-  unloadEmbedding: vi.fn(),
-  withEmbedding: vi.fn(async (fn: () => Promise<unknown>) => fn()),
-}));
 
 // Must import after vi.mock declarations
-const { isModelAvailable } = await import('../memory/embeddings/model.js');
+const { isModelAvailable } = await import('../memory/embeddings/index.js');
 const { findSimilarLessons } = await import('../memory/search/vector.js');
 
 describe('learn similarity warning', () => {

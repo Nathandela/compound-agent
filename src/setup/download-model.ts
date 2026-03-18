@@ -2,13 +2,9 @@
  * Download-model command - Download the embedding model for semantic search.
  */
 
-import { statSync } from 'node:fs';
-import { homedir } from 'node:os';
-import { join } from 'node:path';
 import type { Command } from 'commander';
 
-import { formatBytes } from '../cli-utils.js';
-import { isModelAvailable, MODEL_FILENAME, resolveModel } from '../memory/embeddings/index.js';
+import { isModelAvailable, DEFAULT_MODEL_DIR, MODEL_FILENAME, MODEL_URI, resolveModel } from '../memory/embeddings/index.js';
 
 /**
  * Register the download-model command on the program.
@@ -22,16 +18,14 @@ export function registerDownloadModelCommand(program: Command): void {
       const alreadyExisted = isModelAvailable();
 
       if (alreadyExisted) {
-        // Model already exists - get path and size
-        const modelPath = join(homedir(), '.node-llama-cpp', 'models', MODEL_FILENAME);
-        const size = statSync(modelPath).size;
+        const modelDir = `${DEFAULT_MODEL_DIR}/${MODEL_FILENAME}`;
 
         if (options.json) {
-          console.log(JSON.stringify({ success: true, path: modelPath, size, alreadyExisted: true }));
+          console.log(JSON.stringify({ success: true, model: MODEL_URI, path: modelDir, alreadyExisted: true }));
         } else {
           console.log('Model already exists.');
-          console.log(`Path: ${modelPath}`);
-          console.log(`Size: ${formatBytes(size)}`);
+          console.log(`Model: ${MODEL_URI}`);
+          console.log(`Cache: ${modelDir}`);
         }
         return;
       }
@@ -41,15 +35,15 @@ export function registerDownloadModelCommand(program: Command): void {
         console.log('Downloading embedding model...');
       }
 
-      const modelPath = await resolveModel({ cli: !options.json });
-      const size = statSync(modelPath).size;
+      await resolveModel({ cli: !options.json });
+      const modelDir = `${DEFAULT_MODEL_DIR}/${MODEL_FILENAME}`;
 
       if (options.json) {
-        console.log(JSON.stringify({ success: true, path: modelPath, size, alreadyExisted: false }));
+        console.log(JSON.stringify({ success: true, model: MODEL_URI, path: modelDir, alreadyExisted: false }));
       } else {
         console.log(`\nModel downloaded successfully!`);
-        console.log(`Path: ${modelPath}`);
-        console.log(`Size: ${formatBytes(size)}`);
+        console.log(`Model: ${MODEL_URI}`);
+        console.log(`Cache: ${modelDir}`);
       }
     });
 }

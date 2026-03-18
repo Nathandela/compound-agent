@@ -110,7 +110,7 @@ async function walkSupportedFiles(baseDir: string, repoRoot: string): Promise<st
  * @returns Number of chunks embedded
  */
 async function tryEmbedChunks(repoRoot: string): Promise<number> {
-  const { isModelUsable } = await import('../embeddings/model.js');
+  const { isModelUsable } = await import('../embeddings/index.js');
   const usability = await isModelUsable();
   if (!usability.usable) {
     throw new Error(`Embedding failed: ${usability.reason}. ${usability.action}`);

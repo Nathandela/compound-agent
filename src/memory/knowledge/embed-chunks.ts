@@ -5,7 +5,7 @@
  * Uses batch embedding and transactional writes for performance.
  */
 
-import { embedTexts } from '../embeddings/nomic.js';
+import { embedTexts } from '../embeddings/index.js';
 import { openKnowledgeDb } from '../storage/sqlite-knowledge/connection.js';
 
 const BATCH_SIZE = 16;

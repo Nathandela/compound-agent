@@ -6,10 +6,9 @@ import type { KnowledgeChunk } from '../storage/sqlite-knowledge/types.js';
 import type { GenericScoredItem } from '../search/hybrid.js';
 import { openKnowledgeDb } from '../storage/sqlite-knowledge/connection.js';
 import { searchChunksKeywordScored } from '../storage/sqlite-knowledge/search.js';
-import { embedText } from '../embeddings/nomic.js';
+import { embedText, isModelUsable } from '../embeddings/index.js';
 import { cosineSimilarity } from '../search/vector.js';
 import { mergeHybridScores, CANDIDATE_MULTIPLIER, MIN_HYBRID_SCORE } from '../search/hybrid.js';
-import { isModelUsable } from '../embeddings/model.js';
 
 export interface KnowledgeSearchOptions {
   limit?: number;

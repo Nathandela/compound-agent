@@ -205,12 +205,12 @@ async function handleLearn(cmd: Command, insight: string, options: LearnOptions)
  */
 async function checkSimilarityPostCapture(repoRoot: string, item: MemoryItem): Promise<void> {
   try {
-    const { isModelAvailable } = await import('../memory/embeddings/model.js');
+    const { isModelAvailable } = await import('../memory/embeddings/index.js');
     if (!isModelAvailable()) return;
 
     const { syncIfNeeded } = await import('../memory/storage/sqlite/sync.js');
     const { findSimilarLessons } = await import('../memory/search/vector.js');
-    const { embedText, withEmbedding } = await import('../memory/embeddings/nomic.js');
+    const { embedText, withEmbedding } = await import('../memory/embeddings/index.js');
     const chalk = await import('chalk');
     await withEmbedding(async () => {
       // Early probe to catch runtime failures before full similarity check

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { isModelAvailable } from '../embeddings/nomic.js';
+import { isModelAvailable } from '../embeddings/index.js';
 import { appendLesson } from '../storage/jsonl.js';
 import { closeDb, getRetrievalStats, rebuildIndex } from '../storage/sqlite/index.js';
 import { createFullLesson, createQuickLesson, shouldSkipEmbeddingTests } from '../../test-utils.js';
