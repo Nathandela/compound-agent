@@ -897,7 +897,6 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       const pkg = JSON.parse(await readFile(join(getTempDir(), 'package.json'), 'utf-8'));
       expect(pkg.pnpm).toBeDefined();
       expect(pkg.pnpm.onlyBuiltDependencies).toContain('better-sqlite3');
-      expect(pkg.pnpm.onlyBuiltDependencies).toContain('node-llama-cpp');
     });
 
     it('does not modify package.json when no pnpm-lock.yaml exists', async () => {
@@ -915,7 +914,7 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       await writeFile(join(getTempDir(), 'pnpm-lock.yaml'), 'lockfileVersion: 9\n', 'utf-8');
       await writeFile(join(getTempDir(), 'package.json'), JSON.stringify({
         name: 'test-consumer',
-        pnpm: { onlyBuiltDependencies: ['better-sqlite3', 'node-llama-cpp'] },
+        pnpm: { onlyBuiltDependencies: ['better-sqlite3'] },
       }, null, 2) + '\n', 'utf-8');
 
       runCli('setup --skip-model');
@@ -924,7 +923,6 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       const deps: string[] = pkg.pnpm.onlyBuiltDependencies;
       // Each entry should appear exactly once
       expect(deps.filter((d: string) => d === 'better-sqlite3').length).toBe(1);
-      expect(deps.filter((d: string) => d === 'node-llama-cpp').length).toBe(1);
     });
 
     it('preserves existing pnpm config and merges missing deps', async () => {
@@ -941,7 +939,6 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
 
       const pkg = JSON.parse(await readFile(join(getTempDir(), 'package.json'), 'utf-8'));
       expect(pkg.pnpm.onlyBuiltDependencies).toContain('better-sqlite3');
-      expect(pkg.pnpm.onlyBuiltDependencies).toContain('node-llama-cpp');
       // Should preserve existing overrides
       expect(pkg.pnpm.overrides).toEqual({ 'some-pkg': '1.0.0' });
     });
@@ -968,7 +965,6 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       const pkg = JSON.parse(await readFile(join(getTempDir(), 'package.json'), 'utf-8'));
       expect(pkg.pnpm).toBeDefined();
       expect(pkg.pnpm.onlyBuiltDependencies).toContain('better-sqlite3');
-      expect(pkg.pnpm.onlyBuiltDependencies).toContain('node-llama-cpp');
     });
 
     it('detects pnpm via packageManager field when no lockfile exists', async () => {
@@ -983,7 +979,6 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       const pkg = JSON.parse(await readFile(join(getTempDir(), 'package.json'), 'utf-8'));
       expect(pkg.pnpm).toBeDefined();
       expect(pkg.pnpm.onlyBuiltDependencies).toContain('better-sqlite3');
-      expect(pkg.pnpm.onlyBuiltDependencies).toContain('node-llama-cpp');
     });
 
     it('skips pnpm config when packageManager is not pnpm and no lockfile', async () => {

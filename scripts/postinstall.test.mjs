@@ -41,10 +41,10 @@ describe('patchPnpmConfig', () => {
     writeFileSync(join(tempDir, 'pnpm-lock.yaml'), '');
     const result = patchPnpmConfig(tempDir);
     assert.notEqual(result, null);
-    assert.deepEqual(result.added, ['better-sqlite3', 'node-llama-cpp']);
+    assert.deepEqual(result.added, ['better-sqlite3']);
     // Verify file was actually written
     const pkg = JSON.parse(readFileSync(join(tempDir, 'package.json'), 'utf-8'));
-    assert.deepEqual(pkg.pnpm.onlyBuiltDependencies, ['better-sqlite3', 'node-llama-cpp']);
+    assert.deepEqual(pkg.pnpm.onlyBuiltDependencies, ['better-sqlite3']);
   });
 
   it('patches when pnpm detected via packageManager field', () => {
@@ -54,13 +54,13 @@ describe('patchPnpmConfig', () => {
     }));
     const result = patchPnpmConfig(tempDir);
     assert.notEqual(result, null);
-    assert.deepEqual(result.added, ['better-sqlite3', 'node-llama-cpp']);
+    assert.deepEqual(result.added, ['better-sqlite3']);
   });
 
   it('returns null when already fully configured', () => {
     writeFileSync(join(tempDir, 'package.json'), JSON.stringify({
       name: 'test',
-      pnpm: { onlyBuiltDependencies: ['better-sqlite3', 'node-llama-cpp'] },
+      pnpm: { onlyBuiltDependencies: ['better-sqlite3'] },
     }));
     writeFileSync(join(tempDir, 'pnpm-lock.yaml'), '');
     const result = patchPnpmConfig(tempDir);
@@ -70,14 +70,15 @@ describe('patchPnpmConfig', () => {
   it('adds only missing dependencies when partially configured', () => {
     writeFileSync(join(tempDir, 'package.json'), JSON.stringify({
       name: 'test',
-      pnpm: { onlyBuiltDependencies: ['better-sqlite3'] },
+      pnpm: { onlyBuiltDependencies: ['other-native-dep'] },
     }));
     writeFileSync(join(tempDir, 'pnpm-lock.yaml'), '');
     const result = patchPnpmConfig(tempDir);
     assert.notEqual(result, null);
-    assert.deepEqual(result.added, ['node-llama-cpp']);
+    assert.deepEqual(result.added, ['better-sqlite3']);
     const pkg = JSON.parse(readFileSync(join(tempDir, 'package.json'), 'utf-8'));
-    assert.deepEqual(pkg.pnpm.onlyBuiltDependencies, ['better-sqlite3', 'node-llama-cpp']);
+    assert.ok(pkg.pnpm.onlyBuiltDependencies.includes('better-sqlite3'));
+    assert.ok(pkg.pnpm.onlyBuiltDependencies.includes('other-native-dep'));
   });
 
   it('is idempotent: running twice produces same result', () => {
@@ -138,7 +139,7 @@ describe('patchPnpmConfig', () => {
     writeFileSync(join(tempDir, 'pnpm-lock.yaml'), '');
     const result = patchPnpmConfig(tempDir);
     assert.notEqual(result, null);
-    assert.deepEqual(result.added, ['better-sqlite3', 'node-llama-cpp']);
+    assert.deepEqual(result.added, ['better-sqlite3']);
   });
 
   it('preserves existing pnpm overrides when adding onlyBuiltDependencies', () => {
@@ -151,7 +152,7 @@ describe('patchPnpmConfig', () => {
     patchPnpmConfig(tempDir);
     const pkg = JSON.parse(readFileSync(join(tempDir, 'package.json'), 'utf-8'));
     assert.deepEqual(pkg.pnpm.overrides, { tar: '>=7.0.0' });
-    assert.deepEqual(pkg.pnpm.onlyBuiltDependencies, ['better-sqlite3', 'node-llama-cpp']);
+    assert.deepEqual(pkg.pnpm.onlyBuiltDependencies, ['better-sqlite3']);
   });
 
   it('returns null when wildcard "*" is already configured', () => {

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Replace node-llama-cpp with Transformers.js**: Swap EmbeddingGemma-300M (node-llama-cpp, 431MB RSS) for nomic-embed-text-v1.5 (@huggingface/transformers, 23MB RSS) — 95% memory reduction (E5b).
+- **Remove all node-llama-cpp residue**: Update setup templates, doctor diagnostics, comments, and vitest config to reference Transformers.js and onnxruntime-node instead of node-llama-cpp (E5c).
+
 ### Added
 
 - **Research-specialist shipped agent**: New general-purpose research subagent (`research-specialist.md`) shipped via `npx ca init`. Has full tool access (Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch) so it can conduct deep PhD-level research, write survey papers, run experiments, and validate claims with code. Referenced by the `get-a-phd` workflow for parallel research execution.

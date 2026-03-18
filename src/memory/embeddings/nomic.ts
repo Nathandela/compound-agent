@@ -7,7 +7,7 @@
  * - Loading is fast (~140ms warm cache); keeping loaded improves subsequent call performance
  *
  * **Memory usage:**
- * - Embedding pipeline: ~23MB RAM when loaded (vs ~400MB with node-llama-cpp)
+ * - Embedding pipeline: ~23MB RAM when loaded (95% reduction from previous implementation)
  * - Embeddings themselves: ~3KB per embedding (768 dimensions x 4 bytes)
  *
  * @see {@link unloadEmbedding} for releasing memory
@@ -92,8 +92,7 @@ export async function getEmbedding(): Promise<EmbeddingContext> {
 /**
  * Await disposal of all loaded embedding resources.
  *
- * With Transformers.js, cleanup is simpler than node-llama-cpp:
- * a single pipeline.dispose() call (no 3-layer inner-to-outer chain).
+ * With Transformers.js, cleanup is a single pipeline.dispose() call.
  */
 export async function unloadEmbeddingResources(): Promise<void> {
   const pending = pendingInit;

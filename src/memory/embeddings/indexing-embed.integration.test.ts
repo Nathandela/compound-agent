@@ -3,7 +3,7 @@
  *
  * This file exists to keep embedding-dependent tests in the singleFork pool
  * (src/memory/embeddings/**) rather than the thread pool, where native
- * llama-cpp memory causes SIGABRT during worker cleanup.
+ * ONNX runtime (onnxruntime-node) memory causes SIGABRT during worker cleanup.
  */
 
 import { mkdtemp, rm, mkdir, writeFile } from 'node:fs/promises';

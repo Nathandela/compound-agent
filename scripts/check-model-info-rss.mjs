@@ -4,7 +4,7 @@
  * CI fitness check: verify model-info.ts has zero native dependency overhead.
  *
  * Spawns a clean subprocess that measures RSS delta from importing model-info.ts.
- * If a transitive native import (node-llama-cpp) is accidentally introduced,
+ * If a transitive native import (e.g. onnxruntime-node) is accidentally introduced,
  * delta jumps from ~0 MB to ~45-55 MB.
  *
  * Fragile contract guard for Epics 3 + 5.
@@ -39,7 +39,7 @@ try {
   if (deltaMB > MAX_DELTA_MB) {
     console.error(
       `FAIL: model-info.ts import delta = ${deltaMB.toFixed(1)} MB (total ${totalMB.toFixed(1)} MB), exceeds ${MAX_DELTA_MB} MB threshold.\n` +
-      `A transitive native import (node-llama-cpp) was likely introduced.\n` +
+      `A transitive native import (e.g. onnxruntime-node) was likely introduced.\n` +
       `Check src/memory/embeddings/model-info.ts for accidental imports.`
     );
     process.exit(1);

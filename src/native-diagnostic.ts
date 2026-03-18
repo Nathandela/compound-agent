@@ -52,7 +52,7 @@ export function printNativeBuildDiagnostic(err: unknown, cwd: string = process.c
     console.error('');
     console.error('    Option B -- Manual patch:');
     console.error('      1. Add to package.json:');
-    console.error('         "pnpm": { "onlyBuiltDependencies": ["better-sqlite3", "node-llama-cpp"] }');
+    console.error('         "pnpm": { "onlyBuiltDependencies": ["better-sqlite3"] }');
     console.error('      2. Run: pnpm install && pnpm rebuild better-sqlite3');
     console.error('');
     console.error('    Option C -- Approve build scripts interactively:');

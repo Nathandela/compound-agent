@@ -4,8 +4,8 @@
  * This file exists to keep embedding tests in the singleFork pool
  * (src/memory/embeddings/**), which provides safe native memory isolation.
  * Running these in the thread pool causes SIGABRT during worker cleanup
- * because node-llama-cpp allocates native memory that cannot be safely
- * freed across threads.
+ * because onnxruntime-node (used by Transformers.js) allocates native memory
+ * that cannot be safely freed across threads.
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';

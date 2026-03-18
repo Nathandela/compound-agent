@@ -60,13 +60,14 @@ describe('zero native imports (fragile contract)', () => {
     expect(source).not.toMatch(/require\s*\(\s*['"]@huggingface\/transformers['"]\s*\)/);
   });
 
-  it('model-info.ts source does NOT import node-llama-cpp', () => {
+  it('model-info.ts source does NOT import heavy native packages', () => {
     const source = readFileSync(
       join(__dirname, 'model-info.ts'),
       'utf-8'
     );
-    expect(source).not.toMatch(/from\s+['"]node-llama-cpp['"]/);
-    expect(source).not.toMatch(/require\s*\(\s*['"]node-llama-cpp['"]\s*\)/);
+    // Must not pull in onnxruntime-node transitively (zero-native-import contract)
+    expect(source).not.toMatch(/from\s+['"]onnxruntime-node['"]/);
+    expect(source).not.toMatch(/require\s*\(\s*['"]onnxruntime-node['"]\s*\)/);
   });
 
   it('model-info.ts source does NOT import from model.js or nomic.js', () => {

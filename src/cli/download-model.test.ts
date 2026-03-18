@@ -10,7 +10,7 @@ import { appendLesson } from '../memory/storage/jsonl.js';
 import { closeDb, rebuildIndex } from '../memory/storage/sqlite/index.js';
 import { cleanupCliTestDir, createQuickLesson, runCli, setupCliTestDir, shouldSkipEmbeddingTests } from '../test-utils.js';
 
-// SAFETY: Never call isModelUsable() at module top-level — causes ~400MB native memory leak.
+// SAFETY: Never call isModelUsable() at module top-level — it loads the ONNX pipeline (~23MB).
 const modelAvailable = isModelAvailable();
 const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
 
@@ -37,11 +37,10 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(combined).toMatch(/downloading|model|success/i);
     });
 
-    it('shows model path and size after successful download', () => {
+    it('shows model cache path after successful download', () => {
       const { combined } = runCli('download-model', tempDir);
-      expect(combined).toMatch(/path/i);
-      expect(combined).toMatch(/\.gguf/i);
-      expect(combined).toMatch(/\d+\s*MB/i);
+      expect(combined).toMatch(/cache/i);
+      expect(combined).toMatch(/huggingface|nomic/i);
     });
 
     it('is idempotent - skips download if model already exists', () => {
@@ -79,14 +78,15 @@ describe('CLI', { tags: ['integration'] }, () => {
 
       const result = JSON.parse(jsonLine!) as {
         success: boolean;
+        model: string;
         path: string;
-        size: number;
         alreadyExisted: boolean;
       };
 
       expect(result.success).toBe(true);
-      expect(result.path).toMatch(/\.gguf$/);
-      expect(result.size).toBeGreaterThan(0);
+      expect(result.model).toContain('nomic');
+      expect(result.path).toMatch(/^\//);
+      expect(result.path).toContain('huggingface');
       expect(typeof result.alreadyExisted).toBe('boolean');
     });
 
@@ -123,7 +123,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       const result = JSON.parse(jsonLine!) as { path: string };
 
       expect(result.path).toMatch(/^\//);
-      expect(result.path).toContain('.node-llama-cpp');
+      expect(result.path).toContain('huggingface');
     });
 
     it('uses consistent model filename', () => {
@@ -134,22 +134,18 @@ describe('CLI', { tags: ['integration'] }, () => {
 
       const result = JSON.parse(jsonLine!) as { path: string };
 
-      expect(result.path).toContain('hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf');
+      expect(result.path).toContain('nomic-ai');
     });
 
-    it('downloaded model file has valid size (approximately 278MB)', () => {
+    it('JSON output contains model identifier', () => {
       const { stdout } = runCli('download-model --json', tempDir);
 
       const jsonLine = stdout.split('\n').find((line) => line.trim().startsWith('{'));
       expect(jsonLine).toBeDefined();
 
-      const result = JSON.parse(jsonLine!) as { size: number };
+      const result = JSON.parse(jsonLine!) as { model: string };
 
-      const expectedSize = 277852359;
-      const tolerance = expectedSize * 0.05;
-
-      expect(result.size).toBeGreaterThan(expectedSize - tolerance);
-      expect(result.size).toBeLessThan(expectedSize + tolerance);
+      expect(result.model).toBe('nomic-ai/nomic-embed-text-v1.5');
     });
 
     it('command name matches error messages in check-plan', () => {
@@ -169,7 +165,7 @@ describe('CLI', { tags: ['integration'] }, () => {
 
       const { combined } = runCli('check-plan --plan "test search"', tempDir);
       if (skipEmbedding) {
-        expect(combined.toLowerCase()).toMatch(/runtime initialization failed|compatibility|failed to create context/i);
+        expect(combined.toLowerCase()).toMatch(/runtime initialization failed|compatibility|failed to create|onnx/i);
         // download-model should make file available; error should not be "file not found"
         expect(combined.toLowerCase()).not.toMatch(/file not found/);
       } else {

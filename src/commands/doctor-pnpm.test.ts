@@ -52,14 +52,14 @@ describe('checkPnpmBuildConfig', () => {
       String(p).endsWith('pnpm-lock.yaml'),
     );
     mockedReadFileSync.mockReturnValue(JSON.stringify({
-      pnpm: { onlyBuiltDependencies: ['better-sqlite3'] },
+      pnpm: { onlyBuiltDependencies: ['some-other-dep'] },
     }));
 
     const result = checkPnpmBuildConfig('/repo');
 
     expect(result).not.toBeNull();
     expect(result!.status).toBe('fail');
-    expect(result!.fix).toContain('node-llama-cpp');
+    expect(result!.fix).toContain('better-sqlite3');
   });
 
   it('returns pass when all required deps are configured', () => {
@@ -67,7 +67,7 @@ describe('checkPnpmBuildConfig', () => {
       String(p).endsWith('pnpm-lock.yaml'),
     );
     mockedReadFileSync.mockReturnValue(JSON.stringify({
-      pnpm: { onlyBuiltDependencies: ['better-sqlite3', 'node-llama-cpp'] },
+      pnpm: { onlyBuiltDependencies: ['better-sqlite3'] },
     }));
 
     const result = checkPnpmBuildConfig('/repo');
@@ -80,7 +80,7 @@ describe('checkPnpmBuildConfig', () => {
     mockedExistsSync.mockReturnValue(false);
     mockedReadFileSync.mockReturnValue(JSON.stringify({
       packageManager: 'pnpm@10.0.0',
-      pnpm: { onlyBuiltDependencies: ['better-sqlite3', 'node-llama-cpp'] },
+      pnpm: { onlyBuiltDependencies: ['better-sqlite3'] },
     }));
 
     const result = checkPnpmBuildConfig('/repo');

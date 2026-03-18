@@ -4,7 +4,7 @@
  * Written BEFORE implementation (TDD).
  *
  * Embedding-dependent tests live in src/memory/embeddings/embed-chunks.integration.test.ts
- * so they run in the singleFork pool (safe native memory isolation).
+ * so they run in the singleFork pool (process isolation required by onnxruntime-node).
  */
 
 import { mkdtemp, rm } from 'node:fs/promises';

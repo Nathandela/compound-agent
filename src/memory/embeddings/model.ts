@@ -40,7 +40,7 @@ export type UsabilityResult =
  * 2. Attempts to create a Transformers.js pipeline
  * 3. Cleans up the pipeline after check
  *
- * Much lighter than the old node-llama-cpp probe (~23MB vs ~400MB).
+ * Much lighter than the previous embedding probe (~23MB vs ~431MB).
  *
  * @returns UsabilityResult with usable status and actionable error if failed
  */

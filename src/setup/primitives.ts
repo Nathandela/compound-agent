@@ -297,7 +297,7 @@ export async function installResearchDocs(repoRoot: string, options?: { force?: 
 // ============================================================================
 
 /** Native addon packages that require pnpm onlyBuiltDependencies opt-in. */
-const REQUIRED_BUILD_DEPS = ['better-sqlite3', 'node-llama-cpp'];
+const REQUIRED_BUILD_DEPS = ['better-sqlite3'];
 
 /** Result of pnpm build config check/update. */
 export interface PnpmConfigResult {

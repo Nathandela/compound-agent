@@ -183,7 +183,7 @@ export function checkPnpmBuildConfig(repoRoot: string): DoctorCheck | null {
   }
   // Wildcard "*" means all builds are allowed
   if (deps.includes('*')) return { name: 'pnpm build config', status: 'pass' };
-  const required = ['better-sqlite3', 'node-llama-cpp'];
+  const required = ['better-sqlite3'];
   const missing = required.filter(d => !deps.includes(d));
   if (missing.length > 0) {
     return { name: 'pnpm build config', status: 'fail', fix: `Missing from onlyBuiltDependencies: [${missing.join(', ')}]. Run: npx ca setup` };

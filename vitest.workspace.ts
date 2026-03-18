@@ -58,6 +58,9 @@ export default defineWorkspace([
       include: ['src/memory/embeddings/**/*.test.ts'],
       pool: 'forks',
       poolOptions: {
+        // singleFork: onnxruntime-node (used by Transformers.js) is a native module
+        // that cannot be safely shared or freed across worker threads/forks.
+        // A single persistent fork provides process isolation and prevents SIGABRT.
         forks: { singleFork: true },
       },
       isolate: true,
