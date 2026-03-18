@@ -42,34 +42,44 @@ export const MODEL_FILENAME = 'models--nomic-ai--nomic-embed-text-v1.5';
 export const DEFAULT_MODEL_DIR = join(homedir(), '.cache', 'huggingface', 'hub');
 
 /**
- * Return all candidate directories where the model might be cached.
+ * Return full paths to where the model directory might be cached.
  *
  * Priority order (matches @huggingface/transformers env.js behavior):
- * 1. TRANSFORMERS_CACHE env var (explicit override)
- * 2. HF_HOME/hub (HuggingFace home override)
- * 3. XDG_CACHE_HOME/huggingface/hub (XDG standard)
- * 4. ~/.cache/huggingface/hub (standard HF Hub path)
- * 5. @huggingface/transformers package-local .cache/ (Transformers.js default)
+ * 1. TRANSFORMERS_CACHE env var (explicit override) — HF Hub layout
+ * 2. HF_HOME/hub (HuggingFace home override) — HF Hub layout
+ * 3. XDG_CACHE_HOME/huggingface/hub (XDG standard) — HF Hub layout
+ * 4. ~/.cache/huggingface/hub (standard HF Hub path) — HF Hub layout
+ * 5. @huggingface/transformers package-local .cache/ — org/model layout
+ *
+ * NOTE: HF Hub layout uses `models--org--model` subdirectories.
+ *       Transformers.js package-local layout uses `org/model` subdirectories.
+ *       Both layouts are handled here.
  *
  * NOTE: This function uses only node:fs, node:os, node:path, node:module —
  * no native imports. The RSS guard (scripts/check-model-info-rss.mjs) enforces this.
  */
-function getCandidateModelDirs(): string[] {
-  const dirs: string[] = [];
+function getCandidateModelPaths(): string[] {
+  const paths: string[] = [];
 
+  // HF Hub-style cache locations: model is at <parent>/models--nomic-ai--nomic-embed-text-v1.5
+  const hubParents: string[] = [];
   if (process.env['TRANSFORMERS_CACHE']) {
-    dirs.push(process.env['TRANSFORMERS_CACHE']);
+    hubParents.push(process.env['TRANSFORMERS_CACHE']);
   }
   if (process.env['HF_HOME']) {
-    dirs.push(join(process.env['HF_HOME'], 'hub'));
+    hubParents.push(join(process.env['HF_HOME'], 'hub'));
   }
   if (process.env['XDG_CACHE_HOME']) {
-    dirs.push(join(process.env['XDG_CACHE_HOME'], 'huggingface', 'hub'));
+    hubParents.push(join(process.env['XDG_CACHE_HOME'], 'huggingface', 'hub'));
+  }
+  hubParents.push(DEFAULT_MODEL_DIR);
+
+  for (const parent of hubParents) {
+    paths.push(join(parent, MODEL_FILENAME));
   }
 
-  dirs.push(DEFAULT_MODEL_DIR);
-
   // Transformers.js package-local .cache/ — the actual default when no env vars are set.
+  // Uses org/model layout (not models--org--model), so we must build the full path here.
   // Resolved via require.resolve to avoid importing the package (zero-native contract).
   try {
     const _require = createRequire(import.meta.url);
@@ -78,7 +88,7 @@ function getCandidateModelDirs(): string[] {
     let dir = dirname(pkgMain);
     for (let depth = 0; depth < 5; depth++) {
       if (existsSync(join(dir, 'package.json'))) {
-        dirs.push(join(dir, '.cache'));
+        paths.push(join(dir, '.cache', 'nomic-ai', 'nomic-embed-text-v1.5'));
         break;
       }
       dir = dirname(dir);
@@ -87,7 +97,7 @@ function getCandidateModelDirs(): string[] {
     // @huggingface/transformers not installed or not resolvable — skip
   }
 
-  return dirs;
+  return paths;
 }
 
 /**
@@ -104,20 +114,16 @@ function getCandidateModelDirs(): string[] {
  * @returns true if model directory exists in any known cache location
  */
 export function isModelAvailable(): boolean {
-  return getCandidateModelDirs().some((dir) => existsSync(join(dir, MODEL_FILENAME)));
+  return getCandidateModelPaths().some(existsSync);
 }
 
 /**
- * Return the cache directory where the model is currently stored,
- * or the default HuggingFace Hub path if not found anywhere.
+ * Return the full path to the model directory where it is currently stored,
+ * or the default HuggingFace Hub model path if not found anywhere.
  *
  * Used by CLI commands that need to display the model path to users.
  */
 export function getModelCacheDir(): string {
-  for (const dir of getCandidateModelDirs()) {
-    if (existsSync(join(dir, MODEL_FILENAME))) {
-      return dir;
-    }
-  }
-  return DEFAULT_MODEL_DIR;
+  const found = getCandidateModelPaths().find(existsSync);
+  return found ?? join(DEFAULT_MODEL_DIR, MODEL_FILENAME);
 }

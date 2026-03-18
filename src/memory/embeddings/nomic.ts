@@ -57,15 +57,19 @@ export async function getEmbedding(): Promise<EmbeddingContext> {
         dtype: 'q8',
       }) as FeatureExtractionPipeline;
 
+      // Capture at construction time so ctx.dispose() can reach the pipeline
+      // even after unloadEmbeddingResources() has nulled the module-level variable.
+      const capturedPipeline = pipelineInstance;
+
       const ctx: EmbeddingContext = {
         async embed(text: string): Promise<Float32Array> {
-          const output = await pipelineInstance!(text, { pooling: 'mean', normalize: true });
+          const output = await capturedPipeline!(text, { pooling: 'mean', normalize: true });
           return new Float32Array(output.data as Float32Array);
         },
         async dispose(): Promise<void> {
-          if (pipelineInstance?.dispose) {
+          if (capturedPipeline?.dispose) {
             try {
-              await pipelineInstance.dispose();
+              await capturedPipeline.dispose();
             } catch {
               // Swallow — best-effort cleanup
             }

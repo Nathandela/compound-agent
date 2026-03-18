@@ -6,6 +6,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import type { Command } from 'commander';
 
@@ -161,8 +162,13 @@ function checkSqliteHealth(): DoctorCheck {
 async function checkOnnxRuntime(): Promise<DoctorCheck> {
   try {
     // onnxruntime-node is a transitive dep via @huggingface/transformers.
-    // No separate @types package — use string cast to bypass TS module resolution.
-    await import('onnxruntime-node' as string);
+    // Under pnpm strict mode it is not top-level-resolvable from this package,
+    // even when embeddings work correctly through Transformers.js. We must resolve
+    // it through its owner to match the actual module resolution path.
+    const _require = createRequire(import.meta.url);
+    const transformersMain = _require.resolve('@huggingface/transformers');
+    const tfRequire = createRequire(transformersMain);
+    tfRequire('onnxruntime-node');
     return { name: 'ONNX Runtime (onnxruntime-node)', status: 'pass' };
   } catch {
     return {

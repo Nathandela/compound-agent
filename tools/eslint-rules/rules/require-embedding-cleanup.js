@@ -12,7 +12,7 @@
  * (containing 'embeddings/').
  */
 
-/** Functions that load native memory (~400MB) */
+/** Functions that load native memory (~23MB) */
 const EMBEDDING_FUNCTIONS = new Set([
   'embedText',
   'embedTexts',
@@ -40,7 +40,7 @@ const rule = {
     },
     messages: {
       missingCleanup:
-        'Embedding memory leak: This file imports {{functionName}} which loads ~400MB of native memory, ' +
+        'Embedding memory leak: This file imports {{functionName}} which loads ~23MB of native memory, ' +
         'but does not import a cleanup function. Wrap embedding usage in withEmbedding() to guarantee cleanup. ' +
         'Example: await withEmbedding(async () => { const v = await embedText("..."); }). ' +
         'See: src/memory/embeddings/nomic.ts',
