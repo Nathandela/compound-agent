@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { createLesson } from '../test-utils.js';
+import { createLesson } from '../test-utils-pure.js';
 import { buildSimilarityMatrix, clusterBySimilarity } from './clustering.js';
 
 describe('buildSimilarityMatrix', () => {

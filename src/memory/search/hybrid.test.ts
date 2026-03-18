@@ -5,7 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import * as fc from 'fast-check';
 
-import { createQuickLesson } from '../../test-utils.js';
+import { createQuickLesson } from '../../test-utils-pure.js';
 import type { ScoredLesson } from './vector.js';
 
 import {

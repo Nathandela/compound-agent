@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-import { createFullLesson, createPattern, createPreference, createQuickLesson, createSolution } from '../../test-utils.js';
+import { createFullLesson, createPattern, createPreference, createQuickLesson, createSolution } from '../../test-utils-pure.js';
 
 import { appendLesson, appendMemoryItem, LESSONS_PATH, readLessons, readMemoryItems } from './jsonl.js';
 import type { ReadLessonsResult, ReadMemoryItemsResult } from './jsonl.js';

@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
-import { createLesson, createQuickLesson, createFullLesson, daysAgo } from './test-utils.js';
+import { createLesson, createQuickLesson, createFullLesson, daysAgo } from './test-utils-pure.js';
 
 describe('test-utils', () => {
   describe('createLesson', () => {

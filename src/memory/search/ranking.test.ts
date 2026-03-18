@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { fc, test } from '@fast-check/vitest';
 
-import { createFullLesson, createPattern, createPreference, createQuickLesson, createSolution, daysAgo } from '../../test-utils.js';
+import { createFullLesson, createPattern, createPreference, createQuickLesson, createSolution, daysAgo } from '../../test-utils-pure.js';
 
 import {
   calculateScore,

@@ -15,18 +15,52 @@ const integrationFiles = [
   'src/setup/setup.test.ts',
 ];
 
+// Native unit tests: require better-sqlite3 or direct storage imports.
+// These cannot run at high parallelism due to native module contention.
+// Maintained as explicit list; add new files here when they import native modules directly.
+const nativeFiles = [
+  'src/audit/checks/lessons.test.ts',
+  'src/audit/checks/patterns.test.ts',
+  'src/audit/engine.test.ts',
+  'src/compound/io.test.ts',
+  'src/memory/capture/quality.test.ts',
+  'src/memory/retrieval/plan.test.ts',
+  'src/memory/retrieval/session.test.ts',
+  'src/memory/search/prewarm.test.ts',
+  'src/memory/search/unified-search.test.ts',
+  'src/memory/search/vector.test.ts',
+  'src/memory/storage/sqlite.test.ts',
+  'src/memory/storage/sqlite/cache.test.ts',
+  'src/setup/gemini.test.ts',
+];
+
 export default defineWorkspace([
   {
     test: {
-      name: 'unit',
+      // Pure tests — no native module deps, safe for high parallelism.
+      name: 'pure',
       globals: true,
       environment: 'node',
       include: ['src/**/*.test.ts', 'tools/**/*.test.js', 'scripts/**/*.test.ts'],
-      exclude: ['src/memory/embeddings/**/*.test.ts', ...integrationFiles],
+      exclude: [...nativeFiles, 'src/memory/embeddings/**/*.test.ts', ...integrationFiles],
       pool: 'threads',
       poolOptions: {
-        // Stopgap: reduced from 4→2 to limit native module memory duplication.
-        // Revisit after E2 (Import Graph Decoupling, learning_agent-863u).
+        threads: { minThreads: 1, maxThreads: 4 },
+      },
+      isolate: true,
+    },
+    cacheDir: 'node_modules/.vitest',
+  },
+  {
+    test: {
+      // Native unit tests — require better-sqlite3 or direct storage imports,
+      // limited parallelism to avoid native module contention.
+      name: 'native',
+      globals: true,
+      environment: 'node',
+      include: nativeFiles,
+      pool: 'threads',
+      poolOptions: {
         threads: { minThreads: 1, maxThreads: 2 },
       },
       isolate: true,
