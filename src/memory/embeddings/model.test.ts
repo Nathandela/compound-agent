@@ -2,8 +2,7 @@
  * Tests for embedding model resolution.
  *
  * Note: Most tests are skipped if the model is not available.
- * To run all tests, download the model first:
- * npx node-llama-cpp pull hf:ggml-org/embeddinggemma-300M-qat-q4_0-GGUF
+ * To run all tests, download the model first: npx ca download-model
  */
 
 import { afterEach, describe, expect, it } from 'vitest';
@@ -20,26 +19,19 @@ import {
 } from './model.js';
 
 // Skip-gate uses isModelAvailable() only (fs.existsSync, zero native memory).
-// Never call isModelUsable() at module top-level — it loads ~400MB of native memory.
 const modelAvailable = isModelAvailable();
 const skipEmbedding = shouldSkipEmbeddingTests(modelAvailable);
 
 describe('embedding model resolution', () => {
   describe('MODEL_URI', () => {
-    it('points to EmbeddingGemma Q4_0 model', () => {
-      expect(MODEL_URI).toContain('embeddinggemma');
-      expect(MODEL_URI).toContain('q4_0');
-      expect(MODEL_URI).toContain('.gguf');
-    });
-
-    it('uses HuggingFace URI scheme', () => {
-      expect(MODEL_URI).toMatch(/^hf:/);
+    it('points to nomic-embed-text-v1.5 model', () => {
+      expect(MODEL_URI).toBe('nomic-ai/nomic-embed-text-v1.5');
     });
   });
 
   describe('MODEL_FILENAME', () => {
-    it('matches the expected filename', () => {
-      expect(MODEL_FILENAME).toBe('hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf');
+    it('matches HuggingFace cache directory convention', () => {
+      expect(MODEL_FILENAME).toBe('models--nomic-ai--nomic-embed-text-v1.5');
     });
   });
 
@@ -52,22 +44,15 @@ describe('embedding model resolution', () => {
 
   describe('resolveModel', () => {
     // Skip if model not available (avoid download in CI)
-    it.skipIf(skipEmbedding)('returns path to model file', async () => {
-      const path = await resolveModel({ cli: false });
-      expect(path).toContain(MODEL_FILENAME);
-      expect(path).toContain('.gguf');
+    it.skipIf(skipEmbedding)('returns model identifier', async () => {
+      const id = await resolveModel({ cli: false });
+      expect(id).toBe(MODEL_URI);
     });
 
-    it.skipIf(skipEmbedding)('returns consistent path', async () => {
-      const path1 = await resolveModel({ cli: false });
-      const path2 = await resolveModel({ cli: false });
-      expect(path1).toBe(path2);
-    });
-
-    it.skipIf(skipEmbedding)('accepts cli option to suppress progress output', async () => {
-      // cli: false suppresses download progress (delegates to node-llama-cpp)
-      const path = await resolveModel({ cli: false });
-      expect(path).toContain(MODEL_FILENAME);
+    it.skipIf(skipEmbedding)('returns consistent result', async () => {
+      const id1 = await resolveModel({ cli: false });
+      const id2 = await resolveModel({ cli: false });
+      expect(id1).toBe(id2);
     });
   });
 
@@ -83,7 +68,7 @@ describe('embedding model resolution', () => {
       expect(typeof result.usable).toBe('boolean');
     }, 15000);
 
-    it.runIf(!modelAvailable)('returns usable=false with reason when model file not present', async () => {
+    it.runIf(!modelAvailable)('returns usable=false with reason when model not present', async () => {
       const result = await isModelUsable();
       expect(result.usable).toBe(false);
       expect(result.reason).toContain('not found');

@@ -1,22 +1,22 @@
 /**
- * Embedding model resolution using node-llama-cpp's built-in resolver.
+ * Embedding model resolution using Transformers.js auto-download.
  *
- * Uses resolveModelFile for automatic download and caching.
- * Model is stored in ~/.node-llama-cpp/models/ by default.
+ * Uses @huggingface/transformers pipeline API which automatically downloads
+ * and caches ONNX models from HuggingFace Hub.
+ * Model is stored in ~/.cache/huggingface/hub/ by default.
  *
  * Lightweight metadata (MODEL_URI, MODEL_FILENAME, DEFAULT_MODEL_DIR,
- * isModelAvailable) lives in model-info.ts to avoid pulling native deps
+ * isModelAvailable) lives in model-info.ts to avoid pulling heavy deps
  * into consumers that only need an fs existence check.
  */
 
-import { join } from 'node:path';
-import { getLlama, LlamaLogLevel, resolveModelFile } from 'node-llama-cpp';
+import type { FeatureExtractionPipeline } from '@huggingface/transformers';
 
 // Re-export lightweight metadata from model-info.ts (zero native imports)
-export { DEFAULT_MODEL_DIR, isModelAvailable, MODEL_FILENAME, MODEL_URI } from './model-info.js';
+export { DEFAULT_MODEL_DIR, EMBEDDING_DIMS, EMBEDDING_MODEL_ID, isModelAvailable, MODEL_FILENAME, MODEL_URI } from './model-info.js';
 
 // Local import for use within this module (re-export doesn't bind locally)
-import { DEFAULT_MODEL_DIR, isModelAvailable, MODEL_FILENAME, MODEL_URI } from './model-info.js';
+import { isModelAvailable, MODEL_URI } from './model-info.js';
 
 /** Cached usability result (per-process) */
 let cachedUsability: UsabilityResult | null = null;
@@ -25,7 +25,7 @@ let cachedUsability: UsabilityResult | null = null;
  * Result of checking if the model is usable at runtime.
  *
  * A discriminated union where `usable` determines which fields are present:
- * - usable=true: Model can initialize and create embedding context
+ * - usable=true: Model can initialize and create embedding pipeline
  * - usable=false: Model cannot be used, with reason and actionable fix
  */
 export type UsabilityResult =
@@ -36,17 +36,11 @@ export type UsabilityResult =
  * Check if the embedding model is usable at runtime.
  *
  * Goes beyond file existence to verify the model can actually initialize:
- * 1. Checks if model file exists (fast fail)
- * 2. Attempts to load llama runtime
- * 3. Attempts to load model
- * 4. Attempts to create embedding context
- * 5. Cleans up all resources after check
+ * 1. Checks if model directory exists (fast fail)
+ * 2. Attempts to create a Transformers.js pipeline
+ * 3. Cleans up the pipeline after check
  *
- * WARNING: This function allocates ~400MB of native C++ memory for the probe.
- * NEVER call at module top-level in test files. When dispose() SIGABRTs in
- * vitest workers, that memory is permanently leaked. For test skip-gating,
- * use isModelAvailable() instead (zero native allocation). Reserve this
- * function for production code paths where runtime verification is needed.
+ * Much lighter than the old node-llama-cpp probe (~23MB vs ~400MB).
  *
  * @returns UsabilityResult with usable status and actionable error if failed
  */
@@ -56,37 +50,24 @@ export async function isModelUsable(): Promise<UsabilityResult> {
     return cachedUsability;
   }
 
-  // Fast fail if model file doesn't exist
+  // Fast fail if model directory doesn't exist
   if (!isModelAvailable()) {
     cachedUsability = {
       usable: false,
-      reason: 'Embedding model file not found',
+      reason: 'Embedding model not found in HuggingFace cache',
       action: 'Run: npx ca download-model',
     };
     return cachedUsability;
   }
 
   // Attempt runtime initialization
-  let llama = null;
-  let model = null;
-  let context = null;
+  let testPipeline: FeatureExtractionPipeline | null = null;
 
   try {
-    const modelPath = join(DEFAULT_MODEL_DIR, MODEL_FILENAME);
-
-    // Step 1: Get llama runtime
-    llama = await getLlama({
-      build: 'never',                  // Never compile from source in a deployed tool
-      progressLogs: false,             // Suppress prebuilt binary fallback warnings
-      logLevel: LlamaLogLevel.error,   // Only surface real errors from C++ backend
-      // Set NODE_LLAMA_CPP_DEBUG=true to re-enable all output for troubleshooting
-    });
-
-    // Step 2: Load model
-    model = await llama.loadModel({ modelPath });
-
-    // Step 3: Create embedding context
-    context = await model.createEmbeddingContext();
+    const { pipeline } = await import('@huggingface/transformers');
+    testPipeline = await pipeline('feature-extraction', MODEL_URI, {
+      dtype: 'q8',
+    }) as FeatureExtractionPipeline;
 
     // Success - cache and return
     cachedUsability = { usable: true };
@@ -100,15 +81,9 @@ export async function isModelUsable(): Promise<UsabilityResult> {
     };
     return cachedUsability;
   } finally {
-    // Clean up resources in reverse order
-    if (context) {
-      try { await context.dispose(); } catch { /* ignore cleanup errors */ }
-    }
-    if (model) {
-      try { await model.dispose(); } catch { /* ignore cleanup errors */ }
-    }
-    if (llama) {
-      try { await llama.dispose(); } catch { /* ignore cleanup errors */ }
+    // Clean up test pipeline
+    if (testPipeline?.dispose) {
+      try { await testPipeline.dispose(); } catch { /* ignore cleanup errors */ }
     }
   }
 }
@@ -124,22 +99,40 @@ export function clearUsabilityCache(): void {
 }
 
 /**
- * Resolve the embedding model path, downloading if necessary.
+ * Resolve the embedding model, downloading if necessary.
  *
- * Uses node-llama-cpp's resolveModelFile for automatic download with progress.
+ * Uses Transformers.js pipeline API which auto-downloads from HuggingFace Hub.
+ * The pipeline is created and immediately disposed — the model files persist
+ * in the HuggingFace cache directory.
  *
  * @param options - Optional configuration
  * @param options.cli - Show download progress in console (default: true)
- * @returns Path to the resolved model file
- *
- * @example
- * ```typescript
- * const modelPath = await resolveModel();
- * const llama = await getLlama({ build: 'never', logLevel: LlamaLogLevel.error });
- * const model = await llama.loadModel({ modelPath });
- * ```
+ * @returns The model identifier string
  */
 export async function resolveModel(options: { cli?: boolean } = {}): Promise<string> {
   const { cli = true } = options;
-  return resolveModelFile(MODEL_URI, { cli });
+
+  if (isModelAvailable()) {
+    return MODEL_URI;
+  }
+
+  // Trigger download by creating (and disposing) a pipeline
+  if (cli) {
+    console.log(`Downloading embedding model: ${MODEL_URI}...`);
+  }
+
+  const { pipeline } = await import('@huggingface/transformers');
+  const p = await pipeline('feature-extraction', MODEL_URI, {
+    dtype: 'q8',
+  }) as FeatureExtractionPipeline;
+
+  if (p.dispose) {
+    await p.dispose();
+  }
+
+  if (cli) {
+    console.log('Model downloaded successfully.');
+  }
+
+  return MODEL_URI;
 }

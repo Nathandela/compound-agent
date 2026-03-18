@@ -1,78 +1,85 @@
 /**
- * Text embedding via node-llama-cpp with EmbeddingGemma model
+ * Text embedding via Transformers.js with nomic-embed-text-v1.5 model
  *
  * **Resource lifecycle:**
- * - Model is loaded lazily on first embedding call (~400MB in memory)
- * - Once loaded, the model remains in memory until `unloadEmbedding()` is called
- * - Loading is slow (~1-3s); keeping loaded improves subsequent call performance
+ * - Model is loaded lazily on first embedding call (~23MB in memory)
+ * - Once loaded, the pipeline remains in memory until `unloadEmbedding()` is called
+ * - Loading is fast (~140ms warm cache); keeping loaded improves subsequent call performance
  *
  * **Memory usage:**
- * - Embedding model: ~400MB RAM when loaded
+ * - Embedding pipeline: ~23MB RAM when loaded (vs ~400MB with node-llama-cpp)
  * - Embeddings themselves: ~3KB per embedding (768 dimensions x 4 bytes)
  *
  * @see {@link unloadEmbedding} for releasing memory
  * @see {@link getEmbedding} for the lazy-loading mechanism
  */
 
-import type { Llama, LlamaModel } from 'node-llama-cpp';
-import { getLlama, LlamaEmbeddingContext, LlamaLogLevel } from 'node-llama-cpp';
+import type { FeatureExtractionPipeline } from '@huggingface/transformers';
 
-import { isModelAvailable, resolveModel } from './model.js';
+import { isModelAvailable } from './model-info.js';
+import { resolveModel } from './model.js';
 
-/** Singleton embedding context */
-let embeddingContext: LlamaEmbeddingContext | null = null;
+/** Opaque handle to the loaded embedding pipeline. */
+export interface EmbeddingContext {
+  /** Embed a single text. Returns a normalized 768-dim vector. */
+  embed(text: string): Promise<Float32Array>;
+  /** Release resources. Safe to call multiple times. */
+  dispose(): Promise<void>;
+}
+
+/** Singleton pipeline instance */
+let pipelineInstance: FeatureExtractionPipeline | null = null;
 /** Pending initialization promise (prevents concurrent duplicate loads) */
-let pendingInit: Promise<LlamaEmbeddingContext> | null = null;
-/** Native resource refs for proper cleanup */
-let llamaInstance: Llama | null = null;
-let modelInstance: LlamaModel | null = null;
+let pendingInit: Promise<EmbeddingContext> | null = null;
+/** Wrapped context for public API */
+let embeddingContext: EmbeddingContext | null = null;
 
 /**
- * Get the LlamaEmbeddingContext instance for generating embeddings.
+ * Get the EmbeddingContext instance for generating embeddings.
  *
  * **Lazy loading behavior:**
- * - First call loads the embedding model (~400MB) into memory
- * - Loading takes ~1-3 seconds depending on hardware
+ * - First call loads the embedding model (~23MB) into memory
+ * - Loading takes ~140ms (warm cache) or longer on first download
  * - Subsequent calls return the cached instance immediately
  * - Downloads model automatically if not present
  *
- * **Resource lifecycle:**
- * - Once loaded, model stays in memory until `unloadEmbedding()` is called
- * - For CLI commands: typically load once, use, then unload on exit
- * - For long-running processes: keep loaded for performance
- *
  * @returns The singleton embedding context
  * @throws Error if model download fails
- *
- * @example
- * ```typescript
- * // Direct usage (prefer embedText for simple cases)
- * const ctx = await getEmbedding();
- * const result = await ctx.getEmbeddingFor('some text');
- *
- * // Ensure cleanup
- * process.on('exit', () => unloadEmbedding());
- * ```
- *
- * @see {@link embedText} for simpler text-to-vector conversion
- * @see {@link unloadEmbedding} for releasing memory
  */
-export async function getEmbedding(): Promise<LlamaEmbeddingContext> {
+export async function getEmbedding(): Promise<EmbeddingContext> {
   if (embeddingContext) return embeddingContext;
   if (pendingInit) return pendingInit;
 
   pendingInit = (async () => {
     try {
-      const modelPath = await resolveModel({ cli: true });
-      llamaInstance = await getLlama({
-        build: 'never',                  // Never compile from source in a deployed tool
-        progressLogs: false,             // Suppress prebuilt binary fallback warnings
-        logLevel: LlamaLogLevel.error,   // Only surface real errors from C++ backend
-        // Set NODE_LLAMA_CPP_DEBUG=true to re-enable all output for troubleshooting
-      });
-      modelInstance = await llamaInstance.loadModel({ modelPath });
-      embeddingContext = await modelInstance.createEmbeddingContext();
-      return embeddingContext;
+      // Ensure model is downloaded
+      await resolveModel({ cli: false });
+
+      // Dynamic import to avoid pulling transformers.js at module load time
+      const { pipeline } = await import('@huggingface/transformers');
+      pipelineInstance = await pipeline('feature-extraction', 'nomic-ai/nomic-embed-text-v1.5', {
+        dtype: 'q8',
+      }) as FeatureExtractionPipeline;
+
+      const ctx: EmbeddingContext = {
+        async embed(text: string): Promise<Float32Array> {
+          const output = await pipelineInstance!(text, { pooling: 'mean', normalize: true });
+          return new Float32Array(output.data as Float64Array);
+        },
+        async dispose(): Promise<void> {
+          if (pipelineInstance?.dispose) {
+            try {
+              await pipelineInstance.dispose();
+            } catch {
+              // Swallow — best-effort cleanup
+            }
+          }
+          pipelineInstance = null;
+        },
+      };
+
+      embeddingContext = ctx;
+      return ctx;
     } catch (err) {
       pendingInit = null; // Allow retry on failure
       throw err;
@@ -85,8 +92,8 @@ export async function getEmbedding(): Promise<LlamaEmbeddingContext> {
 /**
  * Await disposal of all loaded embedding resources.
  *
- * This is intended for CLI shutdown paths that must wait for the native addon
- * to release worker threads before allowing the process to exit.
+ * With Transformers.js, cleanup is simpler than node-llama-cpp:
+ * a single pipeline.dispose() call (no 3-layer inner-to-outer chain).
  */
 export async function unloadEmbeddingResources(): Promise<void> {
   const pending = pendingInit;
@@ -98,82 +105,29 @@ export async function unloadEmbeddingResources(): Promise<void> {
     }
   }
 
-  const context = embeddingContext;
-  const model = modelInstance;
-  const llama = llamaInstance;
-
+  const ctx = embeddingContext;
   embeddingContext = null;
-  modelInstance = null;
-  llamaInstance = null;
   pendingInit = null;
 
-  // Dispose inner-to-outer: context → model → llama.
-  // Sequential disposal prevents SIGABRT from freeing the model while
-  // the context still holds a reference. Each is individually try/caught
-  // so an error in one doesn't prevent the others from being disposed.
-  if (context) {
+  if (ctx) {
+    await ctx.dispose();
+  } else if (pipelineInstance) {
+    // Partial init — pipeline created but context wrapper failed
     try {
-      await context.dispose();
+      if (pipelineInstance.dispose) {
+        await pipelineInstance.dispose();
+      }
     } catch {
-      // Swallow — still need to dispose model and llama.
+      // Swallow
     }
-  }
-  if (model) {
-    try {
-      await model.dispose();
-    } catch {
-      // Swallow — still need to dispose llama.
-    }
-  }
-  if (llama) {
-    try {
-      await llama.dispose();
-    } catch {
-      // Swallow — best-effort cleanup.
-    }
+    pipelineInstance = null;
   }
 }
 
 /**
- * Unload the embedding context to free memory (~400MB).
- *
- * **Resource lifecycle:**
- * - Disposes the underlying LlamaEmbeddingContext
- * - Releases ~400MB of RAM used by the model
- * - After unloading, subsequent embedding calls will reload the model
- *
- * **When to call:**
- * - At the end of CLI commands to ensure clean process exit
- * - In memory-constrained environments after batch processing
- * - Before process exit in graceful shutdown handlers
- * - When switching to a different model (if supported in future)
- *
- * **Best practices:**
- * - For single-operation scripts: call before exit
- * - For daemon/server processes: call in shutdown handler
- * - Not needed between embedding calls in the same process
- *
- * @example
- * ```typescript
- * // CLI command pattern
- * try {
- *   const embedding = await embedText('some text');
- *   // ... use embedding
- * } finally {
- *   unloadEmbedding();
- *   closeDb();
- * }
- *
- * // Graceful shutdown pattern
- * process.on('SIGTERM', () => {
- *   unloadEmbedding();
- *   closeDb();
- *   process.exit(0);
- * });
- * ```
+ * Unload the embedding pipeline to free memory (~23MB).
  *
  * @see {@link getEmbedding} for loading the model
- * @see {@link closeDb} for database cleanup (often used together)
  */
 export function unloadEmbedding(): void {
   void unloadEmbeddingResources();
@@ -184,9 +138,7 @@ export function unloadEmbedding(): void {
  *
  * The model loads lazily on the first embedText/embedTexts call inside
  * the callback (via the existing singleton). After the callback completes
- * or throws, all native resources (~400MB) are disposed.
- *
- * Use this instead of manually pairing embedText with unloadEmbeddingResources.
+ * or throws, all resources are disposed.
  */
 export async function withEmbedding<T>(fn: () => Promise<T>): Promise<T> {
   try {
@@ -199,57 +151,27 @@ export async function withEmbedding<T>(fn: () => Promise<T>): Promise<T> {
 /**
  * Embed a single text string into a vector.
  *
- * **Lazy loading:** First call loads the embedding model (~400MB, ~1-3s).
- * Subsequent calls use the cached model and complete in milliseconds.
+ * **Lazy loading:** First call loads the embedding model (~23MB, ~140ms).
+ * Subsequent calls use the cached pipeline and complete in ~6ms.
  *
  * @param text - The text to embed
  * @returns A 768-dimensional Float32Array vector
  * @throws Error if model download fails
- *
- * @example
- * ```typescript
- * const vector = await embedText('TypeScript error handling');
- * console.log(vector.length); // 768
- *
- * // Remember to clean up when done
- * unloadEmbedding();
- * ```
- *
- * @see {@link embedTexts} for batch embedding
- * @see {@link unloadEmbedding} for releasing memory
  */
 export async function embedText(text: string): Promise<Float32Array> {
   const ctx = await getEmbedding();
-  const result = await ctx.getEmbeddingFor(text);
-  return new Float32Array(result.vector);
+  return ctx.embed(text);
 }
 
 /**
  * Embed multiple texts into vectors.
  *
- * **Lazy loading:** First call loads the embedding model (~400MB, ~1-3s).
- * Subsequent calls use the cached model.
- *
- * **Note:** Texts are embedded sequentially (node-llama-cpp uses a mutex lock).
- * The only advantage over a manual loop is shared model initialization.
+ * Texts are embedded sequentially. The advantage over a manual loop
+ * is shared pipeline initialization.
  *
  * @param texts - Array of texts to embed
  * @returns Array of 768-dimensional vectors, same order as input
  * @throws Error if model download fails
- *
- * @example
- * ```typescript
- * const texts = ['first text', 'second text'];
- * const vectors = await embedTexts(texts);
- * console.log(vectors.length); // 2
- * console.log(vectors[0].length); // 768
- *
- * // Remember to clean up when done
- * unloadEmbedding();
- * ```
- *
- * @see {@link embedText} for single text embedding
- * @see {@link unloadEmbedding} for releasing memory
  */
 export async function embedTexts(texts: string[]): Promise<Float32Array[]> {
   if (texts.length === 0) return [];
@@ -258,8 +180,7 @@ export async function embedTexts(texts: string[]): Promise<Float32Array[]> {
   const results: Float32Array[] = [];
 
   for (const text of texts) {
-    const result = await ctx.getEmbeddingFor(text);
-    results.push(new Float32Array(result.vector));
+    results.push(await ctx.embed(text));
   }
 
   return results;

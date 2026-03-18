@@ -94,6 +94,8 @@ export type { ParseError, ReadLessonsOptions, ReadLessonsResult, ReadMemoryItems
 
 // Embeddings API
 export {
+  EMBEDDING_DIMS,
+  EMBEDDING_MODEL_ID,
   embedText,
   embedTexts,
   getEmbedding,
@@ -104,6 +106,7 @@ export {
   resolveModel,
   unloadEmbedding,
 } from './memory/embeddings/index.js';
+export type { EmbeddingContext } from './memory/embeddings/index.js';
 export type { UsabilityResult } from './memory/embeddings/index.js';
 
 // Search API (vector similarity + ranking + hybrid)

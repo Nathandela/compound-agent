@@ -97,16 +97,15 @@
     "vitest": "^2.0.0"
   },
   "dependencies": {
+    "@huggingface/transformers": "3.8.1",
     "better-sqlite3": "^11.0.0",
     "chalk": "5.6.2",
     "commander": "^12.0.0",
-    "node-llama-cpp": "^3.0.0",
     "zod": "^3.22.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "better-sqlite3",
-      "node-llama-cpp",
       "esbuild"
     ],
     "overrides": {

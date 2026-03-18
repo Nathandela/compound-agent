@@ -2,7 +2,7 @@
  * Tests for text embedding functionality.
  *
  * Note: Tests that require the model are skipped if it's not available.
- * Run `npx node-llama-cpp pull hf:ggml-org/embeddinggemma-300M-qat-q4_0-GGUF` to download.
+ * Run `npx ca download-model` to download the ONNX model.
  */
 
 import { afterAll, describe, expect, it } from 'vitest';
@@ -12,7 +12,6 @@ import { shouldSkipEmbeddingTests } from '../../test-utils.js';
 import { embedText, embedTexts, getEmbedding, isModelAvailable, unloadEmbeddingResources } from './nomic.js';
 
 // Skip-gate uses isModelAvailable() only (fs.existsSync, zero native memory).
-// Never call isModelUsable() at module top-level — it loads ~400MB of native memory.
 const skipEmbedding = shouldSkipEmbeddingTests(isModelAvailable());
 
 describe('embeddings', () => {
@@ -25,6 +24,11 @@ describe('embeddings', () => {
       const vector = await embedText('Use Polars for large files');
       expect(vector).toBeInstanceOf(Float32Array);
       expect(vector.length).toBeGreaterThan(0);
+    });
+
+    it.skipIf(skipEmbedding)('returns 768-dimensional vectors', async () => {
+      const vector = await embedText('test dimensions');
+      expect(vector.length).toBe(768);
     });
 
     it.skipIf(skipEmbedding)('returns consistent vectors for same input', async () => {
@@ -81,6 +85,12 @@ describe('embeddings', () => {
       const e1 = await getEmbedding();
       const e2 = await getEmbedding();
       expect(e1).toBe(e2);
+    });
+
+    it.skipIf(skipEmbedding)('returns an EmbeddingContext with embed and dispose', async () => {
+      const ctx = await getEmbedding();
+      expect(typeof ctx.embed).toBe('function');
+      expect(typeof ctx.dispose).toBe('function');
     });
   });
 });

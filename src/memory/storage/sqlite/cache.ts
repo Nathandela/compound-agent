@@ -5,18 +5,23 @@
 import { createHash } from 'node:crypto';
 import type { Database as DatabaseType } from 'better-sqlite3';
 
+import { EMBEDDING_MODEL_ID } from '../../embeddings/model-info.js';
 import type { CachedEmbeddingData } from './types.js';
 import { openDb } from './connection.js';
 
 /**
  * Compute content hash for a lesson's trigger and insight.
  * Used to detect content changes for embedding cache invalidation.
+ *
+ * Includes the embedding model ID so that a model change automatically
+ * invalidates all cached embeddings (defense layer 2 — model-tagged hash).
+ *
  * @param trigger - The lesson trigger text
  * @param insight - The lesson insight text
- * @returns SHA-256 hash of the combined content
+ * @returns SHA-256 hash of the combined content + model ID
  */
 export function contentHash(trigger: string, insight: string): string {
-  return createHash('sha256').update(`${trigger} ${insight}`).digest('hex');
+  return createHash('sha256').update(`${EMBEDDING_MODEL_ID}:${trigger} ${insight}`).digest('hex');
 }
 
 /**

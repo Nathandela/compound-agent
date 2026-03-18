@@ -64,7 +64,7 @@ describe('public API exports', () => {
       expect(typeof fn).toBe('function');
     }
     expect(typeof MODEL_FILENAME).toBe('string');
-    expect(MODEL_FILENAME).toContain('.gguf');
+    expect(MODEL_FILENAME).toContain('nomic');
   });
 
   it('exports all search functions', () => {

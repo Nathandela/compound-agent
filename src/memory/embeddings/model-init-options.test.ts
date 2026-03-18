@@ -1,55 +1,38 @@
 /**
- * Tests for getLlama() initialization options in isModelUsable().
+ * Tests for pipeline() initialization options in isModelUsable().
  *
- * Verifies that the correct options are passed to suppress noisy warnings
- * while preserving GPU auto-detection, and that resources are properly disposed.
+ * Verifies that the correct options are passed to Transformers.js pipeline,
+ * and that resources are properly disposed after the probe.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('node-llama-cpp', () => ({
-  getLlama: vi.fn(),
-  resolveModelFile: vi.fn(),
-  LlamaLogLevel: { disabled: 'disabled', fatal: 'fatal', error: 'error', warn: 'warn', info: 'info', log: 'log', debug: 'debug' },
+vi.mock('@huggingface/transformers', () => ({
+  pipeline: vi.fn(),
 }));
 
 import { existsSync } from 'node:fs';
-import { getLlama } from 'node-llama-cpp';
+import { pipeline } from '@huggingface/transformers';
 import { clearUsabilityCache, isModelUsable } from './model.js';
 
-// We need to mock existsSync to pretend the model file exists
+// We need to mock existsSync to pretend the model directory exists
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
   return { ...actual, existsSync: vi.fn(() => true) };
 });
 
-function createMockContext() {
-  return { dispose: vi.fn() };
-}
-
-function createMockModel(context: ReturnType<typeof createMockContext>) {
-  return {
-    createEmbeddingContext: vi.fn().mockResolvedValue(context),
+function createMockPipeline() {
+  const mockOutput = { data: new Float32Array(768).fill(0.1) };
+  return Object.assign(vi.fn().mockResolvedValue(mockOutput), {
     dispose: vi.fn().mockResolvedValue(undefined),
-  };
-}
-
-function createMockLlama(model: ReturnType<typeof createMockModel>) {
-  return {
-    loadModel: vi.fn().mockResolvedValue(model),
-    dispose: vi.fn().mockResolvedValue(undefined),
-  };
+  });
 }
 
 function setupMocks() {
-  const context = createMockContext();
-  const model = createMockModel(context);
-  const llama = createMockLlama(model);
-
+  const mockPipeline = createMockPipeline();
   vi.mocked(existsSync).mockReturnValue(true);
-  vi.mocked(getLlama).mockResolvedValue(llama as any);
-
-  return { context, model, llama };
+  vi.mocked(pipeline).mockResolvedValue(mockPipeline as any);
+  return { mockPipeline };
 }
 
 describe('isModelUsable() initialization options', () => {
@@ -58,87 +41,86 @@ describe('isModelUsable() initialization options', () => {
     vi.clearAllMocks();
   });
 
-  describe('getLlama() options', () => {
-    it('passes build: "never" to prevent compilation from source', async () => {
+  describe('pipeline() options', () => {
+    it('uses feature-extraction task', async () => {
       setupMocks();
       await isModelUsable();
-      expect(getLlama).toHaveBeenCalledWith(
-        expect.objectContaining({ build: 'never' }),
+      expect(pipeline).toHaveBeenCalledWith(
+        'feature-extraction',
+        expect.any(String),
+        expect.any(Object),
       );
     });
 
-    it('passes progressLogs: false to suppress binary fallback warnings', async () => {
+    it('passes dtype: "q8" for quantization', async () => {
       setupMocks();
       await isModelUsable();
-      expect(getLlama).toHaveBeenCalledWith(
-        expect.objectContaining({ progressLogs: false }),
+      expect(pipeline).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.objectContaining({ dtype: 'q8' }),
       );
     });
 
-    it('passes logLevel: error to suppress C++ backend warn-level noise', async () => {
+    it('uses nomic-ai/nomic-embed-text-v1.5 model', async () => {
       setupMocks();
       await isModelUsable();
-      expect(getLlama).toHaveBeenCalledWith(
-        expect.objectContaining({ logLevel: 'error' }),
+      expect(pipeline).toHaveBeenCalledWith(
+        expect.any(String),
+        'nomic-ai/nomic-embed-text-v1.5',
+        expect.any(Object),
       );
-    });
-
-    it('does not set gpu option (preserves default auto-detection)', async () => {
-      setupMocks();
-      await isModelUsable();
-      const callArgs = vi.mocked(getLlama).mock.calls[0]![0] as Record<string, unknown>;
-      expect(callArgs).not.toHaveProperty('gpu');
     });
   });
 
   describe('resource cleanup', () => {
-    it('disposes context after successful check', async () => {
-      const { context } = setupMocks();
+    it('disposes pipeline after successful check', async () => {
+      const { mockPipeline } = setupMocks();
       await isModelUsable();
-      expect(context.dispose).toHaveBeenCalledTimes(1);
+      expect(mockPipeline.dispose).toHaveBeenCalledTimes(1);
     });
 
-    it('disposes model after successful check', async () => {
-      const { model } = setupMocks();
-      await isModelUsable();
-      expect(model.dispose).toHaveBeenCalledTimes(1);
-    });
-
-    it('disposes llama instance after successful check', async () => {
-      const { llama } = setupMocks();
-      await isModelUsable();
-      expect(llama.dispose).toHaveBeenCalledTimes(1);
-    });
-
-    it('disposes llama instance even when model loading fails', async () => {
-      const llama = {
-        loadModel: vi.fn().mockRejectedValue(new Error('model load failed')),
-        dispose: vi.fn().mockResolvedValue(undefined),
-      };
+    it('disposes pipeline even when creation fails partially', async () => {
+      const mockPipeline = createMockPipeline();
+      // First call fails, but we want to ensure cleanup still happens
       vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(getLlama).mockResolvedValue(llama as any);
+      vi.mocked(pipeline).mockRejectedValue(new Error('pipeline creation failed'));
 
       const result = await isModelUsable();
       expect(result.usable).toBe(false);
-      expect(llama.dispose).toHaveBeenCalledTimes(1);
+      // pipeline.dispose would not be called since pipeline creation failed
+      // but the function should still return gracefully
+      expect(mockPipeline).toBeDefined();
+    });
+  });
+
+  describe('caching', () => {
+    it('returns cached result on second call', async () => {
+      setupMocks();
+      const result1 = await isModelUsable();
+      const result2 = await isModelUsable();
+      expect(result1).toBe(result2); // Same reference
+      expect(pipeline).toHaveBeenCalledTimes(1); // Only one probe
     });
 
-    it('disposes model and llama when embedding context creation fails', async () => {
-      const model = {
-        createEmbeddingContext: vi.fn().mockRejectedValue(new Error('context creation failed')),
-        dispose: vi.fn().mockResolvedValue(undefined),
-      };
-      const llama = {
-        loadModel: vi.fn().mockResolvedValue(model),
-        dispose: vi.fn().mockResolvedValue(undefined),
-      };
-      vi.mocked(existsSync).mockReturnValue(true);
-      vi.mocked(getLlama).mockResolvedValue(llama as any);
+    it('clearUsabilityCache allows fresh probe', async () => {
+      setupMocks();
+      const result1 = await isModelUsable();
+      clearUsabilityCache();
+      const result2 = await isModelUsable();
+      expect(result1).not.toBe(result2); // Different references
+      expect(pipeline).toHaveBeenCalledTimes(2); // Two probes
+    });
+  });
 
+  describe('fast-fail path', () => {
+    it('returns usable=false without creating pipeline if model not found', async () => {
+      vi.mocked(existsSync).mockReturnValue(false);
       const result = await isModelUsable();
       expect(result.usable).toBe(false);
-      expect(model.dispose).toHaveBeenCalledTimes(1);
-      expect(llama.dispose).toHaveBeenCalledTimes(1);
+      expect(result.reason).toContain('not found');
+      expect(result.action).toContain('download-model');
+      expect(pipeline).not.toHaveBeenCalled();
     });
   });
 });

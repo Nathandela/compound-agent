@@ -12,7 +12,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
  * Bump this when making incompatible schema changes.
  * The connection module auto-rebuilds when the DB version is older.
  */
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 /** SQL schema for lessons database with FTS5 full-text search */
 const SCHEMA_SQL = `

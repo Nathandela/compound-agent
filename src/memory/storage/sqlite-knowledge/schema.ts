@@ -11,7 +11,7 @@ import type { Database as DatabaseType } from 'better-sqlite3';
  * Schema version for the knowledge SQLite cache.
  * Bump this when making incompatible schema changes.
  */
-export const KNOWLEDGE_SCHEMA_VERSION = 2;
+export const KNOWLEDGE_SCHEMA_VERSION = 3;
 
 /** SQL schema for knowledge database with FTS5 full-text search */
 const SCHEMA_SQL = `
