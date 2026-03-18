@@ -10,7 +10,7 @@ import { Command } from 'commander';
 
 import type { MemoryItem } from '../memory/types.js';
 
-import { createQuickLesson } from '../test-utils.js';
+import { createQuickLesson } from '../test-utils-pure.js';
 
 // ---------------------------------------------------------------------------
 // Mocks

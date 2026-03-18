@@ -227,8 +227,8 @@ describe('test-utils', () => {
     });
 
     it('uses custom severity', () => {
-      const lesson = createFullLesson('F002', 'Test', 'critical');
-      expect(lesson.severity).toBe('critical');
+      const lesson = createFullLesson('F002', 'Test', 'low');
+      expect(lesson.severity).toBe('low');
     });
 
     it('uses custom evidence from options', () => {

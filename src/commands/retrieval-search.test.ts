@@ -9,7 +9,7 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import { Command } from 'commander';
 
-import { createQuickLesson } from '../test-utils.js';
+import { createQuickLesson } from '../test-utils-pure.js';
 // ---------------------------------------------------------------------------
 // Mocks
 // ---------------------------------------------------------------------------
