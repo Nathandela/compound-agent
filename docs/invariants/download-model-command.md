@@ -2,7 +2,7 @@
 
 ## CLI Command: `npx ca download-model`
 
-**Purpose**: Download the EmbeddingGemma-300M embedding model (~278MB) required for semantic search.
+**Purpose**: Download the nomic-embed-text-v1.5 embedding model (~23MB ONNX Q8) required for semantic search.
 
 **Context**: This command is referenced in `src/cli.ts` (lines 1336, 1341) when users attempt semantic search without the model present, but the command doesn't exist yet. The underlying download logic exists in `src/embeddings/model.ts` via `resolveModel()`.
 
@@ -13,9 +13,9 @@
 ```
 D1: Model path is always absolute, never relative
 D2: Model filename is always MODEL_FILENAME constant from model.ts
-D3: Model location is always ~/.node-llama-cpp/models/ (DEFAULT_MODEL_DIR)
-D4: Model file size is approximately 278MB (291,782,368 bytes ±1%)
-D5: Downloaded model file is a valid GGUF format file
+D3: Model location is always ~/.cache/huggingface/hub/models--nomic-ai--nomic-embed-text-v1.5/ (DEFAULT_MODEL_DIR)
+D4: Model file size is approximately 23MB (ONNX Q8 format)
+D5: Downloaded model files are valid ONNX format files
 ```
 
 **Rationale**:
@@ -31,7 +31,7 @@ D5: Downloaded model file is a valid GGUF format file
 **Property**: If model already exists locally, download must be skipped (idempotent)
 
 **Why**:
-- Wastes bandwidth and time (~278MB download)
+- Wastes bandwidth and time (~23MB download)
 - User frustration from repeated downloads
 - Potential partial file corruption if download interrupted
 
@@ -85,12 +85,12 @@ D5: Downloaded model file is a valid GGUF format file
 **Test Strategy**:
 - Review all console.log/console.error calls
 - Verify no tokens in progress output
-- Check node-llama-cpp resolveModelFile doesn't expose credentials
+- Check @huggingface/transformers model download doesn't expose credentials
 
 ---
 
 ### S5: No permission bypass
-**Property**: Download must fail gracefully if ~/.node-llama-cpp/models/ is not writable
+**Property**: Download must fail gracefully if ~/.cache/huggingface/hub/ is not writable
 
 **Why**:
 - Respects filesystem permissions
@@ -107,7 +107,7 @@ D5: Downloaded model file is a valid GGUF format file
 ## Liveness Properties (Must EVENTUALLY Happen)
 
 ### L1: Download completes or fails within reasonable time
-**Timeline**: p95 < 5 minutes for 278MB file on typical connection (1MB/s)
+**Timeline**: p95 < 1 minute for ~23MB file on typical connection (1MB/s)
 
 **Why**:
 - Users shouldn't wait indefinitely
@@ -115,7 +115,7 @@ D5: Downloaded model file is a valid GGUF format file
 - Hung processes are worse than clear failures
 
 **Monitoring Strategy**:
-- Verify node-llama-cpp sets reasonable timeout
+- Verify @huggingface/transformers sets reasonable timeout
 - Test with throttled network connection
 - Verify progress output shows activity
 
@@ -157,7 +157,7 @@ D5: Downloaded model file is a valid GGUF format file
 **Scenario**: Model file exists but is 0 bytes or corrupted
 **Expected**: Re-download or fail with clear error about corruption
 
-**Scenario**: ~/.node-llama-cpp/models/ directory doesn't exist
+**Scenario**: ~/.cache/huggingface/hub/ directory doesn't exist
 **Expected**: Create directory automatically, download succeeds
 
 **Scenario**: Disk full during download
@@ -178,18 +178,18 @@ D5: Downloaded model file is a valid GGUF format file
 
 ### Success (human-readable, NOT --json)
 ```
-Downloading embedding model (278MB)...
+Downloading embedding model (~23MB ONNX Q8)...
 [progress bar or percentage]
 Model downloaded successfully
-  Path: ~/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf
-  Size: 278MB
+  Path: ~/.cache/huggingface/hub/models--nomic-ai--nomic-embed-text-v1.5/
+  Model: nomic-ai/nomic-embed-text-v1.5
 ```
 
 ### Already exists (idempotent)
 ```
 Embedding model already downloaded
-  Path: ~/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf
-  Size: 278MB
+  Path: ~/.cache/huggingface/hub/models--nomic-ai--nomic-embed-text-v1.5/
+  Model: nomic-ai/nomic-embed-text-v1.5
 ```
 
 ### Failure (network error)
@@ -210,8 +210,8 @@ Embedding model already downloaded
 ```json
 {
   "success": true,
-  "path": "~/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf",
-  "size": 291782368,
+  "path": "~/.cache/huggingface/hub/models--nomic-ai--nomic-embed-text-v1.5/",
+  "model": "nomic-ai/nomic-embed-text-v1.5",
   "alreadyExisted": false
 }
 ```
@@ -220,8 +220,8 @@ Embedding model already downloaded
 ```json
 {
   "success": true,
-  "path": "~/.node-llama-cpp/models/hf_ggml-org_embeddinggemma-300M-qat-Q4_0.gguf",
-  "size": 291782368,
+  "path": "~/.cache/huggingface/hub/models--nomic-ai--nomic-embed-text-v1.5/",
+  "model": "nomic-ai/nomic-embed-text-v1.5",
   "alreadyExisted": true
 }
 ```

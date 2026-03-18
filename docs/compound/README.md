@@ -18,7 +18,7 @@ The system uses:
 
 - **JSONL storage** (`.claude/lessons/index.jsonl`) as the git-tracked source of truth
 - **SQLite + FTS5** (`.claude/.cache/lessons.sqlite`) as a rebuildable search index
-- **Semantic embeddings** (EmbeddingGemma-300M via node-llama-cpp) for vector similarity search
+- **Semantic embeddings** (nomic-embed-text-v1.5 via @huggingface/transformers) for vector similarity search
 - **Claude Code hooks** to inject memory at session start, before compaction, and on tool failures
 
 Memory items have four types: `lesson`, `solution`, `pattern`, and `preference`. Each has a trigger, an insight, tags, severity, and optional citations.
@@ -49,7 +49,7 @@ npx ca doctor
 7. Installs Claude Code hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse)
 8. For pnpm projects: auto-configures `onlyBuiltDependencies` for native addons
 
-`setup` does everything `init` does, plus downloads the EmbeddingGemma-300M model (~278MB). Use `--skip-model` to skip the download.
+`setup` does everything `init` does, plus downloads the nomic-embed-text-v1.5 model (~23MB ONNX Q8). Use `--skip-model` to skip the download.
 
 ---
 

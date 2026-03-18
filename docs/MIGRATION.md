@@ -162,7 +162,7 @@ npx ca rebuild
 ```bash
 npx ca download-model
 ```
-The model is stored in `~/.node-llama-cpp/models/` and is shared across projects.
+The model is stored in `~/.cache/huggingface/hub/models--nomic-ai--nomic-embed-text-v1.5/` and is shared across projects.
 
 ---
 

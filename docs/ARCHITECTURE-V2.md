@@ -508,7 +508,7 @@ User: /compound:compound
 | Build | tsup | Same |
 | Testing | Vitest + fast-check | Same |
 | Storage | better-sqlite3 + FTS5 | Same |
-| Embeddings | node-llama-cpp + EmbeddingGemma-300M | Same |
+| Embeddings | @huggingface/transformers + nomic-embed-text-v1.5 | Updated |
 | CLI | Commander.js | Same |
 | Schema | Zod | Same |
 | Issue tracking | Beads (bd) | Foundation layer |
@@ -538,7 +538,7 @@ npx compound-agent setup
 | Drop phase skills | `.claude/skills/compound/*.md` | Process instructions for each workflow phase |
 | Configure hooks | `.claude/settings.json` | SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse, PreToolUse, Stop hooks |
 | Create memory store | `.claude/lessons/` | JSONL + cache directory |
-| Download embedding model | `~/.node-llama-cpp/models/` | First-use only, ~278MB |
+| Download embedding model | `~/.cache/huggingface/hub/models--nomic-ai--nomic-embed-text-v1.5/` | First-use only, ~23MB ONNX Q8 |
 
 ### What the npm Package Provides
 

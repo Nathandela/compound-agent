@@ -160,7 +160,7 @@ pnpm lint      # Zero violations
 | Build | tsup |
 | Testing | Vitest + fast-check (property tests) |
 | Storage | better-sqlite3 + FTS5 |
-| Embeddings | node-llama-cpp + EmbeddingGemma-300M |
+| Embeddings | @huggingface/transformers + nomic-embed-text-v1.5 |
 | CLI | Commander.js |
 | Schema | Zod |
 

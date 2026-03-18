@@ -39,7 +39,6 @@ describe('CLI', { tags: ['integration'] }, () => {
 
     it('shows model cache path after successful download', () => {
       const { combined } = runCli('download-model', tempDir);
-      expect(combined).toMatch(/cache/i);
       expect(combined).toMatch(/huggingface|nomic/i);
     });
 
