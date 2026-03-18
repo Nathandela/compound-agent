@@ -320,7 +320,7 @@ npx ca setup --skip-model      # Skip embedding model download
 npx ca setup claude            # Install Claude Code hooks only
 npx ca setup claude --status   # Check hook status
 npx ca hooks                   # Install git hooks
-npx ca download-model          # Download embedding model (~278MB)
+npx ca download-model          # Download embedding model (~23MB)
 \`\`\`
 
 ## Reviewer commands

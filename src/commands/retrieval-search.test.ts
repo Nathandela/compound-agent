@@ -36,7 +36,7 @@ vi.mock('../memory/embeddings/model.js', () => ({
   resolveModel: vi.fn(),
   clearUsabilityCache: vi.fn(),
   MODEL_URI: 'test',
-  MODEL_FILENAME: 'test.gguf',
+  MODEL_FILENAME: 'models--test-model',
 }));
 
 vi.mock('../memory/embeddings/index.js', () => ({

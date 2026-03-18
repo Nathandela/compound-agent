@@ -930,7 +930,7 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       await writeFile(join(getTempDir(), 'package.json'), JSON.stringify({
         name: 'test-consumer',
         pnpm: {
-          onlyBuiltDependencies: ['better-sqlite3'],
+          onlyBuiltDependencies: ['some-other-native-dep'],
           overrides: { 'some-pkg': '1.0.0' },
         },
       }, null, 2) + '\n', 'utf-8');
@@ -938,7 +938,10 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       runCli('setup --skip-model');
 
       const pkg = JSON.parse(await readFile(join(getTempDir(), 'package.json'), 'utf-8'));
+      // better-sqlite3 should be added (was missing)
       expect(pkg.pnpm.onlyBuiltDependencies).toContain('better-sqlite3');
+      // Pre-existing entry should be preserved (additive merge, not replacement)
+      expect(pkg.pnpm.onlyBuiltDependencies).toContain('some-other-native-dep');
       // Should preserve existing overrides
       expect(pkg.pnpm.overrides).toEqual({ 'some-pkg': '1.0.0' });
     });

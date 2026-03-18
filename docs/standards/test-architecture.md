@@ -30,8 +30,8 @@ The remaining 385 tests cover all business logic and run in ~6 seconds.
 
 ## Known Limitations
 
-**Embedding model concurrency**: The `node-llama-cpp` native addon can crash under heavy parallel load. If you see native crashes during parallel test runs:
-- This is a known limitation of the underlying C++ library
+**Embedding model concurrency**: The `onnxruntime-node` native addon can crash under heavy parallel load. If you see native crashes during parallel test runs:
+- This is a known limitation of the underlying ONNX runtime
 - Tests pass reliably when run serially or under moderate parallelism
 - The embedding tests use `skipIf(!modelAvailable)` to gracefully skip when model isn't installed
 

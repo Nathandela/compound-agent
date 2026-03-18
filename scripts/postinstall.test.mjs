@@ -67,6 +67,24 @@ describe('patchPnpmConfig', () => {
     assert.equal(result, null);
   });
 
+  it('is a no-op for consumers upgrading from an old install that had node-llama-cpp', () => {
+    // Old compound-agent versions added both better-sqlite3 and node-llama-cpp.
+    // After upgrade, node-llama-cpp is no longer in REQUIRED_BUILD_DEPS so it
+    // should be left untouched (additive policy — never removes entries).
+    writeFileSync(join(tempDir, 'package.json'), JSON.stringify({
+      name: 'test',
+      pnpm: { onlyBuiltDependencies: ['better-sqlite3', 'node-llama-cpp'] },
+    }));
+    writeFileSync(join(tempDir, 'pnpm-lock.yaml'), '');
+    const result = patchPnpmConfig(tempDir);
+    // All required deps already present → no-op
+    assert.equal(result, null);
+    // node-llama-cpp is left in place (we never remove entries)
+    const pkg = JSON.parse(readFileSync(join(tempDir, 'package.json'), 'utf-8'));
+    assert.ok(pkg.pnpm.onlyBuiltDependencies.includes('better-sqlite3'));
+    assert.ok(pkg.pnpm.onlyBuiltDependencies.includes('node-llama-cpp'));
+  });
+
   it('adds only missing dependencies when partially configured', () => {
     writeFileSync(join(tempDir, 'package.json'), JSON.stringify({
       name: 'test',

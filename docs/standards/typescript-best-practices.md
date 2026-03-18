@@ -445,7 +445,7 @@ This project uses these patterns:
 | Testing | Vitest + fast-check |
 | Build | tsup (ESM output) |
 | Database | better-sqlite3 with FTS5 |
-| Embeddings | node-llama-cpp |
+| Embeddings | @huggingface/transformers |
 
 See [AGENTS.md](../../AGENTS.md) for project-specific conventions.
 

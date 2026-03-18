@@ -18,7 +18,7 @@ import { join } from 'node:path';
  *
  * - Params: 137M
  * - Dimensions: 768 (default)
- * - Format: ONNX (quantized to q8 at load time)
+ * - Format: ONNX Q8 (pre-quantized; downloaded from HuggingFace Hub)
  */
 export const MODEL_URI = 'nomic-ai/nomic-embed-text-v1.5';
 
