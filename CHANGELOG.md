@@ -7,6 +7,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Research-specialist shipped agent**: New general-purpose research subagent (`research-specialist.md`) shipped via `npx ca init`. Has full tool access (Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch) so it can conduct deep PhD-level research, write survey papers, run experiments, and validate claims with code. Referenced by the `get-a-phd` workflow for parallel research execution.
+- **`model-info.ts` module**: Extracted embedding model metadata (name, repo, dimensions, file) into a standalone module with zero native imports, decoupling the import graph so that CLI entry points no longer transitively load `node-llama-cpp` or `better-sqlite3` at parse time.
+- **Architect decomposition spec**: Added specification for embedding memory pressure remediation (`embedding-memory-pressure-remediation.md`).
+- **Hypothesis validation protocol**: Added to spec-dev skill — specs can now define falsifiable hypotheses with validation criteria.
+- **`cleanStaleArtifacts` and `cleanStaleGeminiArtifacts`**: New setup utilities that remove deprecated files and directories during upgrades instead of relying on hardcoded deprecation lists.
+- **LinkedIn architecture diagrams**: Integrated visual architecture diagrams into README (`docs/assets/`).
+- **Independent reviews**: Added Opus and Sonnet independent review documents for embedding memory pressure analysis.
+- **Embedding memory pressure investigation**: Added root-cause analysis, measurement data, and proposal documents in `docs/research/`.
+
+### Fixed
+
+- **Embedding memory pressure remediation**: Lazy-load native modules (node-llama-cpp, better-sqlite3) behind dynamic `import()`, reducing CLI cold-start RSS. Singleton embedding model uses explicit `dispose()`. Added RSS measurement script and integration tests for memory lifecycle.
+- **Review phase resilience**: Fixed jq stdin pipe handling, added auth health checks, and improved error isolation in loop review templates.
+- **Quality-filter-before-storage test ordering**: Resolved flaky test ordering in compound skill tests.
+- **Merged worktree review findings**: Addressed Opus/Sonnet review findings for worktree merges (loop-review-templates, stale-cleanup tests).
+- **Knowledge index integration tests**: Fixed test configuration for embedding integration tests in vitest workspace.
+
+### Changed
+
+- **Gemini adapter is now opt-in**: `installGeminiAdapter()` no longer runs automatically during setup. Users enable it explicitly via config (`externalReviewers`). Includes `uninstallGeminiAdapter()` for clean removal.
+- **Stale cleanup refactored**: Removed hardcoded deprecation lists from upgrade logic, replaced with `cleanStaleArtifacts()` pattern that declaratively defines what to remove.
+
 ## [1.8.0] - 2026-03-15
 
 ### Added
