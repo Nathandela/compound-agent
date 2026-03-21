@@ -44,6 +44,7 @@ import {
   type SqliteVerifyResult,
 } from './primitives.js';
 import { checkUserScope, type ScopeCheckResult } from './scope-check.js';
+import { resolveHookRunnerPath } from './hook-runner-resolve.js';
 import { cleanStaleArtifacts, cleanStaleGeminiArtifacts } from './stale-cleanup.js';
 import { LEGACY_ROOT_SLASH_COMMANDS } from './templates.js';
 import { AGENT_TEMPLATES, AGENT_ROLE_SKILLS, DOC_TEMPLATES, WORKFLOW_COMMANDS, PHASE_SKILLS } from './templates/index.js';
@@ -84,6 +85,7 @@ async function ensureLessonsDirectory(repoRoot: string): Promise<string> {
 
 /**
  * Configure Claude Code settings: hooks in settings.json.
+ * Resolves the hook-runner path to use direct node invocation when available.
  */
 async function configureClaudeSettings(): Promise<{ hooks: boolean }> {
   const settingsPath = getClaudeSettingsPath(false);
@@ -97,7 +99,8 @@ async function configureClaudeSettings(): Promise<{ hooks: boolean }> {
   }
 
   const hadHooks = hasAllCompoundAgentHooks(settings);
-  addAllCompoundAgentHooks(settings);
+  const hookRunnerPath = resolveHookRunnerPath();
+  addAllCompoundAgentHooks(settings, hookRunnerPath);
   await writeClaudeSettings(settingsPath, settings);
 
   return {
@@ -322,7 +325,14 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
 
   // Ensure hooks config is current
   let configUpdated = false;
-  if (!dryRun) {
+  if (dryRun) {
+    // Show what the Gemini section would do
+    if (!await isGeminiEnabled(repoRoot) && hasGeminiCompoundFiles(repoRoot)) {
+      console.log('[dry-run] Would enable Gemini adapter (existing .gemini/ files detected) and update');
+    } else if (await isGeminiEnabled(repoRoot)) {
+      console.log('[dry-run] Would update Gemini adapter files');
+    }
+  } else {
     const { hooks } = await configureClaudeSettings();
     // Migration: auto-enable if .gemini/ compound files already exist
     if (!await isGeminiEnabled(repoRoot) && hasGeminiCompoundFiles(repoRoot)) {

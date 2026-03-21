@@ -40,7 +40,12 @@ export type UsabilityResult =
  * 2. Attempts to create a Transformers.js pipeline
  * 3. Cleans up the pipeline after check
  *
- * Much lighter than the previous embedding probe (~23MB vs ~431MB).
+ * NOTE: The model file on disk is ~23MB, but the ONNX runtime inflates
+ * process RSS to ~370-460MB during pipeline initialization. Even after
+ * dispose(), this memory is never fully reclaimed within the same process.
+ * For long-lived processes (Vitest workers, watch mode), prefer
+ * probeModelUsability() from model-probe.ts which runs the probe in a
+ * subprocess whose memory is fully reclaimed by the OS on exit.
  *
  * @returns UsabilityResult with usable status and actionable error if failed
  */

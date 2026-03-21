@@ -7,39 +7,50 @@
  */
 
 import { existsSync } from 'node:fs';
+import type { Dirent } from 'node:fs';
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { Command } from 'commander';
 
 import { formatError } from '../cli-error-format.js';
 import { out } from '../commands/index.js';
 import { getRepoRoot } from '../cli-utils.js';
 import { enableGemini, disableGemini } from '../config/index.js';
-import { WORKFLOW_COMMANDS, PHASE_SKILLS, AGENT_ROLE_SKILLS } from './templates/index.js';
+import { resolveHookRunnerPath } from './hook-runner-resolve.js';
+import { WORKFLOW_COMMANDS, PHASE_SKILLS, AGENT_ROLE_SKILLS, PHASE_SKILL_REFERENCES } from './templates/index.js';
 
 // ============================================================================
 // Hook script templates
 // ============================================================================
 
-const HOOKS: Record<string, string> = {
-  'ca-prime.sh': `#!/usr/bin/env bash
+/**
+ * Build Gemini hook shell scripts, using direct node invocation when hook-runner is available.
+ */
+function buildGeminiHooks(hookRunnerPath: string | undefined): Record<string, string> {
+  const cmd = (hookName: string): string =>
+    hookRunnerPath
+      ? `node "${hookRunnerPath}" ${hookName}`
+      : `npx ca hooks run ${hookName}`;
+
+  return {
+    'ca-prime.sh': `#!/usr/bin/env bash
 input=$(cat)
 echo "$input" | npx ca prime > /dev/null 2>&1
 echo '{"decision": "allow"}'
 `,
-  'ca-user-prompt.sh': `#!/usr/bin/env bash
+    'ca-user-prompt.sh': `#!/usr/bin/env bash
 input=$(cat)
-echo "$input" | npx ca hooks run user-prompt > /dev/null 2>&1
+echo "$input" | ${cmd('user-prompt')} > /dev/null 2>&1
 echo '{"decision": "allow"}'
 `,
-  'ca-post-tool.sh': `#!/usr/bin/env bash
+    'ca-post-tool.sh': `#!/usr/bin/env bash
 input=$(cat)
-echo "$input" | npx ca hooks run post-tool-success > /dev/null 2>&1
+echo "$input" | ${cmd('post-tool-success')} > /dev/null 2>&1
 echo '{"decision": "allow"}'
 `,
-  'ca-phase-guard.sh': `#!/usr/bin/env bash
+    'ca-phase-guard.sh': `#!/usr/bin/env bash
 input=$(cat)
-echo "$input" | npx ca hooks run phase-guard > /dev/null 2>&1
+echo "$input" | ${cmd('phase-guard')} > /dev/null 2>&1
 rc=$?
 if [ $rc -ne 0 ]; then
   echo '{"decision": "deny", "reason": "Phase guard: read the phase skill before editing"}'
@@ -47,7 +58,11 @@ if [ $rc -ne 0 ]; then
 fi
 echo '{"decision": "allow"}'
 `,
-};
+  };
+}
+
+/** Static HOOKS for backward-compatible cleanup (hook file names). */
+const HOOKS = buildGeminiHooks(undefined);
 
 const SETTINGS_JSON = {
   hooks: {
@@ -94,7 +109,7 @@ async function writeOrRemoveSettings(settingsPath: string, settings: Record<stri
   if (Object.keys(settings).length > 0) {
     await writeFile(settingsPath, JSON.stringify(settings, null, 2) + '\n', 'utf8');
   } else {
-    await rm(settingsPath);
+    await rm(settingsPath, { force: true });
   }
 }
 
@@ -220,6 +235,16 @@ async function writeSkills(geminiDir: string): Promise<void> {
     await writeFile(join(skillDir, 'SKILL.md'), `---\nname: compound-${phase}\ndescription: ${description}\n---\n\n${body}\n`, 'utf8');
   }
 
+  // Install reference files alongside phase skills (e.g., spec-dev/references/spec-guide.md)
+  for (const [relPath, content] of Object.entries(PHASE_SKILL_REFERENCES)) {
+    const slashIdx = relPath.indexOf('/');
+    const phase = relPath.slice(0, slashIdx);
+    const fileRel = relPath.slice(slashIdx + 1);
+    const targetPath = join(geminiDir, 'skills', `compound-${phase}`, fileRel);
+    await mkdir(dirname(targetPath), { recursive: true });
+    await writeFile(targetPath, content, 'utf8');
+  }
+
   for (const [name, content] of Object.entries(AGENT_ROLE_SKILLS)) {
     const skillDir = join(geminiDir, 'skills', `compound-agent-${name}`);
     await mkdir(skillDir, { recursive: true });
@@ -265,7 +290,12 @@ export async function cleanGeminiCompoundFiles(repoRoot: string): Promise<string
   // Remove skills/compound-* directories
   const skillsDir = join(gemDir, 'skills');
   if (existsSync(skillsDir)) {
-    const entries = await readdir(skillsDir, { withFileTypes: true });
+    let entries: Dirent[] = [];
+    try {
+      entries = await readdir(skillsDir, { withFileTypes: true });
+    } catch {
+      // Permission denied or removed between check and read
+    }
     for (const entry of entries) {
       if (entry.isDirectory() && entry.name.startsWith('compound-')) {
         await rm(join(skillsDir, entry.name), { recursive: true, force: true });
@@ -318,7 +348,9 @@ export async function installGeminiAdapter(
   await mkdir(join(geminiDir, 'hooks'), { recursive: true });
   await mkdir(join(geminiDir, 'commands', 'compound'), { recursive: true });
 
-  for (const [filename, content] of Object.entries(HOOKS)) {
+  const hookRunnerPath = resolveHookRunnerPath();
+  const hooks = buildGeminiHooks(hookRunnerPath);
+  for (const [filename, content] of Object.entries(hooks)) {
     await writeFile(join(geminiDir, 'hooks', filename), content, { mode: 0o755 });
   }
 

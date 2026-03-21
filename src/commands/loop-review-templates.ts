@@ -118,7 +118,11 @@ print(d.get('$reviewer', ''))" 2>/dev/null || echo "")
           if [ "$HAS_JQ" = true ]; then
             local tmp
             tmp=$(cat "$sessions_file" | jq --arg k "$reviewer" --arg v "$sid" '. + {($k): $v}' 2>/dev/null)
-            [ -n "$tmp" ] && echo "$tmp" > "$sessions_file"
+            if [ -n "$tmp" ]; then
+              echo "$tmp" > "$sessions_file"
+            else
+              log "WARN: jq failed to update sessions.json for $reviewer (session ID may not persist)"
+            fi
           else
             python3 -c "
 import json
@@ -299,7 +303,7 @@ run_review_phase() {
     local all_approved=true
     for reviewer in $AVAILABLE_REVIEWERS; do
       local report="$cycle_dir/$reviewer.md"
-      if [ -s "$report" ] && grep -q "^REVIEW_APPROVED$" "$report"; then
+      if [ -s "$report" ] && tr -d '\\r' < "$report" | grep -q "^REVIEW_APPROVED$"; then
         log "$reviewer: APPROVED"
       else
         log "$reviewer: CHANGES_REQUESTED (or no report)"

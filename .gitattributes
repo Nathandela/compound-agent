@@ -1,2 +1,5 @@
 # Binary assets — prevent line-ending normalization and diff noise
 docs/assets/*.png binary
+
+# Beads issue tracking — use custom merge driver to avoid JSONL corruption
+.beads/issues.jsonl merge=beads

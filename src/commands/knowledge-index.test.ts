@@ -159,3 +159,121 @@ describe('index-docs command', () => {
     expect(allOutput).not.toContain('embedded');
   });
 });
+
+describe('index-docs conditional withEmbedding (R3)', () => {
+  it('R3.1: without --embed, indexDocs is called directly without withEmbedding', async () => {
+    const indexingModule = await import('../memory/knowledge/index.js');
+    const embeddingModule = await import('../memory/embeddings/index.js');
+
+    const indexDocsSpy = vi.spyOn(indexingModule, 'indexDocs').mockResolvedValueOnce({
+      filesIndexed: 1, filesSkipped: 0, filesErrored: 0,
+      chunksCreated: 2, chunksDeleted: 0, chunksEmbedded: 0, durationMs: 50,
+    });
+    const withEmbeddingSpy = vi.spyOn(embeddingModule, 'withEmbedding');
+
+    registerKnowledgeIndexCommand(program);
+    await program.parseAsync(['node', 'test', 'index-docs']);
+
+    expect(indexDocsSpy).toHaveBeenCalledOnce();
+    expect(withEmbeddingSpy).not.toHaveBeenCalled();
+
+    indexDocsSpy.mockRestore();
+    withEmbeddingSpy.mockRestore();
+  });
+
+  it('R3.2: with --embed, indexDocs is wrapped in withEmbedding', async () => {
+    const indexingModule = await import('../memory/knowledge/index.js');
+    const embeddingModule = await import('../memory/embeddings/index.js');
+
+    const indexDocsSpy = vi.spyOn(indexingModule, 'indexDocs').mockResolvedValueOnce({
+      filesIndexed: 1, filesSkipped: 0, filesErrored: 0,
+      chunksCreated: 2, chunksDeleted: 0, chunksEmbedded: 3, durationMs: 100,
+    });
+    const withEmbeddingSpy = vi.spyOn(embeddingModule, 'withEmbedding').mockImplementation(
+      async (fn) => fn(),
+    );
+
+    registerKnowledgeIndexCommand(program);
+    await program.parseAsync(['node', 'test', 'index-docs', '--embed']);
+
+    expect(withEmbeddingSpy).toHaveBeenCalledOnce();
+    expect(indexDocsSpy).toHaveBeenCalledOnce();
+    // Verify embed: true is passed to indexDocs
+    expect(indexDocsSpy).toHaveBeenCalledWith(expect.any(String), { force: undefined, embed: true });
+
+    indexDocsSpy.mockRestore();
+    withEmbeddingSpy.mockRestore();
+  });
+
+  it('R3.3: closeKnowledgeDb is called in finally for both paths', async () => {
+    const indexingModule = await import('../memory/knowledge/index.js');
+    const knowledgeDbModule = await import('../memory/storage/sqlite-knowledge/connection.js');
+
+    const indexDocsSpy = vi.spyOn(indexingModule, 'indexDocs').mockResolvedValueOnce({
+      filesIndexed: 0, filesSkipped: 0, filesErrored: 0,
+      chunksCreated: 0, chunksDeleted: 0, chunksEmbedded: 0, durationMs: 10,
+    });
+    const closeDbSpy = vi.spyOn(knowledgeDbModule, 'closeKnowledgeDb');
+
+    // Test without --embed
+    registerKnowledgeIndexCommand(program);
+    await program.parseAsync(['node', 'test', 'index-docs']);
+
+    expect(closeDbSpy).toHaveBeenCalled();
+    closeDbSpy.mockClear();
+
+    // Test with --embed (new program instance)
+    const program2 = new Command();
+    program2.exitOverride();
+
+    const embeddingModule = await import('../memory/embeddings/index.js');
+    vi.spyOn(embeddingModule, 'withEmbedding').mockImplementation(async (fn) => fn());
+    indexDocsSpy.mockResolvedValueOnce({
+      filesIndexed: 0, filesSkipped: 0, filesErrored: 0,
+      chunksCreated: 0, chunksDeleted: 0, chunksEmbedded: 0, durationMs: 10,
+    });
+
+    registerKnowledgeIndexCommand(program2);
+    await program2.parseAsync(['node', 'test', 'index-docs', '--embed']);
+
+    expect(closeDbSpy).toHaveBeenCalled();
+
+    indexDocsSpy.mockRestore();
+    closeDbSpy.mockRestore();
+  });
+
+  it('R3.1+: without --embed, withEmbedding is not called at all', async () => {
+    const indexingModule = await import('../memory/knowledge/index.js');
+    const embeddingModule = await import('../memory/embeddings/index.js');
+
+    vi.spyOn(indexingModule, 'indexDocs').mockResolvedValueOnce({
+      filesIndexed: 1, filesSkipped: 0, filesErrored: 0,
+      chunksCreated: 1, chunksDeleted: 0, chunksEmbedded: 0, durationMs: 20,
+    });
+    const withEmbeddingSpy = vi.spyOn(embeddingModule, 'withEmbedding');
+
+    registerKnowledgeIndexCommand(program);
+    await program.parseAsync(['node', 'test', 'index-docs']);
+
+    // withEmbedding should NOT have been called — no ONNX overhead
+    expect(withEmbeddingSpy).not.toHaveBeenCalled();
+
+    vi.restoreAllMocks();
+  });
+
+  it('R3.1: without --embed, embed option is passed as false to indexDocs', async () => {
+    const indexingModule = await import('../memory/knowledge/index.js');
+
+    const indexDocsSpy = vi.spyOn(indexingModule, 'indexDocs').mockResolvedValueOnce({
+      filesIndexed: 0, filesSkipped: 0, filesErrored: 0,
+      chunksCreated: 0, chunksDeleted: 0, chunksEmbedded: 0, durationMs: 10,
+    });
+
+    registerKnowledgeIndexCommand(program);
+    await program.parseAsync(['node', 'test', 'index-docs']);
+
+    expect(indexDocsSpy).toHaveBeenCalledWith(expect.any(String), { force: undefined, embed: false });
+
+    indexDocsSpy.mockRestore();
+  });
+});

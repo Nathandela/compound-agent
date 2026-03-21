@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Replace node-llama-cpp with Transformers.js**: Swap EmbeddingGemma-300M (node-llama-cpp, 431MB RSS) for nomic-embed-text-v1.5 (@huggingface/transformers, 23MB RSS) — 95% memory reduction (E5b).
 - **Remove all node-llama-cpp residue**: Update setup templates, doctor diagnostics, comments, and vitest config to reference Transformers.js and onnxruntime-node instead of node-llama-cpp (E5c).
+- **Gemini adapter is now opt-in**: `installGeminiAdapter()` no longer runs automatically during setup. Users enable it explicitly via `npx ca setup gemini` (sets `gemini: true` in `compound-agent.json`). Use `npx ca setup gemini --disable` / `cleanGeminiCompoundFiles()` for clean removal.
+- **Stale cleanup refactored**: Removed hardcoded deprecation lists from upgrade logic, replaced with `cleanStaleArtifacts()` pattern that declaratively defines what to remove.
 
 ### Added
 
@@ -33,10 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Merged worktree review findings**: Addressed Opus/Sonnet review findings for worktree merges (loop-review-templates, stale-cleanup tests).
 - **Knowledge index integration tests**: Fixed test configuration for embedding integration tests in vitest workspace.
 
-### Changed
-
-- **Gemini adapter is now opt-in**: `installGeminiAdapter()` no longer runs automatically during setup. Users enable it explicitly via config (`externalReviewers`). Includes `uninstallGeminiAdapter()` for clean removal.
-- **Stale cleanup refactored**: Removed hardcoded deprecation lists from upgrade logic, replaced with `cleanStaleArtifacts()` pattern that declaratively defines what to remove.
 
 ## [1.8.0] - 2026-03-15
 

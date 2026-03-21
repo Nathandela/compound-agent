@@ -26,10 +26,9 @@ export function registerKnowledgeIndexCommand(program: Command): void {
       out.info('Indexing docs/ directory...');
 
       try {
-        const result = await withEmbedding(async () => indexDocs(repoRoot, {
-          force: options.force,
-          embed: options.embed,
-        }));
+        const result = options.embed
+          ? await withEmbedding(async () => indexDocs(repoRoot, { force: options.force, embed: true }))
+          : await indexDocs(repoRoot, { force: options.force, embed: false });
 
         const skippedPart = result.filesSkipped > 0
           ? ` (${result.filesSkipped} skipped)`

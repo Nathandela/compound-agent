@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import { setupCliTestContext } from '../test-utils.js';
-import { WORKFLOW_COMMANDS, PHASE_SKILLS, AGENT_ROLE_SKILLS } from './templates/index.js';
+import { WORKFLOW_COMMANDS, PHASE_SKILLS, AGENT_ROLE_SKILLS, PHASE_SKILL_REFERENCES } from './templates/index.js';
 
 describe('Gemini adapter', { tags: ['integration'] }, () => {
   const { getTempDir, runCli } = setupCliTestContext();
@@ -228,6 +228,27 @@ describe('Gemini adapter', { tags: ['integration'] }, () => {
         const fmCount = (content.match(/^---$/gm) ?? []).length;
         expect(fmCount, `compound-agent-${name} should have exactly 2 --- delimiters`).toBe(2);
       }
+    });
+
+    it('installs phase skill reference files alongside SKILL.md', () => {
+      setupGemini();
+      for (const relPath of Object.keys(PHASE_SKILL_REFERENCES)) {
+        // relPath like "spec-dev/references/spec-guide.md"
+        const slashIdx = relPath.indexOf('/');
+        const phase = relPath.slice(0, slashIdx);
+        const fileRel = relPath.slice(slashIdx + 1);
+        const refPath = join(geminiDir(), 'skills', `compound-${phase}`, fileRel);
+        expect(existsSync(refPath), `Expected reference file at ${refPath}`).toBe(true);
+      }
+    });
+
+    it('spec-dev reference file contains EARS content', async () => {
+      setupGemini();
+      const specGuide = PHASE_SKILL_REFERENCES['spec-dev/references/spec-guide.md'];
+      if (!specGuide) return; // Skip if key doesn't exist
+      const refPath = join(geminiDir(), 'skills', 'compound-spec-dev', 'references', 'spec-guide.md');
+      const content = await readFile(refPath, 'utf8');
+      expect(content).toContain('EARS');
     });
 
     it('skill files inline the source content (no @path file injection)', async () => {

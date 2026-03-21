@@ -2,13 +2,15 @@
  * Text embedding via Transformers.js with nomic-embed-text-v1.5 model
  *
  * **Resource lifecycle:**
- * - Model is loaded lazily on first embedding call (~23MB in memory)
+ * - Model is loaded lazily on first embedding call
  * - Once loaded, the pipeline remains in memory until `unloadEmbedding()` is called
  * - Loading is fast (~140ms warm cache); keeping loaded improves subsequent call performance
  *
  * **Memory usage:**
- * - Embedding pipeline: ~23MB RAM when loaded (95% reduction from previous implementation)
+ * - Model file on disk: ~23MB
+ * - ONNX runtime RSS when loaded: ~370-460MB (the runtime inflates well beyond the model file size)
  * - Embeddings themselves: ~3KB per embedding (768 dimensions x 4 bytes)
+ * - After dispose(), RSS is NOT fully reclaimed within the same process
  *
  * @see {@link unloadEmbedding} for releasing memory
  * @see {@link getEmbedding} for the lazy-loading mechanism
@@ -37,7 +39,7 @@ let embeddingContext: EmbeddingContext | null = null;
  * Get the EmbeddingContext instance for generating embeddings.
  *
  * **Lazy loading behavior:**
- * - First call loads the embedding model (~23MB) into memory
+ * - First call loads the embedding model (~370-460MB RSS) into memory
  * - Loading takes ~140ms (warm cache) or longer on first download
  * - Subsequent calls return the cached instance immediately
  * - Downloads model automatically if not present
@@ -132,7 +134,7 @@ export async function unloadEmbeddingResources(): Promise<void> {
 }
 
 /**
- * Unload the embedding pipeline to free memory (~23MB).
+ * Unload the embedding pipeline to free memory (~370-460MB RSS).
  *
  * @see {@link getEmbedding} for loading the model
  * @deprecated Prefer {@link unloadEmbeddingResources} (async). This synchronous
@@ -163,7 +165,7 @@ export async function withEmbedding<T>(fn: () => Promise<T>): Promise<T> {
 /**
  * Embed a single text string into a vector.
  *
- * **Lazy loading:** First call loads the embedding model (~23MB, ~140ms).
+ * **Lazy loading:** First call loads the embedding model (~370-460MB RSS, ~140ms).
  * Subsequent calls use the cached pipeline and complete in ~6ms.
  *
  * @param text - The text to embed

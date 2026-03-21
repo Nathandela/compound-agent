@@ -9,6 +9,7 @@ import type { Command } from 'commander';
 
 import { formatError } from '../cli-error-format.js';
 import { getRepoRoot } from '../cli-utils.js';
+import { readStdin } from '../read-stdin.js';
 import { processUserPrompt } from './hooks-user-prompt.js';
 import { processToolFailure, processToolSuccess } from './hooks-failure-tracker.js';
 import { processPhaseGuard } from './hooks-phase-guard.js';
@@ -255,34 +256,6 @@ export async function installPostCommitHook(repoRoot: string): Promise<HookInsta
   chmodSync(hookPath, HOOK_FILE_MODE);
 
   return { status: 'installed' };
-}
-
-/** Stdin read timeout for hooks (30 seconds). */
-const HOOK_STDIN_TIMEOUT_MS = 30_000;
-
-/**
- * Read stdin as a string with timeout protection.
- */
-async function readStdin(): Promise<string> {
-  const chunks: Buffer[] = [];
-  let timerId: ReturnType<typeof setTimeout> | undefined;
-
-  const timeout = new Promise<never>((_, reject) => {
-    timerId = setTimeout(() => reject(new Error('stdin read timed out')), HOOK_STDIN_TIMEOUT_MS);
-  });
-
-  const read = (async () => {
-    for await (const chunk of process.stdin) {
-      chunks.push(chunk as Buffer);
-    }
-    return Buffer.concat(chunks).toString('utf-8');
-  })();
-
-  try {
-    return await Promise.race([read, timeout]);
-  } finally {
-    clearTimeout(timerId);
-  }
 }
 
 /**

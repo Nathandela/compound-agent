@@ -37,28 +37,24 @@ export async function cleanStaleArtifacts(repoRoot: string, dryRun: boolean): Pr
   await cleanDir(repoRoot, ['.claude', 'commands', 'compound'], removed, dryRun, {
     filter: (name) => name.endsWith('.md'),
     isStale: (name) => !(name in WORKFLOW_COMMANDS),
-    recursive: false,
   });
 
   // 2. Agents: .claude/agents/compound/ — only .md files
   await cleanDir(repoRoot, ['.claude', 'agents', 'compound'], removed, dryRun, {
     filter: (name) => name.endsWith('.md'),
     isStale: (name) => !(name in AGENT_TEMPLATES),
-    recursive: false,
   });
 
   // 3. Skills (phase): .claude/skills/compound/ — directories only, skip 'agents'
   await cleanDir(repoRoot, ['.claude', 'skills', 'compound'], removed, dryRun, {
     filter: (_name, isDir) => isDir,
     isStale: (name) => name !== 'agents' && !(name in PHASE_SKILLS),
-    recursive: true,
   });
 
   // 4. Skills (agent-role): .claude/skills/compound/agents/ — directories only
   await cleanDir(repoRoot, ['.claude', 'skills', 'compound', 'agents'], removed, dryRun, {
     filter: (_name, isDir) => isDir,
     isStale: (name) => !(name in AGENT_ROLE_SKILLS),
-    recursive: true,
   });
 
   // 5. Docs: docs/compound/ — fully managed directory. Only research/ is user-owned.
@@ -69,7 +65,6 @@ export async function cleanStaleArtifacts(repoRoot: string, dryRun: boolean): Pr
       if (isDir && name === 'research') return false;
       return !(name in DOC_TEMPLATES);
     },
-    recursive: true,
   });
 
   return removed;
@@ -96,7 +91,6 @@ export async function cleanStaleGeminiArtifacts(repoRoot: string, dryRun: boolea
   await cleanDir(repoRoot, ['.gemini', 'commands', 'compound'], removed, dryRun, {
     filter: (name) => name.endsWith('.toml'),
     isStale: (name) => !validCommandStems.has(name.replace(/\.toml$/, '')),
-    recursive: false,
   });
 
   // 2. Skills: .gemini/skills/ — only compound-* directories
@@ -112,7 +106,6 @@ export async function cleanStaleGeminiArtifacts(repoRoot: string, dryRun: boolea
       const phase = name.slice('compound-'.length);
       return !(phase in PHASE_SKILLS);
     },
-    recursive: true,
   });
 
   return removed;
@@ -127,8 +120,6 @@ interface CleanOptions {
   filter: (name: string, isDir: boolean) => boolean;
   /** Return true if the entry should be removed. */
   isStale: (name: string, isDir: boolean) => boolean;
-  /** Unused -- rm always uses recursive:true for safety. Kept for caller documentation. */
-  recursive: boolean;
 }
 
 async function cleanDir(

@@ -90,6 +90,8 @@ export const CLAUDE_HOOK_MARKERS = [
   'ca hooks run post-read',
   'ca hooks run phase-audit',
   'ca index-docs',
+  // hook-runner direct invocation pattern (v1.3+)
+  'hook-runner.js',
 ];
 
 /** Claude Code SessionStart hook configuration (v0.2.4: uses prime for trust language) */

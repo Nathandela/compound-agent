@@ -15,6 +15,7 @@ import type { MemoryItem } from '../memory/index.js';
 import { CANDIDATE_MULTIPLIER, MIN_HYBRID_SCORE, mergeHybridResults, rankLessons, searchVector } from '../memory/search/index.js';
 
 import { formatError } from '../cli-error-format.js';
+import { readStdin } from '../read-stdin.js';
 
 import {
   AGE_FLAG_THRESHOLD_DAYS,
@@ -48,45 +49,19 @@ function parseLimitOrNull(rawLimit: string, optionName: string, commandName: str
 // Check-Plan Command Helpers
 // ============================================================================
 
-/** Max stdin size for check-plan (1MB). */
-const MAX_STDIN_BYTES = 1_048_576;
-/** Stdin read timeout (30 seconds). */
-const STDIN_TIMEOUT_MS = 30_000;
-
 /**
  * Read plan text from stdin (non-TTY mode).
- * Enforces a size limit and timeout to prevent hangs in CI/CD.
+ * Uses shared readStdin with proper stream cleanup to avoid zombie processes.
  */
 async function readPlanFromStdin(): Promise<string | undefined> {
   const { stdin } = await import('node:process');
   if (!stdin.isTTY) {
-    const chunks: Buffer[] = [];
-    let totalBytes = 0;
-
-    let timerId: ReturnType<typeof setTimeout> | undefined;
-    const timeout = new Promise<never>((_, reject) => {
-      timerId = setTimeout(() => reject(new Error('stdin read timed out after 30s')), STDIN_TIMEOUT_MS);
-    });
-
-    const read = (async (): Promise<string> => {
-      for await (const chunk of stdin) {
-        const buf = chunk as Buffer;
-        totalBytes += buf.length;
-        if (totalBytes > MAX_STDIN_BYTES) {
-          throw new Error(`stdin exceeds ${MAX_STDIN_BYTES} byte limit`);
-        }
-        chunks.push(buf);
-      }
-      return Buffer.concat(chunks).toString('utf-8').trim();
-    })();
-
     try {
-      return await Promise.race([read, timeout]);
+      const text = await readStdin();
+      return text.trim() || undefined;
     } catch (err) {
       console.error(`Warning: ${err instanceof Error ? err.message : String(err)}`);
       return undefined;
-    } finally {
-      clearTimeout(timerId);
     }
   }
   return undefined;

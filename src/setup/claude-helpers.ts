@@ -25,6 +25,7 @@ import {
   CLAUDE_REF_START_MARKER,
   CLAUDE_USER_PROMPT_HOOK_CONFIG,
 } from './templates.js';
+import { makeHookCommand, resolveHookRunnerPath } from './hook-runner-resolve.js';
 import type { ClaudeHooksResult } from './types.js';
 
 /**
@@ -87,26 +88,50 @@ export function hasAllCompoundAgentHooks(settings: Record<string, unknown>): boo
   return (
     hasHookTypeAny(hooks.SessionStart ?? [], ['ca prime']) &&
     hasHookTypeAny(hooks.PreCompact ?? [], ['ca prime']) &&
-    hasHookTypeAny(hooks.UserPromptSubmit ?? [], ['ca hooks run user-prompt']) &&
-    hasHookTypeAny(hooks.PostToolUseFailure ?? [], ['ca hooks run post-tool-failure']) &&
-    hasHookTypeAny(hooks.PostToolUse ?? [], ['ca hooks run post-tool-success']) &&
-    hasHookTypeAny(hooks.PostToolUse ?? [], ['ca hooks run post-read', 'ca hooks run read-tracker']) &&
-    hasHookTypeAny(hooks.PreToolUse ?? [], ['ca hooks run phase-guard']) &&
-    hasHookTypeAny(hooks.Stop ?? [], ['ca hooks run phase-audit', 'ca hooks run stop-audit'])
+    hasHookTypeAny(hooks.UserPromptSubmit ?? [], ['ca hooks run user-prompt', 'hook-runner.js" user-prompt']) &&
+    hasHookTypeAny(hooks.PostToolUseFailure ?? [], ['ca hooks run post-tool-failure', 'hook-runner.js" post-tool-failure']) &&
+    hasHookTypeAny(hooks.PostToolUse ?? [], ['ca hooks run post-tool-success', 'hook-runner.js" post-tool-success']) &&
+    hasHookTypeAny(hooks.PostToolUse ?? [], ['ca hooks run post-read', 'ca hooks run read-tracker', 'hook-runner.js" post-read']) &&
+    hasHookTypeAny(hooks.PreToolUse ?? [], ['ca hooks run phase-guard', 'hook-runner.js" phase-guard']) &&
+    hasHookTypeAny(hooks.Stop ?? [], ['ca hooks run phase-audit', 'ca hooks run stop-audit', 'hook-runner.js" phase-audit'])
   );
+}
+
+/**
+ * Build a hook config entry for a given hook, using hook-runner when available.
+ */
+function buildHookEntry(
+  hookRunnerPath: string | undefined,
+  hookName: string,
+  matcher: string,
+): { matcher: string; hooks: Array<{ type: string; command: string }> } {
+  return {
+    matcher,
+    hooks: [{
+      type: 'command',
+      command: makeHookCommand(hookRunnerPath, hookName),
+    }],
+  };
 }
 
 /**
  * Add all hooks managed by compound-agent.
  * Note: PreCommit is handled by git hooks, not Claude Code hooks.
+ *
+ * @param settings - Claude Code settings object to modify in-place
+ * @param hookRunnerPath - Optional resolved path to dist/hook-runner.js.
+ *   When provided, hooks use `node <path>` instead of `npx ca hooks run`.
  */
-export function addAllCompoundAgentHooks(settings: Record<string, unknown>): void {
+export function addAllCompoundAgentHooks(
+  settings: Record<string, unknown>,
+  hookRunnerPath?: string,
+): void {
   if (!settings.hooks) {
     settings.hooks = {};
   }
   const hooks = settings.hooks as Record<string, unknown[]>;
 
-  // SessionStart - prime context
+  // SessionStart - prime context (still uses npx ca prime, not hook-runner)
   if (!hooks.SessionStart) {
     hooks.SessionStart = [];
   }
@@ -114,7 +139,7 @@ export function addAllCompoundAgentHooks(settings: Record<string, unknown>): voi
     hooks.SessionStart.push(CLAUDE_HOOK_CONFIG);
   }
 
-  // PreCompact - re-inject prime before compaction
+  // PreCompact - re-inject prime before compaction (still uses npx ca prime)
   if (!hooks.PreCompact) {
     hooks.PreCompact = [];
   }
@@ -126,45 +151,69 @@ export function addAllCompoundAgentHooks(settings: Record<string, unknown>): voi
   if (!hooks.UserPromptSubmit) {
     hooks.UserPromptSubmit = [];
   }
-  if (!hasHookTypeAny(hooks.UserPromptSubmit, ['ca hooks run user-prompt'])) {
-    hooks.UserPromptSubmit.push(CLAUDE_USER_PROMPT_HOOK_CONFIG);
+  if (!hasHookTypeAny(hooks.UserPromptSubmit, ['ca hooks run user-prompt', 'hook-runner.js" user-prompt'])) {
+    hooks.UserPromptSubmit.push(
+      hookRunnerPath
+        ? buildHookEntry(hookRunnerPath, 'user-prompt', '')
+        : CLAUDE_USER_PROMPT_HOOK_CONFIG,
+    );
   }
 
   // PostToolUseFailure - smart failure detection
   if (!hooks.PostToolUseFailure) {
     hooks.PostToolUseFailure = [];
   }
-  if (!hasHookTypeAny(hooks.PostToolUseFailure, ['ca hooks run post-tool-failure'])) {
-    hooks.PostToolUseFailure.push(CLAUDE_POST_TOOL_FAILURE_HOOK_CONFIG);
+  if (!hasHookTypeAny(hooks.PostToolUseFailure, ['ca hooks run post-tool-failure', 'hook-runner.js" post-tool-failure'])) {
+    hooks.PostToolUseFailure.push(
+      hookRunnerPath
+        ? buildHookEntry(hookRunnerPath, 'post-tool-failure', 'Bash|Edit|Write')
+        : CLAUDE_POST_TOOL_FAILURE_HOOK_CONFIG,
+    );
   }
 
   // PostToolUse - reset failure state on success
   if (!hooks.PostToolUse) {
     hooks.PostToolUse = [];
   }
-  if (!hasHookTypeAny(hooks.PostToolUse, ['ca hooks run post-tool-success'])) {
-    hooks.PostToolUse.push(CLAUDE_POST_TOOL_SUCCESS_HOOK_CONFIG);
+  if (!hasHookTypeAny(hooks.PostToolUse, ['ca hooks run post-tool-success', 'hook-runner.js" post-tool-success'])) {
+    hooks.PostToolUse.push(
+      hookRunnerPath
+        ? buildHookEntry(hookRunnerPath, 'post-tool-success', 'Bash|Edit|Write')
+        : CLAUDE_POST_TOOL_SUCCESS_HOOK_CONFIG,
+    );
   }
 
   // PostToolUse - read tracker (tracks skill file reads)
-  if (!hasHookTypeAny(hooks.PostToolUse, ['ca hooks run post-read', 'ca hooks run read-tracker'])) {
-    hooks.PostToolUse.push(CLAUDE_POST_READ_HOOK_CONFIG);
+  if (!hasHookTypeAny(hooks.PostToolUse, ['ca hooks run post-read', 'ca hooks run read-tracker', 'hook-runner.js" post-read'])) {
+    hooks.PostToolUse.push(
+      hookRunnerPath
+        ? buildHookEntry(hookRunnerPath, 'post-read', 'Read')
+        : CLAUDE_POST_READ_HOOK_CONFIG,
+    );
   }
 
   // PreToolUse - phase guard (warns before Edit/Write without skill read)
   if (!hooks.PreToolUse) {
     hooks.PreToolUse = [];
   }
-  if (!hasHookTypeAny(hooks.PreToolUse, ['ca hooks run phase-guard'])) {
-    hooks.PreToolUse.push(CLAUDE_PHASE_GUARD_HOOK_CONFIG);
+  if (!hasHookTypeAny(hooks.PreToolUse, ['ca hooks run phase-guard', 'hook-runner.js" phase-guard'])) {
+    hooks.PreToolUse.push(
+      hookRunnerPath
+        ? buildHookEntry(hookRunnerPath, 'phase-guard', 'Edit|Write')
+        : CLAUDE_PHASE_GUARD_HOOK_CONFIG,
+    );
   }
 
   // Stop - audit hook (blocks stop when phase gate not passed)
   if (!hooks.Stop) {
     hooks.Stop = [];
   }
-  if (!hasHookTypeAny(hooks.Stop, ['ca hooks run phase-audit', 'ca hooks run stop-audit'])) {
-    hooks.Stop.push(CLAUDE_PHASE_AUDIT_HOOK_CONFIG);
+  if (!hasHookTypeAny(hooks.Stop, ['ca hooks run phase-audit', 'ca hooks run stop-audit', 'hook-runner.js" phase-audit'])) {
+    hooks.Stop.push(
+      hookRunnerPath
+        ? buildHookEntry(hookRunnerPath, 'phase-audit', '')
+        : CLAUDE_PHASE_AUDIT_HOOK_CONFIG,
+    );
   }
 
   // Note: remind-capture functionality is handled by git pre-commit hooks
@@ -247,7 +296,8 @@ export async function installClaudeHooksForInit(repoRoot: string): Promise<Claud
   }
 
   try {
-    addAllCompoundAgentHooks(settings);
+    const hookRunnerPath = resolveHookRunnerPath();
+    addAllCompoundAgentHooks(settings, hookRunnerPath);
     await writeClaudeSettings(settingsPath, settings);
     return { installed: true, action: 'installed' };
   } catch (err) {

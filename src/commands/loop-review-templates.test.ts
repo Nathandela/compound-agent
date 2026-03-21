@@ -304,6 +304,12 @@ describe('session ID python3 fallback', () => {
     expect(output).toContain('python3');
   });
 
+  it('logs WARN when jq fails to update sessions.json', () => {
+    const output = buildSessionIdManagement();
+    // Must have a warning branch for jq failure so missing session IDs are debuggable
+    expect(output).toMatch(/WARN.*jq|jq.*WARN/i);
+  });
+
   it('buildSpawnReviewers includes python3 fallback for reading session IDs', () => {
     const output = buildSpawnReviewers();
     expect(output).toContain('python3');
@@ -380,6 +386,12 @@ describe('anchored approval detection', () => {
   it('uses anchored grep for REVIEW_APPROVED in review loop', () => {
     const output = buildReviewLoop();
     expect(output).toMatch(/grep.*\^REVIEW_APPROVED/);
+  });
+
+  it('strips carriage returns before REVIEW_APPROVED check (Windows CLI compat)', () => {
+    const output = buildReviewLoop();
+    // Must strip \r so REVIEW_APPROVED\r doesn't fail the check
+    expect(output).toMatch(/tr\s+-d\s+'\\r'/);
   });
 });
 
