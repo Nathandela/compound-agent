@@ -142,28 +142,22 @@ export function buildReviewPrompt(): string {
   return `
 build_review_prompt() {
   local diff_range="\${1:-HEAD~1..HEAD}"
-  local diff_content
-  diff_content=$(git diff "$diff_range" 2>/dev/null || echo "(no diff)")
-  if [ -z "$diff_content" ]; then diff_content="(empty diff)"; fi
   local beads_context
   beads_context=$(bd list --status=closed --limit=20 2>/dev/null || echo "(no beads)")
-  # Write prompt to temp file to avoid heredoc expansion of reviewer/diff content
-  local prompt_file
-  prompt_file=$(mktemp)
-  cat > "$prompt_file" <<'REVIEW_PROMPT_HEADER'
-You are reviewing code changes made by an autonomous agent loop.
+  local commit_log
+  commit_log=$(git log --oneline "$diff_range" 2>/dev/null | head -20 || echo "(no commits)")
 
-## Completed Beads
-REVIEW_PROMPT_HEADER
-  echo "$beads_context" >> "$prompt_file"
-  cat >> "$prompt_file" <<'REVIEW_PROMPT_MID'
+  # Use printf + quoted heredoc to avoid command injection from commit messages
+  printf '%s\\n' "You are reviewing code changes made by an autonomous agent loop."
+  printf '\\n## Recently Completed Epics/Tasks\\n'
+  echo "$beads_context"
+  printf '\\n## Commits in scope\\n'
+  echo "$commit_log"
+  cat <<'REVIEW_PROMPT'
 
-## Git Diff
-\`\`\`diff
-REVIEW_PROMPT_MID
-  echo "$diff_content" >> "$prompt_file"
-  cat >> "$prompt_file" <<'REVIEW_PROMPT_FOOTER'
-\`\`\`
+## Your job
+Review the code that was changed by those commits. Use git, read files, and
+explore the codebase yourself to understand what was done.
 
 Review for: correctness, security, edge cases, code quality.
 Provide a numbered list of findings with severity (P0/P1/P2/P3).
@@ -171,9 +165,7 @@ Be concise, actionable, no praise.
 
 If everything looks good: output REVIEW_APPROVED on its own line.
 If changes needed: output REVIEW_CHANGES_REQUESTED then your findings.
-REVIEW_PROMPT_FOOTER
-  cat "$prompt_file"
-  rm -f "$prompt_file"
+REVIEW_PROMPT
 }
 `;
 }
@@ -196,42 +188,51 @@ spawn_reviewers() {
   local cycle="$1" cycle_dir="$2"
   local prompt
   prompt=$(build_review_prompt "$REVIEW_DIFF_RANGE")
+
+  # Write prompt to file -- avoids shell arg-length limits for large diffs
+  local prompt_file="$cycle_dir/review-prompt.txt"
+  echo "$prompt" > "$prompt_file"
+
+  local follow_up="Review the latest fixes. If all issues are resolved, output REVIEW_APPROVED alone on its own line. Otherwise output REVIEW_CHANGES_REQUESTED on its own line followed by your findings."
+
   local pids=""
   for reviewer in $AVAILABLE_REVIEWERS; do
     local report="$cycle_dir/$reviewer.md"
     case "$reviewer" in
       (claude-sonnet|claude-opus)
         local model_name
-        if [ "$reviewer" = "claude-sonnet" ]; then model_name="claude-sonnet-4-6[1m]"
+        if [ "$reviewer" = "claude-sonnet" ]; then model_name="claude-sonnet-4-6"
         else model_name="claude-opus-4-6[1m]"; fi
         local sid=""
         sid=$(read_session_id "$reviewer" "$REVIEW_DIR/sessions.json")
         if [ "$cycle" -eq 1 ]; then
-          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" --output-format text \
-                  --session-id "$sid" -p "$prompt" > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \\
+            --output-format text --session-id "$sid" \\
+            -p "$(cat "$prompt_file")" > "$report" 2>&1 || true) &
         else
-          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" --output-format text \
-                  --resume "$sid" \
-                  -p "Review the latest fixes. If all issues are resolved, output REVIEW_APPROVED alone on its own line. Otherwise output REVIEW_CHANGES_REQUESTED on its own line followed by your findings." \
-                  > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \\
+            --output-format text --resume "$sid" \\
+            -p "$follow_up" > "$report" 2>&1 || true) &
         fi
         pids="$pids $!"
         ;;
       (gemini)
         if [ "$cycle" -eq 1 ]; then
-          (portable_timeout "$REVIEW_TIMEOUT" gemini -p "$prompt" -y > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" gemini \\
+            -p "$(cat "$prompt_file")" --yolo > "$report" 2>&1 || true) &
         else
-          (portable_timeout "$REVIEW_TIMEOUT" gemini --resume latest \
-                  -p "Review the latest fixes. If all issues are resolved, output REVIEW_APPROVED alone on its own line. Otherwise output REVIEW_CHANGES_REQUESTED on its own line followed by your findings." \
-                  > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" gemini --resume latest \\
+            -p "$follow_up" --yolo > "$report" 2>&1 || true) &
         fi
         pids="$pids $!"
         ;;
       (codex)
         if [ "$cycle" -eq 1 ]; then
-          (portable_timeout "$REVIEW_TIMEOUT" codex exec "$prompt" > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" codex exec --full-auto \\
+            - < "$prompt_file" > "$report" 2>&1 || true) &
         else
-          (portable_timeout "$REVIEW_TIMEOUT" codex exec resume --last > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" codex exec resume --last \\
+            "$follow_up" > "$report" 2>&1 || true) &
         fi
         pids="$pids $!"
         ;;
@@ -308,14 +309,16 @@ run_review_phase() {
     log "WARN: REVIEW_DIFF_RANGE not set, using HEAD~1..HEAD"
     REVIEW_DIFF_RANGE="HEAD~1..HEAD"
   fi
-  local diff_output
-  diff_output=$(git diff "$REVIEW_DIFF_RANGE" 2>/dev/null || echo "")
-  if [ -z "$diff_output" ]; then
-    log "Empty git diff, skipping review phase"
+  local commit_count
+  commit_count=$(git log --oneline "$REVIEW_DIFF_RANGE" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "\${commit_count:-0}" -eq 0 ]; then
+    log "No commits in range $REVIEW_DIFF_RANGE, skipping review phase"
     return 0
   fi
   detect_reviewers || return 0
   mkdir -p "$REVIEW_DIR"
+  # Reset stale session IDs from previous review runs
+  echo "{}" > "$REVIEW_DIR/sessions.json"
   local cycle=1
   while [ "$cycle" -le "$MAX_REVIEW_CYCLES" ]; do
     local cycle_dir="$REVIEW_DIR/cycle-$cycle"
@@ -347,9 +350,9 @@ run_review_phase() {
         reviewers_with_findings=$((reviewers_with_findings + 1))
         # Summarize findings for visibility
         local p0_count p1_count
-        p0_count=$(grep -c "P0" "$report" 2>/dev/null || echo 0)
-        p1_count=$(grep -c "P1" "$report" 2>/dev/null || echo 0)
-        if [ "$p0_count" -gt 0 ] || [ "$p1_count" -gt 0 ]; then
+        p0_count=$(grep -co "P0" "$report" 2>/dev/null | awk '{s+=$1} END{print s+0}')
+        p1_count=$(grep -co "P1" "$report" 2>/dev/null | awk '{s+=$1} END{print s+0}')
+        if [ "\${p0_count:-0}" -gt 0 ] || [ "\${p1_count:-0}" -gt 0 ]; then
           log "  -> \${p0_count} P0, \${p1_count} P1 findings"
         fi
       fi

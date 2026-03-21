@@ -181,8 +181,8 @@ describe('buildReviewPrompt', () => {
     expect(buildReviewPrompt()).toContain('REVIEW_CHANGES_REQUESTED');
   });
 
-  it('includes git diff in prompt', () => {
-    expect(buildReviewPrompt()).toContain('git diff');
+  it('includes commit log in prompt', () => {
+    expect(buildReviewPrompt()).toContain('git log --oneline');
   });
 });
 
@@ -281,8 +281,8 @@ describe('buildReviewLoop', () => {
     expect(buildReviewLoop()).toContain('REVIEW_APPROVED');
   });
 
-  it('handles empty diff by skipping review', () => {
-    expect(buildReviewLoop()).toContain('git diff');
+  it('handles no commits by skipping review', () => {
+    expect(buildReviewLoop()).toContain('git log --oneline');
   });
 
   it('respects REVIEW_BLOCKING for exit behavior', () => {

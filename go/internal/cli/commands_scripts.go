@@ -306,8 +306,52 @@ func generateLoopScript(maxRetries int, model, epicIDs string) string {
 	fmt.Fprintf(&b, "set -euo pipefail\n\n")
 	escapedModel := util.ShellEscape(model)
 	escapedEpicIDs := util.ShellEscape(epicIDs)
-	fmt.Fprintf(&b, "# Config\nMAX_RETRIES=%d\nMODEL=%s\nEPIC_IDS=%s\nLOG_DIR=\"agent_logs\"\n\n", maxRetries, escapedModel, escapedEpicIDs)
+	fmt.Fprintf(&b, "# Config\nMAX_RETRIES=%d\nMODEL=%s\nEPIC_IDS=%s\nLOG_DIR=\"agent_logs\"\nMIN_FREE_MEMORY_PCT=${MIN_FREE_MEMORY_PCT:-20}\n\n", maxRetries, escapedModel, escapedEpicIDs)
 	fmt.Fprintf(&b, "mkdir -p \"$LOG_DIR\"\n\n")
+
+	// Memory safety
+	b.WriteString(`# --- Memory Safety ---
+cleanup_orphans() {
+  local killed=0
+  for pid in $(pgrep -f "vitest" 2>/dev/null || true); do
+    kill "$pid" 2>/dev/null && killed=$((killed + 1))
+  done
+  for pid in $(pgrep -f "node.*\.test\." 2>/dev/null || true); do
+    kill "$pid" 2>/dev/null && killed=$((killed + 1))
+  done
+  if [ "$killed" -gt 0 ]; then
+    echo "[loop] Cleaned up $killed orphan test processes"
+    sleep 2
+  fi
+}
+
+check_memory() {
+  local free_pct
+  if [ "$(uname)" = "Darwin" ]; then
+    free_pct=$(memory_pressure 2>/dev/null | awk -F: '/free percentage/ {gsub(/%| /,"",$2); print $2}')
+    if [ -z "$free_pct" ]; then return 0; fi
+    if [ "$free_pct" -lt "$MIN_FREE_MEMORY_PCT" ]; then
+      echo "[loop] WARN: System memory ${free_pct}% free (minimum: ${MIN_FREE_MEMORY_PCT}%)"
+      return 1
+    fi
+  else
+    local mem_total mem_available
+    mem_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    mem_available=$(awk '/MemAvailable/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    if [ "$mem_total" -gt 0 ]; then
+      free_pct=$(( mem_available * 100 / mem_total ))
+    else
+      return 0
+    fi
+    if [ "$free_pct" -lt "$MIN_FREE_MEMORY_PCT" ]; then
+      echo "[loop] WARN: System memory ${free_pct}% free (minimum: ${MIN_FREE_MEMORY_PCT}%)"
+      return 1
+    fi
+  fi
+  return 0
+}
+
+`)
 
 	// Epic selector
 	b.WriteString(`# --- Epic Selector ---
@@ -333,6 +377,11 @@ get_next_epic() {
 	fmt.Fprintf(&b, "## Step 3: On completion\n1. Close the epic: %sbd close $epic_id%s\n2. Commit and push all changes\n3. Output this marker on its own line:\n\nEPIC_COMPLETE\n\n", bt, bt)
 	fmt.Fprintf(&b, "## Step 4: On failure\n1. Add a note: %sbd update $epic_id --notes \"Loop failed: <reason>\"%s\n2. Output this marker:\n\nEPIC_FAILED\n\n", bt, bt)
 	fmt.Fprintf(&b, "## Step 5: On human required\nHUMAN_REQUIRED: <reason>\n\n")
+	fmt.Fprintf(&b, "## Memory Safety Rules\n")
+	fmt.Fprintf(&b, "- NEVER run %spnpm test%s (full suite) -- it peaks at 900MB+ and leaks memory.\n", bt, bt)
+	fmt.Fprintf(&b, "- For TypeScript regression checks, use %spnpm test:unit%s (skips embedding + integration).\n", bt, bt)
+	fmt.Fprintf(&b, "- For Go work, use %sgo test ./...%s in the go/ directory.\n", bt, bt)
+	fmt.Fprintf(&b, "- NEVER run embedding tests unless the epic modifies embedding code.\n\n")
 	fmt.Fprintf(&b, "## Rules\n- Do NOT ask questions. Make reasonable decisions.\n- Do NOT stop early. Complete the full workflow.\n- If tests fail, fix them. Retry up to 3 times.\n- Commit incrementally.\n")
 	fmt.Fprintf(&b, "PROMPT_EOF\n}\n\n")
 
@@ -372,6 +421,12 @@ PROCESSED=""
 echo "[loop] Starting infinity loop"
 
 while true; do
+  cleanup_orphans
+  if ! check_memory; then
+    echo "[loop] FATAL: Memory pressure too high, stopping loop"
+    break
+  fi
+
   EPIC_ID=$(get_next_epic)
   [ -z "$EPIC_ID" ] && break
 
@@ -423,6 +478,7 @@ while true; do
         echo "[loop] $EPIC_ID: failed (attempt $((attempt+1)))"
         if [ "$attempt" -lt "$MAX_RETRIES" ]; then
           echo "[loop] Retrying in 5s..."
+          cleanup_orphans
           sleep 5
         fi
         ;;

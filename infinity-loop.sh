@@ -486,14 +486,13 @@ build_review_prompt() {
   local commit_log
   commit_log=$(git log --oneline "$diff_range" 2>/dev/null | head -20 || echo "(no commits)")
 
-  cat <<REVIEW_PROMPT
-You are reviewing code changes made by an autonomous agent loop.
-
-## Recently Completed Epics/Tasks
-$beads_context
-
-## Commits in scope
-$commit_log
+  # Use printf + quoted heredoc to avoid command injection from commit messages
+  printf '%s\n' "You are reviewing code changes made by an autonomous agent loop."
+  printf '\n## Recently Completed Epics/Tasks\n'
+  echo "$beads_context"
+  printf '\n## Commits in scope\n'
+  echo "$commit_log"
+  cat <<'REVIEW_PROMPT'
 
 ## Your job
 Review the code that was changed by those commits. Use git, read files, and

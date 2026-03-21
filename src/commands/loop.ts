@@ -15,6 +15,7 @@ import {
   buildEpicSelector,
   buildMainLoop,
   buildMarkerDetection,
+  buildMemorySafety,
   buildObservability,
   buildPromptFunction,
   buildStreamExtractor,
@@ -195,6 +196,7 @@ export function generateLoopScript(options: LoopScriptOptions): string {
   const hasReview = options.reviewers && options.reviewers.length > 0;
 
   let script = buildScriptHeader(timestamp, options.maxRetries, options.model, epicIds)
+    + buildMemorySafety()
     + buildStreamExtractor()
     + buildMarkerDetection()
     + buildObservability();

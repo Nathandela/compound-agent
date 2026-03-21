@@ -5,6 +5,61 @@
  * Separated from loop.ts to stay within max-lines.
  */
 
+export function buildMemorySafety(): string {
+  return `
+# Memory safety config
+MIN_FREE_MEMORY_PCT=\${MIN_FREE_MEMORY_PCT:-20}
+
+# cleanup_orphans() - Kill leftover node/vitest processes between sessions
+# Prevents memory accumulation from zombie test processes
+cleanup_orphans() {
+  local killed=0
+  for pid in $(pgrep -f "vitest" 2>/dev/null || true); do
+    kill "$pid" 2>/dev/null && killed=$((killed + 1))
+  done
+  for pid in $(pgrep -f "node.*\\.test\\." 2>/dev/null || true); do
+    kill "$pid" 2>/dev/null && killed=$((killed + 1))
+  done
+  if [ "$killed" -gt 0 ]; then
+    log "Cleaned up $killed orphan test processes"
+    sleep 2
+  fi
+}
+
+# check_memory() - Abort if system free memory is too low
+# Returns 0 if OK, 1 if memory pressure detected
+check_memory() {
+  local free_pct
+  if [ "$(uname)" = "Darwin" ]; then
+    free_pct=$(memory_pressure 2>/dev/null | awk -F: '/free percentage/ {gsub(/%| /,"",$2); print $2}')
+    if [ -z "$free_pct" ]; then
+      return 0
+    fi
+    if [ "$free_pct" -lt "$MIN_FREE_MEMORY_PCT" ]; then
+      log "WARN: System memory \${free_pct}% free (minimum: \${MIN_FREE_MEMORY_PCT}%)"
+      return 1
+    fi
+    log "Memory OK: \${free_pct}% free"
+  else
+    local mem_total mem_available
+    mem_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    mem_available=$(awk '/MemAvailable/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    if [ "$mem_total" -gt 0 ]; then
+      free_pct=$(( mem_available * 100 / mem_total ))
+    else
+      return 0
+    fi
+    if [ "$free_pct" -lt "$MIN_FREE_MEMORY_PCT" ]; then
+      log "WARN: System memory \${free_pct}% free (minimum: \${MIN_FREE_MEMORY_PCT}%)"
+      return 1
+    fi
+    log "Memory OK: \${free_pct}% free"
+  fi
+  return 0
+}
+`;
+}
+
 export function buildDependencyCheck(): string {
   return `
 # check_deps_closed() - Verify all depends_on for an epic are closed
@@ -149,6 +204,13 @@ external service setup, design decisions you cannot make, etc.):
 HUMAN_REQUIRED: <reason>
 
 Example: HUMAN_REQUIRED: Need AWS credentials configured in .env
+
+## Memory Safety Rules
+- NEVER run \\\`pnpm test\\\` (full suite) -- it peaks at 900MB+ and leaks memory.
+- For TypeScript regression checks, use \\\`pnpm test:unit\\\` (skips embedding + integration).
+- For Go work, use \\\`go test ./...\\\` in the go/ directory.
+- NEVER run embedding tests (\\\`pnpm test:fast\\\`, \\\`pnpm test:all\\\`) unless the epic modifies embedding code.
+- Between test runs, wait for all vitest/node child processes to exit before starting another.
 
 ## Rules
 - Do NOT ask questions -- there is no human. Make reasonable decisions.
@@ -361,6 +423,14 @@ log "Config: max_retries=$MAX_RETRIES model=$MODEL"
 [ -n "$EPIC_IDS" ] && log "Targeting epics: $EPIC_IDS" || log "Targeting: all ready epics"
 
 while true; do
+  cleanup_orphans
+  if ! check_memory; then
+    log "FATAL: Memory pressure too high, stopping loop to prevent system freeze"
+    log "  Hint: set MIN_FREE_MEMORY_PCT (current: \${MIN_FREE_MEMORY_PCT}%) or kill background processes"
+    FAILED=$((FAILED + 1))
+    break
+  fi
+
   EPIC_ID=$(get_next_epic) || break
 
   log "=========================================="
@@ -395,6 +465,7 @@ while true; do
 
     if [ $ATTEMPT -le $MAX_RETRIES ]; then
       log "Retrying $EPIC_ID..."
+      cleanup_orphans
       sleep 5
     fi
   done
