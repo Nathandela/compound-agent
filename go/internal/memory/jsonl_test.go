@@ -1,0 +1,253 @@
+package memory
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func setupTestDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	// Create .claude/lessons/ directory
+	if err := os.MkdirAll(filepath.Join(dir, ".claude", "lessons"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+func makeTestItem(id string, typ MemoryItemType) MemoryItem {
+	return MemoryItem{
+		ID: id, Type: typ,
+		Trigger: "test trigger", Insight: "test insight",
+		Tags: []string{"tag1"}, Source: SourceManual,
+		Context:    Context{Tool: "bash", Intent: "test"},
+		Created:    "2026-01-01T00:00:00Z",
+		Confirmed:  true,
+		Supersedes: []string{},
+		Related:    []string{},
+	}
+}
+
+func TestAppendMemoryItem_CreatesDir(t *testing.T) {
+	dir := t.TempDir() // No .claude/lessons/ yet
+	item := makeTestItem("L001", TypeLesson)
+
+	if err := AppendMemoryItem(dir, item); err != nil {
+		t.Fatalf("AppendMemoryItem: %v", err)
+	}
+
+	// File should exist
+	path := filepath.Join(dir, LessonsPath)
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected file at %s: %v", path, err)
+	}
+}
+
+func TestAppendAndReadRoundTrip(t *testing.T) {
+	dir := setupTestDir(t)
+	item := makeTestItem("L001", TypeLesson)
+
+	if err := AppendMemoryItem(dir, item); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := ReadMemoryItems(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(result.Items) != 1 {
+		t.Fatalf("got %d items, want 1", len(result.Items))
+	}
+	if result.Items[0].ID != "L001" {
+		t.Errorf("ID = %q, want L001", result.Items[0].ID)
+	}
+	if result.SkippedCount != 0 {
+		t.Errorf("skipped = %d, want 0", result.SkippedCount)
+	}
+}
+
+func TestReadMemoryItems_EmptyFile(t *testing.T) {
+	dir := setupTestDir(t)
+
+	result, err := ReadMemoryItems(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Items) != 0 {
+		t.Errorf("got %d items, want 0", len(result.Items))
+	}
+}
+
+func TestReadMemoryItems_FileNotExists(t *testing.T) {
+	dir := t.TempDir()
+
+	result, err := ReadMemoryItems(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Items) != 0 {
+		t.Errorf("got %d items, want 0", len(result.Items))
+	}
+}
+
+func TestReadMemoryItems_LastWriteWins(t *testing.T) {
+	dir := setupTestDir(t)
+	item1 := makeTestItem("L001", TypeLesson)
+	item1.Insight = "first version"
+
+	item2 := makeTestItem("L001", TypeLesson)
+	item2.Insight = "second version"
+
+	AppendMemoryItem(dir, item1)
+	AppendMemoryItem(dir, item2)
+
+	result, _ := ReadMemoryItems(dir)
+	if len(result.Items) != 1 {
+		t.Fatalf("got %d items, want 1 (dedup)", len(result.Items))
+	}
+	if result.Items[0].Insight != "second version" {
+		t.Errorf("insight = %q, want 'second version'", result.Items[0].Insight)
+	}
+}
+
+func TestReadMemoryItems_Tombstone(t *testing.T) {
+	dir := setupTestDir(t)
+	path := filepath.Join(dir, LessonsPath)
+
+	item := makeTestItem("L001", TypeLesson)
+	AppendMemoryItem(dir, item)
+
+	// Append a tombstone (canonical format: {id, deleted, deletedAt})
+	tombstone := `{"id":"L001","deleted":true,"deletedAt":"2026-03-21T00:00:00Z"}` + "\n"
+	f, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	f.WriteString(tombstone)
+	f.Close()
+
+	result, _ := ReadMemoryItems(dir)
+	if len(result.Items) != 0 {
+		t.Fatalf("got %d items, want 0 (deleted)", len(result.Items))
+	}
+	if !result.DeletedIDs["L001"] {
+		t.Error("expected L001 in deleted IDs")
+	}
+}
+
+func TestReadMemoryItems_LegacyTypeConversion(t *testing.T) {
+	dir := setupTestDir(t)
+	path := filepath.Join(dir, LessonsPath)
+
+	// Write a legacy "quick" type record
+	legacy := `{"id":"Lold","type":"quick","trigger":"t","insight":"i","tags":["a"],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[]}` + "\n"
+	os.WriteFile(path, []byte(legacy), 0o644)
+
+	result, _ := ReadMemoryItems(dir)
+	if len(result.Items) != 1 {
+		t.Fatalf("got %d items, want 1", len(result.Items))
+	}
+	if result.Items[0].Type != TypeLesson {
+		t.Errorf("type = %q, want %q (converted from quick)", result.Items[0].Type, TypeLesson)
+	}
+}
+
+func TestReadMemoryItems_SkipsInvalidJSON(t *testing.T) {
+	dir := setupTestDir(t)
+	path := filepath.Join(dir, LessonsPath)
+
+	content := "not json\n" + `{"id":"L001","type":"lesson","trigger":"t","insight":"i","tags":[],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[]}` + "\n"
+	os.WriteFile(path, []byte(content), 0o644)
+
+	result, _ := ReadMemoryItems(dir)
+	if len(result.Items) != 1 {
+		t.Fatalf("got %d items, want 1", len(result.Items))
+	}
+	if result.SkippedCount != 1 {
+		t.Errorf("skipped = %d, want 1", result.SkippedCount)
+	}
+}
+
+func TestReadMemoryItems_MultipleTypes(t *testing.T) {
+	dir := setupTestDir(t)
+
+	items := []MemoryItem{
+		makeTestItem("L001", TypeLesson),
+		makeTestItem("S001", TypeSolution),
+		makeTestItem("R001", TypePreference),
+	}
+
+	pItem := makeTestItem("P001", TypePattern)
+	pItem.Pattern = &Pattern{Bad: "old", Good: "new"}
+	items = append(items, pItem)
+
+	for _, item := range items {
+		AppendMemoryItem(dir, item)
+	}
+
+	result, _ := ReadMemoryItems(dir)
+	if len(result.Items) != 4 {
+		t.Fatalf("got %d items, want 4", len(result.Items))
+	}
+}
+
+func TestReadMemoryItems_DeleteThenReAdd(t *testing.T) {
+	dir := setupTestDir(t)
+	path := filepath.Join(dir, LessonsPath)
+
+	item := makeTestItem("L001", TypeLesson)
+	AppendMemoryItem(dir, item)
+
+	// Delete it
+	tombstone := `{"id":"L001","deleted":true,"deletedAt":"2026-03-21T00:00:00Z"}` + "\n"
+	f, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	f.WriteString(tombstone)
+	f.Close()
+
+	// Re-add it
+	item.Insight = "re-added"
+	AppendMemoryItem(dir, item)
+
+	result, _ := ReadMemoryItems(dir)
+	if len(result.Items) != 1 {
+		t.Fatalf("got %d items, want 1", len(result.Items))
+	}
+	if result.Items[0].Insight != "re-added" {
+		t.Errorf("insight = %q, want 're-added'", result.Items[0].Insight)
+	}
+}
+
+func TestReadMemoryItems_LegacyTombstone_FullRecordWithDeleted(t *testing.T) {
+	dir := setupTestDir(t)
+	path := filepath.Join(dir, LessonsPath)
+
+	item := makeTestItem("L001", TypeLesson)
+	AppendMemoryItem(dir, item)
+
+	// Legacy full record with deleted:true
+	deleted := `{"id":"L001","type":"lesson","trigger":"t","insight":"i","tags":[],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[],"deleted":true,"deletedAt":"2026-03-21T00:00:00Z"}` + "\n"
+	f, _ := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0o644)
+	f.WriteString(deleted)
+	f.Close()
+
+	result, _ := ReadMemoryItems(dir)
+	if len(result.Items) != 0 {
+		t.Fatalf("got %d items, want 0 (deleted via full record)", len(result.Items))
+	}
+}
+
+func TestReadMemoryItems_FullType(t *testing.T) {
+	dir := setupTestDir(t)
+	path := filepath.Join(dir, LessonsPath)
+
+	// Legacy "full" type record
+	legacy := `{"id":"Lold","type":"full","trigger":"t","insight":"i","tags":[],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[]}` + "\n"
+	os.WriteFile(path, []byte(legacy), 0o644)
+
+	result, _ := ReadMemoryItems(dir)
+	if len(result.Items) != 1 {
+		t.Fatalf("got %d items, want 1", len(result.Items))
+	}
+	if result.Items[0].Type != TypeLesson {
+		t.Errorf("type = %q, want %q", result.Items[0].Type, TypeLesson)
+	}
+}
