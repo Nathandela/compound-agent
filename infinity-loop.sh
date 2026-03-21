@@ -9,6 +9,19 @@
 
 set -euo pipefail
 
+# Crash handler — log WHY we died and update status
+cleanup() {
+  local exit_code=$?
+  if [ $exit_code -ne 0 ]; then
+    log "CRASH: Script exited with code $exit_code"
+    log "CRASH: Last command failed at line ${BASH_LINENO[0]:-unknown}"
+    # Update status file so external watchers know we crashed
+    echo "{\"status\":\"crashed\",\"exit_code\":$exit_code,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"line\":\"${BASH_LINENO[0]:-unknown}\"}" > "${LOG_DIR:-.}/.loop-status.json" 2>/dev/null || true
+    log "CRASH: Status file updated. Check agent_logs/ for details."
+  fi
+}
+trap cleanup EXIT
+
 # Config
 MAX_RETRIES=2
 MODEL="claude-opus-4-6[1m]"
@@ -489,19 +502,11 @@ spawn_reviewers() {
 feed_implementer() {
   local cycle_dir="$1"
   local implementer_report="$cycle_dir/implementer.md"
-  local review_sections=""
-  for reviewer in $AVAILABLE_REVIEWERS; do
-    local report="$cycle_dir/$reviewer.md"
-    if [ -s "$report" ]; then
-      review_sections="$review_sections
-<$reviewer-review>
-$(cat "$report")
-</$reviewer-review>
-"
-    fi
-  done
-  local impl_prompt
-  impl_prompt=$(cat <<IMPL_PROMPT_EOF
+
+  # Build prompt file on disk to avoid heredoc expansion issues.
+  # Reviewer output may contain $vars, backticks, etc. that break heredocs.
+  local prompt_file="$cycle_dir/implementer-prompt.md"
+  cat > "$prompt_file" <<'PROMPT_HEADER'
 You received feedback from independent code reviewers. Analyze and implement all fixes.
 
 First, load your context:
@@ -509,20 +514,44 @@ First, load your context:
 npx ca load-session
 ```
 
-$review_sections
+PROMPT_HEADER
+
+  for reviewer in $AVAILABLE_REVIEWERS; do
+    local report="$cycle_dir/$reviewer.md"
+    if [ -s "$report" ]; then
+      echo "<${reviewer}-review>" >> "$prompt_file"
+      cat "$report" >> "$prompt_file"
+      echo "</${reviewer}-review>" >> "$prompt_file"
+      echo "" >> "$prompt_file"
+    fi
+  done
+
+  cat >> "$prompt_file" <<'PROMPT_FOOTER'
 
 Fix ALL P0 and P1 findings. Address P2 where reasonable. Commit fixes.
 Run tests to verify. Output FIXES_APPLIED when done.
-IMPL_PROMPT_EOF
-)
-  log "Running implementer session..."
-  portable_timeout "$REVIEW_TIMEOUT" claude --model "$REVIEW_MODEL" --output-format text          --dangerously-skip-permissions          -p "$impl_prompt" > "$implementer_report" 2>&1 || true
-  log "Implementer session complete"
+PROMPT_FOOTER
+
+  local impl_prompt
+  impl_prompt=$(cat "$prompt_file")
+
+  log "Running implementer session (prompt: $prompt_file)..."
+  local impl_start
+  impl_start=$(date +%s)
+  portable_timeout "$REVIEW_TIMEOUT" claude --model "$REVIEW_MODEL" --output-format text \
+          --dangerously-skip-permissions \
+          -p "$impl_prompt" > "$implementer_report" 2>&1 || true
+  local impl_duration=$(( $(date +%s) - impl_start ))
+  log "Implementer session complete (${impl_duration}s)"
 }
 
 run_review_phase() {
   local trigger="$1"
+  local review_start
+  review_start=$(date +%s)
+  log "=========================================="
   log "Starting review phase (trigger: $trigger)"
+  log "=========================================="
   if [ -z "${REVIEW_DIFF_RANGE:-}" ]; then
     log "WARN: REVIEW_DIFF_RANGE not set, using HEAD~1..HEAD"
     REVIEW_DIFF_RANGE="HEAD~1..HEAD"
@@ -540,20 +569,48 @@ run_review_phase() {
     local cycle_dir="$REVIEW_DIR/cycle-$cycle"
     mkdir -p "$cycle_dir"
     init_review_sessions "$cycle_dir"
-    log "Review cycle $cycle/$MAX_REVIEW_CYCLES"
+    log "Review cycle $cycle/$MAX_REVIEW_CYCLES — spawning reviewers..."
+    local spawn_start
+    spawn_start=$(date +%s)
     spawn_reviewers "$cycle" "$cycle_dir"
+    local spawn_duration=$(( $(date +%s) - spawn_start ))
+    log "Reviewers completed in ${spawn_duration}s"
     local all_approved=true
+    local reviewers_with_findings=0
+    local reviewers_errored=0
     for reviewer in $AVAILABLE_REVIEWERS; do
       local report="$cycle_dir/$reviewer.md"
-      if [ -s "$report" ] && tr -d '\r' < "$report" | grep -q "^REVIEW_APPROVED$"; then
+      if [ ! -s "$report" ]; then
+        log "$reviewer: NO OUTPUT (empty report — likely crashed or timed out)"
+        reviewers_errored=$((reviewers_errored + 1))
+      elif tr -d '\r' < "$report" | grep -q "^REVIEW_APPROVED$"; then
         log "$reviewer: APPROVED"
+      elif grep -qi "rate limit\|Rate limit\|API.*[Ee]rror\|API_KEY\|GEMINI_API_KEY\|authentication" "$report"; then
+        log "$reviewer: ERROR (API/auth issue, not a code review rejection)"
+        # Log first line of error for diagnostics
+        log "  -> $(head -1 "$report")"
+        reviewers_errored=$((reviewers_errored + 1))
       else
-        log "$reviewer: CHANGES_REQUESTED (or no report)"
+        log "$reviewer: CHANGES_REQUESTED"
         all_approved=false
+        reviewers_with_findings=$((reviewers_with_findings + 1))
+        # Summarize P0/P1 findings for visibility
+        local p0_count p1_count
+        p0_count=$(grep -c "P0" "$report" 2>/dev/null || echo 0)
+        p1_count=$(grep -c "P1" "$report" 2>/dev/null || echo 0)
+        if [ "$p0_count" -gt 0 ] || [ "$p1_count" -gt 0 ]; then
+          log "  -> ${p0_count} P0, ${p1_count} P1 findings"
+        fi
       fi
     done
+    log "Review cycle $cycle summary: approved=$(echo "$AVAILABLE_REVIEWERS" | wc -w | tr -d ' ') errored=$reviewers_errored findings=$reviewers_with_findings"
     if [ "$all_approved" = true ]; then
       log "All reviewers approved (cycle $cycle)"
+      return 0
+    fi
+    # If ALL non-approved reviewers errored (none had actual findings), skip implementer
+    if [ "$reviewers_with_findings" -eq 0 ]; then
+      log "No actual code findings — all rejections were errors. Treating as approved."
       return 0
     fi
     if [ "$cycle" -lt "$MAX_REVIEW_CYCLES" ]; then
@@ -565,11 +622,13 @@ run_review_phase() {
     fi
     cycle=$((cycle + 1))
   done
-  log "Review phase ended after $MAX_REVIEW_CYCLES cycles without full approval"
+  local review_duration=$(( $(date +%s) - review_start ))
+  log "Review phase ended after $MAX_REVIEW_CYCLES cycles without full approval (${review_duration}s)"
   if [ "$REVIEW_BLOCKING" = true ]; then
     log "FATAL: Review blocking enabled, exiting"
     exit 1
   fi
+  log "Review non-blocking: continuing to next epic"
 }
 
 # Main loop
@@ -581,14 +640,19 @@ LOOP_START=$(date +%s)
 COMPLETED_SINCE_REVIEW=0
 REVIEW_BASE_SHA=$(git rev-parse HEAD)
 
+log "=========================================="
 log "Infinity loop starting"
-log "Config: max_retries=$MAX_RETRIES model=$MODEL"
+log "=========================================="
+log "Config: max_retries=$MAX_RETRIES model=$MODEL review_every=$REVIEW_EVERY"
+log "Review: reviewers=$REVIEW_REVIEWERS blocking=$REVIEW_BLOCKING timeout=${REVIEW_TIMEOUT}s"
 [ -n "$EPIC_IDS" ] && log "Targeting epics: $EPIC_IDS" || log "Targeting: all ready epics"
 
 while true; do
   EPIC_ID=$(get_next_epic) || break
 
+  log "=========================================="
   log "Processing epic: $EPIC_ID"
+  log "=========================================="
   EPIC_START=$(date +%s)
 
   ATTEMPT=0
@@ -697,5 +761,12 @@ fi
 TOTAL_DURATION=$(( $(date +%s) - LOOP_START ))
 echo "{\"type\":\"summary\",\"completed\":$COMPLETED,\"failed\":$FAILED,\"skipped\":$SKIPPED,\"total_duration_s\":$TOTAL_DURATION}" >> "$EXEC_LOG"
 write_status "idle"
-log "Loop finished. Completed: $COMPLETED, Failed: $FAILED, Skipped: $SKIPPED"
+log "=========================================="
+log "Loop finished"
+log "  Completed: $COMPLETED"
+log "  Failed:    $FAILED"
+log "  Skipped:   $SKIPPED"
+log "  Duration:  ${TOTAL_DURATION}s ($(( TOTAL_DURATION / 60 ))m)"
+log "  Processed: $PROCESSED"
+log "=========================================="
 [ $FAILED -eq 0 ] && exit 0 || exit 1
