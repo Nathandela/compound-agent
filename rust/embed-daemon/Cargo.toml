@@ -1,0 +1,20 @@
+[package]
+name = "ca-embed-daemon"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "ca-embed"
+path = "src/main.rs"
+
+[dependencies]
+ort = "2.0.0-rc.12"
+tokenizers = "0.21"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+libc = "0.2"
+
+[profile.release]
+opt-level = 2
+lto = "thin"
+strip = true
