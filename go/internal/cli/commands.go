@@ -33,6 +33,8 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(loadSessionCmd())
 	rootCmd.AddCommand(checkPlanCmd())
 	registerCrudCommands(rootCmd)
+	registerCaptureCommands(rootCmd)
+	registerMaintenanceCommands(rootCmd)
 }
 
 // --- search command ---
