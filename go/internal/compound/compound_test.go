@@ -177,6 +177,49 @@ func TestReadCctPatterns_NonExistent(t *testing.T) {
 	}
 }
 
+func TestWriteCctPatterns_Deduplication(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude", "lessons"), 0755)
+
+	original := []CctPattern{
+		{ID: "CCT-aaa", Name: "original", Description: "first", Frequency: 2, SourceIDs: []string{"L1"}, Created: "2026-01-01T00:00:00Z"},
+		{ID: "CCT-bbb", Name: "keep", Description: "untouched", Frequency: 1, SourceIDs: []string{"L2"}, Created: "2026-01-01T00:00:00Z"},
+	}
+	if err := WriteCctPatterns(dir, original); err != nil {
+		t.Fatalf("first write failed: %v", err)
+	}
+
+	// Write again with same ID — should replace, not duplicate
+	updated := []CctPattern{
+		{ID: "CCT-aaa", Name: "updated", Description: "second", Frequency: 3, SourceIDs: []string{"L1", "L3"}, Created: "2026-01-02T00:00:00Z"},
+	}
+	if err := WriteCctPatterns(dir, updated); err != nil {
+		t.Fatalf("second write failed: %v", err)
+	}
+
+	read, err := ReadCctPatterns(dir)
+	if err != nil {
+		t.Fatalf("read failed: %v", err)
+	}
+
+	if len(read) != 2 {
+		t.Fatalf("expected 2 patterns (deduped), got %d", len(read))
+	}
+
+	// Order must be deterministic: existing order preserved
+	if read[0].ID != "CCT-aaa" || read[1].ID != "CCT-bbb" {
+		t.Errorf("expected order [CCT-aaa, CCT-bbb], got [%s, %s]", read[0].ID, read[1].ID)
+	}
+
+	// Replaced pattern has updated values
+	if read[0].Name != "updated" {
+		t.Errorf("expected name 'updated', got '%s'", read[0].Name)
+	}
+	if read[0].Frequency != 3 {
+		t.Errorf("expected frequency 3, got %d", read[0].Frequency)
+	}
+}
+
 func sevPtr(s memory.Severity) *memory.Severity {
 	return &s
 }

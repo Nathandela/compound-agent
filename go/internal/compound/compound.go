@@ -227,20 +227,53 @@ func SynthesizePattern(cluster []memory.MemoryItem, clusterID string) CctPattern
 	}
 }
 
-// WriteCctPatterns appends patterns to cct-patterns.jsonl.
+// WriteCctPatterns writes patterns to cct-patterns.jsonl, deduplicating by ID.
+// Existing patterns with the same ID are replaced by new ones.
 func WriteCctPatterns(repoRoot string, patterns []CctPattern) error {
 	filePath := filepath.Join(repoRoot, ".claude", "lessons", "cct-patterns.jsonl")
 	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 		return fmt.Errorf("create dir: %w", err)
 	}
 
-	f, err := os.OpenFile(filePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	// Read existing patterns
+	existing, err := ReadCctPatterns(repoRoot)
+	if err != nil {
+		return fmt.Errorf("read existing: %w", err)
+	}
+
+	// Merge: preserve existing order, replace by ID, append new
+	byID := make(map[string]CctPattern)
+	for _, p := range patterns {
+		byID[p.ID] = p
+	}
+
+	var merged []CctPattern
+	seen := make(map[string]bool)
+	// Existing patterns keep their order; replaced if ID matches
+	for _, p := range existing {
+		if replacement, ok := byID[p.ID]; ok {
+			merged = append(merged, replacement)
+		} else {
+			merged = append(merged, p)
+		}
+		seen[p.ID] = true
+	}
+	// Append truly new patterns in input order
+	for _, p := range patterns {
+		if !seen[p.ID] {
+			merged = append(merged, p)
+			seen[p.ID] = true
+		}
+	}
+
+	// Write all patterns (truncate)
+	f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("open file: %w", err)
 	}
 	defer f.Close()
 
-	for _, p := range patterns {
+	for _, p := range merged {
 		data, err := json.Marshal(p)
 		if err != nil {
 			return fmt.Errorf("marshal pattern: %w", err)

@@ -24,11 +24,72 @@ MAX_RETRIES=2
 MODEL="claude-opus-4-6[1m]"
 EPIC_IDS="learning_agent-us7y learning_agent-9bp2 learning_agent-d1wt learning_agent-yee7 learning_agent-9piq learning_agent-mopp learning_agent-plhp learning_agent-19uz"
 LOG_DIR="agent_logs"
+MIN_FREE_MEMORY_PCT=${MIN_FREE_MEMORY_PCT:-20}  # Stop loop if free memory drops below this %
 
 # Helpers
 timestamp() { date '+%Y-%m-%d_%H-%M-%S'; }
 log() { echo "[$(timestamp)] $*"; }
 die() { log "FATAL: $*"; exit 1; }
+
+# cleanup_orphans() - Kill leftover node/vitest processes from THIS repo between sessions
+# Prevents memory accumulation from zombie test processes
+# Scoped to current working directory to avoid killing unrelated processes
+cleanup_orphans() {
+  local killed=0
+  local repo_dir
+  repo_dir=$(pwd)
+  # Kill orphan vitest/node test workers whose cwd is inside this repo
+  for pid in $(pgrep -f "vitest|node.*\.test\." 2>/dev/null || true); do
+    local proc_cwd=""
+    if [ "$(uname)" = "Darwin" ]; then
+      proc_cwd=$(lsof -p "$pid" -Fn 2>/dev/null | grep '^ncwd' | sed 's/^n//' || true)
+    else
+      proc_cwd=$(readlink "/proc/$pid/cwd" 2>/dev/null || true)
+    fi
+    # Only kill if the process cwd is exactly this repo or a subdirectory
+    case "$proc_cwd" in
+      "$repo_dir"|"$repo_dir"/*) kill "$pid" 2>/dev/null && killed=$((killed + 1)) ;;
+    esac
+  done
+  if [ "$killed" -gt 0 ]; then
+    log "Cleaned up $killed orphan test processes"
+    sleep 2  # Let OS reclaim memory
+  fi
+}
+
+# check_memory() - Abort if system free memory is too low
+# Returns 0 if OK, 1 if memory pressure detected
+check_memory() {
+  local free_pct
+  if [ "$(uname)" = "Darwin" ]; then
+    # macOS: use memory_pressure to get real free percentage (includes purgeable/inactive)
+    free_pct=$(memory_pressure 2>/dev/null | awk -F: '/free percentage/ {gsub(/%| /,"",$2); print $2}')
+    if [ -z "$free_pct" ]; then
+      return 0  # Can't measure, assume OK
+    fi
+    if [ "$free_pct" -lt "$MIN_FREE_MEMORY_PCT" ]; then
+      log "WARN: System memory ${free_pct}% free (minimum: ${MIN_FREE_MEMORY_PCT}%)"
+      return 1
+    fi
+    log "Memory OK: ${free_pct}% free"
+  else
+    # Linux: use /proc/meminfo
+    local mem_total mem_available
+    mem_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    mem_available=$(awk '/MemAvailable/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
+    if [ "$mem_total" -gt 0 ]; then
+      free_pct=$(( mem_available * 100 / mem_total ))
+    else
+      return 0
+    fi
+    if [ "$free_pct" -lt "$MIN_FREE_MEMORY_PCT" ]; then
+      log "WARN: System memory ${free_pct}% free (minimum: ${MIN_FREE_MEMORY_PCT}%)"
+      return 1
+    fi
+    log "Memory OK: ${free_pct}% free"
+  fi
+  return 0
+}
 
 command -v claude >/dev/null || die "claude CLI required"
 command -v bd >/dev/null || die "bd (beads) CLI required"
@@ -180,16 +241,15 @@ Work through all phases: plan, work, review, compound.
 
 ## Step 3: On completion
 When all work is done and tests pass:
-1. Close the epic: `bd close $epic_id`
-2. Sync beads: `bd sync`
-3. Commit and push all changes
-4. Output this exact marker on its own line:
+1. Close the epic: \`bd close $epic_id\`
+2. Commit and push all changes
+3. Output this exact marker on its own line:
 
 EPIC_COMPLETE
 
 ## Step 4: On failure
 If you cannot complete the epic after reasonable effort:
-1. Add a note: `bd update $epic_id --notes "Loop failed: <reason>"`
+1. Add a note: \`bd update $epic_id --notes "Loop failed: <reason>"\`
 2. Output this exact marker on its own line:
 
 EPIC_FAILED
@@ -197,12 +257,19 @@ EPIC_FAILED
 ## Step 5: On human required
 If you hit a blocker that REQUIRES human action (account creation, API keys,
 external service setup, design decisions you cannot make, etc.):
-1. Add a note: `bd update $epic_id --notes "Human required: <reason>"`
+1. Add a note: \`bd update $epic_id --notes "Human required: <reason>"\`
 2. Output this exact marker followed by a short reason on the SAME line:
 
 HUMAN_REQUIRED: <reason>
 
 Example: HUMAN_REQUIRED: Need AWS credentials configured in .env
+
+## Memory Safety Rules
+- NEVER run \`pnpm test\` (full suite) -- it peaks at 900MB+ and leaks memory.
+- For TypeScript regression checks, use \`pnpm test:unit\` (skips embedding + integration).
+- For Go work, use \`go test ./...\` in the go/ directory.
+- NEVER run embedding tests (\`pnpm test:fast\`, \`pnpm test:all\`) unless the epic modifies embedding code.
+- Between test runs, wait for all vitest/node child processes to exit before starting another.
 
 ## Rules
 - Do NOT ask questions -- there is no human. Make reasonable decisions.
@@ -414,28 +481,23 @@ json.dump(d, open('$sessions_file', 'w'))" 2>/dev/null || true
 
 build_review_prompt() {
   local diff_range="${1:-HEAD~1..HEAD}"
-  local diff_content
-  diff_content=$(git diff "$diff_range" 2>/dev/null || echo "(no diff)")
-  if [ -z "$diff_content" ]; then diff_content="(empty diff)"; fi
   local beads_context
   beads_context=$(bd list --status=closed --limit=20 2>/dev/null || echo "(no beads)")
-  # Write prompt to temp file to avoid heredoc expansion of reviewer/diff content
-  local prompt_file
-  prompt_file=$(mktemp)
-  cat > "$prompt_file" <<'REVIEW_PROMPT_HEADER'
+  local commit_log
+  commit_log=$(git log --oneline "$diff_range" 2>/dev/null | head -20 || echo "(no commits)")
+
+  cat <<REVIEW_PROMPT
 You are reviewing code changes made by an autonomous agent loop.
 
-## Completed Beads
-REVIEW_PROMPT_HEADER
-  echo "$beads_context" >> "$prompt_file"
-  cat >> "$prompt_file" <<'REVIEW_PROMPT_MID'
+## Recently Completed Epics/Tasks
+$beads_context
 
-## Git Diff
-```diff
-REVIEW_PROMPT_MID
-  echo "$diff_content" >> "$prompt_file"
-  cat >> "$prompt_file" <<'REVIEW_PROMPT_FOOTER'
-```
+## Commits in scope
+$commit_log
+
+## Your job
+Review the code that was changed by those commits. Use git, read files, and
+explore the codebase yourself to understand what was done.
 
 Review for: correctness, security, edge cases, code quality.
 Provide a numbered list of findings with severity (P0/P1/P2/P3).
@@ -443,9 +505,7 @@ Be concise, actionable, no praise.
 
 If everything looks good: output REVIEW_APPROVED on its own line.
 If changes needed: output REVIEW_CHANGES_REQUESTED then your findings.
-REVIEW_PROMPT_FOOTER
-  cat "$prompt_file"
-  rm -f "$prompt_file"
+REVIEW_PROMPT
 }
 
 read_session_id() {
@@ -464,36 +524,52 @@ spawn_reviewers() {
   local cycle="$1" cycle_dir="$2"
   local prompt
   prompt=$(build_review_prompt "$REVIEW_DIFF_RANGE")
+
+  # Write prompt to temp file -- avoids shell arg-length limits for large diffs
+  local prompt_file="$cycle_dir/review-prompt.txt"
+  echo "$prompt" > "$prompt_file"
+
+  local follow_up="Review the latest fixes. If all issues are resolved, output REVIEW_APPROVED alone on its own line. Otherwise output REVIEW_CHANGES_REQUESTED on its own line followed by your findings."
+
   local pids=""
   for reviewer in $AVAILABLE_REVIEWERS; do
     local report="$cycle_dir/$reviewer.md"
     case "$reviewer" in
       (claude-sonnet|claude-opus)
         local model_name
-        if [ "$reviewer" = "claude-sonnet" ]; then model_name="claude-sonnet-4-6[1m]"
+        if [ "$reviewer" = "claude-sonnet" ]; then model_name="claude-sonnet-4-6"
         else model_name="claude-opus-4-6[1m]"; fi
         local sid=""
         sid=$(read_session_id "$reviewer" "$REVIEW_DIR/sessions.json")
         if [ "$cycle" -eq 1 ]; then
-          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" --output-format text                   --session-id "$sid" -p "$prompt" > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
+            --output-format text --session-id "$sid" \
+            -p "$(cat "$prompt_file")" > "$report" 2>&1 || true) &
         else
-          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" --output-format text                   --resume "$sid"                   -p "Review the latest fixes. If all issues are resolved, output REVIEW_APPROVED alone on its own line. Otherwise output REVIEW_CHANGES_REQUESTED on its own line followed by your findings."                   > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
+            --output-format text --resume "$sid" \
+            -p "$follow_up" > "$report" 2>&1 || true) &
         fi
         pids="$pids $!"
         ;;
       (gemini)
         if [ "$cycle" -eq 1 ]; then
-          (portable_timeout "$REVIEW_TIMEOUT" gemini -p "$prompt" -y > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" gemini \
+            -p "$(cat "$prompt_file")" --yolo > "$report" 2>&1 || true) &
         else
-          (portable_timeout "$REVIEW_TIMEOUT" gemini --resume latest                   -p "Review the latest fixes. If all issues are resolved, output REVIEW_APPROVED alone on its own line. Otherwise output REVIEW_CHANGES_REQUESTED on its own line followed by your findings."                   > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" gemini --resume latest \
+            -p "$follow_up" --yolo > "$report" 2>&1 || true) &
         fi
         pids="$pids $!"
         ;;
       (codex)
         if [ "$cycle" -eq 1 ]; then
-          (portable_timeout "$REVIEW_TIMEOUT" codex exec "$prompt" > "$report" 2>&1 || true) &
+          # Pipe prompt via stdin (codex reads from stdin when given -)
+          (portable_timeout "$REVIEW_TIMEOUT" codex exec --full-auto \
+            - < "$prompt_file" > "$report" 2>&1 || true) &
         else
-          (portable_timeout "$REVIEW_TIMEOUT" codex exec resume --last > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" codex exec resume --last \
+            "$follow_up" > "$report" 2>&1 || true) &
         fi
         pids="$pids $!"
         ;;
@@ -562,14 +638,16 @@ run_review_phase() {
     log "WARN: REVIEW_DIFF_RANGE not set, using HEAD~1..HEAD"
     REVIEW_DIFF_RANGE="HEAD~1..HEAD"
   fi
-  local diff_output
-  diff_output=$(git diff "$REVIEW_DIFF_RANGE" 2>/dev/null || echo "")
-  if [ -z "$diff_output" ]; then
-    log "Empty git diff, skipping review phase"
+  local commit_count
+  commit_count=$(git log --oneline "$REVIEW_DIFF_RANGE" 2>/dev/null | wc -l | tr -d ' ')
+  if [ "${commit_count:-0}" -eq 0 ]; then
+    log "No commits in range $REVIEW_DIFF_RANGE, skipping review phase"
     return 0
   fi
   detect_reviewers || return 0
   mkdir -p "$REVIEW_DIR"
+  # Reset stale session IDs from previous review runs
+  echo "{}" > "$REVIEW_DIR/sessions.json"
   local cycle=1
   while [ "$cycle" -le "$MAX_REVIEW_CYCLES" ]; do
     local cycle_dir="$REVIEW_DIR/cycle-$cycle"
@@ -601,9 +679,9 @@ run_review_phase() {
         reviewers_with_findings=$((reviewers_with_findings + 1))
         # Summarize findings for visibility
         local p0_count p1_count
-        p0_count=$(grep -c "P0" "$report" 2>/dev/null || echo 0)
-        p1_count=$(grep -c "P1" "$report" 2>/dev/null || echo 0)
-        if [ "$p0_count" -gt 0 ] || [ "$p1_count" -gt 0 ]; then
+        p0_count=$(grep -co "P0" "$report" 2>/dev/null | awk '{s+=$1} END{print s+0}')
+        p1_count=$(grep -co "P1" "$report" 2>/dev/null | awk '{s+=$1} END{print s+0}')
+        if [ "${p0_count:-0}" -gt 0 ] || [ "${p1_count:-0}" -gt 0 ]; then
           log "  -> ${p0_count} P0, ${p1_count} P1 findings"
         fi
       fi
@@ -651,6 +729,15 @@ log "Config: max_retries=$MAX_RETRIES model=$MODEL"
 [ -n "$EPIC_IDS" ] && log "Targeting epics: $EPIC_IDS" || log "Targeting: all ready epics"
 
 while true; do
+  # Memory safety: clean up orphans and check memory before starting next epic
+  cleanup_orphans
+  if ! check_memory; then
+    log "FATAL: Memory pressure too high, stopping loop to prevent system freeze"
+    log "  Hint: set MIN_FREE_MEMORY_PCT (current: ${MIN_FREE_MEMORY_PCT}%) or kill background processes"
+    FAILED=$((FAILED + 1))
+    break
+  fi
+
   EPIC_ID=$(get_next_epic) || break
 
   log "=========================================="
@@ -724,6 +811,7 @@ while true; do
 
     if [ $ATTEMPT -le $MAX_RETRIES ]; then
       log "Retrying $EPIC_ID..."
+      cleanup_orphans
       sleep 5
     fi
   done

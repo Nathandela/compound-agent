@@ -39,20 +39,27 @@ func compoundCmd() *cobra.Command {
 				return compoundFromCache(cmd, repoRoot, items)
 			}
 
-			// Compute embeddings for all items
-			embeddings := make([][]float64, len(items))
-			for i, item := range items {
+			// Compute embeddings for all items, filtering out failures
+			var filtered []memory.MemoryItem
+			var filteredEmbeddings [][]float64
+			for _, item := range items {
 				text := item.Trigger + " " + item.Insight
 				vecs, err := embedder.Embed([]string{text})
 				if err != nil {
-					return fmt.Errorf("embed item %s: %w", item.ID, err)
+					cmd.Printf("[warn] Could not embed item %s, skipping: %v\n", item.ID, err)
+					continue
 				}
-				if len(vecs) > 0 {
-					embeddings[i] = vecs[0]
+				if len(vecs) > 0 && vecs[0] != nil {
+					filtered = append(filtered, item)
+					filteredEmbeddings = append(filteredEmbeddings, vecs[0])
 				}
 			}
 
-			return synthesizeAndWrite(cmd, repoRoot, items, embeddings)
+			if skipped := len(items) - len(filtered); skipped > 0 {
+				cmd.Printf("[warn] %d lesson(s) skipped (embedding failed).\n", skipped)
+			}
+
+			return synthesizeAndWrite(cmd, repoRoot, filtered, filteredEmbeddings)
 		},
 	}
 }
@@ -94,6 +101,10 @@ func compoundFromCache(cmd *cobra.Command, repoRoot string, items []memory.Memor
 			filtered = append(filtered, item)
 			filteredEmbeddings = append(filteredEmbeddings, embeddings[i])
 		}
+	}
+
+	if skipped := len(items) - len(filtered); skipped > 0 {
+		cmd.Printf("[warn] %d lesson(s) skipped (no cached embeddings). Run the embedding daemon to include them.\n", skipped)
 	}
 
 	return synthesizeAndWrite(cmd, repoRoot, filtered, filteredEmbeddings)

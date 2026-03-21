@@ -183,6 +183,94 @@ func TestAuditCommand_JSON(t *testing.T) {
 	}
 }
 
+func TestImproveCommand_ShellInjection(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(improveCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	payload := `"; rm -rf /; #`
+	_, err := executeCommand(root, "improve", "-o", outPath, "--force", "--model", payload)
+	if err != nil {
+		t.Fatalf("improve command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The payload must be inside single quotes, not bare double quotes
+	if strings.Contains(script, `MODEL="`+payload) {
+		t.Error("model flag is interpolated without escaping — shell injection possible")
+	}
+	if !strings.Contains(script, `MODEL='`) {
+		t.Error("expected MODEL to be single-quoted for shell safety")
+	}
+}
+
+func TestLoopCommand_ShellInjection(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	payload := `$(whoami)`
+	_, err := executeCommand(root, "loop", "-o", outPath, "--force", "--epics", payload)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The payload must be inside single quotes, preventing command substitution
+	if strings.Contains(script, `EPIC_IDS="`+payload) {
+		t.Error("epics flag is interpolated without escaping — shell injection possible")
+	}
+	if !strings.Contains(script, `EPIC_IDS='`) {
+		t.Error("expected EPIC_IDS to be single-quoted for shell safety")
+	}
+}
+
+func TestImproveCommand_NoVerifyRemoved(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(improveCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	_, err := executeCommand(root, "improve", "-o", outPath, "--force")
+	if err != nil {
+		t.Fatalf("improve command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	if strings.Contains(script, "--no-verify") {
+		t.Error("generated script must not use --no-verify (bypasses pre-commit hooks)")
+	}
+}
+
+func TestFindTraceForEpic_PathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	logDir := filepath.Join(dir, "agent_logs")
+	os.MkdirAll(logDir, 0755)
+
+	// Attempting path traversal via epic ID should return empty
+	result := findTraceForEpic(logDir, "../other_dir/trace_")
+	if result != "" {
+		t.Errorf("expected empty for path traversal attempt, got: %s", result)
+	}
+
+	result = findTraceForEpic(logDir, "normal-epic")
+	// No trace file exists, should just return empty
+	if result != "" {
+		t.Errorf("expected empty for non-existent trace, got: %s", result)
+	}
+}
+
 func TestImproveInitSubcommand(t *testing.T) {
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(improveCmd())
