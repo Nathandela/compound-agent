@@ -5,6 +5,8 @@ package search
 import (
 	"database/sql"
 	"math"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -134,7 +136,7 @@ func TestSearchVector_EmptyDB(t *testing.T) {
 	defer db.Close()
 
 	embedder := &mockEmbedder{vectors: map[string][]float64{}}
-	result, err := SearchVector(db, embedder, "test query", 10)
+	result, err := SearchVector(db, embedder, "test query", 10, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -160,7 +162,7 @@ func TestSearchVector_ReturnsSortedByScore(t *testing.T) {
 		"python error try except blocks": {0.0, 0.0, 0.9, 0.1},      // L003 -- different
 	}}
 
-	result, err := SearchVector(db, embedder, "go error", 10)
+	result, err := SearchVector(db, embedder, "go error", 10, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -201,7 +203,7 @@ func TestSearchVector_UsesCachedEmbeddings(t *testing.T) {
 		// it would get simpleHash (different vector). Cache hit means cachedVec is used.
 	}}
 
-	result, err := SearchVector(db, embedder, "test query", 10)
+	result, err := SearchVector(db, embedder, "test query", 10, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -225,7 +227,7 @@ func TestSearchVector_SkipsInvalidatedItems(t *testing.T) {
 	defer db.Close()
 
 	embedder := &mockEmbedder{vectors: map[string][]float64{}}
-	result, err := SearchVector(db, embedder, "test", 10)
+	result, err := SearchVector(db, embedder, "test", 10, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -248,7 +250,7 @@ func TestSearchVector_RespectsLimit(t *testing.T) {
 	defer db.Close()
 
 	embedder := &mockEmbedder{vectors: map[string][]float64{}}
-	result, err := SearchVector(db, embedder, "test", 2)
+	result, err := SearchVector(db, embedder, "test", 2, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -311,6 +313,76 @@ func TestFindSimilarLessons_ExcludesSpecifiedID(t *testing.T) {
 	}
 	if result[0].Item.ID != "L002" {
 		t.Errorf("expected L002, got %s", result[0].Item.ID)
+	}
+}
+
+func TestSearchVector_IncludesCCTPatterns(t *testing.T) {
+	// SearchVector should also score CCT patterns from cct-patterns.jsonl
+	items := []memory.MemoryItem{
+		{ID: "L001", Type: memory.TypeLesson, Trigger: "go error", Insight: "handle errors", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
+	}
+	db := setupTestDB(t, items)
+	defer db.Close()
+
+	// Create a temp dir with cct-patterns.jsonl
+	dir := t.TempDir()
+	lessonsDir := filepath.Join(dir, ".claude", "lessons")
+	os.MkdirAll(lessonsDir, 0755)
+	os.WriteFile(filepath.Join(lessonsDir, "cct-patterns.jsonl"),
+		[]byte(`{"id":"CCT-abc","name":"Error Handling","description":"Always handle errors explicitly","frequency":3,"sourceIds":["L001"],"created":"2025-01-01T00:00:00Z"}`+"\n"),
+		0644)
+
+	queryVec := []float64{1.0, 0.0, 0.0, 0.0}
+	embedder := &mockEmbedder{vectors: map[string][]float64{
+		"test query":                 queryVec,
+		"go error handle errors":     queryVec,
+		"Error Handling Always handle errors explicitly": queryVec,
+	}}
+
+	result, err := SearchVector(db, embedder, "test query", 10, dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// Should have 1 lesson + 1 CCT pattern = 2 results
+	if len(result) != 2 {
+		t.Fatalf("expected 2 results (1 lesson + 1 CCT pattern), got %d", len(result))
+	}
+
+	// Check that CCT pattern is included
+	hasLesson := false
+	hasCCT := false
+	for _, r := range result {
+		if r.Item.ID == "L001" {
+			hasLesson = true
+		}
+		if r.Item.ID == "CCT-abc" {
+			hasCCT = true
+		}
+	}
+	if !hasLesson {
+		t.Error("expected lesson L001 in results")
+	}
+	if !hasCCT {
+		t.Error("expected CCT pattern CCT-abc in results")
+	}
+}
+
+func TestSearchVector_NoCCTFile(t *testing.T) {
+	// SearchVector should work fine when cct-patterns.jsonl doesn't exist
+	items := []memory.MemoryItem{
+		{ID: "L001", Type: memory.TypeLesson, Trigger: "test", Insight: "test", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
+	}
+	db := setupTestDB(t, items)
+	defer db.Close()
+
+	embedder := &mockEmbedder{vectors: map[string][]float64{}}
+	// Pass a dir with no cct-patterns.jsonl
+	result, err := SearchVector(db, embedder, "test", 10, t.TempDir())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Errorf("expected 1 result, got %d", len(result))
 	}
 }
 

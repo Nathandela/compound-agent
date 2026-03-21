@@ -5,6 +5,8 @@ import (
 	"math"
 	"sort"
 
+	"github.com/nathandelacretaz/compound-agent/internal/compound"
+	"github.com/nathandelacretaz/compound-agent/internal/memory"
 	"github.com/nathandelacretaz/compound-agent/internal/storage"
 )
 
@@ -40,20 +42,44 @@ func CosineSimilarity(a, b []float64) float64 {
 	return dot / mag
 }
 
-// SearchVector performs vector similarity search over all items in the database.
+// cctToMemoryItem converts a CCT pattern to a MemoryItem for unified scoring.
+func cctToMemoryItem(p compound.CctPattern) memory.MemoryItem {
+	return memory.MemoryItem{
+		ID:        p.ID,
+		Type:      memory.TypeLesson,
+		Trigger:   p.Name,
+		Insight:   p.Description,
+		Tags:      []string{},
+		Source:     memory.SourceManual,
+		Context:   memory.Context{Tool: "compound", Intent: "synthesis"},
+		Created:   p.Created,
+		Confirmed: true,
+		Related:   p.SourceIDs,
+	}
+}
+
+// SearchVector performs vector similarity search over all items in the database
+// and CCT patterns from cct-patterns.jsonl.
 //
 // Algorithm:
-//  1. Read all non-invalidated items.
+//  1. Read all non-invalidated items + CCT patterns.
 //  2. Embed the query text.
 //  3. For each item, use cached embedding if hash matches, otherwise embed and cache.
 //  4. Compute cosine similarity, sort descending, return top `limit`.
-func SearchVector(db *sql.DB, embedder Embedder, query string, limit int) ([]ScoredItem, error) {
+func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRoot string) ([]ScoredItem, error) {
 	sdb := storage.NewSearchDB(db)
 	items, err := sdb.ReadAll()
 	if err != nil {
 		return nil, err
 	}
-	if len(items) == 0 {
+
+	// Read CCT patterns if available
+	var cctPatterns []compound.CctPattern
+	if repoRoot != "" {
+		cctPatterns, _ = compound.ReadCctPatterns(repoRoot)
+	}
+
+	if len(items) == 0 && len(cctPatterns) == 0 {
 		return nil, nil
 	}
 
@@ -84,6 +110,17 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int) ([]Sco
 
 		score := CosineSimilarity(queryVec, itemVec)
 		results = append(results, ScoredItem{Item: item, Score: score})
+	}
+
+	// Score CCT patterns
+	for _, pattern := range cctPatterns {
+		text := pattern.Name + " " + pattern.Description
+		vecs, err := embedder.Embed([]string{text})
+		if err != nil {
+			continue // Skip patterns that fail embedding
+		}
+		score := CosineSimilarity(queryVec, vecs[0])
+		results = append(results, ScoredItem{Item: cctToMemoryItem(pattern), Score: score})
 	}
 
 	sort.Slice(results, func(i, j int) bool {

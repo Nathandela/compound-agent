@@ -68,3 +68,33 @@ func TestLockPath(t *testing.T) {
 		t.Errorf("LockPath = %v, want %v", got, want)
 	}
 }
+
+func TestFindModelFiles_NotFound(t *testing.T) {
+	dir := t.TempDir()
+	model, tokenizer := FindModelFiles(dir)
+	if model != "" || tokenizer != "" {
+		t.Errorf("expected empty paths, got model=%s tokenizer=%s", model, tokenizer)
+	}
+}
+
+func TestModelDownloadDir(t *testing.T) {
+	dir := t.TempDir()
+	got := ModelDownloadDir(dir)
+	want := filepath.Join(dir, ".claude", ".cache", "model")
+	if got != want {
+		t.Errorf("ModelDownloadDir = %v, want %v", got, want)
+	}
+}
+
+func TestFindModelFiles_InCacheDir(t *testing.T) {
+	dir := t.TempDir()
+	modelDir := filepath.Join(dir, ".claude", ".cache", "model")
+	os.MkdirAll(modelDir, 0755)
+	os.WriteFile(filepath.Join(modelDir, "model_quantized.onnx"), []byte("fake"), 0644)
+	os.WriteFile(filepath.Join(modelDir, "tokenizer.json"), []byte("fake"), 0644)
+
+	model, tokenizer := FindModelFiles(dir)
+	if model == "" || tokenizer == "" {
+		t.Errorf("expected model files found, got model=%s tokenizer=%s", model, tokenizer)
+	}
+}

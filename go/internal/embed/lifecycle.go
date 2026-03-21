@@ -2,6 +2,8 @@ package embed
 
 import (
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -170,6 +172,143 @@ func findDaemonBinary() (string, error) {
 	}
 
 	return "", fmt.Errorf("%s not found in PATH or next to binary", daemonBinary)
+}
+
+// FindModelFiles searches known locations for the ONNX model and tokenizer.
+// Returns empty strings if not found.
+func FindModelFiles(repoRoot string) (modelPath, tokenizerPath string) {
+	// Location 1: HuggingFace transformers cache in node_modules
+	hfBase := filepath.Join(repoRoot, "node_modules", ".pnpm",
+		"@huggingface+transformers@3.8.1", "node_modules",
+		"@huggingface", "transformers", ".cache",
+		"nomic-ai", "nomic-embed-text-v1.5")
+
+	candidates := []struct {
+		model     string
+		tokenizer string
+	}{
+		{filepath.Join(hfBase, "onnx", "model_quantized.onnx"), filepath.Join(hfBase, "tokenizer.json")},
+		// Location 2: .claude/.cache/model (after download-model)
+		{filepath.Join(repoRoot, ".claude", ".cache", "model", "model_quantized.onnx"), filepath.Join(repoRoot, ".claude", ".cache", "model", "tokenizer.json")},
+		// Location 3: Next to the Go binary
+		{findNextToBinary("model_quantized.onnx"), findNextToBinary("tokenizer.json")},
+	}
+
+	for _, c := range candidates {
+		if c.model == "" || c.tokenizer == "" {
+			continue
+		}
+		if _, err := os.Stat(c.model); err == nil {
+			if _, err := os.Stat(c.tokenizer); err == nil {
+				return c.model, c.tokenizer
+			}
+		}
+	}
+	return "", ""
+}
+
+// findNextToBinary returns a path next to the current executable, or empty string.
+func findNextToBinary(filename string) string {
+	self, err := os.Executable()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(filepath.Dir(self), filename)
+}
+
+// ModelDownloadDir returns the directory where model files are downloaded.
+func ModelDownloadDir(repoRoot string) string {
+	return filepath.Join(repoRoot, ".claude", ".cache", "model")
+}
+
+// HuggingFace model URLs for nomic-embed-text-v1.5.
+const (
+	hfModelURL     = "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/onnx/model_quantized.onnx"
+	hfTokenizerURL = "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5/resolve/main/tokenizer.json"
+)
+
+// DownloadResult holds the result of a model download.
+type DownloadResult struct {
+	ModelPath     string
+	TokenizerPath string
+	AlreadyExists bool
+}
+
+// DownloadModel downloads the ONNX model and tokenizer to the cache directory.
+// Returns immediately if files already exist.
+func DownloadModel(repoRoot string, progress func(string)) (*DownloadResult, error) {
+	dir := ModelDownloadDir(repoRoot)
+	modelPath := filepath.Join(dir, "model_quantized.onnx")
+	tokenizerPath := filepath.Join(dir, "tokenizer.json")
+
+	// Check if already downloaded
+	_, modelErr := os.Stat(modelPath)
+	_, tokErr := os.Stat(tokenizerPath)
+	if modelErr == nil && tokErr == nil {
+		return &DownloadResult{
+			ModelPath:     modelPath,
+			TokenizerPath: tokenizerPath,
+			AlreadyExists: true,
+		}, nil
+	}
+
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return nil, fmt.Errorf("create model dir: %w", err)
+	}
+
+	// Download model
+	if progress != nil {
+		progress("Downloading model_quantized.onnx...")
+	}
+	if err := downloadFile(hfModelURL, modelPath); err != nil {
+		return nil, fmt.Errorf("download model: %w", err)
+	}
+
+	// Download tokenizer
+	if progress != nil {
+		progress("Downloading tokenizer.json...")
+	}
+	if err := downloadFile(hfTokenizerURL, tokenizerPath); err != nil {
+		os.Remove(modelPath) // Clean up partial download
+		return nil, fmt.Errorf("download tokenizer: %w", err)
+	}
+
+	return &DownloadResult{
+		ModelPath:     modelPath,
+		TokenizerPath: tokenizerPath,
+	}, nil
+}
+
+// downloadFile downloads a URL to a local file path.
+func downloadFile(url, destPath string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return fmt.Errorf("GET %s: %w", url, err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("GET %s: status %d", url, resp.StatusCode)
+	}
+
+	tmpPath := destPath + ".tmp"
+	f, err := os.Create(tmpPath)
+	if err != nil {
+		return fmt.Errorf("create %s: %w", tmpPath, err)
+	}
+
+	if _, err := io.Copy(f, resp.Body); err != nil {
+		f.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("write %s: %w", tmpPath, err)
+	}
+
+	if err := f.Close(); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+
+	return os.Rename(tmpPath, destPath)
 }
 
 // waitForReady polls the daemon socket until it responds to health checks.

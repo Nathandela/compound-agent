@@ -40,7 +40,7 @@ func RetrieveForPlan(db *sql.DB, repoRoot string, embedder search.Embedder, plan
 	vectorFailed := false
 
 	if embedder != nil {
-		vecItems, err = search.SearchVector(db, embedder, planText, candidateLimit)
+		vecItems, err = search.SearchVector(db, embedder, planText, candidateLimit, repoRoot)
 		if err != nil {
 			vectorFailed = true
 		}

@@ -68,13 +68,13 @@ func searchCmd() *cobra.Command {
 				return fmt.Errorf("sync: %w", err)
 			}
 
-			embedder := tryGetEmbedder(repoRoot)
+			embedder := getOrStartEmbedder(repoRoot)
 
 			var items []memory.MemoryItem
 			if embedder != nil {
 				candidateLimit := limit * search.CandidateMultiplier
 
-				vecResults, vecErr := search.SearchVector(db, embedder, query, candidateLimit)
+				vecResults, vecErr := search.SearchVector(db, embedder, query, candidateLimit, repoRoot)
 
 				sdb := storage.NewSearchDB(db)
 				kwScored, kwErr := sdb.SearchKeywordScored(query, candidateLimit, "")
@@ -242,7 +242,7 @@ func checkPlanCmd() *cobra.Command {
 				return fmt.Errorf("sync: %w", err)
 			}
 
-			embedder := tryGetEmbedder(repoRoot)
+			embedder := getOrStartEmbedder(repoRoot)
 
 			result, err := retrieval.RetrieveForPlan(db, repoRoot, embedder, planText, limit)
 			if err != nil {
@@ -284,18 +284,29 @@ func (a *embedderAdapter) Embed(texts []string) ([][]float64, error) {
 	return resp.Vectors, nil
 }
 
-// tryGetEmbedder attempts to connect to the embed daemon.
-// Returns nil if the daemon is unavailable (graceful degradation).
-func tryGetEmbedder(repoRoot string) search.Embedder {
+// getOrStartEmbedder connects to the embed daemon, starting it if needed.
+// Returns nil if the daemon binary or model files are unavailable (graceful degradation).
+func getOrStartEmbedder(repoRoot string) search.Embedder {
+	// Fast path: try connecting to an already-running daemon
 	sockPath := embed.SocketPath(repoRoot)
 	client, err := embed.NewClient(sockPath, 500*time.Millisecond)
-	if err != nil {
-		return nil
-	}
-	resp, err := client.Health()
-	if err != nil || resp.Status != "ok" {
+	if err == nil {
+		resp, err := client.Health()
+		if err == nil && resp.Status == "ok" {
+			return &embedderAdapter{client: client}
+		}
 		client.Close()
-		return nil
+	}
+
+	// Slow path: find model files and start daemon via EnsureDaemon
+	modelPath, tokenizerPath := embed.FindModelFiles(repoRoot)
+	if modelPath == "" || tokenizerPath == "" {
+		return nil // No model files available
+	}
+
+	client, err = embed.EnsureDaemon(repoRoot, modelPath, tokenizerPath)
+	if err != nil {
+		return nil // Daemon failed to start, degrade gracefully
 	}
 	return &embedderAdapter{client: client}
 }

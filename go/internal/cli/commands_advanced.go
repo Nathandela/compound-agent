@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/nathandelacretaz/compound-agent/internal/compound"
 	"github.com/nathandelacretaz/compound-agent/internal/embed"
@@ -31,7 +30,7 @@ func compoundCmd() *cobra.Command {
 			}
 
 			// Try to get embeddings via daemon
-			embedder := tryGetEmbedder(repoRoot)
+			embedder := getOrStartEmbedder(repoRoot)
 			if embedder == nil {
 				cmd.Println("[warn] Embedding daemon not available. Using keyword-based clustering is not supported.")
 				cmd.Println("Start the daemon or run: ca download-model")
@@ -134,29 +133,37 @@ func synthesizeAndWrite(cmd *cobra.Command, repoRoot string, items []memory.Memo
 	return nil
 }
 
-// downloadModelCmd provides a placeholder for model download.
+// downloadModelCmd downloads the ONNX embedding model and tokenizer.
 func downloadModelCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "download-model",
 		Short: "Download the embedding model",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoRoot := util.GetRepoRoot()
-			sockPath := embed.SocketPath(repoRoot)
 
-			// Check if daemon is running (model would already be loaded)
-			client, err := embed.NewClient(sockPath, 500*time.Millisecond)
-			if err == nil {
-				resp, err := client.Health()
-				if err == nil && resp.Status == "ok" {
-					cmd.Println("[ok] Embedding model is loaded (daemon running)")
-					client.Close()
-					return nil
-				}
-				client.Close()
+			// Check if model files already exist
+			modelPath, tokenizerPath := embed.FindModelFiles(repoRoot)
+			if modelPath != "" && tokenizerPath != "" {
+				cmd.Println("[ok] Model files already present:")
+				cmd.Printf("  Model:     %s\n", modelPath)
+				cmd.Printf("  Tokenizer: %s\n", tokenizerPath)
+				return nil
 			}
 
-			cmd.Println("[info] Model download is handled by the Rust embed daemon.")
-			cmd.Println("The model will be downloaded on first use when the daemon starts.")
+			result, err := embed.DownloadModel(repoRoot, func(msg string) {
+				cmd.Println("[info] " + msg)
+			})
+			if err != nil {
+				return fmt.Errorf("download model: %w", err)
+			}
+
+			if result.AlreadyExists {
+				cmd.Println("[ok] Model already downloaded.")
+			} else {
+				cmd.Println("[ok] Model downloaded successfully.")
+			}
+			cmd.Printf("  Model:     %s\n", result.ModelPath)
+			cmd.Printf("  Tokenizer: %s\n", result.TokenizerPath)
 			return nil
 		},
 	}
