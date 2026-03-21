@@ -63,6 +63,36 @@ func SetCachedEmbedding(db *sql.DB, id string, embedding []float64, hash string)
 	db.Exec("UPDATE lessons SET embedding = ?, content_hash = ? WHERE id = ?", blob, hash, id)
 }
 
+// GetCachedInsightEmbeddingsBulk reads all cached insight embeddings in a single query.
+// Returns a map keyed by lesson ID. Rows without a content_hash_insight are skipped.
+func GetCachedInsightEmbeddingsBulk(db *sql.DB) map[string]CachedEmbeddingEntry {
+	result := make(map[string]CachedEmbeddingEntry)
+
+	rows, err := db.Query("SELECT id, embedding_insight, content_hash_insight FROM lessons WHERE embedding_insight IS NOT NULL")
+	if err != nil {
+		return result
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id string
+		var blob []byte
+		var hash sql.NullString
+
+		if err := rows.Scan(&id, &blob, &hash); err != nil {
+			continue
+		}
+		if !hash.Valid {
+			continue
+		}
+
+		vec := blobToFloat64(blob)
+		result[id] = CachedEmbeddingEntry{Vector: vec, Hash: hash.String}
+	}
+
+	return result
+}
+
 // GetCachedInsightEmbedding retrieves the insight-only embedding for a lesson.
 // Returns nil if no cached data exists or the hash doesn't match expectedHash.
 func GetCachedInsightEmbedding(db *sql.DB, id string, expectedHash string) []float64 {

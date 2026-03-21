@@ -187,7 +187,16 @@ func FindModelFiles(repoRoot string) (modelPath, tokenizerPath string) {
 		{findNextToBinary("model_quantized.onnx"), findNextToBinary("tokenizer.json")},
 	}
 
-	// Location 3: HuggingFace transformers cache in node_modules (any version)
+	// Location 3: HuggingFace transformers cache — npm/yarn (flat node_modules)
+	hfDirect := filepath.Join(repoRoot, "node_modules",
+		"@huggingface", "transformers", ".cache",
+		"nomic-ai", "nomic-embed-text-v1.5")
+	candidates = append(candidates, struct {
+		model     string
+		tokenizer string
+	}{filepath.Join(hfDirect, "onnx", "model_quantized.onnx"), filepath.Join(hfDirect, "tokenizer.json")})
+
+	// Location 4: HuggingFace transformers cache — pnpm (hoisted, any version)
 	hfPattern := filepath.Join(repoRoot, "node_modules", ".pnpm",
 		"@huggingface+transformers@*", "node_modules",
 		"@huggingface", "transformers", ".cache",
@@ -300,11 +309,11 @@ func downloadFile(url, destPath string) error {
 		return fmt.Errorf("GET %s: status %d", url, resp.StatusCode)
 	}
 
-	tmpPath := destPath + ".tmp"
-	f, err := os.Create(tmpPath)
+	f, err := os.CreateTemp(filepath.Dir(destPath), filepath.Base(destPath)+".tmp.*")
 	if err != nil {
-		return fmt.Errorf("create %s: %w", tmpPath, err)
+		return fmt.Errorf("create temp file: %w", err)
 	}
+	tmpPath := f.Name()
 
 	if _, err := io.Copy(f, resp.Body); err != nil {
 		f.Close()

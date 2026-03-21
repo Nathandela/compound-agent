@@ -14,10 +14,34 @@ import (
 // for FindSimilarLessons.
 const DefaultSimilarityThreshold = 0.80
 
+// maxEmbedBatch is the maximum texts per Embed() call, matching the Rust
+// daemon's CA_EMBED_MAX_BATCH default. Larger batches are chunked automatically.
+const maxEmbedBatch = 64
+
 // Embedder provides text embedding functionality.
 // Implemented by the embed daemon client.
 type Embedder interface {
 	Embed(texts []string) ([][]float64, error)
+}
+
+// embedBatched embeds texts in chunks of maxEmbedBatch to stay within daemon limits.
+func embedBatched(embedder Embedder, texts []string) ([][]float64, error) {
+	if len(texts) == 0 {
+		return nil, nil
+	}
+	result := make([][]float64, 0, len(texts))
+	for i := 0; i < len(texts); i += maxEmbedBatch {
+		end := i + maxEmbedBatch
+		if end > len(texts) {
+			end = len(texts)
+		}
+		vecs, err := embedder.Embed(texts[i:end])
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, vecs...)
+	}
+	return result, nil
 }
 
 // CosineSimilarity computes the cosine similarity between two vectors.
@@ -94,34 +118,53 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRo
 
 	cache := storage.GetCachedEmbeddingsBulk(db)
 
-	var results []ScoredItem
-	for _, item := range items {
+	// Separate cached from uncached items for batched embedding
+	type uncachedEntry struct {
+		idx  int
+		text string
+		hash string
+	}
+	itemVecs := make([][]float64, len(items))
+	var uncached []uncachedEntry
+
+	for i, item := range items {
 		hash := storage.ContentHash(item.Trigger, item.Insight)
-
-		var itemVec []float64
 		if cached, ok := cache[item.ID]; ok && cached.Hash == hash {
-			itemVec = cached.Vector
+			itemVecs[i] = cached.Vector
 		} else {
-			text := item.Trigger + " " + item.Insight
-			vecs, err := embedder.Embed([]string{text})
-			if err != nil {
-				return nil, err
-			}
-			itemVec = vecs[0]
-			storage.SetCachedEmbedding(db, item.ID, itemVec, hash)
+			uncached = append(uncached, uncachedEntry{idx: i, text: item.Trigger + " " + item.Insight, hash: hash})
 		}
+	}
 
-		score := CosineSimilarity(queryVec, itemVec)
+	// Batch embed all uncached items (chunked to respect daemon limits)
+	if len(uncached) > 0 {
+		texts := make([]string, len(uncached))
+		for i, u := range uncached {
+			texts[i] = u.text
+		}
+		vecs, err := embedBatched(embedder, texts)
+		if err != nil {
+			return nil, err
+		}
+		for i, u := range uncached {
+			itemVecs[u.idx] = vecs[i]
+			storage.SetCachedEmbedding(db, items[u.idx].ID, vecs[i], u.hash)
+		}
+	}
+
+	var results []ScoredItem
+	for i, item := range items {
+		score := CosineSimilarity(queryVec, itemVecs[i])
 		results = append(results, ScoredItem{Item: item, Score: score})
 	}
 
-	// Score CCT patterns — batch all into a single Embed() call
+	// Score CCT patterns — batched with chunking for daemon limits
 	if len(cctPatterns) > 0 {
 		cctTexts := make([]string, len(cctPatterns))
 		for i, p := range cctPatterns {
 			cctTexts[i] = p.Name + " " + p.Description
 		}
-		cctVecs, cctErr := embedder.Embed(cctTexts)
+		cctVecs, cctErr := embedBatched(embedder, cctTexts)
 		if cctErr == nil && len(cctVecs) == len(cctPatterns) {
 			for i, pattern := range cctPatterns {
 				score := CosineSimilarity(queryVec, cctVecs[i])
@@ -162,29 +205,58 @@ func FindSimilarLessons(db *sql.DB, embedder Embedder, text string, threshold fl
 	}
 	queryVec := queryVecs[0]
 
-	var results []ScoredItem
+	cache := storage.GetCachedInsightEmbeddingsBulk(db)
+
+	// Separate cached from uncached items for batched embedding
+	type uncachedEntry struct {
+		idx  int
+		hash string
+	}
+	// Filter out excluded item and collect cache status
+	type candidate struct {
+		item memory.MemoryItem
+		hash string
+	}
+	var candidates []candidate
 	for _, item := range items {
 		if item.ID == excludeID {
 			continue
 		}
+		candidates = append(candidates, candidate{item: item, hash: storage.ContentHash(item.Insight, "")})
+	}
 
-		hash := storage.ContentHash(item.Insight, "")
+	itemVecs := make([][]float64, len(candidates))
+	var uncached []uncachedEntry
 
-		var itemVec []float64
-		if cached := storage.GetCachedInsightEmbedding(db, item.ID, hash); cached != nil {
-			itemVec = cached
+	for i, c := range candidates {
+		if cached, ok := cache[c.item.ID]; ok && cached.Hash == c.hash {
+			itemVecs[i] = cached.Vector
 		} else {
-			vecs, err := embedder.Embed([]string{item.Insight})
-			if err != nil {
-				return nil, err
-			}
-			itemVec = vecs[0]
-			storage.SetCachedInsightEmbedding(db, item.ID, itemVec, hash)
+			uncached = append(uncached, uncachedEntry{idx: i, hash: c.hash})
 		}
+	}
 
-		score := CosineSimilarity(queryVec, itemVec)
+	// Batch embed all uncached items (chunked to respect daemon limits)
+	if len(uncached) > 0 {
+		texts := make([]string, len(uncached))
+		for i, u := range uncached {
+			texts[i] = candidates[u.idx].item.Insight
+		}
+		vecs, err := embedBatched(embedder, texts)
+		if err != nil {
+			return nil, err
+		}
+		for i, u := range uncached {
+			itemVecs[u.idx] = vecs[i]
+			storage.SetCachedInsightEmbedding(db, candidates[u.idx].item.ID, vecs[i], u.hash)
+		}
+	}
+
+	var results []ScoredItem
+	for i, c := range candidates {
+		score := CosineSimilarity(queryVec, itemVecs[i])
 		if score >= threshold {
-			results = append(results, ScoredItem{Item: item, Score: score})
+			results = append(results, ScoredItem{Item: c.item, Score: score})
 		}
 	}
 
