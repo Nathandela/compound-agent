@@ -321,8 +321,8 @@ func detectCmd() *cobra.Command {
 					"id":       id,
 				})
 			} else {
-				cmd.Printf("Detected: %s\nSource:   %s\nTrigger:  %s\nInsight:  %s\nType:     %s\nID:       %s\n",
-					dr.Source, dr.Source, dr.Trigger, dr.Insight, dr.Type, id)
+				cmd.Printf("Source:   %s\nTrigger:  %s\nInsight:  %s\nType:     %s\nID:       %s\n",
+					dr.Source, dr.Trigger, dr.Insight, dr.Type, id)
 			}
 			return nil
 		},

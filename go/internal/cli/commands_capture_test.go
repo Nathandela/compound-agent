@@ -506,8 +506,11 @@ func TestDetectCmd_UserCorrection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stdout, "user_correction") || !strings.Contains(stdout, "Detected") {
-		t.Errorf("expected detection output, got: %s", stdout)
+	if !strings.Contains(stdout, "Source:   user_correction") {
+		t.Errorf("expected 'Source:   user_correction' in output, got: %s", stdout)
+	}
+	if !strings.Contains(stdout, "Trigger:") {
+		t.Errorf("expected 'Trigger:' in output, got: %s", stdout)
 	}
 }
 
@@ -533,8 +536,8 @@ func TestDetectCmd_TestFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stdout, "test_failure") || !strings.Contains(stdout, "Detected") {
-		t.Errorf("expected test_failure detection, got: %s", stdout)
+	if !strings.Contains(stdout, "Source:   test_failure") {
+		t.Errorf("expected 'Source:   test_failure' in output, got: %s", stdout)
 	}
 }
 
@@ -562,8 +565,8 @@ func TestDetectCmd_SelfCorrection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stdout, "self_correction") || !strings.Contains(stdout, "Detected") {
-		t.Errorf("expected self_correction detection, got: %s", stdout)
+	if !strings.Contains(stdout, "Source:   self_correction") {
+		t.Errorf("expected 'Source:   self_correction' in output, got: %s", stdout)
 	}
 }
 
