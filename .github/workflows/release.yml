@@ -9,23 +9,27 @@ permissions:
 
 jobs:
   build-go:
-    name: Build Go CLI
-    runs-on: ${{ matrix.os }}
+    name: Build Go CLI (${{ matrix.goos }}-${{ matrix.goarch }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - runner: ubuntu-latest
             goos: linux
             goarch: amd64
-          - os: ubuntu-latest
+            cc: gcc
+          - runner: ubuntu-24.04-arm
             goos: linux
             goarch: arm64
-          - os: macos-latest
+            cc: gcc
+          - runner: macos-latest
             goos: darwin
             goarch: arm64
-          - os: macos-13
+            cc: clang
+          - runner: macos-13
             goos: darwin
             goarch: amd64
+            cc: clang
     steps:
       - uses: actions/checkout@v4
         with:
@@ -41,6 +45,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "1"
+          CC: ${{ matrix.cc }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           COMMIT="${GITHUB_SHA:0:8}"
@@ -58,18 +63,21 @@ jobs:
           path: go/dist/ca-${{ matrix.goos }}-${{ matrix.goarch }}
 
   build-rust:
-    name: Build Rust Daemon
-    runs-on: ${{ matrix.os }}
+    name: Build Rust Daemon (${{ matrix.artifact }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - runner: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact: ca-embed-linux-amd64
-          - os: macos-latest
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            artifact: ca-embed-linux-arm64
+          - runner: macos-latest
             target: aarch64-apple-darwin
             artifact: ca-embed-darwin-arm64
-          - os: macos-13
+          - runner: macos-13
             target: x86_64-apple-darwin
             artifact: ca-embed-darwin-amd64
     steps:
@@ -83,11 +91,16 @@ jobs:
         working-directory: rust/embed-daemon
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cp rust/embed-daemon/target/${{ matrix.target }}/release/ca-embed dist/${{ matrix.artifact }}
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: rust/embed-daemon/target/${{ matrix.target }}/release/ca-embed
+          path: dist/${{ matrix.artifact }}
 
   release:
     name: Create Release
@@ -110,6 +123,7 @@ jobs:
             dist/ca-darwin-amd64/ca-darwin-amd64
             dist/ca-linux-amd64/ca-linux-amd64
             dist/ca-linux-arm64/ca-linux-arm64
-            dist/ca-embed-darwin-arm64/ca-embed
-            dist/ca-embed-darwin-amd64/ca-embed
-            dist/ca-embed-linux-amd64/ca-embed
+            dist/ca-embed-darwin-arm64/ca-embed-darwin-arm64
+            dist/ca-embed-darwin-amd64/ca-embed-darwin-amd64
+            dist/ca-embed-linux-amd64/ca-embed-linux-amd64
+            dist/ca-embed-linux-arm64/ca-embed-linux-arm64

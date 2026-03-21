@@ -29,23 +29,27 @@ jobs:
         run: go vet -tags sqlite_fts5 ./...
 
   go-build:
-    name: Go Build
-    runs-on: ${{ matrix.os }}
+    name: Go Build (${{ matrix.goos }}-${{ matrix.goarch }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - runner: ubuntu-latest
             goos: linux
             goarch: amd64
-          - os: ubuntu-latest
+            cc: gcc
+          - runner: ubuntu-24.04-arm
             goos: linux
             goarch: arm64
-          - os: macos-latest
+            cc: gcc
+          - runner: macos-latest
             goos: darwin
             goarch: arm64
-          - os: macos-13
+            cc: clang
+          - runner: macos-13
             goos: darwin
             goarch: amd64
+            cc: clang
     steps:
       - uses: actions/checkout@v4
 
@@ -59,6 +63,7 @@ jobs:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
           CGO_ENABLED: "1"
+          CC: ${{ matrix.cc }}
         run: |
           go build -tags sqlite_fts5 \
             -ldflags="-s -w -X github.com/nathandelacretaz/compound-agent/internal/build.Version=ci-${{ github.sha }}" \
@@ -72,18 +77,21 @@ jobs:
           path: go/dist/ca-${{ matrix.goos }}-${{ matrix.goarch }}
 
   rust-build:
-    name: Rust Embed Daemon
-    runs-on: ${{ matrix.os }}
+    name: Rust Embed Daemon (${{ matrix.artifact }})
+    runs-on: ${{ matrix.runner }}
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
+          - runner: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             artifact: ca-embed-linux-amd64
-          - os: macos-latest
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            artifact: ca-embed-linux-arm64
+          - runner: macos-latest
             target: aarch64-apple-darwin
             artifact: ca-embed-darwin-arm64
-          - os: macos-13
+          - runner: macos-13
             target: x86_64-apple-darwin
             artifact: ca-embed-darwin-amd64
     steps:
@@ -97,9 +105,10 @@ jobs:
         working-directory: rust/embed-daemon
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Copy artifact
-        run: cp rust/embed-daemon/target/${{ matrix.target }}/release/ca-embed dist/${{ matrix.artifact }}
-        continue-on-error: false
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cp rust/embed-daemon/target/${{ matrix.target }}/release/ca-embed dist/${{ matrix.artifact }}
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
