@@ -99,9 +99,12 @@ func ReadMemoryItems(repoRoot string) (ReadMemoryItemsResult, error) {
 		result.Items = append(result.Items, item)
 	}
 
-	// Sort by created timestamp for deterministic ordering (Go maps iterate randomly)
+	// Sort by created timestamp, then ID for deterministic ordering
 	sort.Slice(result.Items, func(i, j int) bool {
-		return result.Items[i].Created < result.Items[j].Created
+		if result.Items[i].Created != result.Items[j].Created {
+			return result.Items[i].Created < result.Items[j].Created
+		}
+		return result.Items[i].ID < result.Items[j].ID
 	})
 
 	return result, nil
@@ -143,8 +146,8 @@ func parseLine(line string) (MemoryItem, bool, bool) {
 		item.Type = TypeLesson
 	}
 
-	// Basic validation: must have id and type
-	if item.ID == "" || item.Type == "" {
+	// Full validation: match TS Zod schema strictness
+	if err := ValidateMemoryItem(&item); err != nil {
 		return MemoryItem{}, false, false
 	}
 

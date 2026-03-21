@@ -251,3 +251,84 @@ func TestReadMemoryItems_FullType(t *testing.T) {
 		t.Errorf("type = %q, want %q", result.Items[0].Type, TypeLesson)
 	}
 }
+
+// R1: parseLine must reject records that TS rejects via Zod schema validation
+func TestParseLine_RejectsMissingTrigger(t *testing.T) {
+	line := `{"id":"L001","type":"lesson","insight":"i","tags":[],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[]}`
+	_, _, ok := parseLine(line)
+	if ok {
+		t.Error("parseLine should reject record missing trigger")
+	}
+}
+
+func TestParseLine_RejectsMissingInsight(t *testing.T) {
+	line := `{"id":"L001","type":"lesson","trigger":"t","tags":[],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[]}`
+	_, _, ok := parseLine(line)
+	if ok {
+		t.Error("parseLine should reject record missing insight")
+	}
+}
+
+func TestParseLine_RejectsInvalidSource(t *testing.T) {
+	line := `{"id":"L001","type":"lesson","trigger":"t","insight":"i","tags":[],"source":"bogus","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[]}`
+	_, _, ok := parseLine(line)
+	if ok {
+		t.Error("parseLine should reject record with invalid source")
+	}
+}
+
+func TestParseLine_RejectsMissingCreated(t *testing.T) {
+	line := `{"id":"L001","type":"lesson","trigger":"t","insight":"i","tags":[],"source":"manual","context":{"tool":"t","intent":"i"},"confirmed":false,"supersedes":[],"related":[]}`
+	_, _, ok := parseLine(line)
+	if ok {
+		t.Error("parseLine should reject record missing created")
+	}
+}
+
+func TestParseLine_RejectsInvalidType(t *testing.T) {
+	line := `{"id":"L001","type":"bogus","trigger":"t","insight":"i","tags":[],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[]}`
+	_, _, ok := parseLine(line)
+	if ok {
+		t.Error("parseLine should reject record with invalid type")
+	}
+}
+
+func TestParseLine_AcceptsEmptyTags(t *testing.T) {
+	line := `{"id":"L001","type":"lesson","trigger":"t","insight":"i","tags":[],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[]}`
+	_, _, ok := parseLine(line)
+	if !ok {
+		t.Error("parseLine should accept record with empty tags")
+	}
+}
+
+// R4: Sort with equal timestamps must use ID as tiebreaker
+func TestReadMemoryItems_DeterministicSort_EqualTimestamps(t *testing.T) {
+	dir := setupTestDir(t)
+	sameTime := "2026-01-01T00:00:00Z"
+
+	// Create items with same timestamp but different IDs
+	items := []MemoryItem{
+		{ID: "L003", Type: TypeLesson, Trigger: "t", Insight: "c", Tags: []string{}, Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: sameTime, Supersedes: []string{}, Related: []string{}},
+		{ID: "L001", Type: TypeLesson, Trigger: "t", Insight: "a", Tags: []string{}, Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: sameTime, Supersedes: []string{}, Related: []string{}},
+		{ID: "L002", Type: TypeLesson, Trigger: "t", Insight: "b", Tags: []string{}, Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: sameTime, Supersedes: []string{}, Related: []string{}},
+	}
+	for _, item := range items {
+		AppendMemoryItem(dir, item)
+	}
+
+	// Run multiple times to detect non-determinism
+	for i := 0; i < 10; i++ {
+		result, err := ReadMemoryItems(dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(result.Items) != 3 {
+			t.Fatalf("got %d items, want 3", len(result.Items))
+		}
+		// Must be sorted by ID when timestamps are equal
+		if result.Items[0].ID != "L001" || result.Items[1].ID != "L002" || result.Items[2].ID != "L003" {
+			t.Errorf("iteration %d: wrong order: %s, %s, %s (want L001, L002, L003)",
+				i, result.Items[0].ID, result.Items[1].ID, result.Items[2].ID)
+		}
+	}
+}

@@ -7,6 +7,7 @@ import (
 )
 
 // ReadStdinFrom reads all data from r with timeout and size-limit protection.
+// The size limit is enforced incrementally — at most maxBytes+1 bytes are read.
 func ReadStdinFrom(r io.Reader, timeout time.Duration, maxBytes int) (string, error) {
 	type result struct {
 		data []byte
@@ -15,7 +16,9 @@ func ReadStdinFrom(r io.Reader, timeout time.Duration, maxBytes int) (string, er
 
 	ch := make(chan result, 1)
 	go func() {
-		data, err := io.ReadAll(r)
+		// Read at most maxBytes+1 to detect overflow without buffering the full stream
+		limited := io.LimitReader(r, int64(maxBytes)+1)
+		data, err := io.ReadAll(limited)
 		ch <- result{data, err}
 	}()
 
