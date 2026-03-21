@@ -1,0 +1,19 @@
+cargo:rustc-check-cfg=cfg(link_error)
+cargo:warning=[ort-sys] [WARN] can't do xcframework linking for target 'aarch64-apple-darwin'
+cargo:rerun-if-env-changed=ORT_LIB_PATH
+cargo:rerun-if-env-changed=ORT_LIB_LOCATION
+cargo:rerun-if-env-changed=CARGO_NET_OFFLINE
+cargo:rerun-if-env-changed=ORT_SKIP_DOWNLOAD
+cargo:rerun-if-env-changed=ORT_OFFLINE
+[ort-sys] [DEBUG] Using prebuilt binaries
+[ort-sys] [DEBUG] looking for prebuilt binaries matching feature set: none
+[ort-sys] [DEBUG] downloading from 'https://cdn.pyke.io/0/pyke:ort-rs/ms@1.24.2/aarch64-apple-darwin.tar.lzma2'; tls_provider=NativeTls, root_certs=PlatformVerifier
+cargo:rerun-if-env-changed=ORT_CXX_STDLIB
+cargo:rerun-if-env-changed=CXXSTDLIB
+cargo:rustc-link-lib=c++
+cargo:rustc-link-lib=framework=Foundation
+cargo:rerun-if-env-changed=CC
+cargo:rustc-link-search=/Library/Developer/CommandLineTools/usr/lib/clang/15.0.0/lib/darwin
+cargo:rustc-link-lib=clang_rt.osx
+cargo:rustc-link-search=native=/Users/Nathan/Library/Caches/ort.pyke.io/dfbin/aarch64-apple-darwin/612739f75438dc0a075461e1fb454226b4a1eb175e60a7271ba966bbbb972cd4
+cargo:rustc-link-lib=static=onnxruntime

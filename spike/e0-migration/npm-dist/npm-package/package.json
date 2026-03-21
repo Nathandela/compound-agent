@@ -1,0 +1,18 @@
+{
+  "name": "ca-spike",
+  "version": "0.0.1",
+  "description": "Spike: esbuild-style Go binary distribution via npm",
+  "bin": {
+    "ca-spike": "./bin/ca-spike"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/"
+  ],
+  "os": ["darwin", "linux"],
+  "cpu": ["x64", "arm64"],
+  "license": "MIT"
+}

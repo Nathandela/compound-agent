@@ -1,0 +1,5 @@
+# Build artifacts
+go-binary/bin/
+npm-package/bin/ca-spike-binary
+npm-package/node_modules/
+npm-package/package-lock.json

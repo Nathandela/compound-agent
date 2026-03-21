@@ -1,0 +1,13 @@
+{
+  "cookit_active": true,
+  "epic_id": "learning_agent-q026",
+  "current_phase": "review",
+  "phase_index": 4,
+  "skills_read": [
+    ".claude/skills/compound/review/SKILL.md"
+  ],
+  "gates_passed": [
+    "gate-3"
+  ],
+  "started_at": "2026-03-21T08:00:42.908Z"
+}

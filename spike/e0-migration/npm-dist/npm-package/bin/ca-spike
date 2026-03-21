@@ -1,0 +1,22 @@
+#!/usr/bin/env node
+
+// Wrapper script that executes the Go binary.
+// This is what npm links into node_modules/.bin/ca-spike.
+// The esbuild pattern: thin JS wrapper -> platform-specific binary.
+
+const { execFileSync } = require("child_process");
+const path = require("path");
+
+const binaryPath = path.join(__dirname, "ca-spike-binary");
+
+try {
+  execFileSync(binaryPath, process.argv.slice(2), {
+    stdio: "inherit",
+  });
+} catch (err) {
+  if (err.status != null) {
+    process.exit(err.status);
+  }
+  console.error(`Failed to execute binary: ${err.message}`);
+  process.exit(1);
+}
