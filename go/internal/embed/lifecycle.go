@@ -26,6 +26,11 @@ func PIDPath(socketPath string) string {
 	return socketPath + ".pid"
 }
 
+// LockPath returns the lock file path for a socket path.
+func LockPath(socketPath string) string {
+	return socketPath + ".lock"
+}
+
 // DaemonBinaryName returns the name of the daemon binary.
 func DaemonBinaryName() string {
 	return daemonBinary
@@ -45,58 +50,82 @@ func IsDaemonRunning(pidPath string) bool {
 	if err != nil {
 		return false
 	}
-	// Signal 0 checks if process exists without sending a signal
 	err = proc.Signal(syscall.Signal(0))
 	return err == nil
 }
 
 // EnsureDaemon ensures the daemon is running and returns a connected client.
-// If the daemon is not running, it starts it and waits for readiness.
+// Uses flock to prevent concurrent daemon starts (H1).
 func EnsureDaemon(repoRoot, modelPath, tokenizerPath string) (*Client, error) {
 	sockPath := SocketPath(repoRoot)
 	pidPath := PIDPath(sockPath)
 
-	// Try connecting to existing daemon first
-	if !IsSocketStale(sockPath) {
-		client, err := NewClient(sockPath, warmTimeout)
+	// Fast path: try connecting to existing daemon without locking
+	if IsDaemonRunning(pidPath) {
+		client, err := tryConnect(sockPath)
 		if err == nil {
-			resp, err := client.Health()
-			if err == nil && resp.Status == "ok" {
-				return client, nil
-			}
-			client.Close()
+			return client, nil
 		}
 	}
 
-	// Clean up stale socket if present
-	if _, err := os.Stat(sockPath); err == nil {
-		CleanStaleSocket(sockPath)
-	}
+	// Slow path: acquire lock, check again, start if needed (H1 mitigation)
+	return ensureDaemonLocked(sockPath, modelPath, tokenizerPath)
+}
 
-	// Ensure cache directory exists
+// tryConnect attempts to connect and health-check an existing daemon.
+func tryConnect(sockPath string) (*Client, error) {
+	client, err := NewClient(sockPath, warmTimeout)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := client.Health()
+	if err != nil || resp.Status != "ok" {
+		client.Close()
+		return nil, fmt.Errorf("health check failed")
+	}
+	return client, nil
+}
+
+// ensureDaemonLocked acquires an exclusive flock before starting the daemon.
+func ensureDaemonLocked(sockPath, modelPath, tokenizerPath string) (*Client, error) {
 	cacheDir := filepath.Dir(sockPath)
 	if err := os.MkdirAll(cacheDir, 0755); err != nil {
 		return nil, fmt.Errorf("create cache dir: %w", err)
 	}
 
-	// Start daemon
+	lockFile, err := os.OpenFile(LockPath(sockPath), os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		return nil, fmt.Errorf("open lock file: %w", err)
+	}
+	defer lockFile.Close()
+
+	// Exclusive lock — blocks until other processes release
+	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
+		return nil, fmt.Errorf("acquire lock: %w", err)
+	}
+	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+
+	// Re-check after acquiring lock — another process may have started the daemon
+	if client, err := tryConnect(sockPath); err == nil {
+		return client, nil
+	}
+
+	// Clean stale socket/PID files
+	CleanStaleSocket(sockPath)
+
 	if err := startDaemon(sockPath, modelPath, tokenizerPath); err != nil {
 		return nil, fmt.Errorf("start daemon: %w", err)
 	}
 
-	// Wait for daemon to become ready
 	client, err := waitForReady(sockPath, coldStartWait)
 	if err != nil {
 		return nil, fmt.Errorf("daemon not ready: %w", err)
 	}
-
-	_ = pidPath // used by IsDaemonRunning
 	return client, nil
 }
 
 // startDaemon starts the embed daemon process.
 func startDaemon(socketPath, modelPath, tokenizerPath string) error {
-	// Find the daemon binary
 	binPath, err := findDaemonBinary()
 	if err != nil {
 		return err
@@ -119,14 +148,12 @@ func startDaemon(socketPath, modelPath, tokenizerPath string) error {
 		return fmt.Errorf("exec %s: %w", binPath, err)
 	}
 
-	// Release -- daemon runs independently
 	proc.Release()
 	return nil
 }
 
 // findDaemonBinary looks for the ca-embed binary near the Go binary or in PATH.
 func findDaemonBinary() (string, error) {
-	// Check next to our own binary
 	self, err := os.Executable()
 	if err == nil {
 		candidate := filepath.Join(filepath.Dir(self), daemonBinary)
@@ -135,7 +162,6 @@ func findDaemonBinary() (string, error) {
 		}
 	}
 
-	// Check PATH
 	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
 		candidate := filepath.Join(dir, daemonBinary)
 		if _, err := os.Stat(candidate); err == nil {
@@ -152,21 +178,10 @@ func waitForReady(socketPath string, timeout time.Duration) (*Client, error) {
 	interval := 50 * time.Millisecond
 
 	for time.Now().Before(deadline) {
-		client, err := NewClient(socketPath, warmTimeout)
-		if err != nil {
-			time.Sleep(interval)
-			continue
-		}
-		resp, err := client.Health()
-		if err != nil {
-			client.Close()
-			time.Sleep(interval)
-			continue
-		}
-		if resp.Status == "ok" {
+		client, err := tryConnect(socketPath)
+		if err == nil {
 			return client, nil
 		}
-		client.Close()
 		time.Sleep(interval)
 	}
 

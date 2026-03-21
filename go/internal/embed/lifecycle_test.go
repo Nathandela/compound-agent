@@ -59,3 +59,12 @@ func TestDaemonBinaryName(t *testing.T) {
 		t.Errorf("DaemonBinaryName = %v, want ca-embed", name)
 	}
 }
+
+func TestLockPath(t *testing.T) {
+	sock := "/tmp/test.sock"
+	got := LockPath(sock)
+	want := "/tmp/test.sock.lock"
+	if got != want {
+		t.Errorf("LockPath = %v, want %v", got, want)
+	}
+}

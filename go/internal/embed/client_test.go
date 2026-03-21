@@ -1,6 +1,7 @@
 package embed
 
 import (
+	"bufio"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -42,14 +43,11 @@ func startMockDaemon(t *testing.T, handler func(net.Conn)) (string, func()) {
 // echoHandler reads JSON-lines, echoes health/embed responses.
 func echoHandler(conn net.Conn) {
 	defer conn.Close()
-	buf := make([]byte, 4096)
-	for {
-		n, err := conn.Read(buf)
-		if err != nil {
-			return
-		}
+	scanner := bufio.NewScanner(conn)
+	for scanner.Scan() {
+		line := scanner.Bytes()
 		var req Request
-		if err := json.Unmarshal(buf[:n-1], &req); err != nil {
+		if err := json.Unmarshal(line, &req); err != nil {
 			resp, _ := json.Marshal(Response{ID: "unknown", Error: "parse error"})
 			conn.Write(append(resp, '\n'))
 			continue

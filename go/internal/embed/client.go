@@ -36,11 +36,8 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-// Send sends a request and waits for a response.
-func (c *Client) Send(req Request) (*Response, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+// sendLocked sends a request and waits for a response. Must be called with c.mu held.
+func (c *Client) sendLocked(req Request) (*Response, error) {
 	line, err := EncodeLine(req)
 	if err != nil {
 		return nil, fmt.Errorf("encode request: %w", err)
@@ -60,10 +57,19 @@ func (c *Client) Send(req Request) (*Response, error) {
 	return DecodeLine(respLine)
 }
 
+// Send sends a request and waits for a response.
+func (c *Client) Send(req Request) (*Response, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.sendLocked(req)
+}
+
 // Health sends a health check request.
 func (c *Client) Health() (*Response, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.reqID++
-	return c.Send(Request{
+	return c.sendLocked(Request{
 		ID:     fmt.Sprintf("health-%d", c.reqID),
 		Method: "health",
 	})
@@ -71,8 +77,10 @@ func (c *Client) Health() (*Response, error) {
 
 // Embed sends texts for embedding.
 func (c *Client) Embed(texts []string) (*Response, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.reqID++
-	return c.Send(Request{
+	return c.sendLocked(Request{
 		ID:     fmt.Sprintf("embed-%d", c.reqID),
 		Method: "embed",
 		Texts:  texts,
@@ -81,8 +89,10 @@ func (c *Client) Embed(texts []string) (*Response, error) {
 
 // Shutdown sends a shutdown request to the daemon.
 func (c *Client) Shutdown() (*Response, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	c.reqID++
-	return c.Send(Request{
+	return c.sendLocked(Request{
 		ID:     fmt.Sprintf("shutdown-%d", c.reqID),
 		Method: "shutdown",
 	})
