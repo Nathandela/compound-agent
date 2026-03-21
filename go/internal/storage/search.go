@@ -1,0 +1,288 @@
+package storage
+
+import (
+	"database/sql"
+	"encoding/json"
+	"math"
+	"strings"
+
+	"github.com/nathandelacretaz/compound-agent/internal/memory"
+)
+
+// ftsOperators are FTS5 special tokens to strip from queries.
+var ftsOperators = map[string]bool{
+	"AND": true, "OR": true, "NOT": true, "NEAR": true,
+}
+
+// SearchDB wraps a sql.DB with search operations.
+type SearchDB struct {
+	db *sql.DB
+}
+
+// NewSearchDB creates a SearchDB from an open database.
+func NewSearchDB(db *sql.DB) *SearchDB {
+	return &SearchDB{db: db}
+}
+
+// Close closes the underlying database.
+func (s *SearchDB) Close() error {
+	return s.db.Close()
+}
+
+// ScoredResult pairs a MemoryItem with a BM25-normalized score.
+type ScoredResult struct {
+	memory.MemoryItem
+	Score float64
+}
+
+// SanitizeFtsQuery strips FTS5 special characters and operators.
+func SanitizeFtsQuery(query string) string {
+	stripped := strings.Map(func(r rune) rune {
+		switch r {
+		case '"', '*', '^', '+', '-', '(', ')', ':', '{', '}':
+			return -1
+		default:
+			return r
+		}
+	}, query)
+
+	tokens := strings.Fields(stripped)
+	var filtered []string
+	for _, t := range tokens {
+		if !ftsOperators[t] {
+			filtered = append(filtered, t)
+		}
+	}
+	return strings.Join(filtered, " ")
+}
+
+// SearchKeyword searches using FTS5 MATCH.
+func (s *SearchDB) SearchKeyword(query string, limit int, typeFilter memory.MemoryItemType) ([]memory.MemoryItem, error) {
+	sanitized := SanitizeFtsQuery(query)
+	if sanitized == "" {
+		return nil, nil
+	}
+
+	rows, err := s.executeFts(sanitized, limit, typeFilter, false)
+	if err != nil {
+		return nil, err
+	}
+
+	var items []memory.MemoryItem
+	for _, r := range rows {
+		items = append(items, r.MemoryItem)
+	}
+	return items, nil
+}
+
+// SearchKeywordScored searches using FTS5 with normalized BM25 scores.
+func (s *SearchDB) SearchKeywordScored(query string, limit int, typeFilter memory.MemoryItemType) ([]ScoredResult, error) {
+	sanitized := SanitizeFtsQuery(query)
+	if sanitized == "" {
+		return nil, nil
+	}
+
+	return s.executeFts(sanitized, limit, typeFilter, true)
+}
+
+// ReadAll reads all non-invalidated memory items from SQLite.
+func (s *SearchDB) ReadAll() ([]memory.MemoryItem, error) {
+	rows, err := s.db.Query("SELECT * FROM lessons WHERE invalidated_at IS NULL")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []memory.MemoryItem
+	for rows.Next() {
+		item, err := scanRow(rows)
+		if err != nil {
+			continue
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (s *SearchDB) executeFts(sanitized string, limit int, typeFilter memory.MemoryItemType, withRank bool) ([]ScoredResult, error) {
+	selectCols := "l.*"
+	orderClause := ""
+	if withRank {
+		selectCols = "l.*, fts.rank"
+		orderClause = "ORDER BY fts.rank"
+	}
+
+	typeClause := ""
+	args := []interface{}{sanitized}
+	if typeFilter != "" {
+		typeClause = "AND l.type = ?"
+		args = append(args, string(typeFilter))
+	}
+	args = append(args, limit)
+
+	query := `SELECT ` + selectCols + `
+		FROM lessons l
+		JOIN lessons_fts fts ON l.rowid = fts.rowid
+		WHERE lessons_fts MATCH ?
+		  AND l.invalidated_at IS NULL
+		  ` + typeClause + `
+		` + orderClause + `
+		LIMIT ?`
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, nil // graceful degradation on FTS5 errors
+	}
+	defer rows.Close()
+
+	var results []ScoredResult
+	for rows.Next() {
+		item, rank, err := scanRowWithRank(rows, withRank)
+		if err != nil {
+			continue
+		}
+		score := 0.0
+		if withRank {
+			score = normalizeBm25Rank(rank)
+		}
+		results = append(results, ScoredResult{MemoryItem: item, Score: score})
+	}
+	return results, rows.Err()
+}
+
+// normalizeBm25Rank converts FTS5's negative rank to [0, 1].
+func normalizeBm25Rank(rank float64) float64 {
+	if rank >= 0 {
+		return 0
+	}
+	// FTS5 rank is negative; more negative = more relevant
+	return 1.0 / (1.0 + math.Exp(rank))
+}
+
+// scanRow scans a lessons row into a MemoryItem.
+func scanRow(rows *sql.Rows) (memory.MemoryItem, error) {
+	item, _, err := scanRowWithRank(rows, false)
+	return item, err
+}
+
+// scanRowWithRank scans a lessons row, optionally including FTS5 rank.
+func scanRowWithRank(rows *sql.Rows, withRank bool) (memory.MemoryItem, float64, error) {
+	var (
+		id, typ, trigger, insight string
+		evidence, severity        sql.NullString
+		tags, source, context     string
+		supersedes, related       string
+		created                   string
+		confirmed, deleted        int
+		retrievalCount            int
+		lastRetrieved             sql.NullString
+		embedding                 sql.NullString
+		contentHash               sql.NullString
+		embeddingInsight          sql.NullString
+		contentHashInsight        sql.NullString
+		invalidatedAt             sql.NullString
+		invalidationReason        sql.NullString
+		citFile                   sql.NullString
+		citLine                   sql.NullInt64
+		citCommit                 sql.NullString
+		compactionLevel           sql.NullInt64
+		compactedAt               sql.NullString
+		patternBad                sql.NullString
+		patternGood               sql.NullString
+		rank                      float64
+	)
+
+	dest := []interface{}{
+		&id, &typ, &trigger, &insight, &evidence, &severity,
+		&tags, &source, &context, &supersedes, &related,
+		&created, &confirmed, &deleted, &retrievalCount, &lastRetrieved,
+		&embedding, &contentHash, &embeddingInsight, &contentHashInsight,
+		&invalidatedAt, &invalidationReason,
+		&citFile, &citLine, &citCommit,
+		&compactionLevel, &compactedAt,
+		&patternBad, &patternGood,
+	}
+	if withRank {
+		dest = append(dest, &rank)
+	}
+
+	if err := rows.Scan(dest...); err != nil {
+		return memory.MemoryItem{}, 0, err
+	}
+
+	item := memory.MemoryItem{
+		ID:        id,
+		Type:      memory.MemoryItemType(typ),
+		Trigger:   trigger,
+		Insight:   insight,
+		Source:    memory.Source(source),
+		Created:   created,
+		Confirmed: confirmed == 1,
+	}
+
+	// Tags: comma-separated
+	if tags != "" {
+		item.Tags = strings.Split(tags, ",")
+	} else {
+		item.Tags = []string{}
+	}
+
+	// JSON fields
+	json.Unmarshal([]byte(context), &item.Context)
+	json.Unmarshal([]byte(supersedes), &item.Supersedes)
+	json.Unmarshal([]byte(related), &item.Related)
+	if item.Supersedes == nil {
+		item.Supersedes = []string{}
+	}
+	if item.Related == nil {
+		item.Related = []string{}
+	}
+
+	// Optional fields
+	if evidence.Valid {
+		item.Evidence = &evidence.String
+	}
+	if severity.Valid {
+		sev := memory.Severity(severity.String)
+		item.Severity = &sev
+	}
+	if deleted == 1 {
+		b := true
+		item.Deleted = &b
+	}
+	if retrievalCount > 0 {
+		item.RetrievalCount = &retrievalCount
+	}
+	if lastRetrieved.Valid {
+		item.LastRetrieved = &lastRetrieved.String
+	}
+	if invalidatedAt.Valid {
+		item.InvalidatedAt = &invalidatedAt.String
+	}
+	if invalidationReason.Valid {
+		item.InvalidationReason = &invalidationReason.String
+	}
+	if citFile.Valid {
+		cit := memory.Citation{File: citFile.String}
+		if citLine.Valid {
+			l := int(citLine.Int64)
+			cit.Line = &l
+		}
+		if citCommit.Valid {
+			cit.Commit = &citCommit.String
+		}
+		item.Citation = &cit
+	}
+	if compactionLevel.Valid && compactionLevel.Int64 != 0 {
+		cl := int(compactionLevel.Int64)
+		item.CompactionLevel = &cl
+	}
+	if compactedAt.Valid {
+		item.CompactedAt = &compactedAt.String
+	}
+	if patternBad.Valid && patternGood.Valid {
+		item.Pattern = &memory.Pattern{Bad: patternBad.String, Good: patternGood.String}
+	}
+
+	return item, rank, nil
+}
