@@ -1,0 +1,21 @@
+# Build artifacts
+**/target/
+**/bin/
+!**/bin/*.sh
+
+# Go binaries
+*.exe
+ca-spike*
+fts5-parity
+ipc-client
+ipc-bench-client
+
+# Reference data (regenerable)
+reference-vectors.json
+reference-lessons.sqlite
+fts5-reference.json
+fts5-test-data.json
+fts5-schema.json
+
+# npm artifacts
+**/node_modules/

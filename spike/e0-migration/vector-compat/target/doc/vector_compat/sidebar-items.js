@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["cosine_similarity","l2_normalize","main","mean_pool"],"struct":["ReferenceEntry"]};

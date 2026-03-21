@@ -1,1 +1,0 @@
-rd_("AoReturns the argument unchanged.BaCalls <code>U::from(self)</code>.CfMean pooling: average token embeddings weighted by \xe2\x80\xa6AoL2-normalize a vector in place.CjVector compatibility spike: validate that the Rust ort \xe2\x80\xa6ChA reference text/vector pair from the TS implementation.BfCosine similarity between two vectors.")
