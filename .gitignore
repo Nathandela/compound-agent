@@ -38,6 +38,20 @@ npm-debug.log*
 # Beads runtime artifacts
 .beads/dolt-monitor.pid
 .beads/dolt-server.lock
+.beads/dolt-server*.pid
+.beads/dolt-server*.port
+
+# Go build artifacts
+go/ca
+
+# Rust build artifacts
+rust/embed-daemon/target/
+
+# Agent logs
+agent_logs/
+
+# Claude worktrees
+.claude/worktrees/
 
 # Environment
 .env

@@ -22,7 +22,7 @@ trap _loop_cleanup EXIT
 # Config
 MAX_RETRIES=2
 MODEL="claude-opus-4-6[1m]"
-EPIC_IDS="learning_agent-us7y learning_agent-9bp2 learning_agent-d1wt learning_agent-yee7 learning_agent-9piq learning_agent-mopp learning_agent-plhp learning_agent-19uz"
+EPIC_IDS="learning_agent-hdl3 learning_agent-ko94 learning_agent-xhbr learning_agent-w0tg learning_agent-2zzc"
 LOG_DIR="agent_logs"
 MIN_FREE_MEMORY_PCT=${MIN_FREE_MEMORY_PCT:-20}  # Stop loop if free memory drops below this %
 
@@ -365,7 +365,7 @@ log_result() {
 }
 
 # Review phase config
-REVIEW_EVERY=2
+REVIEW_EVERY=1
 MAX_REVIEW_CYCLES=3
 REVIEW_BLOCKING=false
 REVIEW_MODEL="claude-opus-4-6[1m]"
