@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -136,11 +137,17 @@ func Compact(repoRoot string) (CompactResult, error) {
 	}
 	f.Close()
 
-	// Collect remaining lessons
+	// Collect remaining lessons, sorted deterministically by Created then ID
 	lessons := make([]MemoryItem, 0, len(lessonMap))
 	for _, item := range lessonMap {
 		lessons = append(lessons, item)
 	}
+	sort.Slice(lessons, func(i, j int) bool {
+		if lessons[i].Created != lessons[j].Created {
+			return lessons[i].Created < lessons[j].Created
+		}
+		return lessons[i].ID < lessons[j].ID
+	})
 	result.LessonsRemaining = len(lessons)
 
 	// Atomic write: temp file then rename
@@ -168,6 +175,11 @@ func Compact(repoRoot string) (CompactResult, error) {
 		}
 	}
 
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		os.Remove(tmpPath)
+		return result, fmt.Errorf("sync temp: %w", err)
+	}
 	if err := tmp.Close(); err != nil {
 		os.Remove(tmpPath)
 		return result, fmt.Errorf("close temp: %w", err)

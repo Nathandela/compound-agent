@@ -35,6 +35,7 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	registerCrudCommands(rootCmd)
 	registerCaptureCommands(rootCmd)
 	registerMaintenanceCommands(rootCmd)
+	registerKnowledgeCommands(rootCmd)
 }
 
 // --- search command ---
@@ -109,7 +110,7 @@ func searchCmd() *cobra.Command {
 				}
 			}
 
-			fmt.Print(formatSearchResults(items))
+			cmd.Print(formatSearchResults(items))
 			return nil
 		},
 	}
@@ -148,7 +149,7 @@ func listCmd() *cobra.Command {
 				filtered = filtered[:limit]
 			}
 
-			fmt.Print(formatListResults(filtered, total, result.SkippedCount))
+			cmd.Print(formatListResults(filtered, total, result.SkippedCount))
 			return nil
 		},
 	}
@@ -179,9 +180,13 @@ func loadSessionCmd() *cobra.Command {
 			totalCount := len(allResult.Items)
 
 			if jsonOut {
-				fmt.Println(formatSessionJSON(lessons, totalCount))
+				out, err := formatSessionJSON(lessons, totalCount)
+				if err != nil {
+					return err
+				}
+				cmd.Println(out)
 			} else {
-				fmt.Print(formatSessionHuman(lessons, totalCount))
+				cmd.Print(formatSessionHuman(lessons, totalCount))
 			}
 			return nil
 		},
@@ -240,9 +245,13 @@ func checkPlanCmd() *cobra.Command {
 			}
 
 			if jsonOut {
-				fmt.Println(formatCheckPlanJSON(result.Lessons))
+				out, err := formatCheckPlanJSON(result.Lessons)
+				if err != nil {
+					return err
+				}
+				cmd.Println(out)
 			} else {
-				fmt.Print(formatCheckPlanHuman(result.Lessons))
+				cmd.Print(formatCheckPlanHuman(result.Lessons))
 			}
 			return nil
 		},
@@ -369,7 +378,7 @@ func formatSessionHuman(items []memory.MemoryItem, totalCount int) string {
 	return b.String()
 }
 
-func formatSessionJSON(items []memory.MemoryItem, totalCount int) string {
+func formatSessionJSON(items []memory.MemoryItem, totalCount int) (string, error) {
 	data := struct {
 		Lessons    []memory.MemoryItem `json:"lessons"`
 		Count      int                 `json:"count"`
@@ -382,8 +391,11 @@ func formatSessionJSON(items []memory.MemoryItem, totalCount int) string {
 	if data.Lessons == nil {
 		data.Lessons = []memory.MemoryItem{}
 	}
-	out, _ := json.Marshal(data)
-	return string(out)
+	out, err := json.Marshal(data)
+	if err != nil {
+		return "", fmt.Errorf("marshal session JSON: %w", err)
+	}
+	return string(out), nil
 }
 
 func formatCheckPlanHuman(ranked []search.RankedItem) string {
@@ -404,7 +416,7 @@ func formatCheckPlanHuman(ranked []search.RankedItem) string {
 	return b.String()
 }
 
-func formatCheckPlanJSON(ranked []search.RankedItem) string {
+func formatCheckPlanJSON(ranked []search.RankedItem) (string, error) {
 	type lessonJSON struct {
 		ID        string  `json:"id"`
 		Insight   string  `json:"insight"`
@@ -427,8 +439,11 @@ func formatCheckPlanJSON(ranked []search.RankedItem) string {
 		Lessons: lessons,
 		Count:   len(lessons),
 	}
-	out, _ := json.Marshal(data)
-	return string(out)
+	out, err := json.Marshal(data)
+	if err != nil {
+		return "", fmt.Errorf("marshal check-plan JSON: %w", err)
+	}
+	return string(out), nil
 }
 
 func countOldLessons(items []memory.MemoryItem) int {

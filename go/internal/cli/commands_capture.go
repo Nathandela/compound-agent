@@ -38,6 +38,7 @@ type detectResult struct {
 	Insight  string
 	Source   memory.Source
 	Type     memory.MemoryItemType
+	Reason   string // why detection or quality gate rejected (empty on success)
 }
 
 // --- learn command ---
@@ -177,19 +178,23 @@ func captureCmd() *cobra.Command {
 
 			if input != "" {
 				// Read and detect from input file
-				dr, err := detectFromFile(input)
+				dr, err := detectFromFile(input, repoRoot)
 				if err != nil {
 					return err
 				}
 				if !dr.Detected {
 					if jsonOut {
-						writeJSON(cmd, map[string]interface{}{
+						return writeJSON(cmd, map[string]interface{}{
 							"detected": false,
 							"saved":    false,
+							"reason":   dr.Reason,
 						})
-						return nil
 					}
-					cmd.Println("No correction detected from input.")
+					if dr.Reason != "" {
+						cmd.Printf("Not captured: %s\n", dr.Reason)
+					} else {
+						cmd.Println("No correction detected from input.")
+					}
 					return nil
 				}
 				finalTrigger = dr.Trigger
@@ -218,14 +223,13 @@ func captureCmd() *cobra.Command {
 					}
 					saved = true
 				}
-				writeJSON(cmd, map[string]interface{}{
+				return writeJSON(cmd, map[string]interface{}{
 					"id":      id,
 					"trigger": finalTrigger,
 					"insight": finalInsight,
 					"type":    string(itemType),
 					"saved":   saved,
 				})
-				return nil
 			}
 
 			if yes {
@@ -274,16 +278,20 @@ func detectCmd() *cobra.Command {
 
 			repoRoot := util.GetRepoRoot()
 
-			dr, err := detectFromFile(input)
+			dr, err := detectFromFile(input, repoRoot)
 			if err != nil {
 				return err
 			}
 
 			if !dr.Detected {
 				if jsonOut {
-					writeJSON(cmd, map[string]interface{}{
+					return writeJSON(cmd, map[string]interface{}{
 						"detected": false,
+						"reason":   dr.Reason,
 					})
+				}
+				if dr.Reason != "" {
+					cmd.Printf("Not captured: %s\n", dr.Reason)
 				} else {
 					cmd.Println("No correction detected.")
 				}
@@ -298,7 +306,7 @@ func detectCmd() *cobra.Command {
 					return fmt.Errorf("write: %w", err)
 				}
 				if jsonOut {
-					writeJSON(cmd, map[string]interface{}{
+					return writeJSON(cmd, map[string]interface{}{
 						"detected": true,
 						"source":   string(dr.Source),
 						"trigger":  dr.Trigger,
@@ -307,14 +315,13 @@ func detectCmd() *cobra.Command {
 						"id":       id,
 						"saved":    true,
 					})
-				} else {
-					cmd.Printf("Learned: %s\n  ID: %s\n", dr.Insight, id)
 				}
+				cmd.Printf("Learned: %s\n  ID: %s\n", dr.Insight, id)
 				return nil
 			}
 
 			if jsonOut {
-				writeJSON(cmd, map[string]interface{}{
+				return writeJSON(cmd, map[string]interface{}{
 					"detected": true,
 					"source":   string(dr.Source),
 					"trigger":  dr.Trigger,
@@ -322,10 +329,9 @@ func detectCmd() *cobra.Command {
 					"type":     string(dr.Type),
 					"id":       id,
 				})
-			} else {
-				cmd.Printf("Source:   %s\nTrigger:  %s\nInsight:  %s\nType:     %s\nID:       %s\n",
-					dr.Source, dr.Trigger, dr.Insight, dr.Type, id)
 			}
+			cmd.Printf("Source:   %s\nTrigger:  %s\nInsight:  %s\nType:     %s\nID:       %s\n",
+				dr.Source, dr.Trigger, dr.Insight, dr.Type, id)
 			return nil
 		},
 	}
@@ -350,6 +356,9 @@ func parseCitation(raw string, commit string) (*memory.Citation, error) {
 	line, err := strconv.Atoi(parts[1])
 	if err != nil {
 		return nil, fmt.Errorf("invalid citation line number %q in %q (expected file:line)", parts[1], raw)
+	}
+	if line < 1 {
+		return nil, fmt.Errorf("citation line number must be positive, got %d", line)
 	}
 	cit := &memory.Citation{File: file, Line: &line}
 	if commit != "" {
@@ -384,7 +393,7 @@ func buildCaptureItem(id string, typ memory.MemoryItemType, trigger, insight str
 }
 
 // detectFromFile reads a JSON input file and runs detection logic.
-func detectFromFile(path string) (detectResult, error) {
+func detectFromFile(path, repoRoot string) (detectResult, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return detectResult{}, fmt.Errorf("read input file: %w", err)
@@ -395,13 +404,13 @@ func detectFromFile(path string) (detectResult, error) {
 		return detectResult{}, fmt.Errorf("parse input file: %w", err)
 	}
 
-	return detectAndPropose(input), nil
+	return detectAndPropose(input, repoRoot), nil
 }
 
 // detectAndPropose runs detection in priority order, applies quality filters,
 // and proposes an insight. Specificity is always checked; novelty is checked
 // when an embedder is available (graceful degradation).
-func detectAndPropose(input DetectInput) detectResult {
+func detectAndPropose(input DetectInput, repoRoot string) detectResult {
 	var trigger, insight string
 	var source memory.Source
 
@@ -425,6 +434,9 @@ func detectAndPropose(input DetectInput) detectResult {
 			if len(insight) > 200 {
 				insight = insight[:200]
 			}
+			if insight == "" {
+				insight = fmt.Sprintf("Test failure in %s", detected.Trigger)
+			}
 			trigger = detected.Trigger
 			source = memory.SourceTestFailure
 		}
@@ -444,9 +456,9 @@ func detectAndPropose(input DetectInput) detectResult {
 	}
 
 	// Quality gate: check specificity (nil embedder skips novelty gracefully)
-	shouldPropose, _ := capture.ShouldPropose("", insight, nil)
+	shouldPropose, reason := capture.ShouldPropose(repoRoot, insight, nil)
 	if !shouldPropose {
-		return detectResult{Detected: false}
+		return detectResult{Detected: false, Reason: reason}
 	}
 
 	typ := capture.InferMemoryItemType(insight)

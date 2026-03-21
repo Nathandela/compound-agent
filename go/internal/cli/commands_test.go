@@ -201,7 +201,10 @@ func TestFormatSessionJSON(t *testing.T) {
 		},
 	}
 
-	got := formatSessionJSON(items, 10)
+	got, jsonErr := formatSessionJSON(items, 10)
+	if jsonErr != nil {
+		t.Fatalf("formatSessionJSON: %v", jsonErr)
+	}
 
 	var parsed struct {
 		Lessons    []memory.MemoryItem `json:"lessons"`
@@ -275,7 +278,10 @@ func TestFormatCheckPlanJSON(t *testing.T) {
 		},
 	}
 
-	got := formatCheckPlanJSON(ranked)
+	got, jsonErr := formatCheckPlanJSON(ranked)
+	if jsonErr != nil {
+		t.Fatalf("formatCheckPlanJSON: %v", jsonErr)
+	}
 
 	var parsed struct {
 		Lessons []struct {

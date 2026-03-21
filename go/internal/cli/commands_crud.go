@@ -47,7 +47,7 @@ func showCmd() *cobra.Command {
 					msg = fmt.Sprintf("Lesson %s not found (deleted)", id)
 				}
 				if jsonOut {
-					writeJSON(cmd, map[string]string{"error": msg})
+					_ = writeJSON(cmd, map[string]string{"error": msg})
 				} else {
 					cmd.PrintErrln(msg)
 				}
@@ -96,7 +96,7 @@ func updateCmd() *cobra.Command {
 			if !hasInsight && !hasTrigger && !hasEvidence && !hasSeverity && !hasTags && !hasConfirmed {
 				msg := "No fields to update (specify at least one: --insight, --tags, --severity, ...)"
 				if jsonOut {
-					writeJSON(cmd, map[string]string{"error": msg})
+					_ = writeJSON(cmd, map[string]string{"error": msg})
 				} else {
 					cmd.PrintErrln(msg)
 				}
@@ -109,7 +109,7 @@ func updateCmd() *cobra.Command {
 				if !sev.Valid() {
 					msg := fmt.Sprintf("Invalid severity %q (must be: high, medium, low)", severity)
 					if jsonOut {
-						writeJSON(cmd, map[string]string{"error": msg})
+						_ = writeJSON(cmd, map[string]string{"error": msg})
 					} else {
 						cmd.PrintErrln(msg)
 					}
@@ -131,7 +131,7 @@ func updateCmd() *cobra.Command {
 					msg = fmt.Sprintf("Lesson %s is deleted", id)
 				}
 				if jsonOut {
-					writeJSON(cmd, map[string]string{"error": msg})
+					_ = writeJSON(cmd, map[string]string{"error": msg})
 				} else {
 					cmd.PrintErrln(msg)
 				}
@@ -238,7 +238,9 @@ func deleteCmd() *cobra.Command {
 				if out.Warnings == nil {
 					out.Warnings = []deleteWarning{}
 				}
-				writeJSON(cmd, out)
+				if err := writeJSON(cmd, out); err != nil {
+					return err
+				}
 			} else {
 				if len(deleted) > 0 {
 					cmd.Printf("Deleted %d lesson(s): %s\n", len(deleted), strings.Join(deleted, ", "))
@@ -376,9 +378,13 @@ func dedupTags(raw string) []string {
 	return result
 }
 
-func writeJSON(cmd *cobra.Command, v interface{}) {
-	data, _ := json.Marshal(v)
+func writeJSON(cmd *cobra.Command, v interface{}) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Errorf("marshal JSON: %w", err)
+	}
 	cmd.Println(string(data))
+	return nil
 }
 
 func formatLessonDetailed(item *memory.MemoryItem) string {

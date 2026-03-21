@@ -160,11 +160,11 @@ func statsCmd() *cobra.Command {
 
 			// Age breakdown
 			now := time.Now()
-			var under30, between30_90, over90 int
+			var under30, between30_90, over90, unknownAge int
 			for _, item := range items {
 				created, parseErr := time.Parse(time.RFC3339, item.Created)
 				if parseErr != nil {
-					over90++
+					unknownAge++
 					continue
 				}
 				days := int(now.Sub(created).Hours() / 24)
@@ -211,6 +211,9 @@ func statsCmd() *cobra.Command {
 			fmt.Fprintf(&b, "  <30d:   %d\n", under30)
 			fmt.Fprintf(&b, "  30-90d: %d\n", between30_90)
 			fmt.Fprintf(&b, "  >90d:   %d\n", over90)
+			if unknownAge > 0 {
+				fmt.Fprintf(&b, "  unknown: %d\n", unknownAge)
+			}
 
 			fmt.Fprintf(&b, "\nRetrievals:  %d total\n", totalRetrievals)
 
@@ -266,10 +269,12 @@ func exportCmd() *cobra.Command {
 				}
 			}
 
+			var exported, skippedDate, skippedMarshal int
 			for _, item := range result.Items {
 				if hasSince {
 					created, parseErr := time.Parse(time.RFC3339, item.Created)
 					if parseErr != nil {
+						skippedDate++
 						continue
 					}
 					if created.Before(sinceTime) {
@@ -283,9 +288,14 @@ func exportCmd() *cobra.Command {
 
 				data, marshalErr := json.Marshal(item)
 				if marshalErr != nil {
+					skippedMarshal++
 					continue
 				}
 				cmd.Println(string(data))
+				exported++
+			}
+			if skippedDate > 0 || skippedMarshal > 0 {
+				cmd.PrintErrln(fmt.Sprintf("[warn] Export skipped %d unparseable date(s), %d marshal error(s)", skippedDate, skippedMarshal))
 			}
 			return nil
 		},
