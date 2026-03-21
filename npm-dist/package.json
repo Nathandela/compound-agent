@@ -1,0 +1,39 @@
+{
+  "name": "compound-agent",
+  "version": "0.0.1",
+  "description": "Learning system for Claude Code — avoids repeating mistakes across sessions",
+  "bin": {
+    "ca": "./bin/ca",
+    "compound-agent": "./bin/ca"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Nathandela/compound-agent.git"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "learning",
+    "agent",
+    "compound-agent"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

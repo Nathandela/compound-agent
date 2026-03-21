@@ -1,0 +1,108 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  go-test:
+    name: Go Tests
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+
+      - name: Run tests
+        working-directory: go
+        run: go test -tags sqlite_fts5 ./...
+
+      - name: Run vet
+        working-directory: go
+        run: go vet -tags sqlite_fts5 ./...
+
+  go-build:
+    name: Go Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+          - os: macos-13
+            goos: darwin
+            goarch: amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+
+      - name: Build
+        working-directory: go
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "1"
+        run: |
+          go build -tags sqlite_fts5 \
+            -ldflags="-s -w -X github.com/nathandelacretaz/compound-agent/internal/build.Version=ci-${{ github.sha }}" \
+            -o dist/ca-${{ matrix.goos }}-${{ matrix.goarch }} \
+            ./cmd/ca
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ca-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: go/dist/ca-${{ matrix.goos }}-${{ matrix.goarch }}
+
+  rust-build:
+    name: Rust Embed Daemon
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact: ca-embed-linux-amd64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact: ca-embed-darwin-arm64
+          - os: macos-13
+            target: x86_64-apple-darwin
+            artifact: ca-embed-darwin-amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build
+        working-directory: rust/embed-daemon
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Copy artifact
+        run: cp rust/embed-daemon/target/${{ matrix.target }}/release/ca-embed dist/${{ matrix.artifact }}
+        continue-on-error: false
+
+      - name: Upload binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}

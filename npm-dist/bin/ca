@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+
+// Thin wrapper that spawns the Go binary.
+// Uses Node.js only for locating the binary; all work is done by the Go process.
+
+const { execFileSync } = require("child_process");
+const path = require("path");
+const fs = require("fs");
+
+const binaryPath = path.resolve(__dirname, "ca-binary");
+
+if (!fs.existsSync(binaryPath)) {
+  console.error("[compound-agent] Binary not found. Run: npm install compound-agent");
+  process.exit(1);
+}
+
+try {
+  execFileSync(binaryPath, process.argv.slice(2), {
+    stdio: "inherit",
+    env: process.env,
+  });
+} catch (err) {
+  // execFileSync throws on non-zero exit codes; forward the exit code
+  process.exit(err.status || 1);
+}
