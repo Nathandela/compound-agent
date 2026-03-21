@@ -66,11 +66,16 @@ function downloadFile(url, dest) {
 
           const file = fs.createWriteStream(dest);
           res.pipe(file);
-          file.on("finish", () => {
-            file.close();
-            resolve();
+          file.on("close", resolve);
+          file.on("error", (err) => {
+            fs.unlink(dest, () => {});
+            reject(err);
           });
-          file.on("error", reject);
+          res.on("error", (err) => {
+            file.destroy();
+            fs.unlink(dest, () => {});
+            reject(err);
+          });
         })
         .on("error", reject);
     };
@@ -79,26 +84,41 @@ function downloadFile(url, dest) {
   });
 }
 
+async function downloadBinary(binDir, url, destName, label) {
+  const destPath = path.join(binDir, destName);
+
+  try {
+    await downloadFile(url, destPath);
+    fs.chmodSync(destPath, 0o755);
+
+    const stats = fs.statSync(destPath);
+    const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
+    console.log(`[compound-agent] ${label}: ${sizeMB} MB`);
+  } catch (err) {
+    console.error(`[compound-agent] ${label} download failed: ${err.message}`);
+    console.error(`[compound-agent] URL: ${url}`);
+    throw err;
+  }
+}
+
 async function main() {
   const platformKey = getPlatformKey();
   const version = getVersion();
-  const binaryName = `ca-${platformKey}`;
 
   const binDir = path.resolve(__dirname, "../bin");
-  const destPath = path.join(binDir, "ca-binary");
+  const caPath = path.join(binDir, "ca-binary");
+  const embedPath = path.join(binDir, "ca-embed");
 
-  // Check if binary already exists (e.g., from manual install)
-  if (fs.existsSync(destPath)) {
+  // Check if both binaries already exist and work
+  if (fs.existsSync(caPath) && fs.existsSync(embedPath)) {
     try {
-      execSync(`"${destPath}" version`, { stdio: "pipe" });
-      console.log("[compound-agent] Binary already installed, skipping download");
+      execSync(`"${caPath}" version`, { stdio: "pipe" });
+      console.log("[compound-agent] Binaries already installed, skipping download");
       return;
     } catch {
       // Binary exists but doesn't work, re-download
     }
   }
-
-  const releaseUrl = `https://github.com/${REPO}/releases/download/v${version}/${binaryName}`;
 
   console.log(`[compound-agent] Platform: ${platformKey}`);
   console.log(`[compound-agent] Downloading: v${version}`);
@@ -107,18 +127,16 @@ async function main() {
     fs.mkdirSync(binDir, { recursive: true });
   }
 
-  try {
-    await downloadFile(releaseUrl, destPath);
-    fs.chmodSync(destPath, 0o755);
+  const baseUrl = `https://github.com/${REPO}/releases/download/v${version}`;
 
-    const stats = fs.statSync(destPath);
-    const sizeMB = (stats.size / (1024 * 1024)).toFixed(2);
-    console.log(`[compound-agent] Installed: ${sizeMB} MB`);
+  try {
+    await Promise.all([
+      downloadBinary(binDir, `${baseUrl}/ca-${platformKey}`, "ca-binary", "CLI binary"),
+      downloadBinary(binDir, `${baseUrl}/ca-embed-${platformKey}`, "ca-embed", "Embed daemon"),
+    ]);
   } catch (err) {
-    console.error(`[compound-agent] Download failed: ${err.message}`);
-    console.error(`[compound-agent] URL: ${releaseUrl}`);
     console.error(
-      "[compound-agent] You can manually download the binary from:"
+      "[compound-agent] You can manually download binaries from:"
     );
     console.error(
       `[compound-agent]   https://github.com/${REPO}/releases/tag/v${version}`
