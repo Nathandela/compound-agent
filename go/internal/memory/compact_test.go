@@ -45,14 +45,16 @@ func readJSONLItems(t *testing.T, dir string) []map[string]interface{} {
 
 func makeLesson(id, insight string) string {
 	item := MemoryItem{
-		ID:      id,
-		Type:    TypeLesson,
-		Trigger: "test trigger",
-		Insight: insight,
-		Tags:    []string{"test"},
-		Source:  SourceManual,
-		Context: Context{Tool: "test", Intent: "test"},
-		Created: "2026-01-15T00:00:00Z",
+		ID:         id,
+		Type:       TypeLesson,
+		Trigger:    "test trigger",
+		Insight:    insight,
+		Tags:       []string{"test"},
+		Source:     SourceManual,
+		Context:    Context{Tool: "test", Intent: "test"},
+		Created:    "2026-01-15T00:00:00Z",
+		Supersedes: []string{},
+		Related:    []string{},
 	}
 	data, _ := json.Marshal(item)
 	return string(data)

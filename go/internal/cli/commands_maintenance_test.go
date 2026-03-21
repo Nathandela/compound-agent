@@ -375,6 +375,7 @@ func TestImportCmd_BasicImport(t *testing.T) {
 			ID: "LIMP1", Type: memory.TypeLesson, Trigger: "import trigger",
 			Insight: "imported insight", Tags: []string{"imported"},
 			Source: memory.SourceManual, Context: memory.Context{}, Created: "2026-03-10T10:00:00Z",
+			Supersedes: []string{}, Related: []string{},
 		},
 	}
 	importFile := filepath.Join(dir, "import.jsonl")
@@ -424,11 +425,13 @@ func TestImportCmd_SkipsDuplicates(t *testing.T) {
 			ID: "L0001", Type: memory.TypeLesson, Trigger: "duplicate",
 			Insight: "Already exists", Tags: []string{},
 			Source: memory.SourceManual, Context: memory.Context{}, Created: "2026-03-01T10:00:00Z",
+			Supersedes: []string{}, Related: []string{},
 		},
 		{
 			ID: "LNEW1", Type: memory.TypeLesson, Trigger: "new trigger",
 			Insight: "Brand new lesson", Tags: []string{"new"},
 			Source: memory.SourceManual, Context: memory.Context{}, Created: "2026-03-15T10:00:00Z",
+			Supersedes: []string{}, Related: []string{},
 		},
 	}
 	importFile := filepath.Join(dir, "import.jsonl")
@@ -469,6 +472,7 @@ func TestImportCmd_InvalidItems(t *testing.T) {
 		ID: "LVALID", Type: memory.TypeLesson, Trigger: "trigger",
 		Insight: "valid insight", Tags: []string{},
 		Source: memory.SourceManual, Context: memory.Context{}, Created: "2026-03-10T10:00:00Z",
+		Supersedes: []string{}, Related: []string{},
 	}
 	data, _ := json.Marshal(validItem)
 	f.Write(append(data, '\n'))

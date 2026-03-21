@@ -18,6 +18,9 @@ type PlanRetrievalResult struct {
 // RetrieveForPlan retrieves relevant lessons for a plan using hybrid search.
 // Falls back to keyword-only when embedder is nil or vector search fails.
 func RetrieveForPlan(db *sql.DB, repoRoot string, embedder search.Embedder, planText string, limit int) (PlanRetrievalResult, error) {
+	if limit < 1 {
+		limit = 5
+	}
 	candidateLimit := limit * search.CandidateMultiplier
 
 	// Keyword search

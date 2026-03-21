@@ -23,7 +23,10 @@ type ReadMemoryItemsResult struct {
 
 // AppendMemoryItem appends a single memory item to the JSONL file.
 // Creates the directory structure if it doesn't exist.
+// Ensures array fields are never nil to produce valid JSONL.
 func AppendMemoryItem(repoRoot string, item MemoryItem) error {
+	EnsureArrayFields(&item)
+
 	path := filepath.Join(repoRoot, LessonsPath)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return fmt.Errorf("create dir: %w", err)
@@ -145,6 +148,9 @@ func parseLine(line string) (MemoryItem, bool, bool) {
 	if item.Type == "quick" || item.Type == "full" {
 		item.Type = TypeLesson
 	}
+
+	// Normalize nil arrays from legacy records
+	EnsureArrayFields(&item)
 
 	// Full validation: match TS Zod schema strictness
 	if err := ValidateMemoryItem(&item); err != nil {

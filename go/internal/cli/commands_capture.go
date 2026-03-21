@@ -105,15 +105,17 @@ func learnCmd() *cobra.Command {
 			}
 
 			item := memory.MemoryItem{
-				ID:        id,
-				Type:      typ,
-				Trigger:   trigger,
-				Insight:   insight,
-				Tags:      parseTags(tags),
-				Source:    memory.SourceManual,
-				Context:   memory.Context{Tool: "cli", Intent: "manual learning"},
-				Created:   time.Now().UTC().Format(time.RFC3339),
-				Confirmed: true,
+				ID:         id,
+				Type:       typ,
+				Trigger:    trigger,
+				Insight:    insight,
+				Tags:       parseTags(tags),
+				Source:     memory.SourceManual,
+				Context:    memory.Context{Tool: "cli", Intent: "manual learning"},
+				Created:    time.Now().UTC().Format(time.RFC3339),
+				Confirmed:  true,
+				Supersedes: []string{},
+				Related:    []string{},
 			}
 
 			if cmd.Flags().Changed("severity") {
@@ -367,15 +369,17 @@ func parseTags(raw string) []string {
 // buildCaptureItem constructs a MemoryItem for programmatic/detected captures.
 func buildCaptureItem(id string, typ memory.MemoryItemType, trigger, insight string, source memory.Source) memory.MemoryItem {
 	return memory.MemoryItem{
-		ID:        id,
-		Type:      typ,
-		Trigger:   trigger,
-		Insight:   insight,
-		Tags:      []string{},
-		Source:    source,
-		Context:   memory.Context{Tool: "cli", Intent: "capture"},
-		Created:   time.Now().UTC().Format(time.RFC3339),
-		Confirmed: true,
+		ID:         id,
+		Type:       typ,
+		Trigger:    trigger,
+		Insight:    insight,
+		Tags:       []string{},
+		Source:     source,
+		Context:    memory.Context{Tool: "cli", Intent: "capture"},
+		Created:    time.Now().UTC().Format(time.RFC3339),
+		Confirmed:  true,
+		Supersedes: []string{},
+		Related:    []string{},
 	}
 }
 
@@ -394,8 +398,13 @@ func detectFromFile(path string) (detectResult, error) {
 	return detectAndPropose(input), nil
 }
 
-// detectAndPropose runs detection in priority order and proposes an insight.
+// detectAndPropose runs detection in priority order, applies quality filters,
+// and proposes an insight. Specificity is always checked; novelty is checked
+// when an embedder is available (graceful degradation).
 func detectAndPropose(input DetectInput) detectResult {
+	var trigger, insight string
+	var source memory.Source
+
 	// 1. User correction (messages + context)
 	if len(input.Messages) >= 2 {
 		signal := capture.CorrectionSignal{
@@ -403,50 +412,49 @@ func detectAndPropose(input DetectInput) detectResult {
 			Context:  input.Context,
 		}
 		if detected := capture.DetectUserCorrection(signal); detected != nil {
-			insight := detected.CorrectionMessage
-			typ := capture.InferMemoryItemType(insight)
-			return detectResult{
-				Detected: true,
-				Trigger:  detected.Trigger,
-				Insight:  insight,
-				Source:   memory.SourceUserCorrection,
-				Type:     typ,
-			}
+			trigger = detected.Trigger
+			insight = detected.CorrectionMessage
+			source = memory.SourceUserCorrection
 		}
 	}
 
 	// 2. Test failure
-	if input.TestResult != nil {
+	if trigger == "" && input.TestResult != nil {
 		if detected := capture.DetectTestFailure(*input.TestResult); detected != nil {
-			insight := detected.ErrorOutput
+			insight = detected.ErrorOutput
 			if len(insight) > 200 {
 				insight = insight[:200]
 			}
-			typ := capture.InferMemoryItemType(insight)
-			return detectResult{
-				Detected: true,
-				Trigger:  detected.Trigger,
-				Insight:  insight,
-				Source:   memory.SourceTestFailure,
-				Type:     typ,
-			}
+			trigger = detected.Trigger
+			source = memory.SourceTestFailure
 		}
 	}
 
 	// 3. Self correction (edit history)
-	if input.EditHistory != nil {
+	if trigger == "" && input.EditHistory != nil {
 		if detected := capture.DetectSelfCorrection(*input.EditHistory); detected != nil {
-			insight := fmt.Sprintf("Self-correction detected on %s", detected.File)
-			typ := capture.InferMemoryItemType(insight)
-			return detectResult{
-				Detected: true,
-				Trigger:  detected.Trigger,
-				Insight:  insight,
-				Source:   memory.SourceSelfCorrection,
-				Type:     typ,
-			}
+			insight = fmt.Sprintf("Self-correction detected on %s", detected.File)
+			trigger = detected.Trigger
+			source = memory.SourceSelfCorrection
 		}
 	}
 
-	return detectResult{Detected: false}
+	if trigger == "" {
+		return detectResult{Detected: false}
+	}
+
+	// Quality gate: check specificity (nil embedder skips novelty gracefully)
+	shouldPropose, _ := capture.ShouldPropose("", insight, nil)
+	if !shouldPropose {
+		return detectResult{Detected: false}
+	}
+
+	typ := capture.InferMemoryItemType(insight)
+	return detectResult{
+		Detected: true,
+		Trigger:  trigger,
+		Insight:  insight,
+		Source:   source,
+		Type:     typ,
+	}
 }

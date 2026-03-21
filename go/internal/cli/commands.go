@@ -46,6 +46,9 @@ func searchCmd() *cobra.Command {
 		Short: "Search lessons by keyword or semantic similarity",
 		Args:  cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if limit < 1 {
+				limit = DefaultSearchLimit
+			}
 			query := strings.Join(args, " ")
 			repoRoot := util.GetRepoRoot()
 
@@ -199,6 +202,9 @@ func checkPlanCmd() *cobra.Command {
 		Use:   "check-plan",
 		Short: "Check a plan against learned lessons",
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if limit < 1 {
+				limit = DefaultCheckPlanLimit
+			}
 			// Read plan from flag or stdin
 			if planText == "" {
 				fi, _ := os.Stdin.Stat()

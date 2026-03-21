@@ -123,7 +123,22 @@ func GenerateID(insight string, typ MemoryItemType) string {
 	return fmt.Sprintf("%s%x", prefix, hash[:8])
 }
 
+// EnsureArrayFields initializes nil slice fields to empty slices so that
+// JSON serialization produces [] instead of null (matching the TypeScript schema).
+func EnsureArrayFields(item *MemoryItem) {
+	if item.Tags == nil {
+		item.Tags = []string{}
+	}
+	if item.Supersedes == nil {
+		item.Supersedes = []string{}
+	}
+	if item.Related == nil {
+		item.Related = []string{}
+	}
+}
+
 // ValidateMemoryItem checks required fields and enum constraints.
+// Rejects nil array fields that the shared schema requires to be arrays.
 func ValidateMemoryItem(item *MemoryItem) error {
 	if item.ID == "" {
 		return fmt.Errorf("id is required")
@@ -142,6 +157,15 @@ func ValidateMemoryItem(item *MemoryItem) error {
 	}
 	if item.Created == "" {
 		return fmt.Errorf("created is required")
+	}
+	if item.Tags == nil {
+		return fmt.Errorf("tags must be an array, not null")
+	}
+	if item.Supersedes == nil {
+		return fmt.Errorf("supersedes must be an array, not null")
+	}
+	if item.Related == nil {
+		return fmt.Errorf("related must be an array, not null")
 	}
 	if item.Severity != nil && !validSeverities[*item.Severity] {
 		return fmt.Errorf("invalid severity: %q", *item.Severity)

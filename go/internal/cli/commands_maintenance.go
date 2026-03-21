@@ -379,7 +379,6 @@ const trustLanguage = `# Compound Agent Active
 | Command | Purpose |
 |---------|---------|
 | ` + "`npx ca search \"query\"`" + ` | Search lessons - MUST call before architectural decisions; use anytime you need context |
-| ` + "`npx ca knowledge \"query\"`" + ` | Semantic search over project docs - MUST call before architectural decisions; use keyword phrases, not questions |
 | ` + "`npx ca learn \"insight\"`" + ` | Capture lessons - call AFTER corrections or discoveries |
 
 ## Core Constraints
@@ -392,13 +391,13 @@ const trustLanguage = `# Compound Agent Active
 
 ## Retrieval Protocol
 
-You MUST call ` + "`npx ca search`" + ` and ` + "`npx ca knowledge`" + ` BEFORE:
+You MUST call ` + "`npx ca search`" + ` BEFORE:
 - Architectural decisions or complex planning
 - Implementing patterns you've done before in this repo
 
 **NEVER skip search for complex decisions.** Past mistakes will repeat.
 
-Beyond mandatory triggers, use these commands freely — they are lightweight queries, not heavyweight operations. Uncertain about a pattern? ` + "`ca search`" + `. Need a detail from the docs? ` + "`ca knowledge`" + `. The cost of an unnecessary search is near-zero; the cost of a missed one can be hours.
+Beyond mandatory triggers, use these commands freely — they are lightweight queries, not heavyweight operations. Uncertain about a pattern? ` + "`ca search`" + `. The cost of an unnecessary search is near-zero; the cost of a missed one can be hours.
 
 ## Capture Protocol
 

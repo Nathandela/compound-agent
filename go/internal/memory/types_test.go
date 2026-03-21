@@ -255,6 +255,7 @@ func TestValidateMemoryItem_MissingFields(t *testing.T) {
 func TestValidateMemoryItem_InvalidEnums(t *testing.T) {
 	base := MemoryItem{
 		ID: "L123", Type: TypeLesson, Trigger: "t", Insight: "i",
+		Tags: []string{}, Supersedes: []string{}, Related: []string{},
 		Source: SourceManual, Context: Context{Tool: "t", Intent: "i"},
 		Created: "2026-01-01T00:00:00Z",
 	}
@@ -285,6 +286,7 @@ func TestValidateMemoryItem_PatternRequired(t *testing.T) {
 	// Pattern type requires pattern field
 	item := MemoryItem{
 		ID: "P123", Type: TypePattern, Trigger: "t", Insight: "i",
+		Tags: []string{}, Supersedes: []string{}, Related: []string{},
 		Source: SourceManual, Context: Context{Tool: "t", Intent: "i"},
 		Created: "2026-01-01T00:00:00Z",
 	}
@@ -296,6 +298,50 @@ func TestValidateMemoryItem_PatternRequired(t *testing.T) {
 	item.Pattern = &Pattern{Bad: "old", Good: "new"}
 	if err := ValidateMemoryItem(&item); err != nil {
 		t.Errorf("expected valid with pattern, got: %v", err)
+	}
+}
+
+func TestValidateMemoryItem_NilArraysRejected(t *testing.T) {
+	base := MemoryItem{
+		ID: "L123", Type: TypeLesson, Trigger: "t", Insight: "i",
+		Tags: []string{}, Supersedes: []string{}, Related: []string{},
+		Source: SourceManual, Context: Context{Tool: "t", Intent: "i"},
+		Created: "2026-01-01T00:00:00Z",
+	}
+
+	// Nil Tags
+	bad := base
+	bad.Tags = nil
+	if err := ValidateMemoryItem(&bad); err == nil {
+		t.Error("expected error for nil Tags")
+	}
+
+	// Nil Supersedes
+	bad = base
+	bad.Supersedes = nil
+	if err := ValidateMemoryItem(&bad); err == nil {
+		t.Error("expected error for nil Supersedes")
+	}
+
+	// Nil Related
+	bad = base
+	bad.Related = nil
+	if err := ValidateMemoryItem(&bad); err == nil {
+		t.Error("expected error for nil Related")
+	}
+}
+
+func TestEnsureArrayFields(t *testing.T) {
+	item := MemoryItem{}
+	EnsureArrayFields(&item)
+	if item.Tags == nil {
+		t.Error("Tags should be initialized")
+	}
+	if item.Supersedes == nil {
+		t.Error("Supersedes should be initialized")
+	}
+	if item.Related == nil {
+		t.Error("Related should be initialized")
 	}
 }
 
