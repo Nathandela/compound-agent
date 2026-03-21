@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 
+	"github.com/nathandelacretaz/compound-agent/internal/cli"
 	"github.com/nathandelacretaz/compound-agent/internal/hook"
 	"github.com/spf13/cobra"
 )
@@ -34,6 +35,7 @@ func main() {
 
 	hooksCmd.AddCommand(runCmd)
 	rootCmd.AddCommand(hooksCmd)
+	cli.RegisterCommands(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
