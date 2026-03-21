@@ -183,16 +183,15 @@ Work through all phases: plan, work, review, compound.
 
 ## Step 3: On completion
 When all work is done and tests pass:
-1. Close the epic: `bd close $epic_id`
-2. Sync beads: `bd sync`
-3. Commit and push all changes
-4. Output this exact marker on its own line:
+1. Close the epic: \`bd close $epic_id\`
+2. Commit and push all changes
+3. Output this exact marker on its own line:
 
 EPIC_COMPLETE
 
 ## Step 4: On failure
 If you cannot complete the epic after reasonable effort:
-1. Add a note: `bd update $epic_id --notes "Loop failed: <reason>"`
+1. Add a note: \`bd update $epic_id --notes "Loop failed: <reason>"\`
 2. Output this exact marker on its own line:
 
 EPIC_FAILED
@@ -200,7 +199,7 @@ EPIC_FAILED
 ## Step 5: On human required
 If you hit a blocker that REQUIRES human action (account creation, API keys,
 external service setup, design decisions you cannot make, etc.):
-1. Add a note: `bd update $epic_id --notes "Human required: <reason>"`
+1. Add a note: \`bd update $epic_id --notes "Human required: <reason>"\`
 2. Output this exact marker followed by a short reason on the SAME line:
 
 HUMAN_REQUIRED: <reason>
