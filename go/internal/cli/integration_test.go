@@ -257,12 +257,8 @@ func TestE2E_LoadSessionJSON(t *testing.T) {
 	if parsed.Count != 1 {
 		t.Errorf("expected count=1, got %d", parsed.Count)
 	}
-	if parsed.TotalCount != 3 {
-		// TotalCount should be total lessons (including low severity)
-		// But we only wrote 1 lesson in this test
-		if parsed.TotalCount != 1 {
-			t.Errorf("expected totalCount=1, got %d", parsed.TotalCount)
-		}
+	if parsed.TotalCount != 1 {
+		t.Errorf("expected totalCount=1, got %d", parsed.TotalCount)
 	}
 }
 
