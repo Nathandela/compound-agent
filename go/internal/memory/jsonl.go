@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -97,6 +98,11 @@ func ReadMemoryItems(repoRoot string) (ReadMemoryItemsResult, error) {
 	for _, item := range items {
 		result.Items = append(result.Items, item)
 	}
+
+	// Sort by created timestamp for deterministic ordering (Go maps iterate randomly)
+	sort.Slice(result.Items, func(i, j int) bool {
+		return result.Items[i].Created < result.Items[j].Created
+	})
 
 	return result, nil
 }

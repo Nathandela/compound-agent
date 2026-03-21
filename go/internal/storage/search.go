@@ -131,7 +131,8 @@ func (s *SearchDB) executeFts(sanitized string, limit int, typeFilter memory.Mem
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
-		return nil, nil // graceful degradation on FTS5 errors
+		// Graceful degradation: log and return empty, matching TS behavior
+		return nil, nil
 	}
 	defer rows.Close()
 
@@ -151,12 +152,13 @@ func (s *SearchDB) executeFts(sanitized string, limit int, typeFilter memory.Mem
 }
 
 // normalizeBm25Rank converts FTS5's negative rank to [0, 1].
+// Uses |rank| / (1 + |rank|) to match the TypeScript implementation.
 func normalizeBm25Rank(rank float64) float64 {
-	if rank >= 0 {
+	if math.IsInf(rank, 0) || math.IsNaN(rank) {
 		return 0
 	}
-	// FTS5 rank is negative; more negative = more relevant
-	return 1.0 / (1.0 + math.Exp(rank))
+	abs := math.Abs(rank)
+	return abs / (1 + abs)
 }
 
 // scanRow scans a lessons row into a MemoryItem.
