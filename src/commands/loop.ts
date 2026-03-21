@@ -82,6 +82,16 @@ function buildScriptHeader(timestamp: string, maxRetries: number, model: string,
 
 set -euo pipefail
 
+# Crash handler: log WHY we died and update status file
+_loop_cleanup() {
+  local exit_code=$?
+  if [ $exit_code -ne 0 ]; then
+    log "CRASH: Script exited with code $exit_code at line \${BASH_LINENO[0]:-unknown}"
+    echo "{\\"status\\":\\"crashed\\",\\"exit_code\\":$exit_code,\\"timestamp\\":\\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\\",\\"line\\":\\"\${BASH_LINENO[0]:-unknown}\\"}" > "\${LOG_DIR:-.}/.loop-status.json" 2>/dev/null || true
+  fi
+}
+trap _loop_cleanup EXIT
+
 # Config
 MAX_RETRIES=${maxRetries}
 MODEL="${model}"

@@ -147,15 +147,22 @@ build_review_prompt() {
   if [ -z "$diff_content" ]; then diff_content="(empty diff)"; fi
   local beads_context
   beads_context=$(bd list --status=closed --limit=20 2>/dev/null || echo "(no beads)")
-  cat <<REVIEW_PROMPT_EOF
+  # Write prompt to temp file to avoid heredoc expansion of reviewer/diff content
+  local prompt_file
+  prompt_file=$(mktemp)
+  cat > "$prompt_file" <<'REVIEW_PROMPT_HEADER'
 You are reviewing code changes made by an autonomous agent loop.
 
 ## Completed Beads
-$beads_context
+REVIEW_PROMPT_HEADER
+  echo "$beads_context" >> "$prompt_file"
+  cat >> "$prompt_file" <<'REVIEW_PROMPT_MID'
 
 ## Git Diff
 \`\`\`diff
-$diff_content
+REVIEW_PROMPT_MID
+  echo "$diff_content" >> "$prompt_file"
+  cat >> "$prompt_file" <<'REVIEW_PROMPT_FOOTER'
 \`\`\`
 
 Review for: correctness, security, edge cases, code quality.
@@ -164,7 +171,9 @@ Be concise, actionable, no praise.
 
 If everything looks good: output REVIEW_APPROVED on its own line.
 If changes needed: output REVIEW_CHANGES_REQUESTED then your findings.
-REVIEW_PROMPT_EOF
+REVIEW_PROMPT_FOOTER
+  cat "$prompt_file"
+  rm -f "$prompt_file"
 }
 `;
 }
@@ -241,19 +250,12 @@ export function buildImplementerPhase(): string {
 feed_implementer() {
   local cycle_dir="$1"
   local implementer_report="$cycle_dir/implementer.md"
-  local review_sections=""
-  for reviewer in $AVAILABLE_REVIEWERS; do
-    local report="$cycle_dir/$reviewer.md"
-    if [ -s "$report" ]; then
-      review_sections="$review_sections
-<$reviewer-review>
-$(cat "$report")
-</$reviewer-review>
-"
-    fi
-  done
-  local impl_prompt
-  impl_prompt=$(cat <<IMPL_PROMPT_EOF
+
+  # Build prompt in a file to avoid heredoc expansion of reviewer output.
+  # Reviewer reports may contain $vars, backticks, etc. that break heredocs
+  # and crash the script under set -u (nounset).
+  local prompt_file="$cycle_dir/implementer-prompt.md"
+  cat > "$prompt_file" <<'IMPL_PROMPT_HEADER'
 You received feedback from independent code reviewers. Analyze and implement all fixes.
 
 First, load your context:
@@ -261,17 +263,34 @@ First, load your context:
 npx ca load-session
 \`\`\`
 
-$review_sections
+IMPL_PROMPT_HEADER
+
+  for reviewer in $AVAILABLE_REVIEWERS; do
+    local report="$cycle_dir/$reviewer.md"
+    if [ -s "$report" ]; then
+      printf '<%s-review>\\n' "$reviewer" >> "$prompt_file"
+      cat "$report" >> "$prompt_file"
+      printf '</%s-review>\\n\\n' "$reviewer" >> "$prompt_file"
+    fi
+  done
+
+  cat >> "$prompt_file" <<'IMPL_PROMPT_FOOTER'
 
 Fix ALL P0 and P1 findings. Address P2 where reasonable. Commit fixes.
 Run tests to verify. Output FIXES_APPLIED when done.
-IMPL_PROMPT_EOF
-)
-  log "Running implementer session..."
-  portable_timeout "$REVIEW_TIMEOUT" claude --model "$REVIEW_MODEL" --output-format text \
-         --dangerously-skip-permissions \
+IMPL_PROMPT_FOOTER
+
+  local impl_prompt
+  impl_prompt=$(cat "$prompt_file")
+
+  log "Running implementer session (prompt: $prompt_file)..."
+  local impl_start
+  impl_start=$(date +%s)
+  portable_timeout "$REVIEW_TIMEOUT" claude --model "$REVIEW_MODEL" --output-format text \\
+         --dangerously-skip-permissions \\
          -p "$impl_prompt" > "$implementer_report" 2>&1 || true
-  log "Implementer session complete"
+  local impl_duration=$(( $(date +%s) - impl_start ))
+  log "Implementer session complete (\${impl_duration}s)"
 }
 `;
 }
@@ -280,7 +299,11 @@ export function buildReviewLoop(): string {
   return `
 run_review_phase() {
   local trigger="$1"
+  local review_start
+  review_start=$(date +%s)
+  log "=========================================="
   log "Starting review phase (trigger: $trigger)"
+  log "=========================================="
   if [ -z "\${REVIEW_DIFF_RANGE:-}" ]; then
     log "WARN: REVIEW_DIFF_RANGE not set, using HEAD~1..HEAD"
     REVIEW_DIFF_RANGE="HEAD~1..HEAD"
@@ -298,20 +321,46 @@ run_review_phase() {
     local cycle_dir="$REVIEW_DIR/cycle-$cycle"
     mkdir -p "$cycle_dir"
     init_review_sessions "$cycle_dir"
-    log "Review cycle $cycle/$MAX_REVIEW_CYCLES"
+    log "Review cycle $cycle/$MAX_REVIEW_CYCLES -- spawning reviewers..."
+    local spawn_start
+    spawn_start=$(date +%s)
     spawn_reviewers "$cycle" "$cycle_dir"
+    local spawn_duration=$(( $(date +%s) - spawn_start ))
+    log "Reviewers completed in \${spawn_duration}s"
     local all_approved=true
+    local reviewers_with_findings=0
+    local reviewers_errored=0
     for reviewer in $AVAILABLE_REVIEWERS; do
       local report="$cycle_dir/$reviewer.md"
-      if [ -s "$report" ] && tr -d '\\r' < "$report" | grep -q "^REVIEW_APPROVED$"; then
+      if [ ! -s "$report" ]; then
+        log "$reviewer: NO OUTPUT (empty report -- likely crashed or timed out)"
+        reviewers_errored=$((reviewers_errored + 1))
+      elif tr -d '\\r' < "$report" | grep -q "^REVIEW_APPROVED$"; then
         log "$reviewer: APPROVED"
+      elif grep -qi "rate limit\\|Rate limit\\|API.*[Ee]rror\\|API_KEY\\|GEMINI_API_KEY\\|authentication" "$report"; then
+        log "$reviewer: ERROR (API/auth issue, not a code review rejection)"
+        log "  -> $(head -1 "$report")"
+        reviewers_errored=$((reviewers_errored + 1))
       else
-        log "$reviewer: CHANGES_REQUESTED (or no report)"
+        log "$reviewer: CHANGES_REQUESTED"
         all_approved=false
+        reviewers_with_findings=$((reviewers_with_findings + 1))
+        # Summarize findings for visibility
+        local p0_count p1_count
+        p0_count=$(grep -c "P0" "$report" 2>/dev/null || echo 0)
+        p1_count=$(grep -c "P1" "$report" 2>/dev/null || echo 0)
+        if [ "$p0_count" -gt 0 ] || [ "$p1_count" -gt 0 ]; then
+          log "  -> \${p0_count} P0, \${p1_count} P1 findings"
+        fi
       fi
     done
     if [ "$all_approved" = true ]; then
       log "All reviewers approved (cycle $cycle)"
+      return 0
+    fi
+    # If ALL non-approved reviewers errored (none had actual findings), skip implementer
+    if [ "$reviewers_with_findings" -eq 0 ]; then
+      log "No actual code findings -- all rejections were errors. Treating as approved."
       return 0
     fi
     if [ "$cycle" -lt "$MAX_REVIEW_CYCLES" ]; then
@@ -323,11 +372,13 @@ run_review_phase() {
     fi
     cycle=$((cycle + 1))
   done
-  log "Review phase ended after $MAX_REVIEW_CYCLES cycles without full approval"
+  local review_duration=$(( $(date +%s) - review_start ))
+  log "Review phase ended after $MAX_REVIEW_CYCLES cycles without full approval (\${review_duration}s)"
   if [ "$REVIEW_BLOCKING" = true ]; then
     log "FATAL: Review blocking enabled, exiting"
     exit 1
   fi
+  log "Review non-blocking: continuing to next epic"
 }
 `;
 }

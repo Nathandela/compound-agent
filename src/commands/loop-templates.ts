@@ -354,14 +354,18 @@ SKIPPED=0
 PROCESSED=""
 LOOP_START=$(date +%s)${counterInit}
 
+log "=========================================="
 log "Infinity loop starting"
+log "=========================================="
 log "Config: max_retries=$MAX_RETRIES model=$MODEL"
 [ -n "$EPIC_IDS" ] && log "Targeting epics: $EPIC_IDS" || log "Targeting: all ready epics"
 
 while true; do
   EPIC_ID=$(get_next_epic) || break
 
+  log "=========================================="
   log "Processing epic: $EPIC_ID"
+  log "=========================================="
   EPIC_START=$(date +%s)
 
   ATTEMPT=0
@@ -419,6 +423,13 @@ ${final}
 TOTAL_DURATION=$(( $(date +%s) - LOOP_START ))
 echo "{\\"type\\":\\"summary\\",\\"completed\\":$COMPLETED,\\"failed\\":$FAILED,\\"skipped\\":$SKIPPED,\\"total_duration_s\\":$TOTAL_DURATION}" >> "$EXEC_LOG"
 write_status "idle"
-log "Loop finished. Completed: $COMPLETED, Failed: $FAILED, Skipped: $SKIPPED"
+log "=========================================="
+log "Loop finished"
+log "  Completed: $COMPLETED"
+log "  Failed:    $FAILED"
+log "  Skipped:   $SKIPPED"
+log "  Duration:  \${TOTAL_DURATION}s ($(( TOTAL_DURATION / 60 ))m)"
+log "  Processed: $PROCESSED"
+log "=========================================="
 ${skipExit ? '' : '[ $FAILED -eq 0 ] && exit 0 || exit 1'}`;
 }
