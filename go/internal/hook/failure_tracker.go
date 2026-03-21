@@ -1,0 +1,111 @@
+package hook
+
+import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+const (
+	sameTargetThreshold  = 2
+	totalFailureThreshold = 3
+	failureStateFileName  = ".ca-failure-state.json"
+	stateMaxAge          = time.Hour
+)
+
+const failureTip = "Tip: Multiple failures detected. `npx ca search` may have solutions for similar issues."
+
+type failureState struct {
+	Count           int    `json:"count"`
+	LastTarget      string `json:"lastTarget"`
+	SameTargetCount int    `json:"sameTargetCount"`
+	Timestamp       int64  `json:"timestamp"`
+}
+
+// ToolFailureResult is the output of the post-tool-failure hook.
+type ToolFailureResult struct {
+	HookSpecificOutput *HookSpecificOutput `json:"hookSpecificOutput,omitempty"`
+}
+
+func readFailureState(stateDir string) failureState {
+	data, err := os.ReadFile(filepath.Join(stateDir, failureStateFileName))
+	if err != nil {
+		return failureState{Timestamp: time.Now().UnixMilli()}
+	}
+	var state failureState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return failureState{Timestamp: time.Now().UnixMilli()}
+	}
+	// Check staleness
+	if time.Now().UnixMilli()-state.Timestamp > stateMaxAge.Milliseconds() {
+		return failureState{Timestamp: time.Now().UnixMilli()}
+	}
+	return state
+}
+
+func writeFailureState(stateDir string, state failureState) {
+	data, _ := json.Marshal(state)
+	_ = os.WriteFile(filepath.Join(stateDir, failureStateFileName), data, 0o644)
+}
+
+func deleteFailureState(stateDir string) {
+	_ = os.Remove(filepath.Join(stateDir, failureStateFileName))
+}
+
+func getFailureTarget(toolName string, toolInput map[string]interface{}) string {
+	switch toolName {
+	case "Bash":
+		cmd, ok := toolInput["command"].(string)
+		if !ok {
+			return ""
+		}
+		trimmed := strings.TrimSpace(cmd)
+		if idx := strings.IndexByte(trimmed, ' '); idx != -1 {
+			return trimmed[:idx]
+		}
+		return trimmed
+	case "Edit", "Write":
+		fp, ok := toolInput["file_path"].(string)
+		if !ok {
+			return ""
+		}
+		return fp
+	default:
+		return ""
+	}
+}
+
+// ProcessToolFailure processes a tool failure and returns a tip if thresholds are met.
+func ProcessToolFailure(toolName string, toolInput map[string]interface{}, stateDir string) ToolFailureResult {
+	state := readFailureState(stateDir)
+	state.Count++
+	target := getFailureTarget(toolName, toolInput)
+
+	if target != "" && target == state.LastTarget {
+		state.SameTargetCount++
+	} else {
+		state.SameTargetCount = 1
+		state.LastTarget = target
+	}
+
+	if state.SameTargetCount >= sameTargetThreshold || state.Count >= totalFailureThreshold {
+		deleteFailureState(stateDir)
+		return ToolFailureResult{
+			HookSpecificOutput: &HookSpecificOutput{
+				HookEventName:     "PostToolUseFailure",
+				AdditionalContext: failureTip,
+			},
+		}
+	}
+
+	state.Timestamp = time.Now().UnixMilli()
+	writeFailureState(stateDir, state)
+	return ToolFailureResult{}
+}
+
+// ProcessToolSuccess clears the failure state.
+func ProcessToolSuccess(stateDir string) {
+	deleteFailureState(stateDir)
+}
