@@ -36,6 +36,8 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	registerCaptureCommands(rootCmd)
 	registerMaintenanceCommands(rootCmd)
 	registerKnowledgeCommands(rootCmd)
+	registerInfoCommands(rootCmd)
+	registerSetupCommands(rootCmd)
 }
 
 // --- search command ---
