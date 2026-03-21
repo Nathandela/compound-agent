@@ -7,6 +7,17 @@ on:
     branches: [main]
 
 jobs:
+  goreleaser-check:
+    name: Validate GoReleaser Config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: latest
+          args: check
+
   go-test:
     name: Go Tests
     runs-on: ${{ matrix.os }}

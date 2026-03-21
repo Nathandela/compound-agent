@@ -8,60 +8,6 @@ permissions:
   contents: write
 
 jobs:
-  build-go:
-    name: Build Go CLI (${{ matrix.goos }}-${{ matrix.goarch }})
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            goos: linux
-            goarch: amd64
-            cc: gcc
-          - runner: ubuntu-24.04-arm
-            goos: linux
-            goarch: arm64
-            cc: gcc
-          - runner: macos-latest
-            goos: darwin
-            goarch: arm64
-            cc: clang
-          - runner: macos-13
-            goos: darwin
-            goarch: amd64
-            cc: clang
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: go/go.mod
-
-      - name: Build release binary
-        working-directory: go
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: "1"
-          CC: ${{ matrix.cc }}
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          COMMIT="${GITHUB_SHA:0:8}"
-          go build -tags sqlite_fts5 \
-            -ldflags="-s -w \
-              -X github.com/nathandelacretaz/compound-agent/internal/build.Version=${VERSION} \
-              -X github.com/nathandelacretaz/compound-agent/internal/build.Commit=${COMMIT}" \
-            -o dist/ca-${{ matrix.goos }}-${{ matrix.goarch }} \
-            ./cmd/ca
-
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ca-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: go/dist/ca-${{ matrix.goos }}-${{ matrix.goarch }}
-
   build-rust:
     name: Build Rust Daemon (${{ matrix.artifact }})
     runs-on: ${{ matrix.runner }}
@@ -102,28 +48,26 @@ jobs:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}
 
-  release:
-    name: Create Release
-    needs: [build-go, build-rust]
+  goreleaser:
+    name: GoReleaser
+    needs: [build-rust]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Download all artifacts
+      - name: Download Rust artifacts
         uses: actions/download-artifact@v4
         with:
-          path: dist
+          path: rust-artifacts
+          pattern: ca-embed-*
+          merge-multiple: true
 
-      - name: Create release
-        uses: softprops/action-gh-release@v2
+      - name: GoReleaser
+        uses: goreleaser/goreleaser-cross-action@v5
         with:
-          generate_release_notes: true
-          files: |
-            dist/ca-darwin-arm64/ca-darwin-arm64
-            dist/ca-darwin-amd64/ca-darwin-amd64
-            dist/ca-linux-amd64/ca-linux-amd64
-            dist/ca-linux-arm64/ca-linux-arm64
-            dist/ca-embed-darwin-arm64/ca-embed-darwin-arm64
-            dist/ca-embed-darwin-amd64/ca-embed-darwin-amd64
-            dist/ca-embed-linux-amd64/ca-embed-linux-amd64
-            dist/ca-embed-linux-arm64/ca-embed-linux-arm64
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
