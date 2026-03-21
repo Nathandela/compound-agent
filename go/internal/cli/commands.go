@@ -306,6 +306,7 @@ func getOrStartEmbedder(repoRoot string) search.Embedder {
 
 	client, err = embed.EnsureDaemon(repoRoot, modelPath, tokenizerPath)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "[ca] embed daemon failed: %v (falling back to keyword search)\n", err)
 		return nil // Daemon failed to start, degrade gracefully
 	}
 	return &embedderAdapter{client: client}

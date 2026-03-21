@@ -177,21 +177,27 @@ func findDaemonBinary() (string, error) {
 // FindModelFiles searches known locations for the ONNX model and tokenizer.
 // Returns empty strings if not found.
 func FindModelFiles(repoRoot string) (modelPath, tokenizerPath string) {
-	// Location 1: HuggingFace transformers cache in node_modules
-	hfBase := filepath.Join(repoRoot, "node_modules", ".pnpm",
-		"@huggingface+transformers@3.8.1", "node_modules",
-		"@huggingface", "transformers", ".cache",
-		"nomic-ai", "nomic-embed-text-v1.5")
-
 	candidates := []struct {
 		model     string
 		tokenizer string
 	}{
-		{filepath.Join(hfBase, "onnx", "model_quantized.onnx"), filepath.Join(hfBase, "tokenizer.json")},
-		// Location 2: .claude/.cache/model (after download-model)
+		// Location 1: .claude/.cache/model (after download-model) — preferred
 		{filepath.Join(repoRoot, ".claude", ".cache", "model", "model_quantized.onnx"), filepath.Join(repoRoot, ".claude", ".cache", "model", "tokenizer.json")},
-		// Location 3: Next to the Go binary
+		// Location 2: Next to the Go binary
 		{findNextToBinary("model_quantized.onnx"), findNextToBinary("tokenizer.json")},
+	}
+
+	// Location 3: HuggingFace transformers cache in node_modules (any version)
+	hfPattern := filepath.Join(repoRoot, "node_modules", ".pnpm",
+		"@huggingface+transformers@*", "node_modules",
+		"@huggingface", "transformers", ".cache",
+		"nomic-ai", "nomic-embed-text-v1.5")
+	if matches, err := filepath.Glob(hfPattern); err == nil && len(matches) > 0 {
+		hfBase := matches[len(matches)-1] // Use latest version (sorted lexicographically)
+		candidates = append(candidates, struct {
+			model     string
+			tokenizer string
+		}{filepath.Join(hfBase, "onnx", "model_quantized.onnx"), filepath.Join(hfBase, "tokenizer.json")})
 	}
 
 	for _, c := range candidates {
@@ -279,9 +285,12 @@ func DownloadModel(repoRoot string, progress func(string)) (*DownloadResult, err
 	}, nil
 }
 
+// httpClient is used for model downloads with a 10-minute timeout.
+var httpClient = &http.Client{Timeout: 10 * time.Minute}
+
 // downloadFile downloads a URL to a local file path.
 func downloadFile(url, destPath string) error {
-	resp, err := http.Get(url)
+	resp, err := httpClient.Get(url)
 	if err != nil {
 		return fmt.Errorf("GET %s: %w", url, err)
 	}
@@ -308,7 +317,11 @@ func downloadFile(url, destPath string) error {
 		return err
 	}
 
-	return os.Rename(tmpPath, destPath)
+	if err := os.Rename(tmpPath, destPath); err != nil {
+		os.Remove(tmpPath)
+		return err
+	}
+	return nil
 }
 
 // waitForReady polls the daemon socket until it responds to health checks.

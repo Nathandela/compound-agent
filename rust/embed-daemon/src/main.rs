@@ -354,7 +354,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let max_batch: usize = env::var("CA_EMBED_MAX_BATCH")
         .ok()
-        .and_then(|v| v.parse().ok())
+        .and_then(|v| v.parse::<usize>().ok().filter(|&n| n >= 1))
         .unwrap_or(64);
 
     // Derive PID file path from socket path

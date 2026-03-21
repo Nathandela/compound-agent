@@ -43,18 +43,21 @@ func CosineSimilarity(a, b []float64) float64 {
 }
 
 // cctToMemoryItem converts a CCT pattern to a MemoryItem for unified scoring.
+// Uses SourceManual because no "synthesized" source exists; Context.Intent
+// disambiguates these from genuinely manual entries.
 func cctToMemoryItem(p compound.CctPattern) memory.MemoryItem {
 	return memory.MemoryItem{
-		ID:        p.ID,
-		Type:      memory.TypeLesson,
-		Trigger:   p.Name,
-		Insight:   p.Description,
-		Tags:      []string{},
-		Source:     memory.SourceManual,
-		Context:   memory.Context{Tool: "compound", Intent: "synthesis"},
-		Created:   p.Created,
-		Confirmed: true,
-		Related:   p.SourceIDs,
+		ID:         p.ID,
+		Type:       memory.TypeLesson,
+		Trigger:    p.Name,
+		Insight:    p.Description,
+		Tags:       []string{},
+		Source:      memory.SourceManual,
+		Context:    memory.Context{Tool: "compound", Intent: "synthesis"},
+		Created:    p.Created,
+		Confirmed:  true,
+		Supersedes: []string{},
+		Related:    p.SourceIDs,
 	}
 }
 
@@ -112,15 +115,19 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRo
 		results = append(results, ScoredItem{Item: item, Score: score})
 	}
 
-	// Score CCT patterns
-	for _, pattern := range cctPatterns {
-		text := pattern.Name + " " + pattern.Description
-		vecs, err := embedder.Embed([]string{text})
-		if err != nil {
-			continue // Skip patterns that fail embedding
+	// Score CCT patterns — batch all into a single Embed() call
+	if len(cctPatterns) > 0 {
+		cctTexts := make([]string, len(cctPatterns))
+		for i, p := range cctPatterns {
+			cctTexts[i] = p.Name + " " + p.Description
 		}
-		score := CosineSimilarity(queryVec, vecs[0])
-		results = append(results, ScoredItem{Item: cctToMemoryItem(pattern), Score: score})
+		cctVecs, cctErr := embedder.Embed(cctTexts)
+		if cctErr == nil && len(cctVecs) == len(cctPatterns) {
+			for i, pattern := range cctPatterns {
+				score := CosineSimilarity(queryVec, cctVecs[i])
+				results = append(results, ScoredItem{Item: cctToMemoryItem(pattern), Score: score})
+			}
+		}
 	}
 
 	sort.Slice(results, func(i, j int) bool {
