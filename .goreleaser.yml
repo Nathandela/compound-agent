@@ -1,0 +1,51 @@
+version: 2
+
+project_name: compound-agent
+
+builds:
+  - id: ca
+    dir: go
+    main: ./cmd/ca
+    binary: ca
+    env:
+      - CGO_ENABLED=1
+    goos: [darwin, linux]
+    goarch: [amd64, arm64]
+    flags:
+      - -tags=sqlite_fts5
+    ldflags:
+      - -s -w
+      - -X github.com/nathandelacretaz/compound-agent/internal/build.Version={{.Version}}
+      - -X github.com/nathandelacretaz/compound-agent/internal/build.Commit={{.ShortCommit}}
+
+archives:
+  - id: ca-binary
+    builds: [ca]
+    format: binary
+    name_template: "ca-{{ .Os }}-{{ .Arch }}"
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+  extra_files:
+    - glob: dist/extras/ca-embed-*
+
+release:
+  github:
+    owner: nathandelacretaz
+    name: compound-agent
+  draft: false
+  prerelease: auto
+  name_template: "{{.Tag}}"
+  extra_files:
+    - glob: dist/extras/ca-embed-*
+
+changelog:
+  sort: asc
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))?\!?:.*$'
+    - title: Bug Fixes
+      regexp: '^.*?fix(\([[:word:]]+\))?\!?:.*$'
+    - title: Other
+      order: 999
