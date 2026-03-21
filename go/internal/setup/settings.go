@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/nathandelacretaz/compound-agent/internal/util"
 )
 
 // HookMarkers are strings that identify compound-agent hooks in settings.json.
@@ -69,17 +71,19 @@ func WriteClaudeSettings(path string, settings map[string]any) error {
 }
 
 // makeHookCommand builds the shell command for a hook invocation.
+// binaryPath is shell-escaped to handle paths with spaces.
 func makeHookCommand(binaryPath, hookName string) string {
 	if binaryPath != "" {
-		return fmt.Sprintf("%s hooks run %s 2>/dev/null || true", binaryPath, hookName)
+		return fmt.Sprintf("%s hooks run %s 2>/dev/null || true", util.ShellEscape(binaryPath), hookName)
 	}
 	return fmt.Sprintf("npx ca hooks run %s 2>/dev/null || true", hookName)
 }
 
 // makePrimeCommand builds the prime command.
+// binaryPath is shell-escaped to handle paths with spaces.
 func makePrimeCommand(binaryPath string) string {
 	if binaryPath != "" {
-		return fmt.Sprintf("%s prime 2>/dev/null || true", binaryPath)
+		return fmt.Sprintf("%s prime 2>/dev/null || true", util.ShellEscape(binaryPath))
 	}
 	return "npx ca prime 2>/dev/null || true"
 }

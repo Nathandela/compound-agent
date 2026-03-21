@@ -52,6 +52,22 @@ struct ShutdownResponse {
     status: String,
 }
 
+// --- Error types ---
+
+#[derive(Debug, thiserror::Error)]
+enum DaemonError {
+    #[error("tokenize: {0}")]
+    Tokenize(String),
+    #[error("tensor: {0}")]
+    Tensor(#[from] ort::Error),
+    #[error("inference: {0}")]
+    Inference(String),
+    #[error("extract: {0}")]
+    Extract(String),
+    #[error("write PID file: {0}")]
+    PidFile(#[from] std::io::Error),
+}
+
 // --- Inference ---
 
 fn mean_pool(
@@ -95,13 +111,13 @@ fn embed_texts(
     session: &mut Session,
     tokenizer: &Tokenizer,
     texts: &[String],
-) -> Result<Vec<Vec<f32>>, String> {
+) -> Result<Vec<Vec<f32>>, DaemonError> {
     let mut results = Vec::with_capacity(texts.len());
 
     for text in texts {
         let encoding = tokenizer
             .encode(text.as_str(), true)
-            .map_err(|e| format!("tokenize: {}", e))?;
+            .map_err(|e| DaemonError::Tokenize(e.to_string()))?;
 
         let input_ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
         let attention_mask: Vec<i64> = encoding
@@ -113,13 +129,11 @@ fn embed_texts(
             encoding.get_type_ids().iter().map(|&t| t as i64).collect();
         let seq_len = input_ids.len();
 
-        let input_ids_tensor = Tensor::from_array(([1, seq_len as i64], input_ids))
-            .map_err(|e| format!("tensor: {}", e))?;
+        let input_ids_tensor = Tensor::from_array(([1, seq_len as i64], input_ids))?;
         let attention_mask_tensor =
-            Tensor::from_array(([1, seq_len as i64], attention_mask.clone()))
-                .map_err(|e| format!("tensor: {}", e))?;
-        let token_type_ids_tensor = Tensor::from_array(([1, seq_len as i64], token_type_ids))
-            .map_err(|e| format!("tensor: {}", e))?;
+            Tensor::from_array(([1, seq_len as i64], attention_mask.clone()))?;
+        let token_type_ids_tensor =
+            Tensor::from_array(([1, seq_len as i64], token_type_ids))?;
 
         let outputs = session
             .run(ort::inputs![
@@ -127,12 +141,12 @@ fn embed_texts(
                 "attention_mask" => attention_mask_tensor,
                 "token_type_ids" => token_type_ids_tensor,
             ])
-            .map_err(|e| format!("inference: {}", e))?;
+            .map_err(|e| DaemonError::Inference(e.to_string()))?;
 
         let output_value = &outputs[0];
         let (shape, data) = output_value
             .try_extract_tensor::<f32>()
-            .map_err(|e| format!("extract: {}", e))?;
+            .map_err(|e| DaemonError::Extract(e.to_string()))?;
         let hidden_dim = shape[2] as usize;
 
         let mut pooled = mean_pool(data, &attention_mask, seq_len, hidden_dim);
@@ -145,9 +159,10 @@ fn embed_texts(
 
 // --- PID file ---
 
-fn write_pid_file(path: &Path) -> Result<(), String> {
+fn write_pid_file(path: &Path) -> Result<(), DaemonError> {
     let pid = process::id();
-    fs::write(path, pid.to_string()).map_err(|e| format!("write PID file: {}", e))
+    fs::write(path, pid.to_string())?;
+    Ok(())
 }
 
 fn remove_pid_file(path: &Path) {
@@ -186,7 +201,8 @@ fn handle_connection(
     session: Arc<Mutex<Session>>,
     tokenizer: Arc<Tokenizer>,
     last_activity: Arc<Mutex<Instant>>,
-    shutdown_flag: Arc<AtomicBool>,
+    shutdown_flag: &'static AtomicBool,
+    max_batch: usize,
 ) {
     let mut reader = match stream.try_clone() {
         Ok(s) => BufReader::new(s),
@@ -261,10 +277,10 @@ fn handle_connection(
                     send_response(&mut writer, &resp);
                     continue;
                 }
-                if texts.len() > 64 {
+                if texts.len() > max_batch {
                     let resp = serde_json::to_string(&ErrorResponse {
                         id: req_id,
-                        error: "max batch size is 64".to_string(),
+                        error: format!("batch too large: {} (max {})", texts.len(), max_batch),
                     })
                     .unwrap_or_default();
                     send_response(&mut writer, &resp);
@@ -288,7 +304,7 @@ fn handle_connection(
                     Err(e) => {
                         let resp = serde_json::to_string(&ErrorResponse {
                             id: req_id,
-                            error: e,
+                            error: e.to_string(),
                         })
                         .unwrap_or_default();
                         send_response(&mut writer, &resp);
@@ -336,6 +352,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .and_then(|v| v.parse().ok())
         .unwrap_or(300); // 5 minutes
 
+    let max_batch: usize = env::var("CA_EMBED_MAX_BATCH")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(64);
+
     // Derive PID file path from socket path
     let pid_path = PathBuf::from(format!("{}.pid", socket_path));
 
@@ -373,16 +394,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     write_pid_file(&pid_path)?;
     eprintln!("[ca-embed] PID file: {}", pid_path.display());
 
-    // Set up signal handling
-    let shutdown_flag = Arc::new(AtomicBool::new(false));
-    let shutdown_for_signal = shutdown_flag.clone();
-
     // SIGTERM/SIGINT handler
     unsafe {
-        let flag = shutdown_for_signal;
         libc::signal(libc::SIGTERM, signal_handler as *const () as libc::sighandler_t);
         libc::signal(libc::SIGINT, signal_handler as *const () as libc::sighandler_t);
-        SHUTDOWN_FLAG.store(flag.as_ref() as *const AtomicBool as usize, Ordering::SeqCst);
     }
 
     // Bind socket
@@ -402,7 +417,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Accept loop
     loop {
-        if shutdown_flag.load(Ordering::SeqCst) {
+        if SHUTDOWN_FLAG.load(Ordering::SeqCst) {
             eprintln!("[ca-embed] shutdown requested");
             break;
         }
@@ -425,10 +440,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let sess = session.clone();
                 let tok = tokenizer.clone();
                 let activity = last_activity.clone();
-                let flag = shutdown_flag.clone();
 
                 thread::spawn(move || {
-                    handle_connection(stream, sess, tok, activity, flag);
+                    handle_connection(stream, sess, tok, activity, &SHUTDOWN_FLAG, max_batch);
                 });
             }
             Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
@@ -448,14 +462,122 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-// Global for signal handler (minimal async-signal-safe approach)
-static SHUTDOWN_FLAG: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
+static SHUTDOWN_FLAG: AtomicBool = AtomicBool::new(false);
 
 extern "C" fn signal_handler(_sig: libc::c_int) {
-    let ptr = SHUTDOWN_FLAG.load(Ordering::SeqCst);
-    if ptr != 0 {
-        let flag = unsafe { &*(ptr as *const AtomicBool) };
-        flag.store(true, Ordering::SeqCst);
+    SHUTDOWN_FLAG.store(true, Ordering::SeqCst);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_mean_pool_basic() {
+        // 2 tokens, 3 dimensions, all active
+        let embeddings = vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0];
+        let mask = vec![1, 1];
+        let result = mean_pool(&embeddings, &mask, 2, 3);
+        assert_eq!(result, vec![2.5, 3.5, 4.5]);
+    }
+
+    #[test]
+    fn test_mean_pool_with_padding() {
+        // 3 tokens, 2 dims, last token masked
+        let embeddings = vec![1.0, 2.0, 3.0, 4.0, 0.0, 0.0];
+        let mask = vec![1, 1, 0];
+        let result = mean_pool(&embeddings, &mask, 3, 2);
+        assert_eq!(result, vec![2.0, 3.0]);
+    }
+
+    #[test]
+    fn test_mean_pool_all_masked() {
+        let embeddings = vec![1.0, 2.0, 3.0, 4.0];
+        let mask = vec![0, 0];
+        let result = mean_pool(&embeddings, &mask, 2, 2);
+        assert_eq!(result, vec![0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_l2_normalize_unit() {
+        let mut v = vec![1.0, 0.0, 0.0];
+        l2_normalize(&mut v);
+        assert_eq!(v, vec![1.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_l2_normalize_basic() {
+        let mut v = vec![3.0, 4.0];
+        l2_normalize(&mut v);
+        let expected_mag = 5.0f32;
+        assert!((v[0] - 3.0 / expected_mag).abs() < 1e-6);
+        assert!((v[1] - 4.0 / expected_mag).abs() < 1e-6);
+    }
+
+    #[test]
+    fn test_l2_normalize_zero_vector() {
+        let mut v = vec![0.0, 0.0, 0.0];
+        l2_normalize(&mut v);
+        assert_eq!(v, vec![0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn test_request_deserialization() {
+        let json = r#"{"id":"r1","method":"health"}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        assert_eq!(req.id, Some("r1".to_string()));
+        assert_eq!(req.method, "health");
+        assert!(req.texts.is_none());
+    }
+
+    #[test]
+    fn test_request_deserialization_embed() {
+        let json = r#"{"method":"embed","texts":["hello","world"]}"#;
+        let req: Request = serde_json::from_str(json).unwrap();
+        assert_eq!(req.method, "embed");
+        assert_eq!(req.texts.unwrap(), vec!["hello", "world"]);
+    }
+
+    #[test]
+    fn test_embed_response_serialization() {
+        let resp = EmbedResponse {
+            id: "e1".to_string(),
+            vectors: vec![vec![0.1, 0.2], vec![0.3, 0.4]],
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"id\":\"e1\""));
+        assert!(json.contains("\"vectors\""));
+    }
+
+    #[test]
+    fn test_error_response_serialization() {
+        let resp = ErrorResponse {
+            id: "err1".to_string(),
+            error: "something broke".to_string(),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"error\":\"something broke\""));
+    }
+
+    #[test]
+    fn test_health_response_serialization() {
+        let resp = HealthResponse {
+            id: "h1".to_string(),
+            status: "ok".to_string(),
+            model: "nomic-embed-text-v1.5".to_string(),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"status\":\"ok\""));
+        assert!(json.contains("\"model\":\"nomic-embed-text-v1.5\""));
+    }
+
+    #[test]
+    fn test_shutdown_response_serialization() {
+        let resp = ShutdownResponse {
+            id: "s1".to_string(),
+            status: "shutting_down".to_string(),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        assert!(json.contains("\"status\":\"shutting_down\""));
     }
 }

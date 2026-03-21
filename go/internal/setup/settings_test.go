@@ -158,3 +158,42 @@ func TestRemoveAllHooks_NoHooks(t *testing.T) {
 		t.Error("expected false when no hooks exist")
 	}
 }
+
+func TestMakeHookCommand_ShellEscapesBinaryPath(t *testing.T) {
+	// Paths with spaces must be escaped to prevent shell injection
+	cmd := makeHookCommand("/path/with spaces/ca", "user-prompt")
+	if cmd != "'/path/with spaces/ca' hooks run user-prompt 2>/dev/null || true" {
+		t.Errorf("expected escaped path, got: %s", cmd)
+	}
+}
+
+func TestMakePrimeCommand_ShellEscapesBinaryPath(t *testing.T) {
+	cmd := makePrimeCommand("/path/with spaces/ca")
+	if cmd != "'/path/with spaces/ca' prime 2>/dev/null || true" {
+		t.Errorf("expected escaped path, got: %s", cmd)
+	}
+}
+
+func TestMakeHookCommand_NoEscape_EmptyBinaryPath(t *testing.T) {
+	cmd := makeHookCommand("", "user-prompt")
+	if cmd != "npx ca hooks run user-prompt 2>/dev/null || true" {
+		t.Errorf("expected npx fallback, got: %s", cmd)
+	}
+}
+
+func TestAddAllHooks_WithSpacesInPath(t *testing.T) {
+	settings := map[string]any{}
+	AddAllHooks(settings, "/Users/My User/bin/ca")
+
+	hooks := settings["hooks"].(map[string]any)
+	sessionStart := hooks["SessionStart"].([]any)
+	entry := sessionStart[0].(map[string]any)
+	hooksList := entry["hooks"].([]any)
+	hook := hooksList[0].(map[string]any)
+	cmd := hook["command"].(string)
+
+	// Must be shell-escaped
+	if cmd != "'/Users/My User/bin/ca' prime 2>/dev/null || true" {
+		t.Errorf("expected shell-escaped path, got: %s", cmd)
+	}
+}
