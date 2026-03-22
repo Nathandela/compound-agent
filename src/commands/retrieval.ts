@@ -345,7 +345,7 @@ async function checkPlanAction(cmd: Command, options: { plan?: string; json?: bo
       async () => retrieveForPlan(repoRoot, planText, limit),
       async () => {
         // Keyword-only fallback when no embedding slot available
-        const keywordResults = searchKeywordScored(repoRoot, planText, limit * CANDIDATE_MULTIPLIER);
+        const keywordResults = await searchKeywordScored(repoRoot, planText, limit * CANDIDATE_MULTIPLIER);
         const ranked = rankLessons(mergeHybridResults([], keywordResults, { minScore: 0 }));
         const topLessons = ranked.slice(0, limit);
         if (topLessons.length > 0) {
