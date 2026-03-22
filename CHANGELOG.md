@@ -7,6 +7,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2] - 2026-03-22
+
+### Fixed
+
+- **Silent empty-result messages**: `search`, `load-session`, and `check-plan` commands showed no output when no results found (missing trailing newline merged text with shell prompt).
+- **Setup command output**: `setup` now shows the same detailed breakdown as `init` (directories created, template counts by type, AGENTS.md/CLAUDE.md status).
+- **Beads status reporting**: `init` and `setup` now report whether beads CLI is installed and whether the repo is initialized. Shows install instructions if missing.
+
 ## [2.0.1] - 2026-03-22
 
 ### Changed
