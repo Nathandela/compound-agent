@@ -49,10 +49,13 @@ func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
 	}
 
 	for _, dir := range dirs {
+		_, statErr := os.Stat(dir)
 		if err := os.MkdirAll(dir, 0755); err != nil {
 			return nil, fmt.Errorf("create directory %s: %w", dir, err)
 		}
-		result.DirsCreated = append(result.DirsCreated, dir)
+		if os.IsNotExist(statErr) {
+			result.DirsCreated = append(result.DirsCreated, dir)
+		}
 	}
 
 	// Create empty index.jsonl if it doesn't exist
@@ -159,7 +162,9 @@ func EnsureGitignore(repoRoot string) error {
 		return err
 	}
 
-	patterns := `.cache/
+	marker := "# compound-agent managed"
+	patterns := marker + `
+.cache/
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
@@ -168,16 +173,18 @@ func EnsureGitignore(repoRoot string) error {
 .ca-read-state.json
 `
 
-	// If gitignore exists, check if patterns are already there
+	// If gitignore exists, check for our marker
 	existing, err := os.ReadFile(gitignorePath)
-	if err == nil && len(existing) > 0 {
-		content := string(existing)
-		if strings.Contains(content, ".cache/") && strings.Contains(content, "*.sqlite") {
+	if err == nil {
+		if strings.Contains(string(existing), marker) {
 			return nil // Already has our patterns
 		}
 		// Append our patterns to existing content
-		combined := strings.TrimRight(content, "\n") + "\n" + patterns
+		combined := strings.TrimRight(string(existing), "\n") + "\n" + patterns
 		return os.WriteFile(gitignorePath, []byte(combined), 0644)
+	}
+	if !os.IsNotExist(err) {
+		return fmt.Errorf("read .gitignore: %w", err)
 	}
 
 	return os.WriteFile(gitignorePath, []byte(patterns), 0644)

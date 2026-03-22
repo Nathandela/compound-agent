@@ -5,7 +5,7 @@ package templates
 import (
 	"embed"
 	"io/fs"
-	"path/filepath"
+	"path"
 	"strings"
 )
 
@@ -70,16 +70,16 @@ func CommandTemplates() map[string]string {
 // PhaseSkills returns a map of phase-name -> SKILL.md content.
 func PhaseSkills() map[string]string {
 	result := make(map[string]string)
-	_ = fs.WalkDir(skillsFS, "skills", func(path string, d fs.DirEntry, err error) error {
+	_ = fs.WalkDir(skillsFS, "skills", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		if filepath.Base(path) == "SKILL.md" {
+		if path.Base(p) == "SKILL.md" {
 			// Extract phase name: "skills/<phase>/SKILL.md" -> "<phase>"
-			parts := strings.Split(filepath.ToSlash(path), "/")
+			parts := strings.Split(p, "/")
 			if len(parts) >= 3 {
 				phase := parts[1]
-				data, readErr := fs.ReadFile(skillsFS, path)
+				data, readErr := fs.ReadFile(skillsFS, p)
 				if readErr == nil {
 					result[phase] = string(data)
 				}
@@ -94,19 +94,19 @@ func PhaseSkills() map[string]string {
 // for reference files alongside phase skills.
 func PhaseSkillReferences() map[string]string {
 	result := make(map[string]string)
-	_ = fs.WalkDir(skillsFS, "skills", func(path string, d fs.DirEntry, err error) error {
+	_ = fs.WalkDir(skillsFS, "skills", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		if filepath.Base(path) == "SKILL.md" {
+		if path.Base(p) == "SKILL.md" {
 			return nil // Skip SKILL.md itself
 		}
 		// Path: "skills/<phase>/references/<file>.md"
 		// Key: "<phase>/references/<file>.md"
-		parts := strings.Split(filepath.ToSlash(path), "/")
+		parts := strings.Split(p, "/")
 		if len(parts) >= 2 {
 			relPath := strings.Join(parts[1:], "/") // strip "skills/" prefix
-			data, readErr := fs.ReadFile(skillsFS, path)
+			data, readErr := fs.ReadFile(skillsFS, p)
 			if readErr == nil {
 				result[relPath] = string(data)
 			}
@@ -119,16 +119,16 @@ func PhaseSkillReferences() map[string]string {
 // AgentRoleSkills returns a map of role-name -> SKILL.md content.
 func AgentRoleSkills() map[string]string {
 	result := make(map[string]string)
-	_ = fs.WalkDir(agentRoleSkillsFS, "agent-role-skills", func(path string, d fs.DirEntry, err error) error {
+	_ = fs.WalkDir(agentRoleSkillsFS, "agent-role-skills", func(p string, d fs.DirEntry, err error) error {
 		if err != nil || d.IsDir() {
 			return err
 		}
-		if filepath.Base(path) == "SKILL.md" {
+		if path.Base(p) == "SKILL.md" {
 			// Extract role name: "agent-role-skills/<role>/SKILL.md" -> "<role>"
-			parts := strings.Split(filepath.ToSlash(path), "/")
+			parts := strings.Split(p, "/")
 			if len(parts) >= 3 {
 				role := parts[1]
-				data, readErr := fs.ReadFile(agentRoleSkillsFS, path)
+				data, readErr := fs.ReadFile(agentRoleSkillsFS, p)
 				if readErr == nil {
 					result[role] = string(data)
 				}
@@ -156,7 +156,7 @@ func readEmbedDir(fsys embed.FS, dir string) map[string]string {
 		if entry.IsDir() {
 			continue
 		}
-		data, readErr := fs.ReadFile(fsys, filepath.Join(dir, entry.Name()))
+		data, readErr := fs.ReadFile(fsys, path.Join(dir, entry.Name()))
 		if readErr == nil {
 			result[entry.Name()] = string(data)
 		}

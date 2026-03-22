@@ -2,6 +2,7 @@
 package setup
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -121,6 +122,9 @@ func UpdateAgentsMd(repoRoot string) (bool, error) {
 		content := strings.TrimRight(string(existing), "\n") + "\n" + tmpl
 		return true, os.WriteFile(agentsPath, []byte(content), 0644)
 	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("read AGENTS.md: %w", err)
+	}
 
 	// File doesn't exist — create with template
 	content := strings.TrimSpace(tmpl) + "\n"
@@ -149,6 +153,9 @@ func EnsureClaudeMdReference(repoRoot string) (bool, error) {
 		newContent := strings.TrimRight(content, "\n") + "\n" + ref
 		return true, os.WriteFile(claudeMdPath, []byte(newContent), 0644)
 	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("read CLAUDE.md: %w", err)
+	}
 
 	// File doesn't exist — create
 	content := "# Project Instructions\n" + ref
@@ -164,8 +171,10 @@ func CreatePluginManifest(repoRoot string, version string) (bool, error) {
 		return false, fmt.Errorf("mkdir .claude: %w", err)
 	}
 
-	if _, err := os.Stat(pluginPath); !os.IsNotExist(err) {
+	if _, err := os.Stat(pluginPath); err == nil {
 		return false, nil // Already exists
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return false, fmt.Errorf("stat plugin.json: %w", err)
 	}
 
 	content := strings.ReplaceAll(templates.PluginJSON(), "{{VERSION}}", version)

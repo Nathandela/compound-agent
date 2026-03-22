@@ -99,6 +99,7 @@ func phaseCheckCmd() *cobra.Command {
 	}
 
 	// init <epic-id>
+	var forceInit bool
 	initSubCmd := &cobra.Command{
 		Use:   "init <epic-id>",
 		Short: "Initialize phase state for an epic",
@@ -106,7 +107,16 @@ func phaseCheckCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			epicID := args[0]
 			root := getRoot()
-			os.MkdirAll(filepath.Join(root, ".claude"), 0755)
+			if err := os.MkdirAll(filepath.Join(root, ".claude"), 0755); err != nil {
+				return fmt.Errorf("create .claude dir: %w", err)
+			}
+
+			// Guard against overwriting active state
+			if !forceInit {
+				if existing, err := readPhaseState(root); err == nil {
+					return fmt.Errorf("active phase state exists for epic %q (phase: %s). Use --force to overwrite", existing.EpicID, existing.CurrentPhase)
+				}
+			}
 
 			state := &phaseState{
 				CookitActive: true,
@@ -124,6 +134,7 @@ func phaseCheckCmd() *cobra.Command {
 			return nil
 		},
 	}
+	initSubCmd.Flags().BoolVar(&forceInit, "force", false, "Overwrite existing phase state")
 
 	// start <phase>
 	startSubCmd := &cobra.Command{
@@ -142,6 +153,8 @@ func phaseCheckCmd() *cobra.Command {
 			}
 			state.CurrentPhase = phase
 			state.PhaseIndex = phaseIndex[phase]
+			state.GatesPassed = []string{}
+			state.SkillsRead = []string{}
 			if err := writePhaseState(root, state); err != nil {
 				return fmt.Errorf("write state: %w", err)
 			}
@@ -178,8 +191,12 @@ func phaseCheckCmd() *cobra.Command {
 				state.GatesPassed = append(state.GatesPassed, gate)
 			}
 
+			// Final gate signals epic completion: clean up state file rather than
+			// persisting the gate, since no further phases will read it.
 			if gate == "final" {
-				os.Remove(phaseStatePath(root))
+				if err := os.Remove(phaseStatePath(root)); err != nil && !os.IsNotExist(err) {
+					return fmt.Errorf("remove phase state: %w", err)
+				}
 				cmd.Println("Final gate recorded. Phase state cleaned.")
 				return nil
 			}
@@ -240,7 +257,9 @@ func phaseCheckCmd() *cobra.Command {
 		Short: "Remove phase state file",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := getRoot()
-			os.Remove(phaseStatePath(root))
+			if err := os.Remove(phaseStatePath(root)); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("remove phase state: %w", err)
+			}
 			cmd.Println("Phase state cleaned.")
 			return nil
 		},

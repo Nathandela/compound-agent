@@ -3,6 +3,7 @@ package setup
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -172,5 +173,94 @@ func TestEnsureGitignore(t *testing.T) {
 	content := string(data)
 	if content == "" {
 		t.Error("expected non-empty .gitignore")
+	}
+
+	// Verify all patterns are present
+	for _, pattern := range []string{
+		"# compound-agent managed",
+		".cache/",
+		"*.sqlite",
+		"*.sqlite-shm",
+		"*.sqlite-wal",
+		".ca-phase-state.json",
+		".ca-failure-state.json",
+		".ca-read-state.json",
+	} {
+		if !strings.Contains(content, pattern) {
+			t.Errorf("missing pattern %q in .gitignore", pattern)
+		}
+	}
+}
+
+func TestEnsureGitignore_Idempotent(t *testing.T) {
+	dir := t.TempDir()
+
+	// First call creates the file
+	if err := EnsureGitignore(dir); err != nil {
+		t.Fatalf("first call: %v", err)
+	}
+
+	gitignorePath := filepath.Join(dir, ".claude", ".gitignore")
+	first, _ := os.ReadFile(gitignorePath)
+
+	// Second call should be a no-op
+	if err := EnsureGitignore(dir); err != nil {
+		t.Fatalf("second call: %v", err)
+	}
+
+	second, _ := os.ReadFile(gitignorePath)
+	if string(first) != string(second) {
+		t.Error("expected idempotent gitignore, content changed on second call")
+	}
+}
+
+func TestEnsureGitignore_AppendsToExisting(t *testing.T) {
+	dir := t.TempDir()
+	gitignoreDir := filepath.Join(dir, ".claude")
+	os.MkdirAll(gitignoreDir, 0755)
+
+	// Pre-existing gitignore with unrelated content
+	gitignorePath := filepath.Join(gitignoreDir, ".gitignore")
+	os.WriteFile(gitignorePath, []byte("node_modules/\n"), 0644)
+
+	if err := EnsureGitignore(dir); err != nil {
+		t.Fatalf("EnsureGitignore failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(gitignorePath)
+	content := string(data)
+	if !strings.Contains(content, "node_modules/") {
+		t.Error("existing content was lost")
+	}
+	if !strings.Contains(content, "# compound-agent managed") {
+		t.Error("marker not appended")
+	}
+	if !strings.Contains(content, ".ca-phase-state.json") {
+		t.Error("patterns not appended")
+	}
+}
+
+func TestInitRepo_DirsCreatedAccurate(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
+
+	opts := InitOptions{SkipHooks: true, SkipModel: true, SkipTemplates: true}
+
+	// First run should create dirs
+	result1, err := InitRepo(dir, opts)
+	if err != nil {
+		t.Fatalf("first InitRepo: %v", err)
+	}
+	if len(result1.DirsCreated) == 0 {
+		t.Error("expected dirs created on first run")
+	}
+
+	// Second run should report 0 dirs created
+	result2, err := InitRepo(dir, opts)
+	if err != nil {
+		t.Fatalf("second InitRepo: %v", err)
+	}
+	if len(result2.DirsCreated) != 0 {
+		t.Errorf("expected 0 dirs created on re-run, got %d", len(result2.DirsCreated))
 	}
 }

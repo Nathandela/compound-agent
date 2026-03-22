@@ -217,6 +217,79 @@ func TestInstallBeadsCmd(t *testing.T) {
 	}
 }
 
+func TestPhaseCheckInitGuardsActiveState(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+
+	// First init succeeds
+	cmd1 := phaseCheckCmd()
+	cmd1.SetOut(new(strings.Builder))
+	cmd1.SetArgs([]string{"init", "epic-a", "--repo-root", dir})
+	if err := cmd1.Execute(); err != nil {
+		t.Fatalf("first init: %v", err)
+	}
+
+	// Second init without --force should fail
+	cmd2 := phaseCheckCmd()
+	cmd2.SetOut(new(strings.Builder))
+	cmd2.SetErr(new(strings.Builder))
+	cmd2.SetArgs([]string{"init", "epic-b", "--repo-root", dir})
+	err := cmd2.Execute()
+	if err == nil {
+		t.Error("expected error when overwriting active state without --force")
+	}
+
+	// Second init with --force should succeed
+	cmd3 := phaseCheckCmd()
+	cmd3.SetOut(new(strings.Builder))
+	cmd3.SetArgs([]string{"init", "epic-b", "--force", "--repo-root", dir})
+	if err := cmd3.Execute(); err != nil {
+		t.Fatalf("init --force: %v", err)
+	}
+
+	// Verify new epic ID
+	data, _ := os.ReadFile(filepath.Join(dir, ".claude", ".ca-phase-state.json"))
+	var state map[string]interface{}
+	json.Unmarshal(data, &state)
+	if state["epic_id"] != "epic-b" {
+		t.Errorf("epic_id = %v, want epic-b", state["epic_id"])
+	}
+}
+
+func TestPhaseCheckStartResetsGatesAndSkills(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+
+	// Init
+	cmd := phaseCheckCmd()
+	cmd.SetOut(new(strings.Builder))
+	cmd.SetArgs([]string{"init", "epic-reset", "--repo-root", dir})
+	cmd.Execute()
+
+	// Record a gate
+	cmd2 := phaseCheckCmd()
+	cmd2.SetOut(new(strings.Builder))
+	cmd2.SetArgs([]string{"gate", "post-plan", "--repo-root", dir})
+	cmd2.Execute()
+
+	// Start new phase
+	cmd3 := phaseCheckCmd()
+	cmd3.SetOut(new(strings.Builder))
+	cmd3.SetArgs([]string{"start", "work", "--repo-root", dir})
+	cmd3.Execute()
+
+	// Verify gates and skills were reset
+	data, _ := os.ReadFile(filepath.Join(dir, ".claude", ".ca-phase-state.json"))
+	var state phaseState
+	json.Unmarshal(data, &state)
+	if len(state.GatesPassed) != 0 {
+		t.Errorf("GatesPassed = %v, want empty", state.GatesPassed)
+	}
+	if len(state.SkillsRead) != 0 {
+		t.Errorf("SkillsRead = %v, want empty", state.SkillsRead)
+	}
+}
+
 func TestRulesCmd(t *testing.T) {
 	cmd := rulesCmd()
 	out := new(strings.Builder)
