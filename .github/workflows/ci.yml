@@ -73,7 +73,7 @@ jobs:
             goos: darwin
             goarch: arm64
             cc: clang
-          - runner: macos-13
+          - runner: macos-latest
             goos: darwin
             goarch: amd64
             cc: clang
@@ -118,7 +118,7 @@ jobs:
           - runner: macos-latest
             target: aarch64-apple-darwin
             artifact: ca-embed-darwin-arm64
-          - runner: macos-13
+          - runner: macos-latest
             target: x86_64-apple-darwin
             artifact: ca-embed-darwin-amd64
     steps:
