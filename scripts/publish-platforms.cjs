@@ -38,7 +38,7 @@ function main() {
   }
 
   for (const platform of PLATFORMS) {
-    const pkgName = `@compound-agent/${platform.npm}`;
+    const pkgName = `@syottos/${platform.npm}`;
     console.log(`\n[publish-platforms] Publishing ${pkgName}@${version}`);
 
     const tmpDir = path.resolve(__dirname, "..", `npm-tmp-${platform.npm}`);

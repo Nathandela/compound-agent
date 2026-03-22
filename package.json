@@ -50,10 +50,10 @@
     "knowledge-management"
   ],
   "optionalDependencies": {
-    "@compound-agent/darwin-arm64": "2.0.1",
-    "@compound-agent/darwin-x64": "2.0.1",
-    "@compound-agent/linux-arm64": "2.0.1",
-    "@compound-agent/linux-x64": "2.0.1"
+    "@syottos/darwin-arm64": "2.0.1",
+    "@syottos/darwin-x64": "2.0.1",
+    "@syottos/linux-arm64": "2.0.1",
+    "@syottos/linux-x64": "2.0.1"
   },
   "author": "Nathan Delacrétaz",
   "license": "MIT",

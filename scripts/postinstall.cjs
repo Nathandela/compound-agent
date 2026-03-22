@@ -139,7 +139,7 @@ function cleanupBinaries(binDir) {
 }
 
 function platformPackageInstalled() {
-  const pkg = `@compound-agent/${require("os").platform()}-${require("os").arch()}`;
+  const pkg = `@syottos/${require("os").platform()}-${require("os").arch()}`;
   try {
     const pkgDir = path.dirname(require.resolve(`${pkg}/package.json`));
     return fs.existsSync(path.join(pkgDir, "bin", "ca"));

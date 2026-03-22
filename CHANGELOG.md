@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Platform-specific npm distribution**: Switch from postinstall-only binary download to industry-standard optional dependencies pattern (`@compound-agent/{os}-{arch}`). Works with pnpm out of the box — no `approve-builds` needed.
+- **Platform-specific npm distribution**: Switch from postinstall-only binary download to industry-standard optional dependencies pattern (`@syottos/{os}-{arch}`). Works with pnpm out of the box — no `approve-builds` needed.
 - **Lazy download fallback**: If platform packages are missing and postinstall was blocked, the bin wrapper downloads the binary on first use from GitHub Releases.
 - **Non-fatal postinstall**: Postinstall no longer crashes `npm install` on download failure — the lazy fallback handles it.
 - **npm publish provenance**: All packages published with `--provenance` for supply chain transparency.
@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Weekly npm token health check**: Scheduled workflow verifies `NPM_TOKEN` validity every Monday.
-- **Platform publish script**: `scripts/publish-platforms.cjs` handles creating and publishing `@compound-agent/*` packages during releases. Idempotent — safe to re-run.
+- **Platform publish script**: `scripts/publish-platforms.cjs` handles creating and publishing `@syottos/*` packages during releases. Idempotent — safe to re-run.
 
 ## [Unreleased]
 

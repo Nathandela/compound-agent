@@ -254,10 +254,10 @@ func TestPackageJSON_FilesIncludesBinAndPostinstall(t *testing.T) {
 func TestPackageJSON_HasOptionalDependencies(t *testing.T) {
 	pkg := loadPackageJSON(t)
 	expected := []string{
-		"@compound-agent/darwin-arm64",
-		"@compound-agent/darwin-x64",
-		"@compound-agent/linux-arm64",
-		"@compound-agent/linux-x64",
+		"@syottos/darwin-arm64",
+		"@syottos/darwin-x64",
+		"@syottos/linux-arm64",
+		"@syottos/linux-x64",
 	}
 	for _, name := range expected {
 		v, ok := pkg.OptionalDependencies[name]

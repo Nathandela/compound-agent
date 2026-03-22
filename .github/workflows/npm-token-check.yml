@@ -26,8 +26,8 @@ jobs:
           echo "Token valid for user: $USER"
 
           # Verify publish access to the org
-          if ! npm access list packages @compound-agent 2>/dev/null | grep -q "read-write"; then
-            echo "::warning::Could not verify publish access to @compound-agent org. Ensure the token has publish scope."
+          if ! npm access list packages @syottos 2>/dev/null | grep -q "read-write"; then
+            echo "::warning::Could not verify publish access to @syottos org. Ensure the token has publish scope."
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

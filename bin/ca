@@ -3,7 +3,7 @@
 // Thin wrapper that spawns the Go binary.
 // Resolution order:
 //   1. CA_BINARY_PATH env override
-//   2. Platform-specific npm package (@compound-agent/{os}-{arch})
+//   2. Platform-specific npm package (@syottos/{os}-{arch})
 //   3. Postinstall-downloaded binary (./ca-binary)
 //   4. Local Go dev build (../go/dist/ca)
 //   5. Lazy download from GitHub Releases (fallback when postinstall was blocked)
@@ -18,7 +18,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const require = createRequire(import.meta.url);
 
 function resolvePlatformBinary() {
-  const pkg = `@compound-agent/${process.platform}-${process.arch}`;
+  const pkg = `@syottos/${process.platform}-${process.arch}`;
   try {
     const pkgDir = dirname(require.resolve(`${pkg}/package.json`));
     const bin = resolve(pkgDir, "bin", "ca");
