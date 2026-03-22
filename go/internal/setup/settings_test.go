@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -178,6 +179,31 @@ func TestMakeHookCommand_NoEscape_EmptyBinaryPath(t *testing.T) {
 	cmd := makeHookCommand("", "user-prompt")
 	if cmd != "npx ca hooks run user-prompt 2>/dev/null || true" {
 		t.Errorf("expected npx fallback, got: %s", cmd)
+	}
+}
+
+func TestAddAllHooks_UpgradesNpxToBinaryPath(t *testing.T) {
+	// Simulate hooks installed with npx fallback
+	settings := map[string]any{}
+	AddAllHooks(settings, "")
+
+	hooks := settings["hooks"].(map[string]any)
+	entry := hooks["SessionStart"].([]any)[0].(map[string]any)
+	cmd := entry["hooks"].([]any)[0].(map[string]any)["command"].(string)
+	if !strings.Contains(cmd, "npx ca") {
+		t.Fatalf("expected npx hook, got: %s", cmd)
+	}
+
+	// Re-run with binary path — should upgrade npx to binary path
+	AddAllHooks(settings, "/usr/local/bin/ca")
+
+	entry = hooks["SessionStart"].([]any)[0].(map[string]any)
+	cmd = entry["hooks"].([]any)[0].(map[string]any)["command"].(string)
+	if strings.Contains(cmd, "npx") {
+		t.Errorf("hook still uses npx after upgrade: %s", cmd)
+	}
+	if !strings.Contains(cmd, "/usr/local/bin/ca") {
+		t.Errorf("hook should use binary path, got: %s", cmd)
 	}
 }
 

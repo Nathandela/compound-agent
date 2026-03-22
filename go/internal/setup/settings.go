@@ -154,10 +154,47 @@ func hasHookMarker(arr []any, markers []string) bool {
 	return false
 }
 
+// upgradeNpxHooks replaces "npx ca" commands with the direct binary path.
+// This is needed because npx resolution fails in Claude Code hook contexts
+// (different PATH/environment). Called when binaryPath is available.
+func upgradeNpxHooks(hooks map[string]any, binaryPath string) {
+	if binaryPath == "" {
+		return
+	}
+	escaped := util.ShellEscape(binaryPath)
+	for _, hookType := range HookTypes {
+		arr := getHookArray(hooks, hookType)
+		for _, entry := range arr {
+			entryMap, ok := entry.(map[string]any)
+			if !ok {
+				continue
+			}
+			hooksList, ok := entryMap["hooks"].([]any)
+			if !ok {
+				continue
+			}
+			for _, h := range hooksList {
+				hMap, ok := h.(map[string]any)
+				if !ok {
+					continue
+				}
+				cmd, _ := hMap["command"].(string)
+				if strings.Contains(cmd, "npx ca ") {
+					upgraded := strings.Replace(cmd, "npx ca ", escaped+" ", 1)
+					hMap["command"] = upgraded
+				}
+			}
+		}
+	}
+}
+
 // AddAllHooks adds all compound-agent hooks to settings.
 // binaryPath can be empty string for npx fallback, or path to Go binary.
 func AddAllHooks(settings map[string]any, binaryPath string) {
 	hooks := getHooksMap(settings)
+
+	// Upgrade existing npx-based hooks to use direct binary path
+	upgradeNpxHooks(hooks, binaryPath)
 
 	// SessionStart
 	arr := getHookArray(hooks, "SessionStart")
