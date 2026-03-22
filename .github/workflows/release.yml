@@ -9,6 +9,60 @@ permissions:
   id-token: write
 
 jobs:
+  build-go:
+    name: Build Go CLI (${{ matrix.artifact }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            goos: linux
+            goarch: amd64
+            cc: gcc
+            artifact: ca-linux-amd64
+          - runner: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+            cc: gcc
+            artifact: ca-linux-arm64
+          - runner: macos-latest
+            goos: darwin
+            goarch: arm64
+            cc: clang
+            artifact: ca-darwin-arm64
+          - runner: macos-latest
+            goos: darwin
+            goarch: amd64
+            cc: clang
+            artifact: ca-darwin-amd64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go/go.mod
+
+      - name: Build
+        working-directory: go
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: "1"
+          CC: ${{ matrix.cc }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          COMMIT="${GITHUB_SHA::7}"
+          go build -tags sqlite_fts5 \
+            -ldflags="-s -w -X github.com/nathandelacretaz/compound-agent/internal/build.Version=${VERSION} -X github.com/nathandelacretaz/compound-agent/internal/build.Commit=${COMMIT}" \
+            -o "../dist/${{ matrix.artifact }}" \
+            ./cmd/ca
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}
+
   build-rust:
     name: Build Rust Daemon (${{ matrix.artifact }})
     runs-on: ${{ matrix.runner }}
@@ -24,8 +78,6 @@ jobs:
           - runner: macos-latest
             target: aarch64-apple-darwin
             artifact: ca-embed-darwin-arm64
-          # x86_64 macOS: no native runner available, ort-sys can't cross-compile.
-          # Intel Mac users run the arm64 binary via Rosetta.
     steps:
       - uses: actions/checkout@v4
 
@@ -48,35 +100,37 @@ jobs:
           name: ${{ matrix.artifact }}
           path: dist/${{ matrix.artifact }}
 
-  goreleaser:
-    name: GoReleaser
-    needs: [build-rust]
+  release:
+    name: Create GitHub Release
+    needs: [build-go, build-rust]
     runs-on: ubuntu-latest
-    container:
-      image: ghcr.io/goreleaser/goreleaser-cross:v1.25.8
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Download Rust artifacts
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: rust-artifacts
-          pattern: ca-embed-*
+          path: release-artifacts
           merge-multiple: true
 
-      - name: Fix git safe directory
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - name: Generate checksums
+        run: |
+          cd release-artifacts
+          sha256sum ca-* > checksums.txt
+          cat checksums.txt
 
-      - name: GoReleaser
-        run: goreleaser release --clean
+      - name: Create release
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            release-artifacts/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish-npm:
     name: Publish to npm
-    needs: [goreleaser]
+    needs: [release]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -92,7 +146,6 @@ jobs:
       - name: Download release binaries
         run: |
           mkdir -p release-bins
-          # Go CLI binary: all 4 platforms (cross-compiled by GoReleaser)
           for P in darwin-amd64 darwin-arm64 linux-amd64 linux-arm64; do
             gh release download "${GITHUB_REF_NAME}" \
               --pattern "ca-${P}" \
