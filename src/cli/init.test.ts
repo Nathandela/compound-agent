@@ -480,7 +480,7 @@ exit 0
         expect(hookEntry.hooks[0].command).toContain('prime');
       });
 
-      it('init installs all 5 Claude Code hook types', async () => {
+      it('init installs all 7 managed Claude Code hook types', async () => {
         await mkdir(join(tempDir, '.claude'), { recursive: true });
 
         runCli('init', tempDir);
@@ -488,18 +488,80 @@ exit 0
         const settingsPath = join(tempDir, '.claude', 'settings.json');
         const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
-        // All 5 hook types must be present
+        // All managed hook types must be present
         expect(settings.hooks.SessionStart).toBeDefined();
         expect(settings.hooks.PreCompact).toBeDefined();
         expect(settings.hooks.UserPromptSubmit).toBeDefined();
         expect(settings.hooks.PostToolUseFailure).toBeDefined();
         expect(settings.hooks.PostToolUse).toBeDefined();
+        expect(settings.hooks.PreToolUse).toBeDefined();
+        expect(settings.hooks.Stop).toBeDefined();
 
         // Verify each has the correct command
         expect(settings.hooks.PreCompact[0].hooks[0].command).toContain('ca prime');
-        expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('ca hooks run user-prompt');
-        expect(settings.hooks.PostToolUseFailure[0].hooks[0].command).toContain('ca hooks run post-tool-failure');
-        expect(settings.hooks.PostToolUse[0].hooks[0].command).toContain('ca hooks run post-tool-success');
+        expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('hook-runner.js');
+        expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('user-prompt');
+        expect(settings.hooks.PostToolUseFailure[0].hooks[0].command).toContain('hook-runner.js');
+        expect(settings.hooks.PostToolUseFailure[0].hooks[0].command).toContain('post-tool-failure');
+        expect(settings.hooks.PostToolUse[0].hooks[0].command).toContain('hook-runner.js');
+        expect(settings.hooks.PostToolUse[0].hooks[0].command).toContain('post-tool-success');
+        expect(settings.hooks.PreToolUse[0].hooks[0].command).toContain('phase-guard');
+        expect(settings.hooks.Stop[0].hooks[0].command).toContain('phase-audit');
+      });
+
+      it('init upgrades legacy managed hooks without deleting unrelated shared commands', async () => {
+        const settingsPath = join(tempDir, '.claude', 'settings.json');
+        await mkdir(join(tempDir, '.claude'), { recursive: true });
+        await writeFile(
+          settingsPath,
+          JSON.stringify(
+            {
+              hooks: {
+                SessionStart: [
+                  { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+                ],
+                PreCompact: [
+                  { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+                ],
+                UserPromptSubmit: [
+                  { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] },
+                ],
+                PostToolUseFailure: [
+                  { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-failure 2>/dev/null || true' }] },
+                ],
+                PostToolUse: [
+                  { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-success 2>/dev/null || true' }] },
+                  {
+                    matcher: 'Read',
+                    hooks: [
+                      { type: 'command', command: 'npx ca hooks run read-tracker 2>/dev/null || true' },
+                      { type: 'command', command: 'echo \"keep me\"' },
+                    ],
+                  },
+                ],
+                PreToolUse: [
+                  { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run phase-guard 2>/dev/null || true' }] },
+                ],
+                Stop: [
+                  { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run stop-audit 2>/dev/null || true' }] },
+                ],
+              },
+            },
+            null,
+            2,
+          ),
+        );
+
+        runCli('init', tempDir);
+
+        const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+        expect(settings.hooks.PostToolUse).toHaveLength(3);
+        expect(settings.hooks.PostToolUse[0]).toEqual({
+          matcher: 'Read',
+          hooks: [{ type: 'command', command: 'echo "keep me"' }],
+        });
+        expect(settings.hooks.PostToolUse[2].hooks[0].command).toContain('hook-runner.js');
+        expect(settings.hooks.Stop[0].hooks[0].command).toContain('hook-runner.js');
       });
 
       it('init creates Claude hooks even if .claude directory does not exist', async () => {

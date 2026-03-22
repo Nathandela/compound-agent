@@ -12,13 +12,16 @@ import { getRepoRoot } from '../cli-utils.js';
 import {
   addAllCompoundAgentHooks,
   getClaudeSettingsPath,
-  hasAllCompoundAgentHooks,
+  getCompoundAgentHookStatus,
   readClaudeSettings,
   removeAgentsSection,
   removeClaudeMdReference,
   removeCompoundAgentHook,
+  hasClaudeHook,
   writeClaudeSettings,
 } from './claude-helpers.js';
+import { resolveHookRunnerPath } from './hook-runner-resolve.js';
+import type { CompoundAgentHookStatus } from './claude-helpers.js';
 
 /** Status check result */
 interface StatusResult {
@@ -26,9 +29,11 @@ interface StatusResult {
   exists: boolean;
   validJson: boolean;
   hookInstalled: boolean;
+  hookNeedsMigration: boolean;
+  hookIncomplete: boolean;
   slashCommands: {
-    learn: boolean;
-    search: boolean;
+    learnThat: boolean;
+    checkThat: boolean;
   };
   status: 'connected' | 'partial' | 'disconnected';
 }
@@ -38,22 +43,22 @@ interface StatusResult {
 // ============================================================================
 
 async function handleStatus(
-  alreadyInstalled: boolean,
+  hookStatus: CompoundAgentHookStatus,
   displayPath: string,
   settingsPath: string,
   options: { json?: boolean }
 ): Promise<void> {
   const repoRoot = getRepoRoot();
-  const learnMdPath = join(repoRoot, '.claude', 'commands', 'learn.md');
-  const searchMdPath = join(repoRoot, '.claude', 'commands', 'search.md');
+  const learnThatMdPath = join(repoRoot, '.claude', 'commands', 'compound', 'learn-that.md');
+  const checkThatMdPath = join(repoRoot, '.claude', 'commands', 'compound', 'check-that.md');
 
-  const learnExists = existsSync(learnMdPath);
-  const searchExists = existsSync(searchMdPath);
+  const learnThatExists = existsSync(learnThatMdPath);
+  const checkThatExists = existsSync(checkThatMdPath);
 
   let status: 'connected' | 'partial' | 'disconnected';
-  if (alreadyInstalled && learnExists && searchExists) {
+  if (hookStatus.hasAllDesiredHooks && learnThatExists && checkThatExists) {
     status = 'connected';
-  } else if (alreadyInstalled || learnExists || searchExists) {
+  } else if (hookStatus.hasAnyManagedHooks || learnThatExists || checkThatExists) {
     status = 'partial';
   } else {
     status = 'disconnected';
@@ -63,8 +68,10 @@ async function handleStatus(
     settingsFile: displayPath,
     exists: existsSync(settingsPath),
     validJson: true,
-    hookInstalled: alreadyInstalled,
-    slashCommands: { learn: learnExists, search: searchExists },
+    hookInstalled: hookStatus.hasAllDesiredHooks,
+    hookNeedsMigration: hookStatus.needsMigration,
+    hookIncomplete: hookStatus.hasIncompleteHooks,
+    slashCommands: { learnThat: learnThatExists, checkThat: checkThatExists },
     status,
   };
 
@@ -79,11 +86,19 @@ async function handleStatus(
   console.log(`Hooks file: ${displayPath}`);
   console.log(`  ${result.exists ? '[ok]' : '[missing]'} File exists`);
   console.log(`  ${result.validJson ? '[ok]' : '[error]'} Valid JSON`);
-  console.log(`  ${result.hookInstalled ? '[ok]' : '[warn]'} Compound Agent hooks installed`);
+  if (result.hookInstalled) {
+    console.log('  [ok] Compound Agent hooks installed');
+  } else if (result.hookIncomplete) {
+    console.log('  [warn] Compound Agent hooks are incomplete');
+  } else if (result.hookNeedsMigration) {
+    console.log('  [warn] Compound Agent hooks need update');
+  } else {
+    console.log('  [warn] Compound Agent hooks not installed');
+  }
   console.log('');
   console.log('Slash commands:');
-  console.log(`  ${learnExists ? '[ok]' : '[warn]'} /learn command`);
-  console.log(`  ${searchExists ? '[ok]' : '[warn]'} /search command`);
+  console.log(`  ${learnThatExists ? '[ok]' : '[warn]'} /compound:learn-that command`);
+  console.log(`  ${checkThatExists ? '[ok]' : '[warn]'} /compound:check-that command`);
   console.log('');
 
   if (status === 'connected') {
@@ -91,7 +106,13 @@ async function handleStatus(
   } else if (status === 'partial') {
     out.warn('Partial setup detected.');
     console.log('');
-    console.log("Run 'npx ca setup' to complete setup.");
+    if (result.hookIncomplete) {
+      console.log("Run 'npx ca setup claude' to repair the missing hook entries.");
+    } else if (result.hookNeedsMigration) {
+      console.log("Run 'npx ca setup claude' to migrate hooks to the current runner.");
+    } else {
+      console.log("Run 'npx ca setup' to complete setup.");
+    }
   } else {
     out.error('Not connected.');
     console.log('');
@@ -102,7 +123,7 @@ async function handleStatus(
 async function handleUninstall(
   settings: Record<string, unknown>,
   settingsPath: string,
-  alreadyInstalled: boolean,
+  hasManagedHook: boolean,
   displayPath: string,
   options: { global?: boolean; dryRun?: boolean; json?: boolean }
 ): Promise<void> {
@@ -110,9 +131,9 @@ async function handleUninstall(
 
   if (options.dryRun) {
     if (options.json) {
-      console.log(JSON.stringify({ dryRun: true, wouldRemove: alreadyInstalled, location: displayPath }));
+      console.log(JSON.stringify({ dryRun: true, wouldRemove: hasManagedHook, location: displayPath }));
     } else {
-      if (alreadyInstalled) {
+      if (hasManagedHook) {
         console.log(`Would remove compound-agent hooks from ${displayPath}`);
       } else {
         console.log('No compound-agent hooks to remove');
@@ -163,15 +184,20 @@ async function handleUninstall(
 async function handleInstall(
   settings: Record<string, unknown>,
   settingsPath: string,
-  alreadyInstalled: boolean,
   displayPath: string,
   options: { global?: boolean; dryRun?: boolean; json?: boolean }
 ): Promise<void> {
+  const fileExists = existsSync(settingsPath);
+  const hookRunnerPath = resolveHookRunnerPath();
+  const before = JSON.stringify(settings);
+  addAllCompoundAgentHooks(settings, hookRunnerPath);
+  const changed = JSON.stringify(settings) !== before;
+
   if (options.dryRun) {
     if (options.json) {
-      console.log(JSON.stringify({ dryRun: true, wouldInstall: !alreadyInstalled, location: displayPath }));
+      console.log(JSON.stringify({ dryRun: true, wouldInstall: changed, location: displayPath }));
     } else {
-      if (alreadyInstalled) {
+      if (!changed) {
         console.log('Compound agent hooks already installed');
       } else {
         console.log(`Would install compound-agent hooks to ${displayPath}`);
@@ -180,7 +206,7 @@ async function handleInstall(
     return;
   }
 
-  if (alreadyInstalled) {
+  if (!changed) {
     if (options.json) {
       console.log(JSON.stringify({
         installed: true,
@@ -195,8 +221,6 @@ async function handleInstall(
     return;
   }
 
-  const fileExists = existsSync(settingsPath);
-  addAllCompoundAgentHooks(settings);
   await writeClaudeSettings(settingsPath, settings);
 
   if (options.json) {
@@ -252,14 +276,16 @@ export function registerClaudeSubcommand(setupCommand: Command): void {
         return;
       }
 
-      const alreadyInstalled = hasAllCompoundAgentHooks(settings);
+      const hookRunnerPath = resolveHookRunnerPath();
+      const hookStatus = getCompoundAgentHookStatus(settings, hookRunnerPath);
+      const hasManagedHook = hasClaudeHook(settings);
 
       if (options.status) {
-        await handleStatus(alreadyInstalled, displayPath, settingsPath, options);
+        await handleStatus(hookStatus, displayPath, settingsPath, options);
       } else if (options.uninstall) {
-        await handleUninstall(settings, settingsPath, alreadyInstalled, displayPath, options);
+        await handleUninstall(settings, settingsPath, hasManagedHook, displayPath, options);
       } else {
-        await handleInstall(settings, settingsPath, alreadyInstalled, displayPath, options);
+        await handleInstall(settings, settingsPath, displayPath, options);
       }
     });
 }

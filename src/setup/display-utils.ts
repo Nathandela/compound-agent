@@ -7,10 +7,11 @@ import { join } from 'node:path';
 
 import { runFullBeadsCheck, type BeadsFullCheck } from './beads-check.js';
 import {
+  getCompoundAgentHookStatus,
   getClaudeSettingsPath,
-  hasAllCompoundAgentHooks,
   readClaudeSettings,
 } from './claude-helpers.js';
+import { resolveHookRunnerPath } from './hook-runner-resolve.js';
 import { ensureSqliteAvailable } from '../memory/storage/index.js';
 import type { GitignoreResult } from './gitignore.js';
 import type { HookInstallResult } from './hooks.js';
@@ -105,14 +106,21 @@ export async function runStatus(repoRoot: string): Promise<void> {
   console.log(`  Plugin manifest:    ${existsSync(pluginPath) ? 'installed' : 'not installed'}`);
 
   const settingsPath = getClaudeSettingsPath(false);
-  let hooksInstalled = false;
+  let hooksStatus: 'installed' | 'needs update' | 'incomplete' | 'not installed' = 'not installed';
   try {
     const settings = await readClaudeSettings(settingsPath);
-    hooksInstalled = hasAllCompoundAgentHooks(settings);
+    const hookStatus = getCompoundAgentHookStatus(settings, resolveHookRunnerPath());
+    if (hookStatus.hasAllDesiredHooks) {
+      hooksStatus = 'installed';
+    } else if (hookStatus.hasIncompleteHooks) {
+      hooksStatus = 'incomplete';
+    } else if (hookStatus.hasAnyManagedHooks) {
+      hooksStatus = 'needs update';
+    }
   } catch {
     // No settings
   }
-  console.log(`  Hooks:              ${hooksInstalled ? 'installed' : 'not installed'}`);
+  console.log(`  Hooks:              ${hooksStatus}`);
 
   let sqliteOk = false;
   try {

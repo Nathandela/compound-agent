@@ -19,7 +19,6 @@ import { printBeadsFullStatus, printGitignoreStatus, printPnpmConfigStatus, prin
 import {
   addAllCompoundAgentHooks,
   getClaudeSettingsPath,
-  hasAllCompoundAgentHooks,
   readClaudeSettings,
   writeClaudeSettings,
 } from './claude-helpers.js';
@@ -87,7 +86,9 @@ async function ensureLessonsDirectory(repoRoot: string): Promise<string> {
  * Configure Claude Code settings: hooks in settings.json.
  * Resolves the hook-runner path to use direct node invocation when available.
  */
-async function configureClaudeSettings(): Promise<{ hooks: boolean }> {
+async function configureClaudeSettings(
+  options: { writeChanges?: boolean } = {},
+): Promise<{ hooks: boolean; parseError: boolean }> {
   const settingsPath = getClaudeSettingsPath(false);
   let settings: Record<string, unknown>;
   try {
@@ -95,16 +96,21 @@ async function configureClaudeSettings(): Promise<{ hooks: boolean }> {
   } catch {
     // File exists but has malformed JSON — warn and skip to avoid data loss
     console.error(`Warning: Could not parse ${settingsPath} — skipping hook installation.\nFix the JSON syntax and re-run setup.`);
-    return { hooks: false };
+    return { hooks: false, parseError: true };
   }
 
-  const hadHooks = hasAllCompoundAgentHooks(settings);
   const hookRunnerPath = resolveHookRunnerPath();
+  const before = JSON.stringify(settings);
   addAllCompoundAgentHooks(settings, hookRunnerPath);
-  await writeClaudeSettings(settingsPath, settings);
+  const changed = JSON.stringify(settings) !== before;
+
+  if (changed && options.writeChanges !== false) {
+    await writeClaudeSettings(settingsPath, settings);
+  }
 
   return {
-    hooks: !hadHooks,
+    hooks: changed,
+    parseError: false,
   };
 }
 
@@ -265,6 +271,7 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
   added: number;
   staleRemoved: string[];
   configUpdated: boolean;
+  configParseError: boolean;
   upgrade: UpgradeResult;
   gitignore: GitignoreResult;
 }> {
@@ -325,7 +332,12 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
 
   // Ensure hooks config is current
   let configUpdated = false;
+  let configParseError = false;
   if (dryRun) {
+    const { hooks, parseError } = await configureClaudeSettings({ writeChanges: false });
+    configUpdated = hooks;
+    configParseError = parseError;
+
     // Show what the Gemini section would do
     if (!await isGeminiEnabled(repoRoot) && hasGeminiCompoundFiles(repoRoot)) {
       console.log('[dry-run] Would enable Gemini adapter (existing .gemini/ files detected) and update');
@@ -333,7 +345,7 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
       console.log('[dry-run] Would update Gemini adapter files');
     }
   } else {
-    const { hooks } = await configureClaudeSettings();
+    const { hooks, parseError } = await configureClaudeSettings();
     // Migration: auto-enable if .gemini/ compound files already exist
     if (!await isGeminiEnabled(repoRoot) && hasGeminiCompoundFiles(repoRoot)) {
       await enableGemini(repoRoot);
@@ -346,12 +358,13 @@ export async function runUpdate(repoRoot: string, dryRun: boolean): Promise<{
       for (const action of cleaned) console.log(`  ${action}`);
     }
     configUpdated = hooks;
+    configParseError = parseError;
   }
 
   // Ensure .gitignore has required patterns
   const gitignore = dryRun ? { added: [] } : await ensureGitignore(repoRoot);
 
-  return { updated, added, staleRemoved: allStaleRemoved, configUpdated, upgrade, gitignore };
+  return { updated, added, staleRemoved: allStaleRemoved, configUpdated, configParseError, upgrade, gitignore };
 }
 
 
@@ -448,9 +461,16 @@ export function registerSetupAllCommand(setupCommand: Command): void {
         if (result.upgrade.isUpgrade) {
           console.log(`  ${prefix}${result.upgrade.message}`);
         }
-        if (result.updated === 0 && result.added === 0) {
-          console.log(`${prefix}All generated files are up to date.`);
-        } else {
+        const hasTemplateChanges = result.updated > 0 || result.added > 0;
+        const hasOtherChanges =
+          result.staleRemoved.length > 0 ||
+          result.gitignore.added.length > 0 ||
+          result.configUpdated ||
+          result.configParseError;
+
+        if (!hasTemplateChanges && !hasOtherChanges) {
+          console.log(`${prefix}All generated files and configuration are up to date.`);
+        } else if (hasTemplateChanges) {
           if (result.updated > 0) console.log(`  ${prefix}Updated: ${result.updated} file(s)`);
           if (result.added > 0) console.log(`  ${prefix}Added: ${result.added} file(s)`);
         }
@@ -463,7 +483,12 @@ export function registerSetupAllCommand(setupCommand: Command): void {
         if (result.gitignore.added.length > 0) {
           console.log(`  ${prefix}.gitignore: Added [${result.gitignore.added.join(', ')}]`);
         }
-        if (result.configUpdated) console.log(`  ${prefix}Config: hooks updated`);
+        if (result.configUpdated) {
+          console.log(`  ${prefix}Config: hooks ${dryRun ? 'would be updated' : 'updated'}`);
+        }
+        if (result.configParseError) {
+          console.log(`  ${prefix}Config: invalid settings.json (hooks not checked)`);
+        }
         const fullBeads = runFullBeadsCheck(repoRoot);
         printBeadsFullStatus(fullBeads);
         const scope = checkUserScope(repoRoot);

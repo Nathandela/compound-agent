@@ -2,13 +2,12 @@
  * CLI tests for the setup claude command.
  */
 
-import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { cleanupCliTestDir, setupCliTestDir } from '../test-utils.js';
+import { cleanupCliTestDir, runCliWithEnv, setupCliTestDir } from '../test-utils.js';
 
 describe('CLI', { tags: ['integration'] }, () => {
   let tempDir: string;
@@ -25,24 +24,8 @@ describe('CLI', { tags: ['integration'] }, () => {
   });
 
   const runSetupClaude = (args = ''): { stdout: string; stderr: string; combined: string } => {
-    const cliPath = join(process.cwd(), 'dist', 'cli.js');
-    const argArray = args ? args.split(/\s+/).filter(Boolean) : [];
-    try {
-      const result = execFileSync('node', [cliPath, 'setup', 'claude', ...argArray], {
-        cwd: tempDir,
-        encoding: 'utf-8',
-        env: { ...process.env, HOME: mockHome, COMPOUND_AGENT_ROOT: tempDir },
-        stdio: ['pipe', 'pipe', 'pipe'],
-      });
-      const stdout = typeof result === 'string' ? result : result.toString();
-      return { stdout, stderr: '', combined: stdout };
-    } catch (error) {
-      const err = error as { stdout?: Buffer | string; stderr?: Buffer | string; message?: string };
-      const stdout = err.stdout?.toString() ?? '';
-      const stderr = err.stderr?.toString() ?? '';
-      const combined = stdout + stderr + (err.message ?? '');
-      return { stdout, stderr, combined };
-    }
+    const command = args ? `setup claude ${args}` : 'setup claude';
+    return runCliWithEnv(command, tempDir, { HOME: mockHome });
   };
 
   describe('setup claude command', () => {
@@ -64,6 +47,22 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(hookEntry.hooks[0].command).toContain('ca');
       // v0.2.4: uses prime instead of load-session
       expect(hookEntry.hooks[0].command).toContain('prime');
+    });
+
+    it('uses hook-runner commands for managed hooks when dist/hook-runner.js is available', async () => {
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+
+      runSetupClaude();
+
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+
+      expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PostToolUseFailure[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PostToolUse[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PostToolUse[1].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PreToolUse[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.Stop[0].hooks[0].command).toContain('hook-runner.js');
     });
 
     it('preserves existing settings when adding hooks', async () => {
@@ -118,7 +117,110 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(settings.hooks.SessionStart[1].hooks[0].command).toContain('ca');
     });
 
-    it('installs all 5 hook types', async () => {
+    it('upgrades existing legacy npx hook commands to hook-runner on re-run', async () => {
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              PreCompact: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              UserPromptSubmit: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] },
+              ],
+              PostToolUseFailure: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-failure 2>/dev/null || true' }] },
+              ],
+              PostToolUse: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-success 2>/dev/null || true' }] },
+                { matcher: 'Read', hooks: [{ type: 'command', command: 'npx ca hooks run post-read 2>/dev/null || true' }] },
+              ],
+              PreToolUse: [
+                { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run phase-guard 2>/dev/null || true' }] },
+              ],
+              Stop: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run phase-audit 2>/dev/null || true' }] },
+              ],
+            },
+          },
+          null,
+          2
+        )
+      );
+
+      runSetupClaude();
+
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+      expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PostToolUseFailure[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PostToolUse[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PostToolUse[1].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PreToolUse[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.Stop[0].hooks[0].command).toContain('hook-runner.js');
+    });
+
+    it('preserves unrelated commands when migrating a mixed legacy hook entry', async () => {
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              PreCompact: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              UserPromptSubmit: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] },
+              ],
+              PostToolUseFailure: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-failure 2>/dev/null || true' }] },
+              ],
+              PostToolUse: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-success 2>/dev/null || true' }] },
+                {
+                  matcher: 'Read',
+                  hooks: [
+                    { type: 'command', command: 'npx ca hooks run read-tracker 2>/dev/null || true' },
+                    { type: 'command', command: 'echo \"keep me\"' },
+                  ],
+                },
+              ],
+              PreToolUse: [
+                { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run phase-guard 2>/dev/null || true' }] },
+              ],
+              Stop: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run phase-audit 2>/dev/null || true' }] },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      runSetupClaude();
+
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+      expect(settings.hooks.PostToolUse).toHaveLength(3);
+      expect(settings.hooks.PostToolUse[0]).toEqual({
+        matcher: 'Read',
+        hooks: [{ type: 'command', command: 'echo "keep me"' }],
+      });
+      expect(settings.hooks.PostToolUse[2].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PostToolUse[2].hooks[0].command).toContain('post-read');
+    });
+
+    it('installs all 7 managed hook types', async () => {
       await mkdir(join(tempDir, '.claude'), { recursive: true });
 
       runSetupClaude();
@@ -126,14 +228,14 @@ describe('CLI', { tags: ['integration'] }, () => {
       const settingsPath = join(tempDir, '.claude', 'settings.json');
       const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
-      const expectedHookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse'];
+      const expectedHookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse', 'PreToolUse', 'Stop'];
       for (const hookType of expectedHookTypes) {
         expect(settings.hooks[hookType], `missing hook type: ${hookType}`).toBeDefined();
         expect(settings.hooks[hookType].length, `empty hook array for: ${hookType}`).toBeGreaterThan(0);
       }
     });
 
-    it('--uninstall removes all 5 hook types', async () => {
+    it('--uninstall removes all 7 managed hook types', async () => {
       await mkdir(join(tempDir, '.claude'), { recursive: true });
 
       runSetupClaude();
@@ -142,7 +244,7 @@ describe('CLI', { tags: ['integration'] }, () => {
       const settingsPath = join(tempDir, '.claude', 'settings.json');
       const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
 
-      const hookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse'];
+      const hookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse', 'PreToolUse', 'Stop'];
       for (const hookType of hookTypes) {
         const hookArray = settings.hooks?.[hookType] ?? [];
         expect(hookArray, `hook type ${hookType} should be empty after uninstall`).toHaveLength(0);
@@ -213,6 +315,126 @@ describe('CLI', { tags: ['integration'] }, () => {
       expect(settings.hooks.SessionStart[0].hooks[0].command).toBe('echo "keep me"');
     });
 
+    it('--uninstall preserves unrelated commands in mixed entries', async () => {
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              PostToolUse: [
+                {
+                  matcher: 'Read',
+                  hooks: [
+                    { type: 'command', command: 'node "/tmp/dist/hook-runner.js" post-read 2>/dev/null || true' },
+                    { type: 'command', command: 'echo "keep me"' },
+                  ],
+                },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      runSetupClaude('--uninstall');
+
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+      expect(settings.hooks.PostToolUse).toEqual([
+        {
+          matcher: 'Read',
+          hooks: [{ type: 'command', command: 'echo "keep me"' }],
+        },
+      ]);
+    });
+
+    it('--uninstall does not remove wrapped commands that only embed a managed command substring', async () => {
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              PostToolUse: [
+                {
+                  matcher: 'Read',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: "bash -lc 'echo pre; npx ca hooks run post-read 2>/dev/null || true; echo post'",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      runSetupClaude('--uninstall');
+
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+      expect(settings.hooks.PostToolUse).toEqual([
+        {
+          matcher: 'Read',
+          hooks: [
+            {
+              type: 'command',
+              command: "bash -lc 'echo pre; npx ca hooks run post-read 2>/dev/null || true; echo post'",
+            },
+          ],
+        },
+      ]);
+    });
+
+    it('does not rewrite wrapped commands that only embed a managed command substring', async () => {
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              PostToolUse: [
+                {
+                  matcher: 'Read',
+                  hooks: [
+                    {
+                      type: 'command',
+                      command: "bash -lc 'echo pre; npx ca hooks run post-read 2>/dev/null || true; echo post'",
+                    },
+                  ],
+                },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      runSetupClaude();
+
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+      expect(settings.hooks.PostToolUse[0]).toEqual({
+        matcher: 'Read',
+        hooks: [
+          {
+            type: 'command',
+            command: "bash -lc 'echo pre; npx ca hooks run post-read 2>/dev/null || true; echo post'",
+          },
+        ],
+      });
+      expect(settings.hooks.PostToolUse.some((entry: { hooks: Array<{ command: string }> }) =>
+        entry.hooks.some((hook) => hook.command.includes('post-read') && hook.command.includes('hook-runner.js'))
+      )).toBe(true);
+    });
+
     it('--dry-run shows changes without writing', async () => {
       const { combined } = runSetupClaude('--dry-run');
 
@@ -260,6 +482,136 @@ describe('CLI', { tags: ['integration'] }, () => {
 
       expect(result.dryRun).toBe(true);
       expect(result.wouldInstall).toBe(true);
+    });
+
+    it('--status reports legacy hooks as needing update', async () => {
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              PreCompact: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              UserPromptSubmit: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] },
+              ],
+              PostToolUseFailure: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-failure 2>/dev/null || true' }] },
+              ],
+              PostToolUse: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-success 2>/dev/null || true' }] },
+                { matcher: 'Read', hooks: [{ type: 'command', command: 'npx ca hooks run post-read 2>/dev/null || true' }] },
+              ],
+              PreToolUse: [
+                { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run phase-guard 2>/dev/null || true' }] },
+              ],
+              Stop: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run phase-audit 2>/dev/null || true' }] },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const { combined } = runSetupClaude('--status');
+
+      expect(combined.toLowerCase()).toMatch(/partial/);
+      expect(combined.toLowerCase()).toMatch(/need update|migrate/);
+    });
+
+    it('--status --json exposes hook migration state for legacy settings', async () => {
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              PreCompact: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              UserPromptSubmit: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] },
+              ],
+              PostToolUseFailure: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-failure 2>/dev/null || true' }] },
+              ],
+              PostToolUse: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-success 2>/dev/null || true' }] },
+                { matcher: 'Read', hooks: [{ type: 'command', command: 'npx ca hooks run post-read 2>/dev/null || true' }] },
+              ],
+              PreToolUse: [
+                { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run phase-guard 2>/dev/null || true' }] },
+              ],
+              Stop: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run phase-audit 2>/dev/null || true' }] },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const { stdout } = runSetupClaude('--status --json');
+      const result = JSON.parse(stdout) as {
+        hookInstalled: boolean;
+        hookNeedsMigration: boolean;
+        status: string;
+      };
+
+      expect(result.hookInstalled).toBe(false);
+      expect(result.hookNeedsMigration).toBe(true);
+      expect(result.status).toBe('partial');
+    });
+
+    it('--status reaches connected for a modern init install', () => {
+      runCliWithEnv('init --skip-model', tempDir, { HOME: mockHome });
+
+      const { combined } = runSetupClaude('--status');
+
+      expect(combined.toLowerCase()).toMatch(/connected/);
+      expect(combined).toContain('/compound:learn-that');
+      expect(combined).toContain('/compound:check-that');
+    });
+
+    it('--status reports incomplete hooks separately from migration-only cases', async () => {
+      const settingsPath = join(tempDir, '.claude', 'settings.json');
+      await mkdir(join(tempDir, '.claude'), { recursive: true });
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              UserPromptSubmit: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+      );
+
+      const { combined } = runSetupClaude('--status');
+
+      expect(combined.toLowerCase()).toMatch(/partial/);
+      expect(combined.toLowerCase()).toMatch(/incomplete|repair/);
+      expect(combined.toLowerCase()).not.toMatch(/migrate hooks to the current runner/);
     });
   });
 

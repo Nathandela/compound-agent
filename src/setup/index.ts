@@ -11,6 +11,7 @@ export { checkBeadsAvailable, checkBeadsInitialized, checkBeadsHealthy, runFullB
 export { ensureGitignore, type GitignoreResult } from './gitignore.js';
 export { checkUserScope, type ScopeCheckResult } from './scope-check.js';
 export {
+  getCompoundAgentHookStatus,
   getClaudeSettingsPath,
   hasAllCompoundAgentHooks,
   hasClaudeHook,

@@ -605,6 +605,174 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       // Should mention config was updated
       expect(result.combined).toMatch(/config|hooks/i);
     });
+
+    it('upgrades legacy npx hook commands to hook-runner during setup --update', async () => {
+      runCli('init');
+
+      const settingsPath = join(getTempDir(), '.claude', 'settings.json');
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              PreCompact: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              UserPromptSubmit: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] },
+              ],
+              PostToolUseFailure: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-failure 2>/dev/null || true' }] },
+              ],
+              PostToolUse: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-success 2>/dev/null || true' }] },
+                { matcher: 'Read', hooks: [{ type: 'command', command: 'npx ca hooks run post-read 2>/dev/null || true' }] },
+              ],
+              PreToolUse: [
+                { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run phase-guard 2>/dev/null || true' }] },
+              ],
+              Stop: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run phase-audit 2>/dev/null || true' }] },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      );
+
+      runCli('setup --update');
+
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+      expect(settings.hooks.UserPromptSubmit[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PostToolUseFailure[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PostToolUse[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PostToolUse[1].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PreToolUse[0].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.Stop[0].hooks[0].command).toContain('hook-runner.js');
+    });
+
+    it('preserves mixed custom hook entries during setup --update migration', async () => {
+      runCli('init');
+
+      const settingsPath = join(getTempDir(), '.claude', 'settings.json');
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              PreCompact: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              UserPromptSubmit: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] },
+              ],
+              PostToolUseFailure: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-failure 2>/dev/null || true' }] },
+              ],
+              PostToolUse: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-success 2>/dev/null || true' }] },
+                {
+                  matcher: 'Read',
+                  hooks: [
+                    { type: 'command', command: 'npx ca hooks run read-tracker 2>/dev/null || true' },
+                    { type: 'command', command: 'echo "keep me"' },
+                  ],
+                },
+              ],
+              PreToolUse: [
+                { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run phase-guard 2>/dev/null || true' }] },
+              ],
+              Stop: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run stop-audit 2>/dev/null || true' }] },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      );
+
+      runCli('setup --update');
+
+      const settings = JSON.parse(await readFile(settingsPath, 'utf-8'));
+      expect(settings.hooks.PostToolUse).toHaveLength(3);
+      expect(settings.hooks.PostToolUse[0]).toEqual({
+        matcher: 'Read',
+        hooks: [{ type: 'command', command: 'echo "keep me"' }],
+      });
+      expect(settings.hooks.PostToolUse[2].hooks[0].command).toContain('hook-runner.js');
+      expect(settings.hooks.PostToolUse[2].hooks[0].command).toContain('post-read');
+      expect(settings.hooks.Stop[0].hooks[0].command).toContain('phase-audit');
+    });
+
+    it('reports pending hook migration during setup --update --dry-run without changing settings', async () => {
+      runCli('init');
+
+      const settingsPath = join(getTempDir(), '.claude', 'settings.json');
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              PreCompact: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              UserPromptSubmit: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] },
+              ],
+              PostToolUseFailure: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-failure 2>/dev/null || true' }] },
+              ],
+              PostToolUse: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-success 2>/dev/null || true' }] },
+                { matcher: 'Read', hooks: [{ type: 'command', command: 'npx ca hooks run post-read 2>/dev/null || true' }] },
+              ],
+              PreToolUse: [
+                { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run phase-guard 2>/dev/null || true' }] },
+              ],
+              Stop: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run phase-audit 2>/dev/null || true' }] },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      );
+      const before = await readFile(settingsPath, 'utf-8');
+
+      const result = runCli('setup --update --dry-run');
+      const after = await readFile(settingsPath, 'utf-8');
+
+      expect(after).toBe(before);
+      expect(result.combined).toMatch(/config: hooks would be updated/i);
+      expect(result.combined).not.toMatch(/all generated files (are )?up to date/i);
+    });
+
+    it('reports invalid settings during setup --update --dry-run instead of claiming configuration is up to date', async () => {
+      runCli('setup --skip-model');
+
+      const settingsPath = join(getTempDir(), '.claude', 'settings.json');
+      await writeFile(settingsPath, '{ invalid json', 'utf-8');
+
+      const result = runCli('setup --update --dry-run');
+
+      expect(result.combined).toMatch(/could not parse|invalid settings\.json/i);
+      expect(result.combined).not.toMatch(/all generated files and configuration are up to date/i);
+    });
   });
 
   /**
@@ -623,6 +791,76 @@ describe('Setup Commands - Generated Content', { tags: ['integration'] }, () => 
       const result = runCli('setup --status');
       // Should mention something is missing
       expect(result.combined).toBeDefined();
+    });
+
+    it('shows hooks need update for legacy hook configurations', async () => {
+      runCli('init');
+
+      const settingsPath = join(getTempDir(), '.claude', 'settings.json');
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              PreCompact: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              UserPromptSubmit: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] },
+              ],
+              PostToolUseFailure: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-failure 2>/dev/null || true' }] },
+              ],
+              PostToolUse: [
+                { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-success 2>/dev/null || true' }] },
+                { matcher: 'Read', hooks: [{ type: 'command', command: 'npx ca hooks run post-read 2>/dev/null || true' }] },
+              ],
+              PreToolUse: [
+                { matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run phase-guard 2>/dev/null || true' }] },
+              ],
+              Stop: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run phase-audit 2>/dev/null || true' }] },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      );
+
+      const result = runCli('setup --status');
+      expect(result.combined).toMatch(/Hooks:\s+needs update/i);
+    });
+
+    it('shows hooks incomplete when only a subset of managed hooks is present', async () => {
+      runCli('setup --skip-model');
+
+      const settingsPath = join(getTempDir(), '.claude', 'settings.json');
+      await writeFile(
+        settingsPath,
+        JSON.stringify(
+          {
+            hooks: {
+              SessionStart: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] },
+              ],
+              UserPromptSubmit: [
+                { matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] },
+              ],
+            },
+          },
+          null,
+          2,
+        ),
+        'utf-8',
+      );
+
+      const result = runCli('setup --status');
+      expect(result.combined).toMatch(/Hooks:\s+incomplete/i);
     });
   });
 

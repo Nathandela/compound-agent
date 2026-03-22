@@ -104,6 +104,59 @@ describe('Doctor Command', () => {
     expect(agentsCheck!.status).toBe('fail');
   });
 
+  it('warns when all managed hooks are present but still on legacy commands', async () => {
+    await writeFile(
+      join(tempDir, '.claude', 'settings.json'),
+      JSON.stringify(
+        {
+          hooks: {
+            SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] }],
+            PreCompact: [{ matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] }],
+            UserPromptSubmit: [{ matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] }],
+            PostToolUseFailure: [{ matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-failure 2>/dev/null || true' }] }],
+            PostToolUse: [
+              { matcher: 'Bash|Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run post-tool-success 2>/dev/null || true' }] },
+              { matcher: 'Read', hooks: [{ type: 'command', command: 'npx ca hooks run post-read 2>/dev/null || true' }] },
+            ],
+            PreToolUse: [{ matcher: 'Edit|Write', hooks: [{ type: 'command', command: 'npx ca hooks run phase-guard 2>/dev/null || true' }] }],
+            Stop: [{ matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run phase-audit 2>/dev/null || true' }] }],
+          },
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    );
+
+    const checks = await runDoctor(tempDir);
+    const hookCheck = checks.find(c => c.name === 'Claude hooks');
+    expect(hookCheck).toBeDefined();
+    expect(hookCheck!.status).toBe('warn');
+  });
+
+  it('fails when only a subset of managed hooks is present', async () => {
+    await writeFile(
+      join(tempDir, '.claude', 'settings.json'),
+      JSON.stringify(
+        {
+          hooks: {
+            SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: 'npx ca prime 2>/dev/null || true' }] }],
+            UserPromptSubmit: [{ matcher: '', hooks: [{ type: 'command', command: 'npx ca hooks run user-prompt 2>/dev/null || true' }] }],
+          },
+        },
+        null,
+        2,
+      ),
+      'utf-8',
+    );
+
+    const checks = await runDoctor(tempDir);
+    const hookCheck = checks.find(c => c.name === 'Claude hooks');
+    expect(hookCheck).toBeDefined();
+    expect(hookCheck!.status).toBe('fail');
+    expect(hookCheck!.fix).toContain('setup claude');
+  });
+
   // ============================================================================
   // Each check has a fix hint on failure/warn
   // ============================================================================

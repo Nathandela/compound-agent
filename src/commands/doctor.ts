@@ -15,12 +15,12 @@ import { isModelAvailable } from '../memory/embeddings/index.js';
 import { ensureSqliteAvailable } from '../memory/storage/index.js';
 import { LESSONS_PATH } from '../memory/storage/index.js';
 import {
-  checkBeadsAvailable,
-  checkUserScope,
-  getClaudeSettingsPath,
-  hasAllCompoundAgentHooks,
-  readClaudeSettings,
+    checkBeadsAvailable,
+    checkUserScope,
+    getCompoundAgentHookStatus,
+    readClaudeSettings,
 } from '../setup/index.js';
+import { resolveHookRunnerPath } from '../setup/hook-runner-resolve.js';
 
 export interface DoctorCheck {
   name: string;
@@ -71,17 +71,22 @@ export async function runDoctor(repoRoot: string): Promise<DoctorCheck[]> {
     : { name: 'Workflow commands', status: 'fail', fix: 'Run: npx ca setup' });
 
   // 5. Hooks
-  const settingsPath = getClaudeSettingsPath(false);
-  let hooksOk = false;
+  const settingsPath = join(repoRoot, '.claude', 'settings.json');
+  let hookCheck: DoctorCheck = { name: 'Claude hooks', status: 'fail', fix: 'Run: npx ca setup' };
   try {
     const settings = await readClaudeSettings(settingsPath);
-    hooksOk = hasAllCompoundAgentHooks(settings);
+    const hookStatus = getCompoundAgentHookStatus(settings, resolveHookRunnerPath());
+    if (hookStatus.hasAllDesiredHooks) {
+      hookCheck = { name: 'Claude hooks', status: 'pass' };
+    } else if (hookStatus.hasIncompleteHooks) {
+      hookCheck = { name: 'Claude hooks', status: 'fail', fix: 'Run: npx ca setup claude' };
+    } else if (hookStatus.hasAnyManagedHooks) {
+      hookCheck = { name: 'Claude hooks', status: 'warn', fix: 'Run: npx ca setup claude' };
+    }
   } catch {
     // settings.json may not exist
   }
-  checks.push(hooksOk
-    ? { name: 'Claude hooks', status: 'pass' }
-    : { name: 'Claude hooks', status: 'fail', fix: 'Run: npx ca setup' });
+  checks.push(hookCheck);
 
   // 6. Embedding model
   checks.push(checkEmbeddingModel());

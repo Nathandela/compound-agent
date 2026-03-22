@@ -14,7 +14,6 @@ import {
   AGENTS_SECTION_END_MARKER,
   AGENTS_SECTION_START_MARKER,
   CLAUDE_HOOK_CONFIG,
-  CLAUDE_HOOK_MARKERS,
   CLAUDE_PHASE_AUDIT_HOOK_CONFIG,
   CLAUDE_PHASE_GUARD_HOOK_CONFIG,
   CLAUDE_POST_READ_HOOK_CONFIG,
@@ -27,6 +26,94 @@ import {
 } from './templates.js';
 import { makeHookCommand, resolveHookRunnerPath } from './hook-runner-resolve.js';
 import type { ClaudeHooksResult } from './types.js';
+
+type HookCommandConfig = { matcher: string; hooks: Array<{ type: string; command: string }> };
+type HookCommand = { type?: string; command?: string };
+type HookEntry = { matcher?: string; hooks?: HookCommand[] } & Record<string, unknown>;
+
+interface ManagedHookSpec {
+  hookType: string;
+  hookName?: string;
+  matcher: string;
+  legacyCommands?: string[];
+  hookRunnerAliases?: string[];
+  fallbackConfig: HookCommandConfig;
+}
+
+const MANAGED_HOOK_SPECS: ManagedHookSpec[] = [
+  {
+    hookType: 'SessionStart',
+    matcher: '',
+    legacyCommands: [
+      'npx ca load-session 2>/dev/null || true',
+      'npx compound-agent load-session 2>/dev/null || true',
+    ],
+    fallbackConfig: CLAUDE_HOOK_CONFIG,
+  },
+  {
+    hookType: 'PreCompact',
+    matcher: '',
+    legacyCommands: [
+      'npx ca load-session 2>/dev/null || true',
+      'npx compound-agent load-session 2>/dev/null || true',
+    ],
+    fallbackConfig: CLAUDE_PRECOMPACT_HOOK_CONFIG,
+  },
+  {
+    hookType: 'UserPromptSubmit',
+    hookName: 'user-prompt',
+    matcher: '',
+    fallbackConfig: CLAUDE_USER_PROMPT_HOOK_CONFIG,
+  },
+  {
+    hookType: 'PostToolUseFailure',
+    hookName: 'post-tool-failure',
+    matcher: 'Bash|Edit|Write',
+    fallbackConfig: CLAUDE_POST_TOOL_FAILURE_HOOK_CONFIG,
+  },
+  {
+    hookType: 'PostToolUse',
+    hookName: 'post-tool-success',
+    matcher: 'Bash|Edit|Write',
+    fallbackConfig: CLAUDE_POST_TOOL_SUCCESS_HOOK_CONFIG,
+  },
+  {
+    hookType: 'PostToolUse',
+    hookName: 'post-read',
+    matcher: 'Read',
+    legacyCommands: [
+      'npx ca hooks run read-tracker 2>/dev/null || true',
+    ],
+    hookRunnerAliases: ['read-tracker'],
+    fallbackConfig: CLAUDE_POST_READ_HOOK_CONFIG,
+  },
+  {
+    hookType: 'PreToolUse',
+    hookName: 'phase-guard',
+    matcher: 'Edit|Write',
+    fallbackConfig: CLAUDE_PHASE_GUARD_HOOK_CONFIG,
+  },
+  {
+    hookType: 'Stop',
+    hookName: 'phase-audit',
+    matcher: '',
+    legacyCommands: [
+      'npx ca hooks run stop-audit 2>/dev/null || true',
+    ],
+    hookRunnerAliases: ['stop-audit'],
+    fallbackConfig: CLAUDE_PHASE_AUDIT_HOOK_CONFIG,
+  },
+];
+
+const MANAGED_HOOK_TYPES = [...new Set(MANAGED_HOOK_SPECS.map((spec) => spec.hookType))];
+
+export interface CompoundAgentHookStatus {
+  hasAnyManagedHooks: boolean;
+  hasAllRequiredHooks: boolean;
+  hasAllDesiredHooks: boolean;
+  hasIncompleteHooks: boolean;
+  needsMigration: boolean;
+}
 
 /**
  * Get the path to Claude Code settings file.
@@ -54,27 +141,14 @@ export async function readClaudeSettings(settingsPath: string): Promise<Record<s
 }
 
 /**
- * Check if our hook is already installed.
- * Checks for both current (ca) and legacy (compound-agent) markers in any hook type.
+ * Check if any managed hook command is installed.
+ * Matches only exact commands emitted by current or legacy compound-agent setup.
  */
 export function hasClaudeHook(settings: Record<string, unknown>): boolean {
   const hooks = settings.hooks as Record<string, unknown[]> | undefined;
   if (!hooks) return false;
 
-  // Check all hook types we manage
-  const hookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse', 'PreToolUse', 'Stop'];
-
-  return hookTypes.some((hookType) => {
-    const hookArray = hooks[hookType];
-    if (!hookArray) return false;
-
-    return hookArray.some((entry) => {
-      const hookEntry = entry as { hooks?: Array<{ command?: string }> };
-      return hookEntry.hooks?.some((h) =>
-        CLAUDE_HOOK_MARKERS.some((marker) => h.command?.includes(marker))
-      );
-    });
-  });
+  return MANAGED_HOOK_SPECS.some((spec) => countMatchingCommands(hooks[spec.hookType] ?? [], spec) > 0);
 }
 
 /**
@@ -82,36 +156,116 @@ export function hasClaudeHook(settings: Record<string, unknown>): boolean {
  * This is stricter than hasClaudeHook(), which only checks for any marker.
  */
 export function hasAllCompoundAgentHooks(settings: Record<string, unknown>): boolean {
-  const hooks = settings.hooks as Record<string, unknown[]> | undefined;
-  if (!hooks) return false;
-
-  return (
-    hasHookTypeAny(hooks.SessionStart ?? [], ['ca prime']) &&
-    hasHookTypeAny(hooks.PreCompact ?? [], ['ca prime']) &&
-    hasHookTypeAny(hooks.UserPromptSubmit ?? [], ['ca hooks run user-prompt', 'hook-runner.js" user-prompt']) &&
-    hasHookTypeAny(hooks.PostToolUseFailure ?? [], ['ca hooks run post-tool-failure', 'hook-runner.js" post-tool-failure']) &&
-    hasHookTypeAny(hooks.PostToolUse ?? [], ['ca hooks run post-tool-success', 'hook-runner.js" post-tool-success']) &&
-    hasHookTypeAny(hooks.PostToolUse ?? [], ['ca hooks run post-read', 'ca hooks run read-tracker', 'hook-runner.js" post-read']) &&
-    hasHookTypeAny(hooks.PreToolUse ?? [], ['ca hooks run phase-guard', 'hook-runner.js" phase-guard']) &&
-    hasHookTypeAny(hooks.Stop ?? [], ['ca hooks run phase-audit', 'ca hooks run stop-audit', 'hook-runner.js" phase-audit'])
-  );
+  return getCompoundAgentHookStatus(settings).hasAllRequiredHooks;
 }
 
 /**
  * Build a hook config entry for a given hook, using hook-runner when available.
  */
-function buildHookEntry(
-  hookRunnerPath: string | undefined,
-  hookName: string,
-  matcher: string,
-): { matcher: string; hooks: Array<{ type: string; command: string }> } {
+function buildHookEntry(spec: ManagedHookSpec, hookRunnerPath: string | undefined): HookCommandConfig {
   return {
-    matcher,
+    matcher: spec.matcher,
     hooks: [{
       type: 'command',
-      command: makeHookCommand(hookRunnerPath, hookName),
+      command: getDesiredCommand(spec, hookRunnerPath),
     }],
   };
+}
+
+function getDesiredCommand(spec: ManagedHookSpec, hookRunnerPath: string | undefined): string {
+  if (spec.hookName) {
+    return makeHookCommand(hookRunnerPath, spec.hookName);
+  }
+
+  return spec.fallbackConfig.hooks[0]!.command;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildHookRunnerCommandPattern(commandNames: string[]): RegExp {
+  const namesPattern = commandNames.map(escapeRegExp).join('|');
+  return new RegExp(`^node ".*(?:[/\\\\]|^)hook-runner\\.js" (?:${namesPattern}) 2>/dev/null \\|\\| true$`);
+}
+
+function getManagedCommandMatchers(spec: ManagedHookSpec, hookRunnerPath: string | undefined): Array<string | RegExp> {
+  const matchers: Array<string | RegExp> = [spec.fallbackConfig.hooks[0]!.command];
+
+  if (spec.legacyCommands) {
+    matchers.push(...spec.legacyCommands);
+  }
+
+  if (spec.hookName) {
+    const commandNames = [spec.hookName, ...(spec.hookRunnerAliases ?? [])];
+    matchers.push(buildHookRunnerCommandPattern(commandNames));
+
+    if (hookRunnerPath) {
+      matchers.push(getDesiredCommand(spec, hookRunnerPath));
+    }
+  }
+
+  return matchers;
+}
+
+function commandMatchesMatcher(command: string | undefined, matcher: string | RegExp): boolean {
+  if (typeof command !== 'string') return false;
+  const trimmed = command.trim();
+  return typeof matcher === 'string' ? trimmed === matcher : matcher.test(trimmed);
+}
+
+function commandMatchesSpec(command: string | undefined, spec: ManagedHookSpec, hookRunnerPath: string | undefined): boolean {
+  return getManagedCommandMatchers(spec, hookRunnerPath).some((matcher) => commandMatchesMatcher(command, matcher));
+}
+
+function countMatchingCommands(hookArray: unknown[], spec: ManagedHookSpec, hookRunnerPath = resolveHookRunnerPath()): number {
+  return hookArray.reduce((count, entry) => {
+    const hookEntry = entry as HookEntry;
+    const matchingHooks = Array.isArray(hookEntry.hooks)
+      ? hookEntry.hooks.filter((hook) => commandMatchesSpec(hook.command, spec, hookRunnerPath)).length
+      : 0;
+    return count + matchingHooks;
+  }, 0);
+}
+
+function countDesiredCommands(hookArray: unknown[], desiredCommand: string): number {
+  return hookArray.reduce((count, entry) => {
+    const hookEntry = entry as HookEntry;
+    const matchingHooks = Array.isArray(hookEntry.hooks)
+      ? hookEntry.hooks.filter((hook) => typeof hook.command === 'string' && hook.command.trim() === desiredCommand).length
+      : 0;
+    return count + matchingHooks;
+  }, 0);
+}
+
+function upsertManagedHook(
+  hooks: Record<string, unknown[]>,
+  spec: ManagedHookSpec,
+  hookRunnerPath: string | undefined,
+): void {
+  const existingEntries = hooks[spec.hookType] ?? [];
+  const rewrittenEntries: unknown[] = [];
+
+  for (const entry of existingEntries) {
+    const hookEntry = entry as HookEntry;
+    if (!Array.isArray(hookEntry.hooks)) {
+      rewrittenEntries.push(entry);
+      continue;
+    }
+
+    const preservedHooks = hookEntry.hooks.filter((hook) => !commandMatchesSpec(hook.command, spec, hookRunnerPath));
+    if (preservedHooks.length === hookEntry.hooks.length) {
+      rewrittenEntries.push(entry);
+      continue;
+    }
+
+    if (preservedHooks.length > 0) {
+      rewrittenEntries.push({ ...hookEntry, hooks: preservedHooks });
+    }
+  }
+
+  rewrittenEntries.push(buildHookEntry(spec, hookRunnerPath));
+  hooks[spec.hookType] = rewrittenEntries;
 }
 
 /**
@@ -131,132 +285,96 @@ export function addAllCompoundAgentHooks(
   }
   const hooks = settings.hooks as Record<string, unknown[]>;
 
-  // SessionStart - prime context (still uses npx ca prime, not hook-runner)
-  if (!hooks.SessionStart) {
-    hooks.SessionStart = [];
-  }
-  if (!hasHookTypeAny(hooks.SessionStart, ['ca prime'])) {
-    hooks.SessionStart.push(CLAUDE_HOOK_CONFIG);
-  }
-
-  // PreCompact - re-inject prime before compaction (still uses npx ca prime)
-  if (!hooks.PreCompact) {
-    hooks.PreCompact = [];
-  }
-  if (!hasHookTypeAny(hooks.PreCompact, ['ca prime'])) {
-    hooks.PreCompact.push(CLAUDE_PRECOMPACT_HOOK_CONFIG);
-  }
-
-  // UserPromptSubmit - gentle lesson tool reminders
-  if (!hooks.UserPromptSubmit) {
-    hooks.UserPromptSubmit = [];
-  }
-  if (!hasHookTypeAny(hooks.UserPromptSubmit, ['ca hooks run user-prompt', 'hook-runner.js" user-prompt'])) {
-    hooks.UserPromptSubmit.push(
-      hookRunnerPath
-        ? buildHookEntry(hookRunnerPath, 'user-prompt', '')
-        : CLAUDE_USER_PROMPT_HOOK_CONFIG,
-    );
-  }
-
-  // PostToolUseFailure - smart failure detection
-  if (!hooks.PostToolUseFailure) {
-    hooks.PostToolUseFailure = [];
-  }
-  if (!hasHookTypeAny(hooks.PostToolUseFailure, ['ca hooks run post-tool-failure', 'hook-runner.js" post-tool-failure'])) {
-    hooks.PostToolUseFailure.push(
-      hookRunnerPath
-        ? buildHookEntry(hookRunnerPath, 'post-tool-failure', 'Bash|Edit|Write')
-        : CLAUDE_POST_TOOL_FAILURE_HOOK_CONFIG,
-    );
-  }
-
-  // PostToolUse - reset failure state on success
-  if (!hooks.PostToolUse) {
-    hooks.PostToolUse = [];
-  }
-  if (!hasHookTypeAny(hooks.PostToolUse, ['ca hooks run post-tool-success', 'hook-runner.js" post-tool-success'])) {
-    hooks.PostToolUse.push(
-      hookRunnerPath
-        ? buildHookEntry(hookRunnerPath, 'post-tool-success', 'Bash|Edit|Write')
-        : CLAUDE_POST_TOOL_SUCCESS_HOOK_CONFIG,
-    );
-  }
-
-  // PostToolUse - read tracker (tracks skill file reads)
-  if (!hasHookTypeAny(hooks.PostToolUse, ['ca hooks run post-read', 'ca hooks run read-tracker', 'hook-runner.js" post-read'])) {
-    hooks.PostToolUse.push(
-      hookRunnerPath
-        ? buildHookEntry(hookRunnerPath, 'post-read', 'Read')
-        : CLAUDE_POST_READ_HOOK_CONFIG,
-    );
-  }
-
-  // PreToolUse - phase guard (warns before Edit/Write without skill read)
-  if (!hooks.PreToolUse) {
-    hooks.PreToolUse = [];
-  }
-  if (!hasHookTypeAny(hooks.PreToolUse, ['ca hooks run phase-guard', 'hook-runner.js" phase-guard'])) {
-    hooks.PreToolUse.push(
-      hookRunnerPath
-        ? buildHookEntry(hookRunnerPath, 'phase-guard', 'Edit|Write')
-        : CLAUDE_PHASE_GUARD_HOOK_CONFIG,
-    );
-  }
-
-  // Stop - audit hook (blocks stop when phase gate not passed)
-  if (!hooks.Stop) {
-    hooks.Stop = [];
-  }
-  if (!hasHookTypeAny(hooks.Stop, ['ca hooks run phase-audit', 'ca hooks run stop-audit', 'hook-runner.js" phase-audit'])) {
-    hooks.Stop.push(
-      hookRunnerPath
-        ? buildHookEntry(hookRunnerPath, 'phase-audit', '')
-        : CLAUDE_PHASE_AUDIT_HOOK_CONFIG,
-    );
+  for (const spec of MANAGED_HOOK_SPECS) {
+    upsertManagedHook(hooks, spec, hookRunnerPath);
   }
 
   // Note: remind-capture functionality is handled by git pre-commit hooks
   // (see installPreCommitHook in hooks.ts), not Claude Code hooks
 }
 
-/**
- * Check if a hook type already has a command containing any marker.
- */
-function hasHookTypeAny(hookArray: unknown[], markers: string[]): boolean {
-  return hookArray.some((entry) => {
-    const hookEntry = entry as { hooks?: Array<{ command?: string }> };
-    return hookEntry.hooks?.some((h) => markers.some((marker) => h.command?.includes(marker)));
-  });
+export function getCompoundAgentHookStatus(
+  settings: Record<string, unknown>,
+  hookRunnerPath = resolveHookRunnerPath(),
+): CompoundAgentHookStatus {
+  const hooks = settings.hooks as Record<string, unknown[]> | undefined;
+  if (!hooks) {
+    return {
+      hasAnyManagedHooks: false,
+      hasAllRequiredHooks: false,
+      hasAllDesiredHooks: false,
+      hasIncompleteHooks: false,
+      needsMigration: false,
+    };
+  }
+
+  let hasAnyManagedHooks = false;
+  let hasAllRequiredHooks = true;
+  let hasAllDesiredHooks = true;
+
+  for (const spec of MANAGED_HOOK_SPECS) {
+    const hookArray = hooks[spec.hookType] ?? [];
+    const totalMatches = countMatchingCommands(hookArray, spec, hookRunnerPath);
+    const desiredMatches = countDesiredCommands(hookArray, getDesiredCommand(spec, hookRunnerPath));
+
+    hasAnyManagedHooks ||= totalMatches > 0;
+    hasAllRequiredHooks &&= totalMatches > 0;
+    hasAllDesiredHooks &&= totalMatches === 1 && desiredMatches === 1;
+  }
+
+  const hasIncompleteHooks = hasAnyManagedHooks && !hasAllRequiredHooks;
+
+  return {
+    hasAnyManagedHooks,
+    hasAllRequiredHooks,
+    hasAllDesiredHooks,
+    hasIncompleteHooks,
+    needsMigration: hasAllRequiredHooks && !hasAllDesiredHooks,
+  };
 }
 
 /**
  * Remove our hooks from all hook arrays.
- * Removes both current (ca) and legacy (compound-agent) hooks from all hook types.
+ * Removes only exact current/legacy managed hook commands from all hook types.
  */
 export function removeCompoundAgentHook(settings: Record<string, unknown>): boolean {
   const hooks = settings.hooks as Record<string, unknown[]> | undefined;
   if (!hooks) return false;
 
   let anyRemoved = false;
+  const hookRunnerPath = resolveHookRunnerPath();
 
-  // Hook types we manage
-  const hookTypes = ['SessionStart', 'PreCompact', 'UserPromptSubmit', 'PostToolUseFailure', 'PostToolUse', 'PreToolUse', 'Stop'];
+  for (const hookType of MANAGED_HOOK_TYPES) {
+    const hookArray = hooks[hookType];
+    if (!hookArray) continue;
 
-  for (const hookType of hookTypes) {
-    if (!hooks[hookType]) continue;
+    const hookSpecs = MANAGED_HOOK_SPECS.filter((spec) => spec.hookType === hookType);
 
-    const originalLength = hooks[hookType].length;
-    hooks[hookType] = hooks[hookType].filter((entry) => {
-      const hookEntry = entry as { hooks?: Array<{ command?: string }> };
-      return !hookEntry.hooks?.some((h) =>
-        CLAUDE_HOOK_MARKERS.some((marker) => h.command?.includes(marker))
-      );
-    });
+    const rewrittenEntries: unknown[] = [];
+    for (const entry of hookArray) {
+      const hookEntry = entry as HookEntry;
+      if (!Array.isArray(hookEntry.hooks)) {
+        rewrittenEntries.push(entry);
+        continue;
+      }
 
-    if (hooks[hookType].length < originalLength) {
-      anyRemoved = true;
+      const preservedHooks = hookEntry.hooks.filter((hook) => {
+        return !hookSpecs.some((spec) => commandMatchesSpec(hook.command, spec, hookRunnerPath));
+      });
+      if (preservedHooks.length !== hookEntry.hooks.length) {
+        anyRemoved = true;
+      }
+
+      if (preservedHooks.length > 0) {
+        if (preservedHooks.length === hookEntry.hooks.length) {
+          rewrittenEntries.push(entry);
+        } else {
+          rewrittenEntries.push({ ...hookEntry, hooks: preservedHooks });
+        }
+      }
     }
+
+    hooks[hookType] = rewrittenEntries;
   }
 
   return anyRemoved;
@@ -291,13 +409,16 @@ export async function installClaudeHooksForInit(repoRoot: string): Promise<Claud
     return { installed: false, action: 'error', error: 'Failed to parse settings.json' };
   }
 
-  if (hasAllCompoundAgentHooks(settings)) {
+  const hookRunnerPath = resolveHookRunnerPath();
+  const before = JSON.stringify(settings);
+
+  addAllCompoundAgentHooks(settings, hookRunnerPath);
+
+  if (JSON.stringify(settings) === before) {
     return { installed: true, action: 'already_installed' };
   }
 
   try {
-    const hookRunnerPath = resolveHookRunnerPath();
-    addAllCompoundAgentHooks(settings, hookRunnerPath);
     await writeClaudeSettings(settingsPath, settings);
     return { installed: true, action: 'installed' };
   } catch (err) {
