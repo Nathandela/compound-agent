@@ -66,6 +66,9 @@ jobs:
           pattern: ca-embed-*
           merge-multiple: true
 
+      - name: Fix git safe directory
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
       - name: GoReleaser
         run: goreleaser release --clean
         env:
