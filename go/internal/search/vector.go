@@ -2,6 +2,7 @@ package search
 
 import (
 	"database/sql"
+	"fmt"
 	"math"
 	"sort"
 
@@ -46,10 +47,10 @@ func embedBatched(embedder Embedder, texts []string) ([][]float64, error) {
 
 // CosineSimilarity computes the cosine similarity between two vectors.
 // Returns 0 if either vector has zero magnitude.
-// Panics if len(a) != len(b).
-func CosineSimilarity(a, b []float64) float64 {
+// Returns an error if vectors have different lengths.
+func CosineSimilarity(a, b []float64) (float64, error) {
 	if len(a) != len(b) {
-		panic("CosineSimilarity: vectors must have equal length")
+		return 0, fmt.Errorf("CosineSimilarity: vectors must have equal length (%d vs %d)", len(a), len(b))
 	}
 
 	var dot, normA, normB float64
@@ -61,9 +62,9 @@ func CosineSimilarity(a, b []float64) float64 {
 
 	mag := math.Sqrt(normA) * math.Sqrt(normB)
 	if mag == 0 {
-		return 0
+		return 0, nil
 	}
-	return dot / mag
+	return dot / mag, nil
 }
 
 // cctToMemoryItem converts a CCT pattern to a MemoryItem for unified scoring.
@@ -154,7 +155,10 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRo
 
 	var results []ScoredItem
 	for i, item := range items {
-		score := CosineSimilarity(queryVec, itemVecs[i])
+		score, err := CosineSimilarity(queryVec, itemVecs[i])
+		if err != nil {
+			continue
+		}
 		results = append(results, ScoredItem{Item: item, Score: score})
 	}
 
@@ -167,7 +171,10 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRo
 		cctVecs, cctErr := embedBatched(embedder, cctTexts)
 		if cctErr == nil && len(cctVecs) == len(cctPatterns) {
 			for i, pattern := range cctPatterns {
-				score := CosineSimilarity(queryVec, cctVecs[i])
+				score, err := CosineSimilarity(queryVec, cctVecs[i])
+				if err != nil {
+					continue
+				}
 				results = append(results, ScoredItem{Item: cctToMemoryItem(pattern), Score: score})
 			}
 		}
@@ -254,7 +261,10 @@ func FindSimilarLessons(db *sql.DB, embedder Embedder, text string, threshold fl
 
 	var results []ScoredItem
 	for i, c := range candidates {
-		score := CosineSimilarity(queryVec, itemVecs[i])
+		score, err := CosineSimilarity(queryVec, itemVecs[i])
+		if err != nil {
+			continue
+		}
 		if score >= threshold {
 			results = append(results, ScoredItem{Item: c.item, Score: score})
 		}

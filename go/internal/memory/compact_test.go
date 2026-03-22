@@ -200,3 +200,26 @@ func TestCompact_EmptyFile(t *testing.T) {
 		t.Errorf("expected 0, got %d", result.LessonsRemaining)
 	}
 }
+
+func TestCompact_NoTempFileLeftover(t *testing.T) {
+	dir := t.TempDir()
+	writeTestJSONL(t, dir, []string{
+		makeLesson("L001", "first lesson"),
+		makeTombstone("L001"),
+		makeLesson("L002", "second lesson"),
+	})
+
+	_, err := Compact(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// No temp files should remain after a successful compaction
+	lessonsDir := filepath.Dir(filepath.Join(dir, LessonsPath))
+	entries, _ := os.ReadDir(lessonsDir)
+	for _, e := range entries {
+		if strings.Contains(e.Name(), ".tmp") {
+			t.Errorf("temp file %s left behind after compaction", e.Name())
+		}
+	}
+}

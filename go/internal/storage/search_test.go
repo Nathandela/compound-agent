@@ -211,6 +211,29 @@ func TestSearchKeyword_InvalidatedExcluded(t *testing.T) {
 	}
 }
 
+func TestExecuteFts_PropagatesQueryError(t *testing.T) {
+	db, err := OpenDB(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Close DB to force a query error
+	db.Close()
+
+	sdb := NewSearchDB(db)
+
+	// SearchKeyword calls executeFts; a closed DB must return an error, not nil
+	_, err = sdb.SearchKeyword("anything", 10, "")
+	if err == nil {
+		t.Fatal("expected error from SearchKeyword on closed DB, got nil")
+	}
+
+	// SearchKeywordScored also calls executeFts
+	_, err = sdb.SearchKeywordScored("anything", 10, "")
+	if err == nil {
+		t.Fatal("expected error from SearchKeywordScored on closed DB, got nil")
+	}
+}
+
 func TestRowToMemoryItem(t *testing.T) {
 	dir := setupSyncTestDir(t)
 

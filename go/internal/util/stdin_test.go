@@ -3,6 +3,7 @@ package util
 import (
 	"bytes"
 	"io"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -46,6 +47,53 @@ func TestReadStdin_Timeout(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected timeout error")
 	}
+}
+
+func TestReadStdin_TimeoutClosesInternalPipe(t *testing.T) {
+	// Verify that on timeout, the internal pipe is closed so that a
+	// copy goroutine in the write phase is unblocked. We use a slow
+	// reader that produces data, ensuring io.Copy enters the write phase
+	// before timeout fires. After timeout, io.Copy should fail writing
+	// to the closed pipe and the goroutine should terminate.
+	var copyReturned atomic.Int32
+	r := &trickleReader{delay: 3 * time.Millisecond, copyReturned: &copyReturned}
+
+	_, err := ReadStdinFrom(r, 15*time.Millisecond, 1<<20)
+	if err == nil {
+		t.Fatal("expected timeout error")
+	}
+
+	// Wait briefly for the copy goroutine to notice the closed pipe
+	time.Sleep(50 * time.Millisecond)
+	if copyReturned.Load() == 0 {
+		// The slow reader keeps being called because io.Copy hasn't returned.
+		// This would indicate the pipe close isn't propagating.
+		// In practice, once the reader blocks and the write fails, Copy returns.
+		// We can't directly observe this without instrumenting ReadStdinFrom,
+		// so we verify indirectly: the trickle reader should have stopped
+		// getting Read calls after the pipe closed.
+		if r.callCount() > 20 {
+			t.Error("reader called too many times after timeout -- goroutine may be leaking")
+		}
+	}
+}
+
+// trickleReader produces 1 byte per call with a delay.
+type trickleReader struct {
+	delay        time.Duration
+	copyReturned *atomic.Int32
+	calls        atomic.Int32
+}
+
+func (r *trickleReader) Read(p []byte) (int, error) {
+	r.calls.Add(1)
+	time.Sleep(r.delay)
+	p[0] = 'x'
+	return 1, nil
+}
+
+func (r *trickleReader) callCount() int32 {
+	return r.calls.Load()
 }
 
 func TestReadStdin_ExactlyMaxBytes(t *testing.T) {

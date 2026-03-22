@@ -14,7 +14,6 @@ import (
 func initCmd() *cobra.Command {
 	var (
 		skipHooks bool
-		skipModel bool
 		jsonOut   bool
 		repoRoot  string
 	)
@@ -29,7 +28,6 @@ func initCmd() *cobra.Command {
 
 			result, err := setup.InitRepo(repoRoot, setup.InitOptions{
 				SkipHooks:  skipHooks,
-				SkipModel:  skipModel,
 				BinaryPath: resolveBinaryPath(),
 			})
 			if err != nil {
@@ -74,7 +72,6 @@ func initCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&skipHooks, "skip-hooks", false, "Skip installing Claude Code hooks")
-	cmd.Flags().BoolVar(&skipModel, "skip-model", false, "Skip downloading embedding model")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root (defaults to git root)")
 	return cmd
@@ -90,7 +87,6 @@ func setupCmd() *cobra.Command {
 
 	// Default setup action (no subcommand): runs init + claude hooks
 	var (
-		skipModel bool
 		skipHooks bool
 		jsonOut   bool
 		repoRoot  string
@@ -103,7 +99,6 @@ func setupCmd() *cobra.Command {
 
 		result, err := setup.InitRepo(repoRoot, setup.InitOptions{
 			SkipHooks:  skipHooks,
-			SkipModel:  skipModel,
 			BinaryPath: resolveBinaryPath(),
 		})
 		if err != nil {
@@ -135,7 +130,6 @@ func setupCmd() *cobra.Command {
 		return nil
 	}
 
-	cmd.Flags().BoolVar(&skipModel, "skip-model", false, "Skip downloading embedding model")
 	cmd.Flags().BoolVar(&skipHooks, "skip-hooks", false, "Skip installing hooks")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root")

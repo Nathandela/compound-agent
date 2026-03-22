@@ -335,6 +335,11 @@ func TestCountOldLessonsUnparseable(t *testing.T) {
 	}
 }
 
+func TestCloseEmbedder_NilSafe(t *testing.T) {
+	// CloseEmbedder should be safe to call even when no embedder was started.
+	CloseEmbedder() // must not panic
+}
+
 func TestDatePrefix(t *testing.T) {
 	tests := []struct {
 		input string

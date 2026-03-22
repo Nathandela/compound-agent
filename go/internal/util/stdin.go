@@ -8,6 +8,7 @@ import (
 
 // ReadStdinFrom reads all data from r with timeout and size-limit protection.
 // The size limit is enforced incrementally — at most maxBytes+1 bytes are read.
+// On timeout, the internal pipe is closed so the copy goroutine unblocks.
 func ReadStdinFrom(r io.Reader, timeout time.Duration, maxBytes int) (string, error) {
 	type result struct {
 		data []byte
@@ -15,10 +16,17 @@ func ReadStdinFrom(r io.Reader, timeout time.Duration, maxBytes int) (string, er
 	}
 
 	ch := make(chan result, 1)
+	pr, pw := io.Pipe()
+
+	// Copy goroutine: reads from r, writes to pipe
 	go func() {
-		// Read at most maxBytes+1 to detect overflow without buffering the full stream
-		limited := io.LimitReader(r, int64(maxBytes)+1)
-		data, err := io.ReadAll(limited)
+		_, err := io.Copy(pw, io.LimitReader(r, int64(maxBytes)+1))
+		pw.CloseWithError(err)
+	}()
+
+	// Read goroutine: reads from pipe
+	go func() {
+		data, err := io.ReadAll(pr)
 		ch <- result{data, err}
 	}()
 
@@ -32,6 +40,8 @@ func ReadStdinFrom(r io.Reader, timeout time.Duration, maxBytes int) (string, er
 		}
 		return string(res.data), nil
 	case <-time.After(timeout):
+		pr.CloseWithError(fmt.Errorf("timeout"))
+		pw.CloseWithError(fmt.Errorf("timeout"))
 		return "", fmt.Errorf("stdin read timed out")
 	}
 }

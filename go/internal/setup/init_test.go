@@ -14,7 +14,6 @@ func TestInitRepo_CreatesDirectories(t *testing.T) {
 
 	result, err := InitRepo(dir, InitOptions{
 		SkipHooks:     true,
-		SkipModel:     true,
 		SkipTemplates: true,
 	})
 	if err != nil {
@@ -53,7 +52,7 @@ func TestInitRepo_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 
-	opts := InitOptions{SkipHooks: true, SkipModel: true, SkipTemplates: true}
+	opts := InitOptions{SkipHooks: true, SkipTemplates: true}
 	_, err := InitRepo(dir, opts)
 	if err != nil {
 		t.Fatalf("first InitRepo failed: %v", err)
@@ -79,9 +78,7 @@ func TestInitRepo_InstallsHooks(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 
-	result, err := InitRepo(dir, InitOptions{
-		SkipModel: true,
-	})
+	result, err := InitRepo(dir, InitOptions{})
 	if err != nil {
 		t.Fatalf("InitRepo failed: %v", err)
 	}
@@ -108,7 +105,6 @@ func TestInitRepo_InstallsTemplates(t *testing.T) {
 
 	result, err := InitRepo(dir, InitOptions{
 		SkipHooks: true,
-		SkipModel: true,
 	})
 	if err != nil {
 		t.Fatalf("InitRepo failed: %v", err)
@@ -143,7 +139,7 @@ func TestInitRepo_InstallsTemplates(t *testing.T) {
 	}
 
 	// Verify idempotency on second run
-	result2, err := InitRepo(dir, InitOptions{SkipHooks: true, SkipModel: true})
+	result2, err := InitRepo(dir, InitOptions{SkipHooks: true})
 	if err != nil {
 		t.Fatalf("second InitRepo failed: %v", err)
 	}
@@ -244,7 +240,7 @@ func TestInitRepo_DirsCreatedAccurate(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 
-	opts := InitOptions{SkipHooks: true, SkipModel: true, SkipTemplates: true}
+	opts := InitOptions{SkipHooks: true, SkipTemplates: true}
 
 	// First run should create dirs
 	result1, err := InitRepo(dir, opts)

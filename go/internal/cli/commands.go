@@ -270,6 +270,9 @@ func checkPlanCmd() *cobra.Command {
 
 // --- embedder adapter ---
 
+// activeClient holds the embed daemon client for cleanup via CloseEmbedder.
+var activeClient *embed.Client
+
 type embedderAdapter struct {
 	client *embed.Client
 }
@@ -287,6 +290,7 @@ func (a *embedderAdapter) Embed(texts []string) ([][]float64, error) {
 
 // getOrStartEmbedder connects to the embed daemon, starting it if needed.
 // Returns nil if the daemon binary or model files are unavailable (graceful degradation).
+// The caller should defer CloseEmbedder() to release the connection.
 func getOrStartEmbedder(repoRoot string) search.Embedder {
 	// Fast path: try connecting to an already-running daemon
 	sockPath := embed.SocketPath(repoRoot)
@@ -294,6 +298,7 @@ func getOrStartEmbedder(repoRoot string) search.Embedder {
 	if err == nil {
 		resp, err := client.Health()
 		if err == nil && resp.Status == "ok" {
+			activeClient = client
 			return &embedderAdapter{client: client}
 		}
 		client.Close()
@@ -310,7 +315,17 @@ func getOrStartEmbedder(repoRoot string) search.Embedder {
 		fmt.Fprintf(os.Stderr, "[ca] embed daemon failed: %v (falling back to keyword search)\n", err)
 		return nil // Daemon failed to start, degrade gracefully
 	}
+	activeClient = client
 	return &embedderAdapter{client: client}
+}
+
+// CloseEmbedder closes the active embed daemon client connection, if any.
+// Safe to call even when no embedder was started.
+func CloseEmbedder() {
+	if activeClient != nil {
+		activeClient.Close()
+		activeClient = nil
+	}
 }
 
 // --- formatting helpers ---

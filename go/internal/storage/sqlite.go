@@ -9,7 +9,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-// SchemaVersion matches the TypeScript schema version.
+// SchemaVersion is the current schema version for migration detection.
 const SchemaVersion = 6
 
 // DBPath is the relative path to the SQLite database from repo root.

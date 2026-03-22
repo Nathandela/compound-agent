@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 )
 
-// KnowledgeSchemaVersion matches the TypeScript KNOWLEDGE_SCHEMA_VERSION.
+// KnowledgeSchemaVersion is the current knowledge schema version for migration detection.
 const KnowledgeSchemaVersion = 3
 
 // KnowledgeDBPath is the relative path from repo root.
@@ -249,8 +249,13 @@ func (k *KnowledgeDB) GetIndexedFilePaths() []string {
 	var paths []string
 	for rows.Next() {
 		var p string
-		rows.Scan(&p)
+		if err := rows.Scan(&p); err != nil {
+			continue
+		}
 		paths = append(paths, p)
+	}
+	if err := rows.Err(); err != nil {
+		return nil
 	}
 	return paths
 }
@@ -336,6 +341,7 @@ func (k *KnowledgeDB) SearchChunksKeywordScored(query string, limit int) []Score
 		}
 		results = append(results, ScoredKnowledgeChunk{Chunk: chunk, Score: knowledgeNormalizeBm25(rank)})
 	}
+	// rows.Err() is non-fatal for search results; return what we have
 	return results
 }
 
@@ -374,6 +380,7 @@ func (k *KnowledgeDB) GetAllEmbeddings() map[string]CachedEmbeddingEntry {
 		vec := blobToFloat64(blob)
 		result[id] = CachedEmbeddingEntry{Vector: vec, Hash: hash.String}
 	}
+	// rows.Err() is non-fatal for cache reads; return what we have
 	return result
 }
 
@@ -423,6 +430,9 @@ func (k *KnowledgeDB) GetAllChunks() []KnowledgeChunk {
 		}
 		chunks = append(chunks, c)
 	}
+	if rows.Err() != nil {
+		return nil
+	}
 	return chunks
 }
 
@@ -441,6 +451,9 @@ func (k *KnowledgeDB) GetUnembeddedChunks() []KnowledgeChunk {
 			continue
 		}
 		chunks = append(chunks, c)
+	}
+	if rows.Err() != nil {
+		return nil
 	}
 	return chunks
 }
@@ -484,6 +497,9 @@ func (k *KnowledgeDB) HydrateChunks(ids []string) []KnowledgeChunk {
 			c.Model = model.String
 		}
 		chunks = append(chunks, c)
+	}
+	if rows.Err() != nil {
+		return nil
 	}
 	return chunks
 }

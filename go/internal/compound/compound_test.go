@@ -220,6 +220,47 @@ func TestWriteCctPatterns_Deduplication(t *testing.T) {
 	}
 }
 
+func TestWriteCctPatterns_NoTempFileLeftover(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude", "lessons"), 0755)
+
+	patterns := []CctPattern{
+		{ID: "CCT-tmp", Name: "test", Description: "d", Frequency: 1, SourceIDs: []string{"L1"}, Created: "2026-01-01T00:00:00Z"},
+	}
+	if err := WriteCctPatterns(dir, patterns); err != nil {
+		t.Fatalf("write failed: %v", err)
+	}
+
+	// No .tmp file should remain after a successful write
+	entries, _ := os.ReadDir(filepath.Join(dir, ".claude", "lessons"))
+	for _, e := range entries {
+		if filepath.Ext(e.Name()) == ".tmp" {
+			t.Errorf("temp file %s left behind after write", e.Name())
+		}
+	}
+
+	// Main file should exist with correct data
+	read, err := ReadCctPatterns(dir)
+	if err != nil {
+		t.Fatalf("read failed: %v", err)
+	}
+	if len(read) != 1 || read[0].ID != "CCT-tmp" {
+		t.Errorf("expected 1 pattern CCT-tmp, got %v", read)
+	}
+}
+
+func TestWriteCctPatterns_ReadCctPatterns_UsesErrorsIs(t *testing.T) {
+	// ReadCctPatterns on a non-existent path should return nil, nil
+	// This exercises the errors.Is(err, os.ErrNotExist) path
+	patterns, err := ReadCctPatterns(t.TempDir())
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	if patterns != nil {
+		t.Errorf("expected nil patterns, got %v", patterns)
+	}
+}
+
 func sevPtr(s memory.Severity) *memory.Severity {
 	return &s
 }

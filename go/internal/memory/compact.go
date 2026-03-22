@@ -155,11 +155,11 @@ func Compact(repoRoot string) (CompactResult, error) {
 		return result, fmt.Errorf("mkdir: %w", err)
 	}
 
-	tmpPath := path + ".tmp"
-	tmp, err := os.Create(tmpPath)
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".compact-*.tmp")
 	if err != nil {
 		return result, fmt.Errorf("create temp: %w", err)
 	}
+	tmpPath := tmp.Name()
 
 	for _, item := range lessons {
 		data, err := json.Marshal(item)

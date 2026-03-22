@@ -16,11 +16,6 @@ const DuplicateThreshold = 0.98
 // minWordCount is the minimum number of words for a specific insight.
 const minWordCount = 4
 
-// Embedder provides text embedding functionality.
-type Embedder interface {
-	Embed(texts []string) ([][]float64, error)
-}
-
 // NoveltyResult holds the result of a novelty check.
 type NoveltyResult struct {
 	Novel      bool
@@ -84,7 +79,7 @@ func isActionable(insight string) (actionable bool, reason string) {
 
 // isNovel checks if an insight is novel using an embedder and DB at repoRoot.
 // If embedder is nil, returns novel=true (graceful degradation).
-func isNovel(repoRoot string, insight string, embedder Embedder, threshold float64) NoveltyResult {
+func isNovel(repoRoot string, insight string, embedder search.Embedder, threshold float64) NoveltyResult {
 	if embedder == nil {
 		return NoveltyResult{Novel: true}
 	}
@@ -100,7 +95,7 @@ func isNovel(repoRoot string, insight string, embedder Embedder, threshold float
 }
 
 // isNovelWithDB checks novelty against an already-opened database.
-func isNovelWithDB(db *sql.DB, insight string, embedder Embedder, threshold float64) NoveltyResult {
+func isNovelWithDB(db *sql.DB, insight string, embedder search.Embedder, threshold float64) NoveltyResult {
 	similar, err := search.FindSimilarLessons(db, embedder, insight, threshold, "")
 	if err != nil {
 		return NoveltyResult{Novel: true}
@@ -124,7 +119,7 @@ func isNovelWithDB(db *sql.DB, insight string, embedder Embedder, threshold floa
 
 // ShouldPropose checks if an insight should be proposed as a new lesson.
 // Checks specificity first (fast, no DB), then novelty via embedder.
-func ShouldPropose(repoRoot string, insight string, embedder Embedder) (shouldPropose bool, reason string) {
+func ShouldPropose(repoRoot string, insight string, embedder search.Embedder) (shouldPropose bool, reason string) {
 	specific, specificReason := isSpecific(insight)
 	if !specific {
 		return false, specificReason

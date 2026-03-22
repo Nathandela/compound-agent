@@ -58,9 +58,10 @@ func GetCachedEmbeddingsBulk(db *sql.DB) map[string]CachedEmbeddingEntry {
 
 // SetCachedEmbedding stores an embedding vector and content hash for a lesson.
 // UPDATE-only: the lesson row must already exist.
-func SetCachedEmbedding(db *sql.DB, id string, embedding []float64, hash string) {
+func SetCachedEmbedding(db *sql.DB, id string, embedding []float64, hash string) error {
 	blob := float64ToBlob(embedding)
-	db.Exec("UPDATE lessons SET embedding = ?, content_hash = ? WHERE id = ?", blob, hash, id)
+	_, err := db.Exec("UPDATE lessons SET embedding = ?, content_hash = ? WHERE id = ?", blob, hash, id)
+	return err
 }
 
 // GetCachedInsightEmbeddingsBulk reads all cached insight embeddings in a single query.
@@ -117,9 +118,10 @@ func GetCachedInsightEmbedding(db *sql.DB, id string, expectedHash string) []flo
 
 // SetCachedInsightEmbedding stores an insight-only embedding and hash.
 // UPDATE-only: the lesson row must already exist.
-func SetCachedInsightEmbedding(db *sql.DB, id string, embedding []float64, hash string) {
+func SetCachedInsightEmbedding(db *sql.DB, id string, embedding []float64, hash string) error {
 	blob := float64ToBlob(embedding)
-	db.Exec("UPDATE lessons SET embedding_insight = ?, content_hash_insight = ? WHERE id = ?", blob, hash, id)
+	_, err := db.Exec("UPDATE lessons SET embedding_insight = ?, content_hash_insight = ? WHERE id = ?", blob, hash, id)
+	return err
 }
 
 // float64ToBlob converts a []float64 to little-endian float32 bytes.

@@ -82,11 +82,10 @@ npx ca init --skip-agents      # Skip AGENTS.md and template installation
 npx ca init --skip-hooks       # Skip git hook installation
 npx ca init --skip-claude      # Skip Claude Code hooks
 npx ca init --json             # Output result as JSON
-npx ca setup                   # Full setup (init + model download)
+npx ca setup                   # Full setup (init + hooks + templates)
 npx ca setup --update          # Regenerate templates (preserves user files)
 npx ca setup --uninstall       # Remove compound-agent integration
 npx ca setup --status          # Show installation status
-npx ca setup --skip-model      # Skip embedding model download
 npx ca setup claude            # Install Claude Code hooks only
 npx ca setup claude --status   # Check hook status
 npx ca hooks                   # Install git hooks

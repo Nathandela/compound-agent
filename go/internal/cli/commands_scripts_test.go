@@ -271,6 +271,77 @@ func TestFindTraceForEpic_PathTraversal(t *testing.T) {
 	}
 }
 
+func TestImproveCommand_UsesGitStashNotCheckout(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(improveCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	_, err := executeCommand(root, "improve", "-o", outPath, "--force")
+	if err != nil {
+		t.Fatalf("improve command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	if strings.Contains(script, "git checkout -- .") {
+		t.Error("generated script must not use 'git checkout -- .' (destroys unrelated work); use 'git stash' instead")
+	}
+	if !strings.Contains(script, "git stash") {
+		t.Error("expected 'git stash' in generated script for safe rollback")
+	}
+}
+
+func TestLoopCommand_GoTestUsesTagsSqliteFts5(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// go test references must include -tags sqlite_fts5
+	if strings.Contains(script, "go test ./...") && !strings.Contains(script, "go test -tags sqlite_fts5 ./...") {
+		t.Error("generated loop script uses 'go test ./...' without -tags sqlite_fts5")
+	}
+	// Should not reference pnpm test commands (stale TS leftovers)
+	if strings.Contains(script, "pnpm test:unit") {
+		t.Error("generated loop script references stale 'pnpm test:unit'")
+	}
+	if strings.Contains(script, "pnpm test") {
+		t.Error("generated loop script references stale 'pnpm test'")
+	}
+}
+
+func TestLoopCommand_NoStaleTypeScriptRefs(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	if strings.Contains(script, "TypeScript") {
+		t.Error("generated loop script still references TypeScript")
+	}
+}
+
 func TestImproveInitSubcommand(t *testing.T) {
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(improveCmd())

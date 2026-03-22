@@ -12,7 +12,6 @@ import (
 // InitOptions controls what init creates.
 type InitOptions struct {
 	SkipHooks      bool
-	SkipModel      bool
 	SkipTemplates  bool   // Skip installing agent/command/skill/doc templates.
 	BinaryPath     string // Path to the Go binary for hook commands. Empty = npx fallback.
 }

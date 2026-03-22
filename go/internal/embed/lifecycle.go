@@ -133,12 +133,18 @@ func startDaemon(socketPath, modelPath, tokenizerPath string) error {
 		return err
 	}
 
+	devNull, err := os.Open(os.DevNull)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", os.DevNull, err)
+	}
+	defer devNull.Close()
+
 	attr := &os.ProcAttr{
 		Dir: filepath.Dir(socketPath),
 		Env: os.Environ(),
 		Files: []*os.File{
-			os.Stdin,
-			nil, // stdout discarded
+			devNull,   // stdin from /dev/null
+			nil,       // stdout discarded
 			os.Stderr,
 		},
 	}

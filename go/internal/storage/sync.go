@@ -54,7 +54,9 @@ func RebuildIndex(db *sql.DB, repoRoot string) error {
 	// Store JSONL mtime
 	mtime := getJsonlMtime(repoRoot)
 	if mtime > 0 {
-		setLastSyncMtime(tx, mtime)
+		if err := setLastSyncMtime(tx, mtime); err != nil {
+			return fmt.Errorf("set sync mtime: %w", err)
+		}
 	}
 
 	return tx.Commit()
@@ -136,9 +138,10 @@ func getLastSyncMtime(db *sql.DB) float64 {
 	return f
 }
 
-func setLastSyncMtime(tx *sql.Tx, mtime float64) {
-	tx.Exec("INSERT OR REPLACE INTO metadata (key, value) VALUES ('last_sync_mtime', ?)",
+func setLastSyncMtime(tx *sql.Tx, mtime float64) error {
+	_, err := tx.Exec("INSERT OR REPLACE INTO metadata (key, value) VALUES ('last_sync_mtime', ?)",
 		strconv.FormatFloat(mtime, 'f', -1, 64))
+	return err
 }
 
 // Null helpers for optional fields

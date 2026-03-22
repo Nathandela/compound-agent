@@ -23,14 +23,23 @@ type PhaseState struct {
 // Phases is the ordered list of cook-it phase names.
 var Phases = []string{"spec-dev", "plan", "work", "review", "compound"}
 
-func phaseStatePath(repoRoot string) string {
+// Gates is the ordered list of cook-it gate names.
+var Gates = []string{"post-plan", "gate-3", "gate-4", "final"}
+
+// phaseIndex maps phase name to 1-based index.
+var phaseIndexMap = map[string]int{
+	"spec-dev": 1, "plan": 2, "work": 3, "review": 4, "compound": 5,
+}
+
+// PhaseStatePath returns the filesystem path for the phase state file.
+func PhaseStatePath(repoRoot string) string {
 	return filepath.Join(repoRoot, ".claude", ".ca-phase-state.json")
 }
 
 // GetPhaseState reads and validates the phase state from disk.
 // Returns nil if file is missing, corrupted, or stale (>72h).
 func GetPhaseState(repoRoot string) *PhaseState {
-	data, err := os.ReadFile(phaseStatePath(repoRoot))
+	data, err := os.ReadFile(PhaseStatePath(repoRoot))
 	if err != nil {
 		return nil
 	}
@@ -85,7 +94,7 @@ func GetPhaseState(repoRoot string) *PhaseState {
 	}
 	if time.Since(startedAt) > phaseStateMaxAge {
 		// Clean up stale file
-		os.Remove(phaseStatePath(repoRoot))
+		os.Remove(PhaseStatePath(repoRoot))
 		return nil
 	}
 
@@ -115,7 +124,41 @@ func UpdatePhaseState(repoRoot string, partial map[string]interface{}) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(phaseStatePath(repoRoot), data, 0o644)
+	return os.WriteFile(PhaseStatePath(repoRoot), data, 0o644)
+}
+
+// WritePhaseState writes the phase state to disk.
+func WritePhaseState(repoRoot string, state *PhaseState) error {
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(PhaseStatePath(repoRoot), data, 0o644)
+}
+
+// IsValidPhase returns true if s is a recognized phase name.
+func IsValidPhase(s string) bool {
+	for _, p := range Phases {
+		if p == s {
+			return true
+		}
+	}
+	return false
+}
+
+// IsValidGate returns true if s is a recognized gate name.
+func IsValidGate(s string) bool {
+	for _, g := range Gates {
+		if g == s {
+			return true
+		}
+	}
+	return false
+}
+
+// PhaseIndexOf returns the 1-based index for a phase name, or 0 if not found.
+func PhaseIndexOf(phase string) int {
+	return phaseIndexMap[phase]
 }
 
 // ExpectedGateForPhase returns the required gate name for a phase index, or "" for none.

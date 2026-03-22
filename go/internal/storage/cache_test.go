@@ -208,6 +208,50 @@ func TestGetCachedInsightEmbedding_NotFound(t *testing.T) {
 	}
 }
 
+// --- SetCachedEmbedding error propagation ---
+
+func TestSetCachedEmbedding_ReturnsError(t *testing.T) {
+	db, err := OpenDB(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Close DB to force an error
+	db.Close()
+
+	err = SetCachedEmbedding(db, "L001", []float64{1.0}, "hash")
+	if err == nil {
+		t.Error("expected error from SetCachedEmbedding on closed DB, got nil")
+	}
+}
+
+func TestSetCachedInsightEmbedding_ReturnsError(t *testing.T) {
+	db, err := OpenDB(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Close DB to force an error
+	db.Close()
+
+	err = SetCachedInsightEmbedding(db, "L001", []float64{1.0}, "hash")
+	if err == nil {
+		t.Error("expected error from SetCachedInsightEmbedding on closed DB, got nil")
+	}
+}
+
+func TestSetCachedEmbedding_SuccessReturnsNil(t *testing.T) {
+	db, err := OpenDB(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	insertTestLesson(t, db, "L001", "trigger", "insight")
+	err = SetCachedEmbedding(db, "L001", []float64{1.0, 2.0}, "hash")
+	if err != nil {
+		t.Errorf("expected nil error on success, got %v", err)
+	}
+}
+
 // --- Helper ---
 
 func insertTestLesson(t *testing.T, db *sql.DB, id, trigger, insight string) {

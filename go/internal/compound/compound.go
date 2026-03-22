@@ -5,6 +5,7 @@ package compound
 import (
 	"crypto/sha256"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"os"
@@ -266,21 +267,40 @@ func WriteCctPatterns(repoRoot string, patterns []CctPattern) error {
 		}
 	}
 
-	// Write all patterns (truncate)
-	f, err := os.OpenFile(filePath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
+	// Atomic write: temp file then rename
+	tmpPath := filePath + ".tmp"
+	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
-		return fmt.Errorf("open file: %w", err)
+		return fmt.Errorf("open temp file: %w", err)
 	}
-	defer f.Close()
 
 	for _, p := range merged {
 		data, err := json.Marshal(p)
 		if err != nil {
+			f.Close()
+			os.Remove(tmpPath)
 			return fmt.Errorf("marshal pattern: %w", err)
 		}
 		if _, err := f.Write(append(data, '\n')); err != nil {
+			f.Close()
+			os.Remove(tmpPath)
 			return fmt.Errorf("write pattern: %w", err)
 		}
+	}
+
+	if err := f.Sync(); err != nil {
+		f.Close()
+		os.Remove(tmpPath)
+		return fmt.Errorf("sync temp file: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("close temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, filePath); err != nil {
+		os.Remove(tmpPath)
+		return fmt.Errorf("rename temp file: %w", err)
 	}
 	return nil
 }
@@ -289,7 +309,7 @@ func WriteCctPatterns(repoRoot string, patterns []CctPattern) error {
 func ReadCctPatterns(repoRoot string) ([]CctPattern, error) {
 	filePath := filepath.Join(repoRoot, ".claude", "lessons", "cct-patterns.jsonl")
 	data, err := os.ReadFile(filePath)
-	if os.IsNotExist(err) {
+	if errors.Is(err, os.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {

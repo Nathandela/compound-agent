@@ -17,7 +17,7 @@ func TestInitCommand(t *testing.T) {
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(initCmd())
 
-	out, err := executeCommand(root, "init", "--repo-root", dir, "--skip-model")
+	out, err := executeCommand(root, "init", "--repo-root", dir)
 	if err != nil {
 		t.Fatalf("init command failed: %v\nOutput: %s", err, out)
 	}
@@ -42,7 +42,7 @@ func TestInitCommand_JSON(t *testing.T) {
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(initCmd())
 
-	out, err := executeCommand(root, "init", "--repo-root", dir, "--skip-model", "--json")
+	out, err := executeCommand(root, "init", "--repo-root", dir, "--json")
 	if err != nil {
 		t.Fatalf("init --json failed: %v\nOutput: %s", err, out)
 	}
@@ -53,6 +53,26 @@ func TestInitCommand_JSON(t *testing.T) {
 	}
 	if result["success"] != true {
 		t.Errorf("expected success=true, got %v", result["success"])
+	}
+}
+
+func TestInitCommand_NoSkipModelFlag(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	cmd := initCmd()
+	root.AddCommand(cmd)
+
+	// --skip-model flag should not exist (dead flag removed)
+	if cmd.Flags().Lookup("skip-model") != nil {
+		t.Error("--skip-model flag should be removed (dead flag)")
+	}
+}
+
+func TestSetupCommand_NoSkipModelFlag(t *testing.T) {
+	cmd := setupCmd()
+
+	// --skip-model flag should not exist (dead flag removed)
+	if cmd.Flags().Lookup("skip-model") != nil {
+		t.Error("--skip-model flag should be removed from setup command (dead flag)")
 	}
 }
 

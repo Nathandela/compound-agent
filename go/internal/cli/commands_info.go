@@ -5,11 +5,11 @@ import (
 	"os/exec"
 	"runtime"
 
+	"github.com/nathandelacretaz/compound-agent/internal/build"
 	"github.com/spf13/cobra"
 )
 
 const (
-	version        = "1.8.0"
 	repoURL        = "https://github.com/Nathandela/compound-agent"
 	discussionsURL = repoURL + "/discussions"
 )
@@ -19,10 +19,21 @@ func aboutCmd() *cobra.Command {
 		Use:   "about",
 		Short: "Show version and project info",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.Printf("compound-agent v%s (go)\n", version)
+			cmd.Printf("compound-agent v%s (go)\n", build.Version)
 			cmd.Println()
 			cmd.Printf("Repository:  %s\n", repoURL)
 			cmd.Printf("Discussions: %s\n", discussionsURL)
+			return nil
+		},
+	}
+}
+
+func versionCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print the version",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			cmd.Println(build.Version)
 			return nil
 		},
 	}
@@ -66,17 +77,18 @@ func openURL(url string) {
 
 func registerInfoCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(aboutCmd())
+	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(feedbackCmd())
 }
 
 // formatVersion returns the version string for use in other commands.
 func formatVersion() string {
-	return fmt.Sprintf("compound-agent v%s (go)", version)
+	return fmt.Sprintf("compound-agent v%s (go)", build.Version)
 }
 
 // versionString is used by other packages that need the bare version.
 func versionString() string {
-	return version
+	return build.Version
 }
 
 // FormatRepoURL returns the repo URL for use by other commands.

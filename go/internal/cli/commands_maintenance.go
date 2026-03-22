@@ -1,4 +1,4 @@
-// Package cli — maintenance commands: compact, rebuild, stats, export, import, prime, clean-lessons.
+// Package cli — maintenance commands: compact, rebuild, stats, export, import, prime.
 package cli
 
 import (
@@ -17,7 +17,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// registerMaintenanceCommands registers compact, rebuild, stats, export, import, prime, clean-lessons.
+// registerMaintenanceCommands registers compact, rebuild, stats, export, import, prime.
 func registerMaintenanceCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(compactCmd())
 	rootCmd.AddCommand(rebuildCmd())
@@ -25,7 +25,6 @@ func registerMaintenanceCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(exportCmd())
 	rootCmd.AddCommand(importCmd())
 	rootCmd.AddCommand(primeCmd())
-	rootCmd.AddCommand(cleanLessonsCmd())
 }
 
 // --- compact command ---
@@ -449,20 +448,6 @@ func primeCmd() *cobra.Command {
 				}
 			}
 
-			return nil
-		},
-	}
-	return cmd
-}
-
-// --- clean-lessons command ---
-
-func cleanLessonsCmd() *cobra.Command {
-	cmd := &cobra.Command{
-		Use:   "clean-lessons",
-		Short: "Detect semantic duplicates among lessons",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			cmd.Println("Embedding model not available. Cannot check for semantic duplicates.")
 			return nil
 		},
 	}

@@ -49,7 +49,7 @@ npx ca doctor
 7. Installs Claude Code hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse)
 8. For pnpm projects: auto-configures `onlyBuiltDependencies` for native addons
 
-`setup` does everything `init` does, plus downloads the nomic-embed-text-v1.5 model (~23MB ONNX Q8). Use `--skip-model` to skip the download.
+`setup` does everything `init` does. The embedding model is managed separately by the embed daemon.
 
 ---
 

@@ -3,7 +3,9 @@ package storage
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"math"
+	"os"
 	"strings"
 
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
@@ -87,7 +89,15 @@ func (s *SearchDB) SearchKeywordScored(query string, limit int, typeFilter memor
 
 // ReadAll reads all non-invalidated memory items from SQLite.
 func (s *SearchDB) ReadAll() ([]memory.MemoryItem, error) {
-	rows, err := s.db.Query("SELECT * FROM lessons WHERE invalidated_at IS NULL")
+	rows, err := s.db.Query(`SELECT id, type, trigger, insight, evidence, severity,
+		tags, source, context, supersedes, related,
+		created, confirmed, deleted, retrieval_count, last_retrieved,
+		embedding, content_hash, embedding_insight, content_hash_insight,
+		invalidated_at, invalidation_reason,
+		citation_file, citation_line, citation_commit,
+		compaction_level, compacted_at,
+		pattern_bad, pattern_good
+		FROM lessons WHERE invalidated_at IS NULL`)
 	if err != nil {
 		return nil, err
 	}
@@ -131,8 +141,7 @@ func (s *SearchDB) executeFts(sanitized string, limit int, typeFilter memory.Mem
 
 	rows, err := s.db.Query(query, args...)
 	if err != nil {
-		// Graceful degradation: log and return empty, matching TS behavior
-		return nil, nil
+		return nil, fmt.Errorf("FTS search: %w", err)
 	}
 	defer rows.Close()
 
@@ -152,7 +161,7 @@ func (s *SearchDB) executeFts(sanitized string, limit int, typeFilter memory.Mem
 }
 
 // normalizeBm25Rank converts FTS5's negative rank to [0, 1].
-// Uses |rank| / (1 + |rank|) to match the TypeScript implementation.
+// Uses |rank| / (1 + |rank|) for a bounded monotonic transformation.
 func normalizeBm25Rank(rank float64) float64 {
 	if math.IsInf(rank, 0) || math.IsNaN(rank) {
 		return 0
@@ -178,9 +187,9 @@ func scanRowWithRank(rows *sql.Rows, withRank bool) (memory.MemoryItem, float64,
 		confirmed, deleted        int
 		retrievalCount            int
 		lastRetrieved             sql.NullString
-		embedding                 sql.NullString
+		embedding                 sql.RawBytes
 		contentHash               sql.NullString
-		embeddingInsight          sql.NullString
+		embeddingInsight          sql.RawBytes
 		contentHashInsight        sql.NullString
 		invalidatedAt             sql.NullString
 		invalidationReason        sql.NullString
@@ -229,10 +238,16 @@ func scanRowWithRank(rows *sql.Rows, withRank bool) (memory.MemoryItem, float64,
 		item.Tags = []string{}
 	}
 
-	// JSON fields
-	json.Unmarshal([]byte(context), &item.Context)
-	json.Unmarshal([]byte(supersedes), &item.Supersedes)
-	json.Unmarshal([]byte(related), &item.Related)
+	// JSON fields — log but don't fail on corrupt data
+	if err := json.Unmarshal([]byte(context), &item.Context); err != nil {
+		fmt.Fprintf(os.Stderr, "[ca] warning: corrupt context JSON for %s: %v\n", id, err)
+	}
+	if err := json.Unmarshal([]byte(supersedes), &item.Supersedes); err != nil {
+		fmt.Fprintf(os.Stderr, "[ca] warning: corrupt supersedes JSON for %s: %v\n", id, err)
+	}
+	if err := json.Unmarshal([]byte(related), &item.Related); err != nil {
+		fmt.Fprintf(os.Stderr, "[ca] warning: corrupt related JSON for %s: %v\n", id, err)
+	}
 	if item.Supersedes == nil {
 		item.Supersedes = []string{}
 	}

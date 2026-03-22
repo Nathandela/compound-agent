@@ -6,7 +6,7 @@ model: sonnet
 
 # Lessons Reviewer
 
-Analyze flagged lesson pairs from `npx ca clean-lessons` output.
+Analyze flagged lesson pairs from semantic duplicate detection.
 
 For each pair, classify as one of:
 - **Duplicate**: Nearly identical — propose merging into one lesson

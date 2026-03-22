@@ -82,7 +82,10 @@ func SearchKnowledgeVector(kdb *storage.KnowledgeDB, embedder search.Embedder, q
 	}
 	var results []scored
 	for id, entry := range entries {
-		score := search.CosineSimilarity(queryVec, entry.Vector)
+		score, err := search.CosineSimilarity(queryVec, entry.Vector)
+		if err != nil {
+			continue
+		}
 		results = append(results, scored{id: id, score: score})
 	}
 

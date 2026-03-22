@@ -157,6 +157,89 @@ func TestUpdatePhaseState(t *testing.T) {
 	}
 }
 
+func TestWritePhaseState(t *testing.T) {
+	dir := t.TempDir()
+	stateDir := filepath.Join(dir, ".claude")
+	os.MkdirAll(stateDir, 0o755)
+
+	state := &PhaseState{
+		CookitActive: true,
+		EpicID:       "write-test",
+		CurrentPhase: "work",
+		PhaseIndex:   3,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{"post-plan"},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	}
+
+	if err := WritePhaseState(dir, state); err != nil {
+		t.Fatalf("WritePhaseState: %v", err)
+	}
+
+	got := GetPhaseState(dir)
+	if got == nil {
+		t.Fatal("expected non-nil state after WritePhaseState")
+	}
+	if got.EpicID != "write-test" {
+		t.Errorf("EpicID = %q, want write-test", got.EpicID)
+	}
+	if len(got.GatesPassed) != 1 || got.GatesPassed[0] != "post-plan" {
+		t.Errorf("GatesPassed = %v, want [post-plan]", got.GatesPassed)
+	}
+}
+
+func TestPhaseStatePath(t *testing.T) {
+	got := PhaseStatePath("/some/repo")
+	want := filepath.Join("/some/repo", ".claude", ".ca-phase-state.json")
+	if got != want {
+		t.Errorf("PhaseStatePath = %q, want %q", got, want)
+	}
+}
+
+func TestIsValidPhase(t *testing.T) {
+	for _, p := range Phases {
+		if !IsValidPhase(p) {
+			t.Errorf("IsValidPhase(%q) = false, want true", p)
+		}
+	}
+	if IsValidPhase("nonexistent") {
+		t.Error("IsValidPhase(nonexistent) = true, want false")
+	}
+}
+
+func TestIsValidGate(t *testing.T) {
+	for _, g := range Gates {
+		if !IsValidGate(g) {
+			t.Errorf("IsValidGate(%q) = false, want true", g)
+		}
+	}
+	if IsValidGate("nonexistent") {
+		t.Error("IsValidGate(nonexistent) = true, want false")
+	}
+}
+
+func TestPhaseIndex(t *testing.T) {
+	tests := []struct {
+		phase string
+		want  int
+	}{
+		{"spec-dev", 1},
+		{"plan", 2},
+		{"work", 3},
+		{"review", 4},
+		{"compound", 5},
+	}
+	for _, tt := range tests {
+		got := PhaseIndexOf(tt.phase)
+		if got != tt.want {
+			t.Errorf("PhaseIndexOf(%q) = %d, want %d", tt.phase, got, tt.want)
+		}
+	}
+	if PhaseIndexOf("nonexistent") != 0 {
+		t.Errorf("PhaseIndexOf(nonexistent) = %d, want 0", PhaseIndexOf("nonexistent"))
+	}
+}
+
 func TestExpectedGateForPhase(t *testing.T) {
 	tests := []struct {
 		index int

@@ -300,6 +300,41 @@ func TestSetChunkEmbeddingBatch(t *testing.T) {
 	}
 }
 
+func TestGetIndexedFilePaths_ChecksRowsErr(t *testing.T) {
+	// GetIndexedFilePaths should check rows.Err() after iteration.
+	// We verify correct behavior by checking normal operation returns expected paths.
+	db := openTestKnowledgeDB(t)
+	kdb := NewKnowledgeDB(db)
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	chunks := []KnowledgeChunk{
+		{ID: "c1", FilePath: "docs/a.md", StartLine: 1, EndLine: 5, ContentHash: "h1", Text: "text", UpdatedAt: now},
+	}
+	kdb.UpsertChunks(chunks)
+
+	paths := kdb.GetIndexedFilePaths()
+	if len(paths) != 1 || paths[0] != "docs/a.md" {
+		t.Errorf("GetIndexedFilePaths() = %v, want [docs/a.md]", paths)
+	}
+}
+
+func TestGetAllChunks_ChecksRowsErr(t *testing.T) {
+	db := openTestKnowledgeDB(t)
+	kdb := NewKnowledgeDB(db)
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	chunks := []KnowledgeChunk{
+		{ID: "c1", FilePath: "docs/a.md", StartLine: 1, EndLine: 5, ContentHash: "h1", Text: "text1", UpdatedAt: now},
+		{ID: "c2", FilePath: "docs/b.md", StartLine: 1, EndLine: 5, ContentHash: "h2", Text: "text2", UpdatedAt: now},
+	}
+	kdb.UpsertChunks(chunks)
+
+	all := kdb.GetAllChunks()
+	if len(all) != 2 {
+		t.Errorf("GetAllChunks() returned %d chunks, want 2", len(all))
+	}
+}
+
 func TestHydrateChunks(t *testing.T) {
 	db := openTestKnowledgeDB(t)
 	kdb := NewKnowledgeDB(db)

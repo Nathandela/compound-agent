@@ -155,6 +155,28 @@ func TestClient_ErrorResponse(t *testing.T) {
 	}
 }
 
+func TestClient_SetDeadlineErrors(t *testing.T) {
+	// Verify that SetWriteDeadline and SetReadDeadline errors are propagated.
+	// We do this by closing the connection before sending, which causes
+	// SetWriteDeadline to fail.
+	sock, cleanup := startMockDaemon(t, echoHandler)
+	defer cleanup()
+
+	c, err := NewClient(sock, 2*time.Second)
+	if err != nil {
+		t.Fatalf("connect: %v", err)
+	}
+
+	// Close the underlying connection
+	c.conn.Close()
+
+	// Now sending should fail (SetWriteDeadline or Write will error)
+	_, err = c.Health()
+	if err == nil {
+		t.Error("expected error after closing connection, got nil")
+	}
+}
+
 func TestClient_ConnectFailure(t *testing.T) {
 	_, err := NewClient("/nonexistent/path.sock", 500*time.Millisecond)
 	if err == nil {

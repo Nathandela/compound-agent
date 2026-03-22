@@ -224,7 +224,7 @@ for topic in $(get_topics); do
         ;;
       NO_IMPROVEMENT)
         echo "[improve] $topic: no improvement found"
-        git checkout -- . 2>/dev/null || true
+        git stash push -m "ca-improve: rolled back" 2>/dev/null || true
         no_improve_streak=$((no_improve_streak + 1))
         if [ "$no_improve_streak" -ge 2 ]; then
           echo "[improve] $topic: diminishing returns, moving on"
@@ -233,7 +233,7 @@ for topic in $(get_topics); do
         ;;
       FAILED|UNKNOWN)
         echo "[improve] $topic: failed"
-        git checkout -- . 2>/dev/null || true
+        git stash push -m "ca-improve: rolled back" 2>/dev/null || true
         FAILED_COUNT=$((FAILED_COUNT + 1))
         break
         ;;
@@ -378,9 +378,7 @@ get_next_epic() {
 	fmt.Fprintf(&b, "## Step 4: On failure\n1. Add a note: %sbd update $epic_id --notes \"Loop failed: <reason>\"%s\n2. Output this marker:\n\nEPIC_FAILED\n\n", bt, bt)
 	fmt.Fprintf(&b, "## Step 5: On human required\nHUMAN_REQUIRED: <reason>\n\n")
 	fmt.Fprintf(&b, "## Memory Safety Rules\n")
-	fmt.Fprintf(&b, "- NEVER run %spnpm test%s (full suite) -- it peaks at 900MB+ and leaks memory.\n", bt, bt)
-	fmt.Fprintf(&b, "- For TypeScript regression checks, use %spnpm test:unit%s (skips embedding + integration).\n", bt, bt)
-	fmt.Fprintf(&b, "- For Go work, use %sgo test ./...%s in the go/ directory.\n", bt, bt)
+	fmt.Fprintf(&b, "- For Go work, use %sgo test -tags sqlite_fts5 ./...%s in the go/ directory.\n", bt, bt)
 	fmt.Fprintf(&b, "- NEVER run embedding tests unless the epic modifies embedding code.\n\n")
 	fmt.Fprintf(&b, "## Rules\n- Do NOT ask questions. Make reasonable decisions.\n- Do NOT stop early. Complete the full workflow.\n- If tests fail, fix them. Retry up to 3 times.\n- Commit incrementally.\n")
 	fmt.Fprintf(&b, "PROMPT_EOF\n}\n\n")

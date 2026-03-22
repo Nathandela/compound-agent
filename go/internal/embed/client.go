@@ -43,12 +43,16 @@ func (c *Client) sendLocked(req Request) (*Response, error) {
 		return nil, fmt.Errorf("encode request: %w", err)
 	}
 
-	c.conn.SetWriteDeadline(time.Now().Add(c.timeout))
+	if err := c.conn.SetWriteDeadline(time.Now().Add(c.timeout)); err != nil {
+		return nil, fmt.Errorf("set write deadline: %w", err)
+	}
 	if _, err := c.conn.Write(line); err != nil {
 		return nil, fmt.Errorf("write request: %w", err)
 	}
 
-	c.conn.SetReadDeadline(time.Now().Add(c.timeout))
+	if err := c.conn.SetReadDeadline(time.Now().Add(c.timeout)); err != nil {
+		return nil, fmt.Errorf("set read deadline: %w", err)
+	}
 	respLine, err := c.reader.ReadBytes('\n')
 	if err != nil {
 		return nil, fmt.Errorf("read response: %w", err)

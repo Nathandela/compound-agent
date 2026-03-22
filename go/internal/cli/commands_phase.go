@@ -8,79 +8,13 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/nathandelacretaz/compound-agent/internal/hook"
 	"github.com/nathandelacretaz/compound-agent/internal/util"
 	"github.com/spf13/cobra"
 )
 
-// Phase state constants.
-var (
-	validPhases = []string{"spec-dev", "plan", "work", "review", "compound"}
-	validGates  = []string{"post-plan", "gate-3", "gate-4", "final"}
-	phaseIndex  = map[string]int{
-		"spec-dev": 1, "plan": 2, "work": 3, "review": 4, "compound": 5,
-	}
-)
-
-const phaseStateMaxAge = 72 * time.Hour
-
-// phaseState is the JSON schema for .ca-phase-state.json.
-type phaseState struct {
-	CookitActive bool     `json:"cookit_active"`
-	EpicID       string   `json:"epic_id"`
-	CurrentPhase string   `json:"current_phase"`
-	PhaseIndex   int      `json:"phase_index"`
-	SkillsRead   []string `json:"skills_read"`
-	GatesPassed  []string `json:"gates_passed"`
-	StartedAt    string   `json:"started_at"`
-}
-
-func phaseStatePath(repoRoot string) string {
-	return filepath.Join(repoRoot, ".claude", ".ca-phase-state.json")
-}
-
-func readPhaseState(repoRoot string) (*phaseState, error) {
-	data, err := os.ReadFile(phaseStatePath(repoRoot))
-	if err != nil {
-		return nil, err
-	}
-	var state phaseState
-	if err := json.Unmarshal(data, &state); err != nil {
-		return nil, err
-	}
-	// TTL check
-	started, err := time.Parse(time.RFC3339, state.StartedAt)
-	if err == nil && time.Since(started) > phaseStateMaxAge {
-		os.Remove(phaseStatePath(repoRoot))
-		return nil, fmt.Errorf("phase state expired")
-	}
-	return &state, nil
-}
-
-func writePhaseState(repoRoot string, state *phaseState) error {
-	data, err := json.MarshalIndent(state, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(phaseStatePath(repoRoot), data, 0644)
-}
-
-func isValidPhase(s string) bool {
-	for _, p := range validPhases {
-		if p == s {
-			return true
-		}
-	}
-	return false
-}
-
-func isValidGate(s string) bool {
-	for _, g := range validGates {
-		if g == s {
-			return true
-		}
-	}
-	return false
-}
+// phaseState is a type alias for hook.PhaseState, kept for internal compatibility.
+type phaseState = hook.PhaseState
 
 func phaseCheckCmd() *cobra.Command {
 	var repoRoot string
@@ -113,12 +47,12 @@ func phaseCheckCmd() *cobra.Command {
 
 			// Guard against overwriting active state
 			if !forceInit {
-				if existing, err := readPhaseState(root); err == nil {
+				if existing := hook.GetPhaseState(root); existing != nil {
 					return fmt.Errorf("active phase state exists for epic %q (phase: %s). Use --force to overwrite", existing.EpicID, existing.CurrentPhase)
 				}
 			}
 
-			state := &phaseState{
+			state := &hook.PhaseState{
 				CookitActive: true,
 				EpicID:       epicID,
 				CurrentPhase: "spec-dev",
@@ -127,7 +61,7 @@ func phaseCheckCmd() *cobra.Command {
 				GatesPassed:  []string{},
 				StartedAt:    time.Now().UTC().Format(time.RFC3339),
 			}
-			if err := writePhaseState(root, state); err != nil {
+			if err := hook.WritePhaseState(root, state); err != nil {
 				return fmt.Errorf("write state: %w", err)
 			}
 			cmd.Printf("Phase state initialized for %s. Current phase: spec-dev (1/5).\n", epicID)
@@ -143,19 +77,19 @@ func phaseCheckCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			phase := args[0]
-			if !isValidPhase(phase) {
-				return fmt.Errorf("invalid phase: %q. Valid phases: %v", phase, validPhases)
+			if !hook.IsValidPhase(phase) {
+				return fmt.Errorf("invalid phase: %q. Valid phases: %v", phase, hook.Phases)
 			}
 			root := getRoot()
-			state, err := readPhaseState(root)
-			if err != nil {
+			state := hook.GetPhaseState(root)
+			if state == nil {
 				return fmt.Errorf("no active phase state. Run: ca phase-check init <epic-id>")
 			}
 			state.CurrentPhase = phase
-			state.PhaseIndex = phaseIndex[phase]
+			state.PhaseIndex = hook.PhaseIndexOf(phase)
 			state.GatesPassed = []string{}
 			state.SkillsRead = []string{}
-			if err := writePhaseState(root, state); err != nil {
+			if err := hook.WritePhaseState(root, state); err != nil {
 				return fmt.Errorf("write state: %w", err)
 			}
 			cmd.Printf("Phase updated: %s (%d/5).\n", state.CurrentPhase, state.PhaseIndex)
@@ -170,12 +104,12 @@ func phaseCheckCmd() *cobra.Command {
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			gate := args[0]
-			if !isValidGate(gate) {
-				return fmt.Errorf("invalid gate: %q. Valid gates: %v", gate, validGates)
+			if !hook.IsValidGate(gate) {
+				return fmt.Errorf("invalid gate: %q. Valid gates: %v", gate, hook.Gates)
 			}
 			root := getRoot()
-			state, err := readPhaseState(root)
-			if err != nil {
+			state := hook.GetPhaseState(root)
+			if state == nil {
 				return fmt.Errorf("no active phase state. Run: ca phase-check init <epic-id>")
 			}
 
@@ -194,14 +128,14 @@ func phaseCheckCmd() *cobra.Command {
 			// Final gate signals epic completion: clean up state file rather than
 			// persisting the gate, since no further phases will read it.
 			if gate == "final" {
-				if err := os.Remove(phaseStatePath(root)); err != nil && !os.IsNotExist(err) {
+				if err := os.Remove(hook.PhaseStatePath(root)); err != nil && !os.IsNotExist(err) {
 					return fmt.Errorf("remove phase state: %w", err)
 				}
 				cmd.Println("Final gate recorded. Phase state cleaned.")
 				return nil
 			}
 
-			if err := writePhaseState(root, state); err != nil {
+			if err := hook.WritePhaseState(root, state); err != nil {
 				return fmt.Errorf("write state: %w", err)
 			}
 			cmd.Printf("Gate recorded: %s.\n", gate)
@@ -216,9 +150,9 @@ func phaseCheckCmd() *cobra.Command {
 		Short: "Show current phase state",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := getRoot()
-			state, err := readPhaseState(root)
+			state := hook.GetPhaseState(root)
 			if jsonOut {
-				if err != nil {
+				if state == nil {
 					cmd.Println(`{"cookit_active":false}`)
 					return nil
 				}
@@ -227,7 +161,7 @@ func phaseCheckCmd() *cobra.Command {
 				return nil
 			}
 
-			if err != nil {
+			if state == nil {
 				cmd.Println("No active cook-it session.")
 				return nil
 			}
@@ -257,7 +191,7 @@ func phaseCheckCmd() *cobra.Command {
 		Short: "Remove phase state file",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := getRoot()
-			if err := os.Remove(phaseStatePath(root)); err != nil && !os.IsNotExist(err) {
+			if err := os.Remove(hook.PhaseStatePath(root)); err != nil && !os.IsNotExist(err) {
 				return fmt.Errorf("remove phase state: %w", err)
 			}
 			cmd.Println("Phase state cleaned.")

@@ -603,19 +603,15 @@ func TestPrimeCmd_NoHighSeverity(t *testing.T) {
 	}
 }
 
-// --- clean-lessons command tests ---
+// --- clean-lessons removed ---
 
-func TestCleanLessonsCmd_NoEmbedder(t *testing.T) {
-	dir := setupTestRepo(t, nil)
-	t.Setenv("COMPOUND_AGENT_ROOT", dir)
-
+func TestCleanLessonsCmd_NotRegistered(t *testing.T) {
 	root := buildMaintenanceRoot()
-	stdout, _, err := runCmd(root, []string{"clean-lessons"})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !strings.Contains(stdout, "Embedding model not available") {
-		t.Errorf("expected embedding unavailable message, got: %s", stdout)
+	// clean-lessons command should not exist
+	for _, cmd := range root.Commands() {
+		if cmd.Name() == "clean-lessons" {
+			t.Error("clean-lessons command should not be registered (stub removed)")
+		}
 	}
 }
 

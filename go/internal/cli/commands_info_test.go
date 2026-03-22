@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nathandelacretaz/compound-agent/internal/build"
 	"github.com/spf13/cobra"
 )
 
@@ -51,6 +52,51 @@ func TestFeedbackCommand(t *testing.T) {
 	}
 	if !strings.Contains(out, "Nathandela/compound-agent") {
 		t.Error("expected output to contain repository path")
+	}
+}
+
+func TestVersionCommand(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(versionCmd())
+
+	out, err := executeCommand(root, "version")
+	if err != nil {
+		t.Fatalf("version command failed: %v", err)
+	}
+
+	trimmed := strings.TrimSpace(out)
+	if trimmed != build.Version {
+		t.Errorf("version output = %q, want %q", trimmed, build.Version)
+	}
+}
+
+func TestAboutCommandUsesBuildVersion(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(aboutCmd())
+
+	out, err := executeCommand(root, "about")
+	if err != nil {
+		t.Fatalf("about command failed: %v", err)
+	}
+
+	if !strings.Contains(out, build.Version) {
+		t.Errorf("about output should contain build.Version %q, got: %s", build.Version, out)
+	}
+}
+
+func TestVersionCommandIsRegistered(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	registerInfoCommands(root)
+
+	found := false
+	for _, cmd := range root.Commands() {
+		if cmd.Use == "version" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("version command should be registered by registerInfoCommands")
 	}
 }
 

@@ -96,7 +96,10 @@ func setupTestDB(t *testing.T, items []memory.MemoryItem) *sql.DB {
 
 func TestCosineSimilarity_IdenticalVectors(t *testing.T) {
 	v := []float64{1, 2, 3}
-	got := CosineSimilarity(v, v)
+	got, err := CosineSimilarity(v, v)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if !approxEqual(got, 1.0, 1e-9) {
 		t.Errorf("identical vectors: want 1.0, got %f", got)
 	}
@@ -105,7 +108,10 @@ func TestCosineSimilarity_IdenticalVectors(t *testing.T) {
 func TestCosineSimilarity_OrthogonalVectors(t *testing.T) {
 	a := []float64{1, 0}
 	b := []float64{0, 1}
-	got := CosineSimilarity(a, b)
+	got, err := CosineSimilarity(a, b)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if !approxEqual(got, 0.0, 1e-9) {
 		t.Errorf("orthogonal vectors: want 0.0, got %f", got)
 	}
@@ -114,19 +120,20 @@ func TestCosineSimilarity_OrthogonalVectors(t *testing.T) {
 func TestCosineSimilarity_ZeroVector(t *testing.T) {
 	a := []float64{0, 0, 0}
 	b := []float64{1, 2, 3}
-	got := CosineSimilarity(a, b)
+	got, err := CosineSimilarity(a, b)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if got != 0.0 {
 		t.Errorf("zero vector: want 0.0, got %f", got)
 	}
 }
 
-func TestCosineSimilarity_PanicsOnLengthMismatch(t *testing.T) {
-	defer func() {
-		if r := recover(); r == nil {
-			t.Error("expected panic on length mismatch, got none")
-		}
-	}()
-	CosineSimilarity([]float64{1, 2}, []float64{1, 2, 3})
+func TestCosineSimilarity_ReturnsErrorOnLengthMismatch(t *testing.T) {
+	_, err := CosineSimilarity([]float64{1, 2}, []float64{1, 2, 3})
+	if err == nil {
+		t.Error("expected error on length mismatch, got nil")
+	}
 }
 
 // --- SearchVector tests ---
