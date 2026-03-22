@@ -106,14 +106,13 @@ async function walkSupportedFiles(baseDir: string, repoRoot: string): Promise<st
  * Embed indexed chunks using the local model.
  * Uses dynamic imports to avoid loading the embedding pipeline when not needed.
  *
- * @throws Error if model is not usable (caller explicitly requested --embed)
+ * @throws Error if model is not available (caller explicitly requested --embed)
  * @returns Number of chunks embedded
  */
 async function tryEmbedChunks(repoRoot: string): Promise<number> {
-  const { isModelUsable } = await import('../embeddings/index.js');
-  const usability = await isModelUsable();
-  if (!usability.usable) {
-    throw new Error(`Embedding failed: ${usability.reason}. ${usability.action}`);
+  const { isModelAvailable } = await import('../embeddings/index.js');
+  if (!isModelAvailable()) {
+    throw new Error('Embedding model not found. Run: npx ca download-model');
   }
   const { embedChunks } = await import('./embed-chunks.js');
   const embedResult = await embedChunks(repoRoot);
