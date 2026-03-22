@@ -40,9 +40,10 @@ vi.mock('../memory/embeddings/model.js', () => ({
 }));
 
 vi.mock('../memory/embeddings/index.js', () => ({
+  isModelAvailable: vi.fn(() => true),
   unloadEmbeddingResources: vi.fn(async () => {}),
   withEmbedding: vi.fn(async (fn: () => Promise<unknown>) => fn()),
-  withBoundedEmbedding: vi.fn(async (_repoRoot: string, fn: () => Promise<unknown>) => fn()),
+  withBoundedEmbedding: vi.fn(async (_repoRoot: string, fn: () => Promise<unknown>, _fallback?: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('../memory/storage/index.js', () => ({
@@ -160,6 +161,10 @@ describe('search command: preflight and fallback', () => {
     const { isModelAvailable } = await import('../index.js');
     vi.mocked(isModelAvailable).mockReturnValue(false);
 
+    // Also set the embeddings-level isModelAvailable to false
+    const embeddingsIndex = await import('../memory/embeddings/index.js');
+    vi.mocked(embeddingsIndex.isModelAvailable).mockReturnValue(false);
+
     const lesson = createQuickLesson('L001', 'use Polars for data');
     const { searchKeyword } = await import('../memory/storage/index.js');
     vi.mocked(searchKeyword).mockResolvedValue([lesson]);
@@ -172,6 +177,49 @@ describe('search command: preflight and fallback', () => {
     // searchVector should NOT be called
     expect(searchVector).not.toHaveBeenCalled();
     // searchKeyword (FTS-only) should have been called
+    expect(searchKeyword).toHaveBeenCalled();
+  });
+
+  it('does not consume semaphore slot when model is unavailable', async () => {
+    const { isModelAvailable } = await import('../index.js');
+    vi.mocked(isModelAvailable).mockReturnValue(false);
+
+    const embeddingsIndex = await import('../memory/embeddings/index.js');
+    vi.mocked(embeddingsIndex.isModelAvailable).mockReturnValue(false);
+
+    const lesson = createQuickLesson('L001', 'keyword result');
+    const { searchKeyword } = await import('../memory/storage/index.js');
+    vi.mocked(searchKeyword).mockResolvedValue([lesson]);
+
+    await register();
+    await program.parseAsync(['node', 'ca', 'search', 'test']);
+
+    // withBoundedEmbedding should NOT be called when model is unavailable
+    expect(embeddingsIndex.withBoundedEmbedding).not.toHaveBeenCalled();
+  });
+
+  it('uses semaphore fallback when all slots are busy', async () => {
+    const { isModelAvailable } = await import('../index.js');
+    vi.mocked(isModelAvailable).mockReturnValue(true);
+
+    const embeddingsIndex = await import('../memory/embeddings/index.js');
+    vi.mocked(embeddingsIndex.isModelAvailable).mockReturnValue(true);
+    // Simulate all slots busy: withBoundedEmbedding calls fallback instead of fn
+    vi.mocked(embeddingsIndex.withBoundedEmbedding).mockImplementation(
+      async (_repoRoot: string, _fn: () => Promise<unknown>, fallback?: () => Promise<unknown>) => {
+        if (fallback) return fallback();
+        throw new Error('No fallback provided');
+      },
+    );
+
+    const lesson = createQuickLesson('L001', 'fallback keyword result');
+    const { searchKeyword } = await import('../memory/storage/index.js');
+    vi.mocked(searchKeyword).mockResolvedValue([lesson]);
+
+    await register();
+    await program.parseAsync(['node', 'ca', 'search', 'test']);
+
+    // searchKeyword should be called via the fallback path
     expect(searchKeyword).toHaveBeenCalled();
   });
 

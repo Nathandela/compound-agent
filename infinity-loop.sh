@@ -12,6 +12,7 @@ set -euo pipefail
 # Crash handler: log WHY we died and update status file
 _loop_cleanup() {
   local exit_code=$?
+  stop_memory_watchdog 2>/dev/null || true
   if [ $exit_code -ne 0 ]; then
     log "CRASH: Script exited with code $exit_code at line ${BASH_LINENO[0]:-unknown}"
     echo "{\"status\":\"crashed\",\"exit_code\":$exit_code,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"line\":\"${BASH_LINENO[0]:-unknown}\"}" > "${LOG_DIR:-.}/.loop-status.json" 2>/dev/null || true
@@ -22,9 +23,11 @@ trap _loop_cleanup EXIT
 # Config
 MAX_RETRIES=2
 MODEL="claude-opus-4-6[1m]"
-EPIC_IDS="learning_agent-hdl3 learning_agent-ko94 learning_agent-xhbr learning_agent-w0tg learning_agent-2zzc"
+EPIC_IDS="learning_agent-j5l learning_agent-w37q learning_agent-ko94 learning_agent-xhbr learning_agent-w0tg learning_agent-2zzc"
 LOG_DIR="agent_logs"
 MIN_FREE_MEMORY_PCT=${MIN_FREE_MEMORY_PCT:-20}  # Stop loop if free memory drops below this %
+WATCHDOG_THRESHOLD=${WATCHDOG_THRESHOLD:-15}     # Kill session if free memory drops below this %
+WATCHDOG_INTERVAL=${WATCHDOG_INTERVAL:-30}       # Seconds between watchdog checks
 
 # Helpers
 timestamp() { date '+%Y-%m-%d_%H-%M-%S'; }
@@ -57,38 +60,68 @@ cleanup_orphans() {
   fi
 }
 
-# check_memory() - Abort if system free memory is too low
-# Returns 0 if OK, 1 if memory pressure detected
-check_memory() {
-  local free_pct
+# get_memory_pct() - Return current free memory percentage on stdout (empty on failure)
+get_memory_pct() {
   if [ "$(uname)" = "Darwin" ]; then
-    # macOS: use memory_pressure to get real free percentage (includes purgeable/inactive)
-    free_pct=$(memory_pressure 2>/dev/null | awk -F: '/free percentage/ {gsub(/%| /,"",$2); print $2}')
-    if [ -z "$free_pct" ]; then
-      return 0  # Can't measure, assume OK
-    fi
-    if [ "$free_pct" -lt "$MIN_FREE_MEMORY_PCT" ]; then
-      log "WARN: System memory ${free_pct}% free (minimum: ${MIN_FREE_MEMORY_PCT}%)"
-      return 1
-    fi
-    log "Memory OK: ${free_pct}% free"
+    memory_pressure 2>/dev/null | awk -F: '/free percentage/ {gsub(/%| /,"",$2); print $2}'
   else
-    # Linux: use /proc/meminfo
     local mem_total mem_available
     mem_total=$(awk '/MemTotal/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
     mem_available=$(awk '/MemAvailable/ {print $2}' /proc/meminfo 2>/dev/null || echo 0)
     if [ "$mem_total" -gt 0 ]; then
-      free_pct=$(( mem_available * 100 / mem_total ))
-    else
-      return 0
+      echo $(( mem_available * 100 / mem_total ))
     fi
-    if [ "$free_pct" -lt "$MIN_FREE_MEMORY_PCT" ]; then
-      log "WARN: System memory ${free_pct}% free (minimum: ${MIN_FREE_MEMORY_PCT}%)"
-      return 1
-    fi
-    log "Memory OK: ${free_pct}% free"
   fi
+}
+
+# check_memory() - Abort if system free memory is too low
+# Returns 0 if OK, 1 if memory pressure detected
+check_memory() {
+  local free_pct
+  free_pct=$(get_memory_pct)
+  if [ -z "$free_pct" ]; then
+    return 0  # Can't measure, assume OK
+  fi
+  if [ "$free_pct" -lt "$MIN_FREE_MEMORY_PCT" ]; then
+    log "WARN: System memory ${free_pct}% free (minimum: ${MIN_FREE_MEMORY_PCT}%)"
+    return 1
+  fi
+  log "Memory OK: ${free_pct}% free"
   return 0
+}
+
+# start_memory_watchdog() - Background monitor that kills target PID on memory pressure
+# Args: $1=PID to kill, $2=log file for memory stats
+# Sets: WATCHDOG_PID (global)
+WATCHDOG_PID=""
+
+start_memory_watchdog() {
+  local target_pid="$1"
+  local mem_log="$2"
+  (
+    while kill -0 "$target_pid" 2>/dev/null; do
+      local pct
+      pct=$(get_memory_pct)
+      if [ -n "$pct" ]; then
+        echo "[$(date '+%Y-%m-%d_%H-%M-%S')] memory_free=${pct}%" >> "$mem_log"
+        if [ "$pct" -lt "$WATCHDOG_THRESHOLD" ]; then
+          echo "[$(date '+%Y-%m-%d_%H-%M-%S')] WATCHDOG: memory ${pct}% < ${WATCHDOG_THRESHOLD}%, killing PID $target_pid" >> "$mem_log"
+          kill -TERM -- -"$target_pid" 2>/dev/null || kill "$target_pid" 2>/dev/null || true
+          exit 0
+        fi
+      fi
+      sleep "$WATCHDOG_INTERVAL"
+    done
+  ) &
+  WATCHDOG_PID=$!
+}
+
+stop_memory_watchdog() {
+  if [ -n "$WATCHDOG_PID" ]; then
+    kill "$WATCHDOG_PID" 2>/dev/null || true
+    wait "$WATCHDOG_PID" 2>/dev/null || true
+    WATCHDOG_PID=""
+  fi
 }
 
 command -v claude >/dev/null || die "claude CLI required"
@@ -530,9 +563,18 @@ spawn_reviewers() {
 
   local follow_up="Review the latest fixes. If all issues are resolved, output REVIEW_APPROVED alone on its own line. Otherwise output REVIEW_CHANGES_REQUESTED on its own line followed by your findings."
 
-  local pids=""
+  # Run reviewers sequentially to limit memory pressure (was parallel, caused OOM)
   for reviewer in $AVAILABLE_REVIEWERS; do
+    # Memory gate: skip remaining reviewers if memory is low
+    local mem_pct
+    mem_pct=$(get_memory_pct)
+    if [ -n "$mem_pct" ] && [ "$mem_pct" -lt "$MIN_FREE_MEMORY_PCT" ]; then
+      log "WARN: Skipping $reviewer (and remaining) -- memory ${mem_pct}% < ${MIN_FREE_MEMORY_PCT}%"
+      break
+    fi
+
     local report="$cycle_dir/$reviewer.md"
+    log "Running $reviewer (cycle $cycle) -> $report"
     case "$reviewer" in
       (claude-sonnet|claude-opus)
         local model_name
@@ -541,42 +583,38 @@ spawn_reviewers() {
         local sid=""
         sid=$(read_session_id "$reviewer" "$REVIEW_DIR/sessions.json")
         if [ "$cycle" -eq 1 ]; then
-          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
+          portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
             --output-format text --session-id "$sid" \
-            -p "$(cat "$prompt_file")" > "$report" 2>&1 || true) &
+            -p "$(cat "$prompt_file")" > "$report" 2>&1 || true
         else
-          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
+          portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
             --output-format text --resume "$sid" \
-            -p "$follow_up" > "$report" 2>&1 || true) &
+            -p "$follow_up" > "$report" 2>&1 || true
         fi
-        pids="$pids $!"
         ;;
       (gemini)
         if [ "$cycle" -eq 1 ]; then
-          (portable_timeout "$REVIEW_TIMEOUT" gemini \
-            -p "$(cat "$prompt_file")" --yolo > "$report" 2>&1 || true) &
+          portable_timeout "$REVIEW_TIMEOUT" gemini \
+            -p "$(cat "$prompt_file")" --yolo > "$report" 2>&1 || true
         else
-          (portable_timeout "$REVIEW_TIMEOUT" gemini --resume latest \
-            -p "$follow_up" --yolo > "$report" 2>&1 || true) &
+          portable_timeout "$REVIEW_TIMEOUT" gemini --resume latest \
+            -p "$follow_up" --yolo > "$report" 2>&1 || true
         fi
-        pids="$pids $!"
         ;;
       (codex)
         if [ "$cycle" -eq 1 ]; then
-          # Pipe prompt via stdin (codex reads from stdin when given -)
-          (portable_timeout "$REVIEW_TIMEOUT" codex exec --full-auto \
-            - < "$prompt_file" > "$report" 2>&1 || true) &
+          portable_timeout "$REVIEW_TIMEOUT" codex exec --full-auto \
+            - < "$prompt_file" > "$report" 2>&1 || true
         else
-          (portable_timeout "$REVIEW_TIMEOUT" codex exec resume --last \
-            "$follow_up" > "$report" 2>&1 || true) &
+          portable_timeout "$REVIEW_TIMEOUT" codex exec resume --last \
+            "$follow_up" > "$report" 2>&1 || true
         fi
-        pids="$pids $!"
         ;;
     esac
-    log "Spawned $reviewer (cycle $cycle) -> $report"
+    log "Finished $reviewer (cycle $cycle)"
+    cleanup_orphans
+    sleep 3  # Let OS reclaim memory from exited reviewer before starting next
   done
-  log "Waiting for reviewers: $pids"
-  for pid in $pids; do wait "$pid" 2>/dev/null || true; done
   log "All reviewers finished (cycle $cycle)"
 }
 
@@ -771,12 +809,26 @@ while true; do
     PROMPT=$(build_prompt "$EPIC_ID")
 
     # Two-scope logging: stream-json to trace JSONL, extracted text to macro log
-    claude --dangerously-skip-permissions \
-           --model "$MODEL" \
-           --output-format stream-json \
-           --verbose \
-           -p "$PROMPT" \
-           2>"$LOGFILE.stderr" | tee "$TRACEFILE" | extract_text > "$LOGFILE" || true
+    # Run in background subshell so we can track PID for the memory watchdog
+    MEM_LOG="$LOG_DIR/memory_${EPIC_ID}-${TS}.log"
+    (
+      claude --dangerously-skip-permissions \
+             --model "$MODEL" \
+             --output-format stream-json \
+             --verbose \
+             -p "$PROMPT" \
+             2>"$LOGFILE.stderr" | tee "$TRACEFILE" | extract_text > "$LOGFILE"
+    ) &
+    CLAUDE_PGID=$!
+    start_memory_watchdog "$CLAUDE_PGID" "$MEM_LOG"
+    wait "$CLAUDE_PGID" 2>/dev/null || true
+    stop_memory_watchdog
+
+    # Detect if watchdog killed the session
+    if [ -f "$MEM_LOG" ] && grep -q "WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
+      log "WARN: Session killed by memory watchdog (see $MEM_LOG)"
+      cleanup_orphans
+    fi
 
     # Append stderr to macro log
     [ -f "$LOGFILE.stderr" ] && cat "$LOGFILE.stderr" >> "$LOGFILE" && rm -f "$LOGFILE.stderr"

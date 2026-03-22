@@ -2,11 +2,20 @@
  * Cross-process counting semaphore for embedding model loads.
  *
  * Prevents 30+ concurrent subagents from each loading a ~370MB
- * embedding model. Uses directory-based slot files with PID-based
- * liveness checks and stale detection.
+ * embedding model. Uses unique claim files per process with
+ * PID-based liveness checks and stale detection.
+ *
+ * Design: Each process writes its own `claim-{pid}.lock` file.
+ * Slot admission is determined by sorting active claims by
+ * startedAt timestamp (PID tiebreak) and checking whether
+ * the process's position is within the allowed concurrency.
+ *
+ * This eliminates the TOCTOU race of the prior fixed-slot design,
+ * where two processes could both delete+reclaim the same stale slot.
+ * With unique files, no process ever deletes another live process's file.
  *
  * Slot directory: {repoRoot}/.claude/.cache/embed-slots/
- * Slot files: slot-0.lock, slot-1.lock, ... slot-(N-1).lock
+ * Claim files: claim-{pid}.lock
  * Content: { pid: number, startedAt: string } (ISO timestamp)
  */
 
@@ -38,8 +47,8 @@ function slotDir(repoRoot: string): string {
   return join(repoRoot, '.claude', '.cache', 'embed-slots');
 }
 
-function slotPath(repoRoot: string, index: number): string {
-  return join(slotDir(repoRoot), `slot-${index}.lock`);
+function claimFilePath(repoRoot: string, pid: number): string {
+  return join(slotDir(repoRoot), `claim-${pid}.lock`);
 }
 
 /** Read CA_MAX_EMBED_SLOTS env var, falling back to DEFAULT_MAX_CONCURRENT. */
@@ -61,7 +70,7 @@ function isProcessAlive(pid: number): boolean {
   }
 }
 
-/** Read and parse a slot file. Returns null on any error or invalid shape. */
+/** Read and parse a claim file. Returns null on any error or invalid shape. */
 function readSlot(filePath: string): SlotContent | null {
   try {
     const raw = readFileSync(filePath, 'utf-8');
@@ -87,54 +96,69 @@ function isSlotStale(content: SlotContent): boolean {
 }
 
 /**
- * Try to claim a single slot file. Returns true if acquired.
- * Uses 'wx' flag for atomic exclusive creation.
+ * Remove stale claim files and legacy slot-*.lock files.
+ * Only deletes files for dead processes or expired claims.
  */
-function tryClaimSlot(filePath: string): boolean {
-  const content: SlotContent = { pid: process.pid, startedAt: new Date().toISOString() };
+function cleanStaleClaims(dir: string): void {
   try {
-    writeFileSync(filePath, JSON.stringify(content), { flag: 'wx' });
-    return true;
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code !== 'EEXIST') throw err;
+    const files = readdirSync(dir);
+    for (const file of files) {
+      if (!file.endsWith('.lock')) continue;
+      const filePath = join(dir, file);
 
-    // Slot file exists -- check for staleness
-    const existing = readSlot(filePath);
-    if (!existing || isSlotStale(existing)) {
-      // Stale -- delete then re-create atomically
-      try { unlinkSync(filePath); } catch { /* already gone */ }
-      try {
-        writeFileSync(filePath, JSON.stringify(content), { flag: 'wx' });
-        // Verify we still own it (another process may have stolen it via TOCTOU)
-        const verify = readSlot(filePath);
-        if (!verify || verify.pid !== process.pid) return false;
-        return true;
-      } catch {
-        // Another process won the race
-        return false;
+      // Clean up legacy slot-*.lock files from prior implementation
+      if (file.startsWith('slot-')) {
+        const content = readSlot(filePath);
+        if (!content || isSlotStale(content)) {
+          try { unlinkSync(filePath); } catch { /* already gone */ }
+        }
+        continue;
+      }
+
+      if (!file.startsWith('claim-')) continue;
+      const content = readSlot(filePath);
+      if (!content || isSlotStale(content)) {
+        try { unlinkSync(filePath); } catch { /* already gone */ }
       }
     }
-
-    return false;
+  } catch {
+    // Directory gone or unreadable
   }
 }
 
-function releaseSlot(filePath: string): void {
+/**
+ * Read all active (non-stale) claims, sorted by startedAt then PID.
+ * Deterministic ordering ensures all processes agree on slot assignment.
+ */
+function readActiveClaims(dir: string): SlotContent[] {
+  const active: SlotContent[] = [];
   try {
-    // Verify ownership before deleting (prevents releasing another process's slot)
-    const content = readSlot(filePath);
-    if (content && content.pid !== process.pid) return;
-    unlinkSync(filePath);
+    const files = readdirSync(dir);
+    for (const file of files) {
+      if (!file.startsWith('claim-') || !file.endsWith('.lock')) continue;
+      const content = readSlot(join(dir, file));
+      if (content && !isSlotStale(content)) {
+        active.push(content);
+      }
+    }
   } catch {
-    // Silently ignore -- slot may already be removed
+    // Directory gone or unreadable
   }
+  active.sort((a, b) => {
+    const tA = new Date(a.startedAt).getTime();
+    const tB = new Date(b.startedAt).getTime();
+    if (tA !== tB) return tA - tB;
+    return a.pid - b.pid;
+  });
+  return active;
 }
 
 /**
  * Acquire a search slot for embedding model load.
  *
- * Tries each slot index 0..max-1. On success returns a release callback.
- * On failure returns the active slot count.
+ * Writes a unique claim file, then checks position among all active claims.
+ * If within the allowed concurrency, returns a release callback.
+ * Otherwise removes the claim and returns the active count.
  */
 export function acquireSearchSlot(repoRoot: string): SearchSlotResult {
   const dir = slotDir(repoRoot);
@@ -142,19 +166,36 @@ export function acquireSearchSlot(repoRoot: string): SearchSlotResult {
 
   const max = getMaxConcurrent();
 
-  for (let i = 0; i < max; i++) {
-    const file = slotPath(repoRoot, i);
-    if (tryClaimSlot(file)) {
-      return { acquired: true, release: () => releaseSlot(file) };
-    }
+  // Phase 1: Clean up stale claims
+  cleanStaleClaims(dir);
+
+  // Phase 2: Write our unique claim file
+  const ourPath = claimFilePath(repoRoot, process.pid);
+  const content: SlotContent = { pid: process.pid, startedAt: new Date().toISOString() };
+  writeFileSync(ourPath, JSON.stringify(content));
+
+  // Phase 3: Read all active claims and determine our position
+  const active = readActiveClaims(dir);
+  const ourIndex = active.findIndex((c) => c.pid === process.pid);
+
+  if (ourIndex >= 0 && ourIndex < max) {
+    return {
+      acquired: true,
+      release: () => {
+        try { unlinkSync(ourPath); } catch { /* already gone */ }
+      },
+    };
   }
 
-  return { acquired: false, activeCount: countActiveSlots(repoRoot) };
+  // Not acquired -- remove our claim and report busy
+  try { unlinkSync(ourPath); } catch { /* already gone */ }
+  const activeCount = ourIndex >= 0 ? active.length - 1 : active.length;
+  return { acquired: false, activeCount: Math.max(0, activeCount) };
 }
 
 /**
- * Count active (non-stale) slots.
- * Does not clean up stale slots -- just counts live ones.
+ * Count active (non-stale) claims.
+ * Does not clean up stale claims -- just counts live ones.
  */
 export function countActiveSlots(repoRoot: string): number {
   const dir = slotDir(repoRoot);
@@ -164,7 +205,7 @@ export function countActiveSlots(repoRoot: string): number {
   try {
     const files = readdirSync(dir);
     for (const file of files) {
-      if (!file.startsWith('slot-') || !file.endsWith('.lock')) continue;
+      if (!file.startsWith('claim-') || !file.endsWith('.lock')) continue;
       const content = readSlot(join(dir, file));
       if (content && !isSlotStale(content)) {
         count++;

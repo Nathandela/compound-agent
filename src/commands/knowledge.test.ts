@@ -54,9 +54,10 @@ vi.mock('../memory/knowledge/search.js', () => ({
 }));
 
 vi.mock('../memory/embeddings/index.js', () => ({
+  isModelAvailable: vi.fn(() => true),
   unloadEmbeddingResources: vi.fn(async () => {}),
   withEmbedding: vi.fn(async (fn: () => Promise<unknown>) => fn()),
-  withBoundedEmbedding: vi.fn(async (_repoRoot: string, fn: () => Promise<unknown>) => fn()),
+  withBoundedEmbedding: vi.fn(async (_repoRoot: string, fn: () => Promise<unknown>, _fallback?: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('../memory/storage/sqlite-knowledge/connection.js', () => ({
@@ -198,5 +199,38 @@ describe('knowledge command', () => {
 
     const { withBoundedEmbedding } = await import('../memory/embeddings/index.js');
     expect(withBoundedEmbedding).toHaveBeenCalled();
+  });
+
+  it('does not consume semaphore slot when model is unavailable', async () => {
+    const embeddingsIndex = await import('../memory/embeddings/index.js');
+    vi.mocked(embeddingsIndex.isModelAvailable).mockReturnValue(false);
+
+    const { searchChunksKeywordScored } = await import('../memory/storage/sqlite-knowledge/search.js');
+    vi.mocked(searchChunksKeywordScored).mockReturnValue([]);
+
+    await program.parseAsync(['node', 'ca', 'knowledge', 'test']);
+
+    // withBoundedEmbedding should NOT be called when model is unavailable
+    expect(embeddingsIndex.withBoundedEmbedding).not.toHaveBeenCalled();
+  });
+
+  it('uses semaphore fallback when all slots are busy', async () => {
+    const embeddingsIndex = await import('../memory/embeddings/index.js');
+    vi.mocked(embeddingsIndex.isModelAvailable).mockReturnValue(true);
+    // Simulate all slots busy: withBoundedEmbedding calls fallback instead of fn
+    vi.mocked(embeddingsIndex.withBoundedEmbedding).mockImplementation(
+      async (_repoRoot: string, _fn: () => Promise<unknown>, fallback?: () => Promise<unknown>) => {
+        if (fallback) return fallback();
+        throw new Error('No fallback provided');
+      },
+    );
+
+    const { searchChunksKeywordScored } = await import('../memory/storage/sqlite-knowledge/search.js');
+    vi.mocked(searchChunksKeywordScored).mockReturnValue([]);
+
+    await program.parseAsync(['node', 'ca', 'knowledge', 'test']);
+
+    // searchChunksKeywordScored should be called via the fallback path
+    expect(searchChunksKeywordScored).toHaveBeenCalled();
   });
 });

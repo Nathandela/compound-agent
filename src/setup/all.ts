@@ -56,6 +56,7 @@ interface SetupResult {
   lessonsDir: string;
   agentsMd: boolean;
   hooks: boolean;
+  hooksParseError: boolean;
   gitHooks: HookInstallResult['status'] | 'skipped';
   postCommitHook: HookInstallResult['status'] | 'skipped';
   model: 'downloaded' | 'already_exists' | 'failed' | 'skipped';
@@ -210,7 +211,7 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
   }
 
   // 11. Configure Claude settings (hooks in settings.json)
-  const { hooks } = await configureClaudeSettings();
+  const { hooks, parseError: hooksParseError } = await configureClaudeSettings();
 
   // 11b. Install Gemini CLI compatibility hooks (only if opted in)
   // Migration: auto-enable if .gemini/ compound files already exist from before opt-in was added
@@ -234,6 +235,7 @@ export async function runSetup(options: { skipModel?: boolean; skipHooks?: boole
     lessonsDir,
     agentsMd: agentsMdUpdated,
     hooks,
+    hooksParseError,
     gitHooks,
     postCommitHook,
     model: modelStatus,
@@ -398,7 +400,7 @@ async function printSetupResult(result: SetupResult, quiet: boolean, repoRoot: s
   out.success('Compound agent setup complete');
   console.log(`  Lessons directory: ${result.lessonsDir}`);
   console.log(`  AGENTS.md: ${result.agentsMd ? 'Updated' : 'Already configured'}`);
-  console.log(`  Claude hooks: ${result.hooks ? 'Installed' : 'Already configured'}`);
+  console.log(`  Claude hooks: ${result.hooksParseError ? 'Skipped (invalid settings.json)' : result.hooks ? 'Installed' : 'Already configured'}`);
   printSetupGitHooksStatus(result.gitHooks);
   printPostCommitHookStatus(result.postCommitHook);
   printPnpmConfigStatus(result.pnpmConfig);

@@ -8,7 +8,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { formatError } from '../cli-error-format.js';
-import { withBoundedEmbedding } from '../memory/embeddings/index.js';
+import { isModelAvailable, withBoundedEmbedding } from '../memory/embeddings/index.js';
 import { searchKnowledge } from '../memory/knowledge/index.js';
 import { openKnowledgeDb, closeKnowledgeDb, getChunkCount, searchChunksKeywordScored } from '../memory/storage/sqlite-knowledge/index.js';
 import { getGlobalOpts, out } from './shared.js';
@@ -52,15 +52,19 @@ export function registerKnowledgeCommand(program: Command): void {
           }
         }
 
-        const results = await withBoundedEmbedding(
-          repoRoot,
-          async () => searchKnowledge(repoRoot, query, { limit }),
-          async () => {
-            // Keyword-only fallback when no embedding slot available
-            const kwResults = searchChunksKeywordScored(repoRoot, query, limit);
-            return kwResults.map((k) => ({ item: k.chunk, score: k.score }));
-          },
-        );
+        const keywordFallback = () => {
+          const kwResults = searchChunksKeywordScored(repoRoot, query, limit);
+          return kwResults.map((k) => ({ item: k.chunk, score: k.score }));
+        };
+
+        // Skip semaphore entirely when model is unavailable (no embedding work to do)
+        const results = !isModelAvailable()
+          ? keywordFallback()
+          : await withBoundedEmbedding(
+            repoRoot,
+            async () => searchKnowledge(repoRoot, query, { limit }),
+            async () => keywordFallback(),
+          );
 
         if (results.length === 0) {
           out.info('No matching results found.');

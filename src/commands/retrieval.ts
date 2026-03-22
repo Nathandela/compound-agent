@@ -159,10 +159,12 @@ async function searchAction(cmd: Command, query: string, options: { limit: strin
 
   const keywordFallback = () => searchKeyword(repoRoot, query, limit);
 
-  const results = await withBoundedEmbedding(
-    repoRoot,
-    async () => {
-      if (isModelAvailable()) {
+  // Skip semaphore entirely when model is unavailable (no embedding work to do)
+  const results = !isModelAvailable()
+    ? await keywordFallback()
+    : await withBoundedEmbedding(
+      repoRoot,
+      async () => {
         try {
           // Hybrid search: blend vector + keyword
           const candidateLimit = limit * CANDIDATE_MULTIPLIER;
@@ -177,12 +179,9 @@ async function searchAction(cmd: Command, query: string, options: { limit: strin
           // Model failed at runtime -- fall back to keyword-only search
           return await searchKeyword(repoRoot, query, limit);
         }
-      }
-      // FTS-only fallback when embedding model unavailable
-      return await searchKeyword(repoRoot, query, limit);
-    },
-    keywordFallback,
-  );
+      },
+      keywordFallback,
+    );
 
   if (results.length > 0) {
     incrementRetrievalCount(repoRoot, results.map((lesson) => lesson.id));
