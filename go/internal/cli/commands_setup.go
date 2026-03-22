@@ -121,10 +121,19 @@ func setupCmd() *cobra.Command {
 			if result.HooksInstalled {
 				cmd.Println("  Hooks: installed to .claude/settings.json")
 			}
+			cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
 			totalTemplates := result.AgentsInstalled + result.CommandsInstalled +
 				result.SkillsInstalled + result.RoleSkillsInstalled + result.DocsInstalled
 			if totalTemplates > 0 {
-				cmd.Printf("  Templates: %d installed\n", totalTemplates)
+				cmd.Printf("  Templates: %d installed (agents:%d commands:%d skills:%d roles:%d docs:%d)\n",
+					totalTemplates, result.AgentsInstalled, result.CommandsInstalled,
+					result.SkillsInstalled, result.RoleSkillsInstalled, result.DocsInstalled)
+			}
+			if result.AgentsMdUpdated {
+				cmd.Println("  AGENTS.md: updated")
+			}
+			if result.ClaudeMdUpdated {
+				cmd.Println("  CLAUDE.md: reference added")
 			}
 		}
 		return nil
