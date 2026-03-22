@@ -52,6 +52,8 @@ jobs:
     name: GoReleaser
     needs: [build-rust]
     runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/goreleaser/goreleaser-cross:v1.25.8
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,11 +67,7 @@ jobs:
           merge-multiple: true
 
       - name: GoReleaser
-        uses: goreleaser/goreleaser-action@v6
-        with:
-          distribution: goreleaser-cross
-          version: v1.25.8
-          args: release --clean
+        run: goreleaser release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
