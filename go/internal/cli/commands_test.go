@@ -335,9 +335,10 @@ func TestCountOldLessonsUnparseable(t *testing.T) {
 	}
 }
 
-func TestCloseEmbedder_NilSafe(t *testing.T) {
-	// CloseEmbedder should be safe to call even when no embedder was started.
-	CloseEmbedder() // must not panic
+func TestGetOrStartEmbedder_ReturnsNoopCloser(t *testing.T) {
+	// When daemon is unavailable, the returned closer must be safe to call.
+	_, closer := getOrStartEmbedder(t.TempDir())
+	closer() // must not panic
 }
 
 func TestDatePrefix(t *testing.T) {

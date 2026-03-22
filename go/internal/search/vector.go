@@ -149,7 +149,7 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRo
 		}
 		for i, u := range uncached {
 			itemVecs[u.idx] = vecs[i]
-			storage.SetCachedEmbedding(db, items[u.idx].ID, vecs[i], u.hash)
+			_ = storage.SetCachedEmbedding(db, items[u.idx].ID, vecs[i], u.hash) // cache write failure is non-fatal; search proceeds with in-memory result
 		}
 	}
 
@@ -255,7 +255,7 @@ func FindSimilarLessons(db *sql.DB, embedder Embedder, text string, threshold fl
 		}
 		for i, u := range uncached {
 			itemVecs[u.idx] = vecs[i]
-			storage.SetCachedInsightEmbedding(db, candidates[u.idx].item.ID, vecs[i], u.hash)
+			_ = storage.SetCachedInsightEmbedding(db, candidates[u.idx].item.ID, vecs[i], u.hash) // cache write failure is non-fatal; search proceeds with in-memory result
 		}
 	}
 

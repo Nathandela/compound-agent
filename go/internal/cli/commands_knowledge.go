@@ -42,7 +42,8 @@ func knowledgeCmd() *cobra.Command {
 				}
 			}
 
-			embedder := getOrStartEmbedder(repoRoot)
+			embedder, closeEmbedder := getOrStartEmbedder(repoRoot)
+			defer closeEmbedder()
 
 			results, err := knowledge.SearchKnowledge(kdb, embedder, query, &knowledge.KnowledgeSearchOptions{Limit: limit})
 			if err != nil {
@@ -89,7 +90,8 @@ func indexDocsCmd() *cobra.Command {
 
 			// Embed if requested
 			if embed {
-				embedder := getOrStartEmbedder(repoRoot)
+				embedder, closeEmbedder := getOrStartEmbedder(repoRoot)
+				defer closeEmbedder()
 				if embedder != nil {
 					embedResult, embedErr := knowledge.EmbedChunks(kdb, embedder, nil)
 					if embedErr != nil {

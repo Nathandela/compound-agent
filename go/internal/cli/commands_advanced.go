@@ -30,7 +30,8 @@ func compoundCmd() *cobra.Command {
 			}
 
 			// Try to get embeddings via daemon
-			embedder := getOrStartEmbedder(repoRoot)
+			embedder, closeEmbedder := getOrStartEmbedder(repoRoot)
+			defer closeEmbedder()
 			if embedder == nil {
 				cmd.Println("[warn] Embedding daemon not available. Using keyword-based clustering is not supported.")
 				cmd.Println("Start the daemon or run: ca download-model")
