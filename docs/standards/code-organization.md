@@ -4,28 +4,32 @@
 
 - **Functions**: < 50 lines
 - **Files**: < 300 lines
-- **Modules**: Single clear responsibility
-- **Public API**: Minimal exports via `index.ts`
+- **Packages**: Single clear responsibility
+- **Public API**: Minimal exported symbols (uppercase identifiers)
 
-## Module Design (Parnas Principles)
+## Package Design (Parnas Principles)
 
-```typescript
-// src/storage/index.ts - Public API only
-export { appendLesson, readLessons } from './jsonl.js';
-export { rebuildIndex, searchKeyword } from './sqlite.js';
+```go
+// internal/storage/ — Public API via exported functions
+package storage
 
-// Internal files NOT exported through index.ts
+func AppendLesson(repoRoot string, lesson Lesson) error { ... }
+func ReadLessons(repoRoot string) ([]Lesson, error) { ... }
+func RebuildIndex(repoRoot string) error { ... }
+func SearchKeyword(repoRoot string, query string) ([]Lesson, error) { ... }
+
+// Unexported helpers stay internal to the package
+func openDB(path string) (*sql.DB, error) { ... }
 ```
 
-Code size limits (functions < 50 lines, files < 300 lines) are mechanically enforced via lint rules. See [linting-for-agents.md](linting-for-agents.md) for rule configuration and error message patterns.
+Code size limits (functions < 50 lines, files < 300 lines) are mechanically enforced via lint rules. See [linting-for-agents.md](linting-for-agents.md) for rule configuration.
 
 ## Documentation Structure
 
 ```
 docs/                       # All documentation
 ├── ARCHITECTURE-V2.md      # Three-layer architecture design
-├── RESOURCE_LIFECYCLE.md    # Heavyweight resource management
-├── MIGRATION.md            # Migration guide (learning-agent -> compound-agent)
+├── RESOURCE_LIFECYCLE.md   # Heavyweight resource management
 ├── adr/                    # Architectural Decision Records
 ├── archive/                # Historical specs, plans, and summaries
 ├── invariants/             # Module invariants (data/safety/liveness)
@@ -34,7 +38,23 @@ docs/                       # All documentation
 ├── standards/              # Coding standards and best practices
 └── verification/           # Review workflow and criteria
 
-src/                        # Code with inline JSDoc
-└── module/
-    └── index.ts            # Public API only
+go/                         # Go codebase
+├── cmd/ca/                 # CLI entrypoint
+├── internal/               # All internal packages
+│   ├── build/              # Version/commit injection
+│   ├── capture/            # Lesson capture logic
+│   ├── cli/                # CLI command wiring
+│   ├── compound/           # Core types and config
+│   ├── embed/              # Embedding daemon client
+│   ├── hook/               # Git hook management
+│   ├── knowledge/          # Knowledge base operations
+│   ├── memory/             # JSONL storage and types
+│   ├── retrieval/          # Retrieval logic
+│   ├── search/             # Search algorithms
+│   ├── setup/              # Repository initialization
+│   ├── storage/            # SQLite storage layer
+│   └── util/               # Shared utilities
+├── go.mod
+├── go.sum
+└── Makefile
 ```

@@ -1,0 +1,92 @@
+# golangci-lint configuration for Compound Agent (Go port)
+#
+# TS ESLint rule mapping:
+#   no-sql-interpolation       -> gosec (G201/G202: SQL string formatting/concatenation)
+#   no-utils-helpers-dirs      -> revive (var-naming) + code review (no automated equivalent)
+#   no-mock-module-under-test  -> code review (Go interfaces make this less of an issue)
+#   no-solo-trivial-assertion  -> code review (Go's testing style mitigates this)
+#   enforce-barrel-exports     -> N/A (Go uses packages, not barrel exports)
+#   require-embedding-cleanup  -> govet (Go's defer pattern + lostcancel check handles this)
+
+run:
+  timeout: 5m
+  build-tags:
+    - sqlite_fts5
+
+linters:
+  enable:
+    # --- Standard Go quality ---
+    - govet          # Reports suspicious constructs (shadowing, lost cancels, etc.)
+    - errcheck       # Finds unchecked errors
+    - staticcheck    # Comprehensive static analysis (SA* checks)
+    - gosimple       # Suggests code simplifications
+    - ineffassign    # Detects unused assignments
+    - unused         # Finds unused code
+
+    # --- Security (replaces no-sql-interpolation) ---
+    - gosec          # G201: SQL string formatting, G202: SQL string concatenation
+
+    # --- Code complexity (matches TS "Small Code Principle") ---
+    - funlen         # Function length limit
+    - cyclop         # Cyclomatic complexity
+
+    # --- Style & formatting ---
+    - gofmt          # Formatting consistency
+    - goimports      # Import ordering and formatting
+    - revive         # Extensible linter with style rules
+
+linters-settings:
+  gosec:
+    includes:
+      - G201  # SQL query construction using format string
+      - G202  # SQL query construction using string concatenation
+
+  funlen:
+    lines: 50        # Matches TS Small Code Principle
+    statements: 40
+
+  cyclop:
+    max-complexity: 10
+
+  revive:
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: exported
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: package-comments
+        disabled: true  # Not useful early in project
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      - name: empty-block
+      - name: superfluous-else
+      - name: unreachable-code
+      - name: redefines-builtin-id
+
+issues:
+  # Show all issues (don't cap per-linter)
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  exclude-rules:
+    # Test files get relaxed function length (test setup can be verbose)
+    - path: _test\.go
+      linters:
+        - funlen
+
+    # Test files can use dot imports for testing frameworks
+    - path: _test\.go
+      linters:
+        - revive
+      text: "dot-imports"

@@ -5,9 +5,9 @@
 
 **Name**: Compound Agent
 **Goal**: Learning system that helps Claude Code avoid repeating mistakes across sessions
-**Stack**: TypeScript + pnpm (deployable as dev dependency)
+**Stack**: Go + Rust (npm-distributed as binary wrapper)
 **CLI**: `ca` (alias: `compound-agent`)
-**Primary Language**: TypeScript
+**Primary Language**: Go
 
 ### Key Documentation
 
@@ -55,7 +55,7 @@ When in conflict, prioritize in this order. Never sacrifice correctness for simp
 - **DO NOT** write tests after implementation (TDD only)
 - **DO NOT** mock business logic in tests
 - **DO NOT** use global variables
-- **DO NOT** skip type annotations on public APIs
+- **DO NOT** skip doc comments on exported functions
 
 ### Process (Strong Default)
 - **DO NOT** commit without running tests
@@ -113,8 +113,8 @@ Every implementation MUST follow this subagent sequence:
 ## Quality Gates
 
 ```bash
-pnpm test      # 100% pass rate, no skipped tests
-pnpm lint      # Zero violations
+cd go && go test -tags sqlite_fts5 ./...   # 100% pass rate
+cd go && golangci-lint run ./...            # Zero violations
 ```
 
 > **Full exit criteria**: See `docs/verification/exit-criteria.md`
@@ -146,7 +146,7 @@ pnpm lint      # Zero violations
 
 ### Hand-off Requirements
 - File issues for remaining work (`bd create`)
-- Run quality gates (`pnpm test && pnpm lint`)
+- Run quality gates (`go test`, `golangci-lint run`)
 - Provide context for next session
 
 ---
@@ -155,20 +155,34 @@ pnpm lint      # Zero violations
 
 | Component | Technology |
 |-----------|------------|
-| Language | TypeScript (ESM) |
-| Package Manager | pnpm |
-| Build | tsup |
-| Testing | Vitest + fast-check (property tests) |
-| Storage | better-sqlite3 + FTS5 |
-| Embeddings | @huggingface/transformers + nomic-embed-text-v1.5 |
-| CLI | Commander.js |
-| Schema | Zod |
+| Language | Go |
+| Package Manager | Go modules (+ pnpm for npm wrapper) |
+| Build | go build with CGO + sqlite_fts5 tag |
+| Testing | go test + table-driven tests |
+| Storage | mattn/go-sqlite3 + FTS5 |
+| Embeddings | ca-embed (Rust daemon via IPC) |
+| CLI | Cobra |
+| Release | GoReleaser |
 
 ---
 
 ## Architecture
 
 ```
+go/                             (Go source)
+├── cmd/ca/                     <- CLI entrypoint
+├── internal/                   <- All packages (unexported)
+│   ├── cli/                    <- Cobra command definitions
+│   ├── setup/                  <- Template installation
+│   │   └── templates/          <- Embedded skill/agent/command templates
+│   ├── storage/                <- SQLite + FTS5
+│   ├── search/                 <- Hybrid search (keyword + vector)
+│   ├── capture/                <- Lesson capture
+│   ├── knowledge/              <- Knowledge indexing
+│   ├── retrieval/              <- Session retrieval
+│   ├── compound/               <- Compound synthesis
+│   ├── embed/                  <- Embedding daemon IPC
+│   └── hook/                   <- Git hook management
 .claude/                        (repository scope)
 ├── CLAUDE.md                   <- Always loaded (permanent rules)
 ├── compound-agent.json         <- Config (external reviewers, etc.)
@@ -188,30 +202,25 @@ pnpm lint      # Zero violations
 
 | Resource | Module | Lifecycle |
 |----------|--------|-----------|
-| SQLite database | `src/memory/storage/sqlite/connection.ts` | Lazy init, one instance per process |
-| Embedding model | `src/memory/embeddings/nomic.ts` | Lazy init, one instance per process |
+| SQLite database | `go/internal/storage/` | Lazy init, one instance per process |
+| Embedding daemon | `go/internal/embed/` | Spawned on demand, IPC via Unix socket |
 
-**Policy**: Singleton pattern required. Lazy initialization. Explicit cleanup via `closeDb()` / `unloadEmbedding()` before process exit. Singletons are internal implementation details (not global variables).
+**Policy**: Singleton pattern required. Lazy initialization. Explicit cleanup via `defer db.Close()` before process exit.
 
 ---
 
 ## Build & Test Commands
 
 ```bash
-pnpm install            # Install dependencies
-pnpm build              # Build with tsup
-pnpm test               # Full suite (unit + integration + embedding)
-pnpm test:fast          # Unit + embedding only (~15s)
-pnpm test:unit          # Unit tests only (~14s)
-pnpm test:integration   # CLI integration tests only (~100s)
-pnpm test:changed       # Only tests affected by recent changes
-pnpm test:watch         # Watch mode
-pnpm test:all           # Full suite with model download
-pnpm test:segment <mod> # Tests for one module (e.g., memory, commands)
-pnpm dev                # Development mode (watch)
+cd go && go build -tags sqlite_fts5 ./cmd/ca   # Build CLI binary
+cd go && go test -tags sqlite_fts5 ./...        # Full test suite
+cd go && go vet -tags sqlite_fts5 ./...         # Static analysis
+cd go && golangci-lint run ./...                 # Lint
+make -C go build                                 # Build via Makefile
+make -C go test                                  # Test via Makefile
 ```
 
-**Recommended**: `pnpm test:fast` during development, `pnpm test` before committing.
+**Recommended**: `go test ./...` during development, full suite before committing.
 
 > **Test architecture details**: See `docs/standards/test-architecture.md`
 

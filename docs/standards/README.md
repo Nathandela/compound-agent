@@ -1,28 +1,26 @@
 # Coding Standards
 
-This directory contains coding standards and best practices for the Compound Agent project.
+This directory contains coding standards and best practices for the Compound Agent project (Go).
 
 ## Documents
 
 | Document | Description |
 |----------|-------------|
-| [typescript-best-practices.md](typescript-best-practices.md) | TypeScript patterns, configuration, and conventions |
+| [code-organization.md](code-organization.md) | Small code principle, package design, documentation structure |
+| [anti-patterns.md](anti-patterns.md) | Categorized anti-patterns with enforcement tiers |
+| [test-architecture.md](test-architecture.md) | Test organization, CI strategy, quality standards |
+| [linting-for-agents.md](linting-for-agents.md) | Agent-targeted linting with `go vet` and golangci-lint |
 
 ## Applicability
 
-For this project (TypeScript library), the most relevant sections are:
+For this project (Go CLI tool), the most relevant areas are:
 
-- TypeScript Configuration
-- Code Style & Formatting
-- Backend Patterns (module structure, database queries)
-- Validation & Error Handling (Zod)
-- Testing (Vitest + fast-check)
-- Import Organization
-
-React and frontend patterns from the source are excluded as this is a backend library.
+- Package design and `internal/` layout
+- Database queries (parameterized SQL via go-sqlite3)
+- Error handling (explicit error returns, no panics in library code)
+- Testing (`go test` with build tags, table-driven tests, TDD)
 
 ## Related Documentation
 
-- [../SPEC.md](../SPEC.md) - Project specification
-- [../../AGENTS.md](../../AGENTS.md) - AI agent context
 - [../../.claude/CLAUDE.md](../../.claude/CLAUDE.md) - Project rules and TDD workflow
+- [../ARCHITECTURE-V2.md](../ARCHITECTURE-V2.md) - Architecture vision

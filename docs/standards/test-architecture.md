@@ -2,38 +2,56 @@
 
 ## Test Organization
 
-Tests are organized for parallelization efficiency:
+Tests are colocated with implementation files using Go conventions:
 
 ```
-src/
-├── *.test.ts           # Unit tests (fast, run in parallel)
-├── cli/                # CLI integration tests (split for parallelization)
-│   ├── cli-test-utils.ts    # Shared test utilities
-│   ├── learn.test.ts        # learn command tests
-│   ├── search.test.ts       # search command tests
-│   └── ...                  # One file per command group
-├── storage/            # Storage layer tests
-├── search/             # Search algorithm tests
-├── capture/            # Lesson capture tests
-├── embeddings/         # Embedding model tests
-└── retrieval/          # Retrieval logic tests
+go/internal/
+├── capture/
+│   ├── quality.go
+│   ├── quality_test.go         # Unit tests (colocated)
+│   ├── triggers.go
+│   └── triggers_test.go
+├── embed/
+│   ├── client.go
+│   ├── client_test.go
+│   ├── integration_test.go     # Integration tests (same package)
+│   └── ...
+├── memory/
+│   ├── jsonl.go
+│   ├── jsonl_test.go
+│   ├── types.go
+│   └── types_test.go
+├── storage/
+│   ├── sqlite.go
+│   └── sqlite_test.go
+└── ...
 ```
 
-## Why test:fast Is Fast
+## Build Tags
 
-`test:fast` skips CLI integration tests (`src/cli/*.test.ts`) which:
-- Spawn Node.js processes via `execSync`
-- Have ~400ms overhead per test (process startup + tsx compilation)
-- Account for ~95% of total test time
+SQLite tests require the `sqlite_fts5` build tag:
 
-The remaining 385 tests cover all business logic and run in ~6 seconds.
+```bash
+go test -tags sqlite_fts5 ./...
+```
+
+The `Makefile` wraps this: `make test`.
+
+## Running Tests
+
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| `make test` | Full suite with FTS5 tag | Before committing |
+| `go test -tags sqlite_fts5 ./internal/capture/...` | Single package | Rapid iteration |
+| `go test -tags sqlite_fts5 -run TestName ./internal/...` | Single test | Debugging |
+| `go test -tags sqlite_fts5 -race ./...` | Race detector | CI, concurrency work |
+| `go test -tags sqlite_fts5 -count=1 ./...` | No cache | Verify flaky tests |
 
 ## Known Limitations
 
-**Embedding model concurrency**: The `onnxruntime-node` native addon can crash under heavy parallel load. If you see native crashes during parallel test runs:
-- This is a known limitation of the underlying ONNX runtime
-- Tests pass reliably when run serially or under moderate parallelism
-- The embedding tests use `skipIf(!modelAvailable)` to gracefully skip when model isn't installed
+**CGO dependency**: The `go-sqlite3` driver requires CGO. Ensure `CGO_ENABLED=1` (default on native builds). Cross-compilation requires a C cross-compiler.
+
+**Embedding daemon**: Integration tests for the embed package depend on the `ca-embed` Rust daemon binary. These tests skip gracefully when the daemon is unavailable.
 
 ## CI Strategy
 
@@ -41,22 +59,21 @@ The remaining 385 tests cover all business logic and run in ~6 seconds.
 
 | Gate | Command | Purpose | When to Run |
 |------|---------|---------|-------------|
-| Business Logic | `pnpm test` | All tests; embedding tests skip if model unavailable | Every PR, local dev |
-| Full Suite | `pnpm test:all` | Downloads model, runs all tests including embedding | Release gate only |
+| Unit + Integration | `make test` | All tests; embed tests skip if daemon unavailable | Every PR, local dev |
+| Race Detection | `go test -tags sqlite_fts5 -race ./...` | Detect data races | CI only |
 
 **Local Development:**
-- Use `pnpm test:fast` for rapid iteration (~6s)
-- Run `pnpm test` before committing
+- Use `go test -tags sqlite_fts5 ./internal/<package>/...` for rapid iteration
+- Run `make test` before committing
 
-**CI/CD:**
-- PR checks: `pnpm test` (skips gracefully if no model)
-- Release gate: `pnpm test:all` (requires compatible runner with native bindings)
-
-**Release is blocked until both gates pass.** See CONTRIBUTING.md for full pre-release checklist.
+**Release is blocked until both gates pass.**
 
 ## Test Quality Standards
 
 - **TDD enforced**: Tests must exist BEFORE implementation
-- **No mocked business logic**: Tests use real operations, not vi.mock() on the thing being tested
-- **Property-based tests**: `fast-check` generates edge cases automatically
+- **No mocked business logic**: Tests use real operations, not mocks of the thing being tested
+- **Table-driven tests**: Use Go's `[]struct{ name string; ... }` pattern for case coverage
+- **Subtests**: Use `t.Run(name, func(t *testing.T) { ... })` for test organization
+- **`t.Helper()`**: Mark helper functions so failures report the correct call site
+- **`t.TempDir()`**: Use for filesystem tests -- auto-cleaned after test
 - **Timing tests use generous thresholds**: Avoid flaky tests on slow CI machines
