@@ -10,12 +10,17 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Allow override via env for testing
-const binaryPath = process.env.CA_BINARY_PATH ||
-  resolve(__dirname, "ca-binary");
+// Resolution order: env override → postinstall binary → local Go build
+const candidates = [
+  process.env.CA_BINARY_PATH,
+  resolve(__dirname, "ca-binary"),
+  resolve(__dirname, "..", "go", "dist", "ca"),
+].filter(Boolean);
 
-if (!existsSync(binaryPath)) {
-  console.error("[compound-agent] Binary not found. Try reinstalling compound-agent.");
+const binaryPath = candidates.find((p) => existsSync(p));
+
+if (!binaryPath) {
+  console.error("[compound-agent] Binary not found. Try reinstalling compound-agent or run: cd go && make build");
   process.exit(1);
 }
 

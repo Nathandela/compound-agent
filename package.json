@@ -1,14 +1,15 @@
 {
   "name": "compound-agent",
   "version": "1.8.0",
-  "description": "Semantically-intelligent workflow plugin for Claude Code",
-  "type": "module",
+  "description": "Learning system for Claude Code — avoids repeating mistakes across sessions",
   "bin": {
-    "compound-agent": "./dist/cli.js",
-    "ca": "./dist/cli.js"
+    "ca": "./bin/ca",
+    "compound-agent": "./bin/ca"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.cjs"
   },
   "files": [
-    "dist",
     "bin/",
     "scripts/postinstall.cjs",
     "README.md",
@@ -34,85 +35,22 @@
   },
   "homepage": "https://github.com/Nathandela/compound-agent#readme",
   "llms": "https://raw.githubusercontent.com/Nathandela/compound-agent/main/llms.txt",
-  "scripts": {
-    "postinstall": "node scripts/postinstall.cjs",
-    "prebuild": "tsx scripts/extract-changelog.ts",
-    "build": "tsup",
-    "dev": "tsup --watch",
-    "test": "pnpm build && vitest run",
-    "test:fast": "vitest run --project pure --project native --project embedding",
-    "test:unit": "vitest run --project pure --project native",
-    "test:integration": "pnpm build && vitest run --project integration",
-    "test:watch": "vitest",
-    "test:changed": "vitest run --changed HEAD~1",
-    "test:all": "pnpm build && pnpm download-model && vitest run",
-    "test:segment": "tsx src/test-utils/run-segment.ts",
-    "test:random": "tsx src/test-utils/run-random.ts",
-    "test:critical": "vitest run --project pure --project native -- critical",
-    "check:model-info-rss": "node scripts/check-model-info-rss.mjs",
-    "lint": "tsc --noEmit && eslint . --max-warnings=0",
-    "download-model": "node ./dist/cli.js download-model",
-    "prepublishOnly": "pnpm build"
-  },
   "keywords": [
     "claude",
     "claude-code",
     "compound-agent",
-    "semantic-memory",
-    "memory",
-    "embeddings",
-    "vector-search",
     "ai",
     "agent",
     "llm",
-    "plugin",
     "cli",
     "developer-tools",
     "workflow",
     "tdd",
-    "sqlite",
     "knowledge-management"
   ],
   "author": "Nathan Delacrétaz",
   "license": "MIT",
-  "packageManager": "pnpm@10.28.2",
   "engines": {
-    "node": ">=20"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.39.2",
-    "@fast-check/vitest": "0.2.4",
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^20.11.0",
-    "@typescript-eslint/rule-tester": "8.55.0",
-    "@vitest/coverage-v8": "2.1.9",
-    "eslint": "^9.39.2",
-    "eslint-config-prettier": "10.1.8",
-    "eslint-plugin-import-x": "4.16.1",
-    "eslint-plugin-vitest": "0.5.4",
-    "fast-check": "4.5.3",
-    "tsup": "^8.0.0",
-    "tsx": "^4.0.0",
-    "typescript": "^5.3.0",
-    "typescript-eslint": "8.55.0",
-    "vitest": "^2.0.0"
-  },
-  "dependencies": {
-    "@huggingface/transformers": "3.8.1",
-    "better-sqlite3": "^11.0.0",
-    "chalk": "5.6.2",
-    "commander": "^12.0.0",
-    "zod": "^3.22.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "esbuild",
-      "onnxruntime-node"
-    ],
-    "overrides": {
-      "tar": ">=7.5.7",
-      "axios": ">=1.13.5"
-    }
+    "node": ">=18"
   }
 }
