@@ -25,7 +25,7 @@ Tests written after implementation are not TDD. They're documentation dressed as
 ## Your Validation Process
 
 ### 1. Check Test Existence
-- Does test file exist? (`tests/test_{module}.ts` or `*.test.ts`)
+- Does test file exist? (`*_test.go` colocated with the package)
 - Does test file have content?
 - Are tests written for the specific feature?
 

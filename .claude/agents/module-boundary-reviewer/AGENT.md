@@ -26,67 +26,58 @@ Other modules depend on INTERFACE (what), not IMPLEMENTATION (how).
 
 ### 1. Identify Module Boundaries
 ```bash
-find src -name "*.ts" -type f
-cat src/{module}/index.ts  # Check public API
+find go/internal -type d
+ls go/internal/{module}/  # Check exported symbols
 ```
 
 ### 2. Review Public vs Private API
 
-**Good** (clear public API):
-```typescript
-// src/storage/index.ts
-export { appendLesson, readLessons } from './jsonl.js';
-export { rebuildIndex, searchKeyword } from './sqlite.js';
-export type { Lesson } from './types.js';
+**Good** (clear exported API):
+```go
+// go/internal/storage/search.go
+func SearchKeyword(db *sql.DB, query string) ([]Result, error) { ... }  // Exported
+func sanitizeQuery(q string) string { ... }                              // unexported
 ```
 
-**Bad** (no clear API):
-```typescript
-// src/storage/index.ts
-export * from './jsonl.js';
-export * from './sqlite.js';
-export * from './internal.js';  // Leaking internals!
+**Bad** (leaking internals):
+```go
+// go/internal/storage/cache.go
+func InternalCacheEvict() { ... }  // Should be unexported
 ```
 
 ### 3. Check Dependencies
 
-**Good**:
-```typescript
-import { Lesson } from '../types.js';  // Shared types
-import { embedText } from '../embeddings/index.js';  // Public API
+**Good**: Import from package boundaries:
+```go
+import "github.com/nathandelacretaz/compound-agent/internal/storage"
 ```
 
-**Bad**:
-```typescript
-import { _internalCache } from '../embeddings/cache.js';  // Private!
-```
+**Bad**: Reaching into sub-packages for internals.
 
 ### 4. Verify Cohesion
 
 **High Cohesion**:
 ```
-src/storage/
-├── index.ts        # Public API
-├── jsonl.ts        # JSONL operations
-├── sqlite.ts       # SQLite operations
-└── types.ts        # Storage types
+go/internal/storage/
+├── sqlite.go       # Database operations
+├── search.go       # FTS5 search
+├── sync.go         # Index sync
+└── types.go        # Storage types
 ```
 
 **Low Cohesion**:
 ```
-src/utils/
-├── helpers.ts      # Random functions (code smell!)
-├── misc.ts         # More random
+go/internal/util/    # Grab-bag package (code smell!)
 ```
 
 ### 5. Check for Circular Dependencies
 
-Detect import cycles - they indicate poor module boundaries.
+Go compiler enforces no import cycles. If it builds, there are no circular deps.
 
 ## Review Checklist
 
 ### Public API
-- [ ] `index.ts` exports only essential functions
+- [ ] Only necessary symbols are exported (capitalized)
 - [ ] No implementation details leaked
 - [ ] API is minimal
 

@@ -21,7 +21,7 @@ You are the FINAL INDEPENDENT CODE REVIEWER with ultimate authority to accept or
 
 ### 1. ALL Tests Pass
 ```bash
-pnpm test
+cd go && go test -tags sqlite_fts5 ./...
 ```
 - [ ] 100% pass rate (no failures)
 - [ ] No skipped tests
@@ -32,14 +32,12 @@ pnpm test
 
 ### 3. Code Quality Perfect
 ```bash
-pnpm lint
+cd go && golangci-lint run ./...
 ```
 - [ ] Zero violations
-- [ ] No `// @ts-ignore` comments
 
 ### 4. Professional Standards Met
-- [ ] All function signatures have type hints
-- [ ] All public functions have JSDoc comments
+- [ ] All exported functions have doc comments
 - [ ] Clear, descriptive names
 - [ ] Functions are small (< 50 lines)
 - [ ] No magic numbers
@@ -65,10 +63,10 @@ pnpm lint
 
 ## Your Review Process
 
-1. **Run All Tests**: `pnpm test`
-2. **Check Code Quality**: `pnpm lint`
-3. **Review Type Hints**: All functions typed?
-4. **Review Documentation**: JSDoc on public functions?
+1. **Run All Tests**: `cd go && go test -tags sqlite_fts5 ./...`
+2. **Check Code Quality**: `cd go && golangci-lint run ./...`
+3. **Review Exports**: All exported symbols documented?
+4. **Review Documentation**: Doc comments on public functions?
 5. **Logical Review**: Trace critical paths
 6. **Verify Specification Met**: Requirements addressed?
 7. **Check Standards**: Read `docs/standards/` and verify compliance

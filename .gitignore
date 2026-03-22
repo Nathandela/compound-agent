@@ -2,14 +2,11 @@
 node_modules/
 
 # Build output
-dist/
+go/dist/
 
 # Cache
 .claude/.cache/
 .claude/.ca-*.json
-
-# Ephemeral CI probes
-.model-info-rss-probe.ts
 
 # Setup-generated (ca setup dogfooding on source repo)
 .claude/agents/compound/
@@ -28,12 +25,8 @@ dist/
 *.swp
 *.swo
 
-# Test coverage
-coverage/
-
 # Logs
 *.log
-npm-debug.log*
 
 # Beads runtime artifacts
 .beads/dolt-monitor.pid
