@@ -66,6 +66,7 @@ func initCmd() *cobra.Command {
 				if result.ClaudeMdUpdated {
 					cmd.Println("  CLAUDE.md: reference added")
 				}
+				printBeadsStatus(cmd, repoRoot)
 			}
 			return nil
 		},
@@ -135,6 +136,7 @@ func setupCmd() *cobra.Command {
 			if result.ClaudeMdUpdated {
 				cmd.Println("  CLAUDE.md: reference added")
 			}
+			printBeadsStatus(cmd, repoRoot)
 		}
 		return nil
 	}
@@ -407,6 +409,32 @@ func runDoctorChecks(repoRoot string) []doctorCheck {
 	}
 
 	return checks
+}
+
+// printBeadsStatus reports beads CLI and repo initialization status.
+func printBeadsStatus(cmd *cobra.Command, repoRoot string) {
+	// Check if bd CLI is in PATH
+	bdInstalled := false
+	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
+		if _, err := os.Stat(filepath.Join(dir, "bd")); err == nil {
+			bdInstalled = true
+			break
+		}
+	}
+
+	if !bdInstalled {
+		cmd.Println("  Beads: not installed")
+		cmd.Println("         Install: curl -sSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash")
+		return
+	}
+
+	// Check if .beads/ is initialized in this repo
+	if _, err := os.Stat(filepath.Join(repoRoot, ".beads")); err == nil {
+		cmd.Println("  Beads: initialized")
+	} else {
+		cmd.Println("  Beads: installed but not initialized in this repo")
+		cmd.Println("         Run: bd init")
+	}
 }
 
 func registerSetupCommands(rootCmd *cobra.Command) {
