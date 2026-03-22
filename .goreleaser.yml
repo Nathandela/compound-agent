@@ -2,9 +2,6 @@ version: 2
 
 project_name: compound-agent
 
-git:
-  # rust-artifacts/ from CI download step makes the tree dirty
-  allow_dirty: true
 
 builds:
   - id: ca

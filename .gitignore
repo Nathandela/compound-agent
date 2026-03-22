@@ -57,3 +57,4 @@ agent_logs/
 # Release artifacts (CI only)
 release-bins/
 npm-tmp-*/
+rust-artifacts/
