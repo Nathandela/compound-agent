@@ -44,12 +44,6 @@ func embedBatched(embedder Embedder, texts []string) ([][]float64, error) {
 	return result, nil
 }
 
-// CosineSimilarity computes the cosine similarity between two vectors.
-// Delegates to util.CosineSimilarity (canonical implementation).
-func CosineSimilarity(a, b []float64) (float64, error) {
-	return util.CosineSimilarity(a, b)
-}
-
 // cctToMemoryItem converts a CCT pattern to a MemoryItem for unified scoring.
 // Uses SourceManual because no "synthesized" source exists; Context.Intent
 // disambiguates these from genuinely manual entries.
@@ -138,7 +132,7 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRo
 
 	var results []ScoredItem
 	for i, item := range items {
-		score, err := CosineSimilarity(queryVec, itemVecs[i])
+		score, err := util.CosineSimilarity(queryVec, itemVecs[i])
 		if err != nil {
 			continue
 		}
@@ -154,7 +148,7 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRo
 		cctVecs, cctErr := embedBatched(embedder, cctTexts)
 		if cctErr == nil && len(cctVecs) == len(cctPatterns) {
 			for i, pattern := range cctPatterns {
-				score, err := CosineSimilarity(queryVec, cctVecs[i])
+				score, err := util.CosineSimilarity(queryVec, cctVecs[i])
 				if err != nil {
 					continue
 				}
@@ -244,7 +238,7 @@ func FindSimilarLessons(db *sql.DB, embedder Embedder, text string, threshold fl
 
 	var results []ScoredItem
 	for i, c := range candidates {
-		score, err := CosineSimilarity(queryVec, itemVecs[i])
+		score, err := util.CosineSimilarity(queryVec, itemVecs[i])
 		if err != nil {
 			continue
 		}

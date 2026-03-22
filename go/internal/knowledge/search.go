@@ -5,6 +5,7 @@ import (
 
 	"github.com/nathandelacretaz/compound-agent/internal/search"
 	"github.com/nathandelacretaz/compound-agent/internal/storage"
+	"github.com/nathandelacretaz/compound-agent/internal/util"
 )
 
 const (
@@ -82,7 +83,7 @@ func SearchKnowledgeVector(kdb *storage.KnowledgeDB, embedder search.Embedder, q
 	}
 	var results []scored
 	for id, entry := range entries {
-		score, err := search.CosineSimilarity(queryVec, entry.Vector)
+		score, err := util.CosineSimilarity(queryVec, entry.Vector)
 		if err != nil {
 			continue
 		}
