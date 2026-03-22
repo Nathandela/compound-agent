@@ -161,11 +161,14 @@ func TestVerifyChecksum_GoReleaserMultiLine(t *testing.T) {
 
 // packageJSON is a minimal struct for the fields we care about.
 type packageJSON struct {
-	Bin     map[string]string `json:"bin"`
-	OS      []string          `json:"os"`
-	CPU     []string          `json:"cpu"`
-	Scripts map[string]string `json:"scripts"`
-	Files   []string          `json:"files"`
+	Version              string            `json:"version"`
+	Type                 string            `json:"type"`
+	Bin                  map[string]string `json:"bin"`
+	OS                   []string          `json:"os"`
+	CPU                  []string          `json:"cpu"`
+	Scripts              map[string]string `json:"scripts"`
+	Files                []string          `json:"files"`
+	OptionalDependencies map[string]string `json:"optionalDependencies"`
 }
 
 func loadPackageJSON(t *testing.T) packageJSON {
@@ -248,6 +251,45 @@ func TestPackageJSON_FilesIncludesBinAndPostinstall(t *testing.T) {
 	}
 }
 
+func TestPackageJSON_HasOptionalDependencies(t *testing.T) {
+	pkg := loadPackageJSON(t)
+	expected := []string{
+		"@compound-agent/darwin-arm64",
+		"@compound-agent/darwin-x64",
+		"@compound-agent/linux-arm64",
+		"@compound-agent/linux-x64",
+	}
+	for _, name := range expected {
+		v, ok := pkg.OptionalDependencies[name]
+		if !ok {
+			t.Errorf("missing optionalDependency: %s", name)
+			continue
+		}
+		if v == "" {
+			t.Errorf("optionalDependency %s has empty version", name)
+		}
+	}
+}
+
+func TestPackageJSON_OptionalDepsVersionMatchesPkgVersion(t *testing.T) {
+	pkg := loadPackageJSON(t)
+	if pkg.Version == "" {
+		t.Fatal("package.json has no version field")
+	}
+	for name, v := range pkg.OptionalDependencies {
+		if v != pkg.Version {
+			t.Errorf("optionalDependency %s version %q != package version %q", name, v, pkg.Version)
+		}
+	}
+}
+
+func TestPackageJSON_HasTypeModule(t *testing.T) {
+	pkg := loadPackageJSON(t)
+	if pkg.Type != "module" {
+		t.Errorf("package.json type = %q, want %q (required for ESM bin wrapper)", pkg.Type, "module")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Wrapper / artifact existence checks
 // ---------------------------------------------------------------------------
@@ -263,5 +305,12 @@ func TestPostinstallScriptExists(t *testing.T) {
 	scriptPath := filepath.Join("..", "..", "..", "scripts", "postinstall.cjs")
 	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
 		t.Error("scripts/postinstall.cjs does not exist")
+	}
+}
+
+func TestPublishPlatformsScriptExists(t *testing.T) {
+	scriptPath := filepath.Join("..", "..", "..", "scripts", "publish-platforms.cjs")
+	if _, err := os.Stat(scriptPath); os.IsNotExist(err) {
+		t.Error("scripts/publish-platforms.cjs does not exist")
 	}
 }

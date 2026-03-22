@@ -1,32 +1,73 @@
 #!/usr/bin/env node
 
 // Thin wrapper that spawns the Go binary.
-// Uses Node.js only for locating the binary; all work is done by the Go process.
+// Resolution order:
+//   1. CA_BINARY_PATH env override
+//   2. Platform-specific npm package (@compound-agent/{os}-{arch})
+//   3. Postinstall-downloaded binary (./ca-binary)
+//   4. Local Go dev build (../go/dist/ca)
+//   5. Lazy download from GitHub Releases (fallback when postinstall was blocked)
 
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const require = createRequire(import.meta.url);
 
-// Resolution order: env override → postinstall binary → local Go build
-const candidates = [
-  process.env.CA_BINARY_PATH,
-  resolve(__dirname, "ca-binary"),
-  resolve(__dirname, "..", "go", "dist", "ca"),
-].filter(Boolean);
+function resolvePlatformBinary() {
+  const pkg = `@compound-agent/${process.platform}-${process.arch}`;
+  try {
+    const pkgDir = dirname(require.resolve(`${pkg}/package.json`));
+    const bin = resolve(pkgDir, "bin", "ca");
+    if (existsSync(bin)) return bin;
+  } catch {
+    // Platform package not installed
+  }
+  return null;
+}
 
-const binaryPath = candidates.find((p) => existsSync(p));
+function findBinary() {
+  const candidates = [
+    process.env.CA_BINARY_PATH,
+    resolvePlatformBinary(),
+    resolve(__dirname, "ca-binary"),
+    resolve(__dirname, "..", "go", "dist", "ca"),
+  ].filter(Boolean);
+
+  return candidates.find((p) => existsSync(p)) || null;
+}
+
+let binaryPath = findBinary();
+
+// Lazy download: if no binary found, try running the postinstall script on-the-fly.
+// This handles: pnpm blocking postinstall + platform packages not published (expired token).
+if (!binaryPath) {
+  const postinstall = resolve(__dirname, "..", "scripts", "postinstall.cjs");
+  if (existsSync(postinstall)) {
+    try {
+      console.error("[compound-agent] Binary not found, downloading from GitHub Releases...");
+      execFileSync(process.execPath, [postinstall], {
+        stdio: "inherit",
+        env: { ...process.env, npm_package_name: "" },
+      });
+      binaryPath = findBinary();
+    } catch {
+      // Download failed, fall through to error
+    }
+  }
+}
 
 if (!binaryPath) {
-  console.error("[compound-agent] Binary not found. Try reinstalling compound-agent or run: cd go && make build");
+  console.error("[compound-agent] Binary not found and download failed.");
+  console.error("[compound-agent] Try: pnpm approve-builds && pnpm install compound-agent");
   process.exit(1);
 }
 
 try {
   execFileSync(binaryPath, process.argv.slice(2), { stdio: "inherit" });
 } catch (err) {
-  // execFileSync throws on non-zero exit codes; forward the exit code
   process.exit(err.status || 1);
 }

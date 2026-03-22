@@ -1,6 +1,7 @@
 {
   "name": "compound-agent",
-  "version": "2.0.0",
+  "version": "2.0.1",
+  "type": "module",
   "description": "Learning system for Claude Code — avoids repeating mistakes across sessions",
   "bin": {
     "ca": "./bin/ca",
@@ -48,6 +49,12 @@
     "tdd",
     "knowledge-management"
   ],
+  "optionalDependencies": {
+    "@compound-agent/darwin-arm64": "2.0.1",
+    "@compound-agent/darwin-x64": "2.0.1",
+    "@compound-agent/linux-arm64": "2.0.1",
+    "@compound-agent/linux-x64": "2.0.1"
+  },
   "author": "Nathan Delacrétaz",
   "license": "MIT",
   "engines": {

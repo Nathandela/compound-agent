@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   build-rust:
@@ -71,3 +72,49 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-npm:
+    name: Publish to npm
+    needs: [goreleaser]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Download release binaries
+        run: |
+          mkdir -p release-bins
+          for P in darwin-amd64 darwin-arm64 linux-amd64 linux-arm64; do
+            gh release download "${GITHUB_REF_NAME}" \
+              --pattern "ca-${P}" \
+              --pattern "ca-embed-${P}" \
+              --dir release-bins
+          done
+          gh release download "${GITHUB_REF_NAME}" \
+            --pattern "checksums.txt" \
+            --dir release-bins
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify checksums
+        run: |
+          cd release-bins
+          sha256sum --check --ignore-missing checksums.txt
+          echo "All checksums verified."
+
+      - name: Publish platform packages
+        run: node scripts/publish-platforms.cjs
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Publish main package
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

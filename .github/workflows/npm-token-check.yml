@@ -1,0 +1,33 @@
+name: "npm token health"
+
+on:
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  check-token:
+    name: Verify NPM_TOKEN is valid
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      - name: Check npm token
+        run: |
+          # Verify token is valid
+          if ! USER=$(npm whoami 2>&1); then
+            echo "::error::NPM_TOKEN is expired or invalid. Renew at npmjs.com and update the GitHub secret."
+            exit 1
+          fi
+          echo "Token valid for user: $USER"
+
+          # Verify publish access to the org
+          if ! npm access list packages @compound-agent 2>/dev/null | grep -q "read-write"; then
+            echo "::warning::Could not verify publish access to @compound-agent org. Ensure the token has publish scope."
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

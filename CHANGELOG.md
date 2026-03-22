@@ -7,6 +7,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.1] - 2026-03-22
+
+### Changed
+
+- **Platform-specific npm distribution**: Switch from postinstall-only binary download to industry-standard optional dependencies pattern (`@compound-agent/{os}-{arch}`). Works with pnpm out of the box — no `approve-builds` needed.
+- **Lazy download fallback**: If platform packages are missing and postinstall was blocked, the bin wrapper downloads the binary on first use from GitHub Releases.
+- **Non-fatal postinstall**: Postinstall no longer crashes `npm install` on download failure — the lazy fallback handles it.
+- **npm publish provenance**: All packages published with `--provenance` for supply chain transparency.
+- **Checksum verification in CI**: Release workflow verifies SHA256 checksums before publishing to npm.
+- **Version-aware skip logic**: Postinstall checks binary version matches package version, preventing stale binaries after upgrades.
+
+### Added
+
+- **Weekly npm token health check**: Scheduled workflow verifies `NPM_TOKEN` validity every Monday.
+- **Platform publish script**: `scripts/publish-platforms.cjs` handles creating and publishing `@compound-agent/*` packages during releases. Idempotent — safe to re-run.
+
 ## [Unreleased]
 
 ### Changed

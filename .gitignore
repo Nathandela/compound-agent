@@ -53,3 +53,7 @@ agent_logs/
 # Dolt database files (added by bd init)
 .dolt/
 *.db
+
+# Release artifacts (CI only)
+release-bins/
+npm-tmp-*/

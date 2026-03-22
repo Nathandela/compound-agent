@@ -50,7 +50,7 @@ function verifyChecksum(filePath, artifactName, checksumsPath) {
   return actualHash === expectedHash;
 }
 
-function shouldSkipDownload(binDir) {
+function shouldSkipDownload(binDir, expectedVersion) {
   const caPath = path.join(binDir, "ca-binary");
   const embedPath = path.join(binDir, "ca-embed");
 
@@ -59,8 +59,11 @@ function shouldSkipDownload(binDir) {
   }
 
   try {
-    // P1-2 fix: use execFileSync (no shell) instead of execSync
-    execFileSync(caPath, ["version"], { stdio: "pipe" });
+    const output = execFileSync(caPath, ["version"], { stdio: "pipe", encoding: "utf-8" });
+    // Verify version matches to prevent stale binaries after upgrade
+    if (expectedVersion && !output.includes(expectedVersion)) {
+      return false;
+    }
     return true;
   } catch {
     return false;
@@ -89,13 +92,15 @@ function downloadFile(url, dest) {
           }
 
           if (res.statusCode !== 200) {
+            res.resume(); // Drain response to free the socket
             reject(new Error(`Download failed: HTTP ${res.statusCode} from ${currentUrl}`));
             return;
           }
 
           const file = fs.createWriteStream(dest);
           res.pipe(file);
-          file.on("finish", resolve);
+          file.on("finish", () => file.close());
+          file.on("close", resolve);
           file.on("error", (err) => {
             fs.unlink(dest, () => {});
             reject(err);
@@ -133,9 +138,25 @@ function cleanupBinaries(binDir) {
   }
 }
 
+function platformPackageInstalled() {
+  const pkg = `@compound-agent/${require("os").platform()}-${require("os").arch()}`;
+  try {
+    const pkgDir = path.dirname(require.resolve(`${pkg}/package.json`));
+    return fs.existsSync(path.join(pkgDir, "bin", "ca"));
+  } catch {
+    return false;
+  }
+}
+
 async function main() {
   // Skip self-install (when running pnpm install inside compound-agent itself)
   if (process.env.npm_package_name === "compound-agent") return;
+
+  // Skip if platform-specific package already provides the binary
+  if (platformPackageInstalled()) {
+    console.log("[compound-agent] Binary provided by platform package, skipping download");
+    return;
+  }
 
   const platformKey = getPlatformKey(
     require("os").platform(),
@@ -147,7 +168,7 @@ async function main() {
 
   const binDir = path.resolve(__dirname, "../bin");
 
-  if (shouldSkipDownload(binDir)) {
+  if (shouldSkipDownload(binDir, version)) {
     console.log("[compound-agent] Binaries already installed, skipping download");
     return;
   }
@@ -205,10 +226,11 @@ async function main() {
       throw new Error("Binary downloaded but functional check failed (ca version exited non-zero)");
     }
   } catch (err) {
-    console.error(`[compound-agent] Installation failed: ${err.message}`);
-    console.error("[compound-agent] You can manually download binaries from:");
-    console.error(`[compound-agent]   https://github.com/${REPO}/releases/tag/v${version}`);
-    process.exit(1);
+    // Non-fatal: the bin/ca wrapper will retry via lazy download on first run.
+    // Exiting 0 so npm/pnpm install doesn't fail.
+    console.warn(`[compound-agent] Postinstall download failed: ${err.message}`);
+    console.warn("[compound-agent] The binary will be downloaded on first use.");
+    console.warn(`[compound-agent] Or manually download from: https://github.com/${REPO}/releases/tag/v${version}`);
   }
 }
 
