@@ -37,6 +37,7 @@ describe('PHASE_SKILLS', () => {
       } else if (key === 'architect') {
         expect(content, `${key} missing ## Phase 1`).toContain('## Phase 1');
         expect(content, `${key} missing ## Phase 4`).toContain('## Phase 4');
+        expect(content, `${key} missing ## Phase 5`).toContain('## Phase 5');
       } else {
         expect(content, `${key} missing ## Methodology`).toContain('## Methodology');
       }
@@ -58,9 +59,9 @@ describe('PHASE_SKILLS', () => {
     }
   });
 
-  it('no template exceeds 6000 characters (agentic allowed 12000 due to inline principles)', () => {
+  it('no template exceeds 6000 characters (agentic allowed 12000, architect allowed 9000 due to 5-phase workflow)', () => {
     for (const [key, content] of Object.entries(PHASE_SKILLS)) {
-      const max = key === 'agentic' ? 12000 : 6000;
+      const max = key === 'agentic' ? 12000 : key === 'architect' ? 9000 : 6000;
       expect(
         content.length,
         `${key} is ${content.length} chars (max ${max})`,
@@ -269,21 +270,23 @@ describe('PHASE_SKILLS', () => {
 
   // --- architect skill ---
 
-  it('architect skill has 4 phases: Socratic, Spec, Decompose, Materialize', () => {
+  it('architect skill has 5 phases: Socratic, Spec, Decompose, Materialize, Launch', () => {
     const skill = PHASE_SKILLS.architect;
     expect(skill).toContain('Socratic');
     expect(skill).toContain('Spec');
     expect(skill).toContain('Decompose');
     expect(skill).toContain('Materialize');
+    expect(skill).toContain('Launch');
   });
 
-  it('architect skill has 3 human gates (AskUserQuestion)', () => {
+  it('architect skill has 4 human gates (AskUserQuestion), Gate 4 is opt-in', () => {
     const skill = PHASE_SKILLS.architect;
     expect(skill).toContain('AskUserQuestion');
     // Should reference gates between phases
     expect(skill).toMatch(/Gate.*1|Gate.*Socratic/i);
     expect(skill).toMatch(/Gate.*2|Gate.*Spec/i);
     expect(skill).toMatch(/Gate.*3|Gate.*Decompose/i);
+    expect(skill).toMatch(/Gate.*4/i);
   });
 
   it('architect skill references DDD bounded contexts for decomposition', () => {
@@ -393,6 +396,49 @@ describe('PHASE_SKILLS', () => {
     const skill = PHASE_SKILLS.architect;
     expect(skill).toMatch(/Cynefin/i);
     expect(skill).toMatch(/Garlan/i);
+  });
+
+  // --- architect Phase 5 (Launch) ---
+
+  it('architect skill Phase 5 is opt-in', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/opt.in/i);
+  });
+
+  it('architect skill Phase 5 references ca loop for script generation', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toContain('npx ca loop');
+  });
+
+  it('architect skill Phase 5 includes pre-flight epic validation with status checks', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/pre.flight/i);
+    expect(skill).toContain('in_progress');
+    expect(skill).toContain('closed');
+  });
+
+  it('architect skill Phase 5 uses AskUserQuestion for parameter gathering', () => {
+    const skill = PHASE_SKILLS.architect;
+    // Phase 5 should gather parameters including model and review cadence
+    expect(skill).toMatch(/Gather parameters.*AskUserQuestion/i);
+    expect(skill).toMatch(/review cadence/i);
+  });
+
+  it('architect skill Phase 5 references dry-run', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toContain('LOOP_DRY_RUN');
+  });
+
+  it('architect skill Phase 5 launches in screen session with fallback', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toContain('screen -dmS');
+    expect(skill).toContain('nohup');
+  });
+
+  it('architect skill Phase 5 references infinity-loop guide and probe protocol', () => {
+    const skill = PHASE_SKILLS.architect;
+    expect(skill).toMatch(/infinity-loop\.md/);
+    expect(skill).toMatch(/probe protocol/i);
   });
 
   // Spec-dev: Cynefin, composition EARS, change volatility
@@ -521,5 +567,46 @@ describe('PHASE_SKILL_REFERENCES', () => {
     const content = PHASE_SKILL_REFERENCES['spec-dev/references/spec-guide.md']!;
     expect(content).toContain('Trade-off');
     expect(content).toContain('Reversibility');
+  });
+
+  // --- infinity-loop.md reference ---
+
+  it('contains the infinity-loop.md reference file', () => {
+    expect(PHASE_SKILL_REFERENCES['architect/references/infinity-loop.md']).toBeDefined();
+  });
+
+  it('infinity-loop.md contains configuration parameters table with all key flags', () => {
+    const content = PHASE_SKILL_REFERENCES['architect/references/infinity-loop.md']!;
+    expect(content).toContain('## Configuration Parameters');
+    expect(content).toContain('--epics');
+    expect(content).toContain('--reviewers');
+    expect(content).toContain('--max-retries');
+    expect(content).toContain('--review-every');
+    expect(content).toContain('--improve-max-iters');
+    expect(content).toContain('--model');
+  });
+
+  it('infinity-loop.md contains monitoring guide with watch flags', () => {
+    const content = PHASE_SKILL_REFERENCES['architect/references/infinity-loop.md']!;
+    expect(content).toContain('ca watch');
+    expect(content).toContain('.loop-status.json');
+    expect(content).toContain('--no-follow');
+  });
+
+  it('infinity-loop.md contains pre-flight checklist', () => {
+    const content = PHASE_SKILL_REFERENCES['architect/references/infinity-loop.md']!;
+    expect(content).toMatch(/pre.flight/i);
+  });
+
+  it('infinity-loop.md contains 30-minute probe protocol', () => {
+    const content = PHASE_SKILL_REFERENCES['architect/references/infinity-loop.md']!;
+    expect(content).toContain('30-Minute Probe Protocol');
+    expect(content).toMatch(/warning sign/i);
+  });
+
+  it('infinity-loop.md contains launch examples', () => {
+    const content = PHASE_SKILL_REFERENCES['architect/references/infinity-loop.md']!;
+    expect(content).toContain('screen -dmS');
+    expect(content).toContain('LOOP_DRY_RUN');
   });
 });

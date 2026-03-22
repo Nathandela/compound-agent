@@ -3,26 +3,27 @@
   "version": "1.8.0",
   "description": "Semantically-intelligent workflow plugin for Claude Code",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
   "bin": {
     "compound-agent": "./dist/cli.js",
     "ca": "./dist/cli.js"
   },
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
   "files": [
     "dist",
-    "docs/assets",
-    "docs/research",
-    "scripts/postinstall.mjs",
+    "bin/",
+    "scripts/postinstall.cjs",
+    "README.md",
+    "LICENSE",
     "CHANGELOG.md",
     "llms.txt",
     "context7.json"
+  ],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
   ],
   "repository": {
     "type": "git",
@@ -34,7 +35,7 @@
   "homepage": "https://github.com/Nathandela/compound-agent#readme",
   "llms": "https://raw.githubusercontent.com/Nathandela/compound-agent/main/llms.txt",
   "scripts": {
-    "postinstall": "node scripts/postinstall.mjs",
+    "postinstall": "node scripts/postinstall.cjs",
     "prebuild": "tsx scripts/extract-changelog.ts",
     "build": "tsup",
     "dev": "tsup --watch",

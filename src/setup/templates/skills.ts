@@ -968,7 +968,7 @@ description: Decompose a large system specification into cook-it-ready epic bead
 ## Overview
 Take a large system specification and decompose it into naturally-scoped epic beads that the infinity loop can process via cook-it. Each output epic is sized for one cook-it cycle.
 
-4 phases with 3 human gates. Runs BEFORE spec-dev -- each decomposed epic then goes through full cook-it (including spec-dev to refine its EARS subset).
+5 phases with 4 human gates (Phase 5 is opt-in). Runs BEFORE spec-dev -- each decomposed epic then goes through full cook-it (including spec-dev to refine its EARS subset).
 
 ## Input
 - Beads epic ID: read epic description as input
@@ -1033,6 +1033,64 @@ Spawn **6 parallel subagents** (via Task tool):
 5. Store processing order as notes on the meta-epic
 6. Capture lessons via \`npx ca learn\`
 
+## Phase 5: Launch (Opt-in)
+**Goal**: Configure and launch the infinity loop on the materialized epics.
+
+This phase is OPT-IN. After Phase 4:
+- If the user's starting prompt mentioned loop/launch intent: proceed directly to step 1.
+- Otherwise: use \`AskUserQuestion\` to ask if they want to launch the infinity loop.
+- If declined: stop here. The architect's job is done.
+
+**Gate 4** (launch consent received):
+
+1. **Pre-flight check** -- verify ALL materialized epic beads are status=open:
+   For each epic ID from Phase 4, run \`bd show <id> --json\` and check the status field.
+   - "open" -> ready to process
+   - "in_progress" -> STOP, another session may already be working on it
+   - "closed" -> STOP, epic was already completed
+   Report which epics have unexpected status. Do not proceed unless all are open.
+
+2. **Gather parameters** via \`AskUserQuestion\`:
+   - Model (default: claude-opus-4-6[1m])
+   - Reviewer fleet (claude-sonnet, claude-opus, gemini, codex)
+   - Review cadence: every N epics or end-only? (default: 0, end-only)
+   - Max review cycles (default: 3)
+   - Max retries on failure (default: 1)
+   - Include improvement phase? (default: no)
+   - Dry-run first? (default: yes)
+   See \`architect/references/infinity-loop.md\` for advanced parameters.
+
+3. **Generate script** (produces \`./infinity-loop.sh\`):
+   \`\`\`bash
+   npx ca loop --epics <id1> <id2> ... \\
+     --model <model> \\
+     --reviewers <reviewer1> <reviewer2> ... \\
+     --review-every <N> --max-review-cycles <N> \\
+     --max-retries <N> [--improve] --force
+   \`\`\`
+
+4. **Dry-run** (unless user declined in step 2):
+   \`\`\`bash
+   LOOP_DRY_RUN=1 ./infinity-loop.sh
+   \`\`\`
+   Review output, then use \`AskUserQuestion\`: "Dry-run complete. Proceed with live launch?"
+
+5. **Launch in background**:
+   Verify screen is available: \`command -v screen\`. If not, use \`nohup ./infinity-loop.sh > loop-output.log 2>&1 &\` as fallback.
+   \`\`\`bash
+   screen -dmS compound-loop ./infinity-loop.sh
+   \`\`\`
+   Verify: \`screen -ls | grep compound-loop\`
+
+6. **Report monitoring commands** to the user:
+   - Live watch: \`npx ca watch\`
+   - Status: \`cat agent_logs/.loop-status.json\`
+   - Attach: \`screen -r compound-loop\`
+   - Execution log: \`cat agent_logs/loop-execution.jsonl\`
+   - For ongoing health monitoring, see the 30-minute probe protocol in the reference guide.
+
+See \`architect/references/infinity-loop.md\` for full parameter reference and monitoring guide.
+
 ## Memory Integration
 - \`npx ca search\` before starting each phase
 - \`npx ca knowledge\` for indexed project docs
@@ -1049,6 +1107,8 @@ Spawn **6 parallel subagents** (via Task tool):
 - Treating complex decisions as complicated (Cynefin): service boundaries need experiments, not just analysis
 - Ignoring implicit contracts (threading, timing, backpressure) -- Garlan's architectural mismatch
 - Not capturing assumptions that would invalidate the decomposition if wrong
+- Launching loop without verifying all epics are status=open (pre-flight check)
+- Skipping dry-run (catches configuration errors before live execution)
 
 ## Quality Criteria
 - [ ] Socratic phase completed with domain glossary and mindmap
@@ -1059,8 +1119,13 @@ Spawn **6 parallel subagents** (via Task tool):
 - [ ] Each epic has scope boundaries, EARS subset, interface contracts (explicit + implicit), and assumptions
 - [ ] Dependencies wired via bd dep add
 - [ ] Processing order stored on meta-epic
-- [ ] 3 human gates passed via AskUserQuestion
+- [ ] 3 human gates passed via AskUserQuestion (4 if launch phase activated)
 - [ ] Memory searched at each phase
+- [ ] Phase 5 opt-in question asked (or intent detected in starting prompt)
+- [ ] Pre-flight: all epic beads verified status=open before launch
+- [ ] Dry-run offered and reviewed (if launch activated)
+- [ ] Loop launched in screen session (if user approved)
+- [ ] Monitoring commands reported to user
 `,
 };
 
@@ -1177,5 +1242,167 @@ For each category, generate scenarios using these rules:
 - **Adversarial**: For external interfaces: one scenario per applicable STRIDE category; from state diagrams: each transition + at least one invalid transition
 
 From sequence diagrams: one scenario per message path including alt/opt fragments.
+`,
+
+  'architect/references/infinity-loop.md': `# Infinity Loop Reference Guide
+
+## Overview
+
+The infinity loop (\`ca loop\`) generates a standalone bash script that autonomously processes beads epics via Claude Code sessions. The architect skill's Phase 5 configures and launches this loop on the materialized epics.
+
+Each epic runs through a full \`/compound:cook-it from plan\` cycle. The loop handles retries, dependency ordering, memory safety, and optional multi-model review.
+
+---
+
+## Configuration Parameters
+
+| Parameter | CLI Flag | Default | Description |
+|-----------|----------|---------|-------------|
+| Epic IDs | \`--epics <ids...>\` | auto-discover | Specific epics to process |
+| Model | \`--model <model>\` | claude-opus-4-6[1m] | Claude model for sessions |
+| Max retries | \`--max-retries <n>\` | 1 | Retries per epic on failure |
+| Output | \`-o, --output <path>\` | ./infinity-loop.sh | Script output path |
+| Force | \`--force\` | false | Overwrite existing script |
+| Reviewers | \`--reviewers <names...>\` | none | Review fleet: claude-sonnet, claude-opus, gemini, codex |
+| Review cadence | \`--review-every <n>\` | 0 (end-only) | Review every N completed epics |
+| Review cycles | \`--max-review-cycles <n>\` | 3 | Max review/fix iterations |
+| Review blocking | \`--review-blocking\` | false | Fail loop if review not approved |
+| Review model | \`--review-model <model>\` | claude-opus-4-6[1m] | Model for fix sessions |
+| Improve | \`--improve\` | false | Run improvement phase after epics |
+| Improve iters | \`--improve-max-iters <n>\` | 5 | Max iterations per topic |
+| Improve budget | \`--improve-time-budget <s>\` | 0 (unlimited) | Total improvement time budget |
+
+---
+
+## Pre-flight Checklist
+
+Before launching, verify:
+- [ ] All epic beads exist and are status=open (\`bd show <id> --json\` for each)
+- [ ] Dependencies wired correctly (\`bd show <id> --json\` shows depends_on)
+- [ ] \`claude\` CLI available and authenticated
+- [ ] \`bd\` CLI available
+- [ ] \`screen\` available (\`command -v screen\`)
+- [ ] Sufficient disk space for agent_logs/
+
+---
+
+## Launch Commands
+
+### Generate script
+\`\`\`bash
+npx ca loop --epics E1 E2 E3 \\
+  --reviewers claude-sonnet claude-opus gemini codex \\
+  --max-retries 1 \\
+  --max-review-cycles 3 \\
+  --force
+\`\`\`
+
+### Dry-run (preview without executing Claude sessions)
+\`\`\`bash
+LOOP_DRY_RUN=1 ./infinity-loop.sh
+\`\`\`
+
+### Launch in background
+\`\`\`bash
+screen -dmS compound-loop ./infinity-loop.sh
+\`\`\`
+
+### Verify launch
+\`\`\`bash
+screen -ls | grep compound-loop
+\`\`\`
+
+---
+
+## Monitoring Guide
+
+### Real-time watch
+\`\`\`bash
+npx ca watch                    # Live trace from active session
+npx ca watch --epic <id>        # Watch specific epic
+npx ca watch --improve          # Watch improvement phase
+npx ca watch --no-follow        # Print current trace and exit
+\`\`\`
+
+### Status files
+
+| File | Content |
+|------|---------|
+| \`agent_logs/.loop-status.json\` | Current loop state (epic, attempt, status) |
+| \`agent_logs/loop-execution.jsonl\` | Completed epic results with timing |
+| \`agent_logs/loop_*.log\` | Per-session extracted text log |
+| \`agent_logs/trace_*.jsonl\` | Per-session raw stream-json trace |
+
+### Screen session
+\`\`\`bash
+screen -r compound-loop         # Attach to running loop
+# Ctrl-A D                      # Detach without stopping
+screen -S compound-loop -X quit # Kill the loop
+\`\`\`
+
+### Health checks
+\`\`\`bash
+# Is the loop still running?
+screen -ls | grep compound-loop
+
+# Current status
+cat agent_logs/.loop-status.json
+
+# How many epics completed?
+wc -l agent_logs/loop-execution.jsonl
+
+# Any failures?
+grep '"result":"failed"' agent_logs/loop-execution.jsonl
+\`\`\`
+
+---
+
+## 30-Minute Probe Protocol
+
+Passive monitoring checks to run periodically:
+
+1. **Progress check**: Is \`.loop-status.json\` advancing? Same epic_id for >30 minutes suggests a stuck session.
+2. **Failure scan**: \`grep failed agent_logs/loop-execution.jsonl\` -- any new failures since last check?
+3. **Git activity**: \`git log --oneline -5\` -- are commits being produced? Healthy loop commits per epic.
+4. **Disk usage**: \`du -sh agent_logs/\` -- trace files can grow large.
+5. **Process health**: \`screen -ls\` -- is the screen session still alive?
+
+**Warning signs**:
+- No progress for >30 minutes (stuck)
+- Multiple consecutive failures on the same epic
+- Disk usage growing rapidly without new commits
+- Screen session disappeared (crash -- check \`.loop-status.json\` for crash details)
+
+---
+
+## Examples
+
+### Minimal (auto-discover epics, no review)
+\`\`\`bash
+npx ca loop --force
+LOOP_DRY_RUN=1 ./infinity-loop.sh
+screen -dmS compound-loop ./infinity-loop.sh
+\`\`\`
+
+### Full review fleet with improvement phase
+\`\`\`bash
+npx ca loop --epics E1 E2 E3 \\
+  --reviewers claude-sonnet claude-opus gemini codex \\
+  --max-review-cycles 3 \\
+  --review-blocking \\
+  --improve \\
+  --improve-max-iters 5 \\
+  --force
+\`\`\`
+
+### Conservative (review every 2 epics, blocking)
+\`\`\`bash
+npx ca loop --epics E1 E2 E3 E4 \\
+  --reviewers claude-sonnet gemini \\
+  --review-every 2 \\
+  --review-blocking \\
+  --max-retries 2 \\
+  --force
+\`\`\`
 `,
 };
