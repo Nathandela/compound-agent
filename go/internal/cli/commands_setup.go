@@ -38,10 +38,15 @@ func initCmd() *cobra.Command {
 
 			if jsonOut {
 				data, _ := json.Marshal(map[string]any{
-					"success":        result.Success,
-					"hooksInstalled": result.HooksInstalled,
-					"dirsCreated":    len(result.DirsCreated),
-					"filesCreated":   len(result.FilesCreated),
+					"success":           result.Success,
+					"hooksInstalled":    result.HooksInstalled,
+					"dirsCreated":       len(result.DirsCreated),
+					"filesCreated":      len(result.FilesCreated),
+					"agentsInstalled":   result.AgentsInstalled,
+					"commandsInstalled": result.CommandsInstalled,
+					"skillsInstalled":   result.SkillsInstalled,
+					"roleSkillsInstalled": result.RoleSkillsInstalled,
+					"docsInstalled":     result.DocsInstalled,
 				})
 				cmd.Println(string(data))
 			} else {
@@ -50,6 +55,19 @@ func initCmd() *cobra.Command {
 					cmd.Println("  Hooks: installed")
 				}
 				cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
+				totalTemplates := result.AgentsInstalled + result.CommandsInstalled +
+					result.SkillsInstalled + result.RoleSkillsInstalled + result.DocsInstalled
+				if totalTemplates > 0 {
+					cmd.Printf("  Templates: %d installed (agents:%d commands:%d skills:%d roles:%d docs:%d)\n",
+						totalTemplates, result.AgentsInstalled, result.CommandsInstalled,
+						result.SkillsInstalled, result.RoleSkillsInstalled, result.DocsInstalled)
+				}
+				if result.AgentsMdUpdated {
+					cmd.Println("  AGENTS.md: updated")
+				}
+				if result.ClaudeMdUpdated {
+					cmd.Println("  CLAUDE.md: reference added")
+				}
 			}
 			return nil
 		},

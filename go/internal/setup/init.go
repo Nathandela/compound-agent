@@ -4,21 +4,32 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/nathandelacretaz/compound-agent/internal/build"
 )
 
 // InitOptions controls what init creates.
 type InitOptions struct {
-	SkipHooks  bool
-	SkipModel  bool
-	BinaryPath string // Path to the Go binary for hook commands. Empty = npx fallback.
+	SkipHooks      bool
+	SkipModel      bool
+	SkipTemplates  bool   // Skip installing agent/command/skill/doc templates.
+	BinaryPath     string // Path to the Go binary for hook commands. Empty = npx fallback.
 }
 
 // InitResult reports what init did.
 type InitResult struct {
-	Success        bool
-	HooksInstalled bool
-	DirsCreated    []string
-	FilesCreated   []string
+	Success           bool
+	HooksInstalled    bool
+	DirsCreated       []string
+	FilesCreated      []string
+	AgentsInstalled   int
+	CommandsInstalled int
+	SkillsInstalled   int
+	RoleSkillsInstalled int
+	DocsInstalled     int
+	AgentsMdUpdated   bool
+	ClaudeMdUpdated   bool
+	PluginCreated     bool
 }
 
 // InitRepo initializes compound-agent in a repository.
@@ -72,6 +83,67 @@ func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
 			}
 		}
 		result.HooksInstalled = true
+	}
+
+	// Install templates unless skipped
+	if !opts.SkipTemplates {
+		version := build.Version
+
+		// AGENTS.md
+		updated, err := UpdateAgentsMd(repoRoot)
+		if err != nil {
+			return nil, fmt.Errorf("update AGENTS.md: %w", err)
+		}
+		result.AgentsMdUpdated = updated
+
+		// .claude/CLAUDE.md reference
+		updated, err = EnsureClaudeMdReference(repoRoot)
+		if err != nil {
+			return nil, fmt.Errorf("ensure CLAUDE.md reference: %w", err)
+		}
+		result.ClaudeMdUpdated = updated
+
+		// plugin.json
+		created, err := CreatePluginManifest(repoRoot, version)
+		if err != nil {
+			return nil, fmt.Errorf("create plugin.json: %w", err)
+		}
+		result.PluginCreated = created
+
+		// Agent templates
+		n, err := InstallAgentTemplates(repoRoot)
+		if err != nil {
+			return nil, fmt.Errorf("install agent templates: %w", err)
+		}
+		result.AgentsInstalled = n
+
+		// Workflow commands
+		n, err = InstallWorkflowCommands(repoRoot)
+		if err != nil {
+			return nil, fmt.Errorf("install workflow commands: %w", err)
+		}
+		result.CommandsInstalled = n
+
+		// Phase skills
+		n, err = InstallPhaseSkills(repoRoot)
+		if err != nil {
+			return nil, fmt.Errorf("install phase skills: %w", err)
+		}
+		result.SkillsInstalled = n
+
+		// Agent role skills
+		n, err = InstallAgentRoleSkills(repoRoot)
+		if err != nil {
+			return nil, fmt.Errorf("install agent role skills: %w", err)
+		}
+		result.RoleSkillsInstalled = n
+
+		// Documentation templates
+		n, err = InstallDocTemplates(repoRoot, version)
+		if err != nil {
+			return nil, fmt.Errorf("install doc templates: %w", err)
+		}
+		result.DocsInstalled = n
 	}
 
 	return result, nil

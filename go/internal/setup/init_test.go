@@ -12,8 +12,9 @@ func TestInitRepo_CreatesDirectories(t *testing.T) {
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 
 	result, err := InitRepo(dir, InitOptions{
-		SkipHooks: true,
-		SkipModel: true,
+		SkipHooks:     true,
+		SkipModel:     true,
+		SkipTemplates: true,
 	})
 	if err != nil {
 		t.Fatalf("InitRepo failed: %v", err)
@@ -51,7 +52,7 @@ func TestInitRepo_Idempotent(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 
-	opts := InitOptions{SkipHooks: true, SkipModel: true}
+	opts := InitOptions{SkipHooks: true, SkipModel: true, SkipTemplates: true}
 	_, err := InitRepo(dir, opts)
 	if err != nil {
 		t.Fatalf("first InitRepo failed: %v", err)
@@ -97,6 +98,61 @@ func TestInitRepo_InstallsHooks(t *testing.T) {
 
 	if !result.HooksInstalled {
 		t.Error("expected HooksInstalled=true")
+	}
+}
+
+func TestInitRepo_InstallsTemplates(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
+
+	result, err := InitRepo(dir, InitOptions{
+		SkipHooks: true,
+		SkipModel: true,
+	})
+	if err != nil {
+		t.Fatalf("InitRepo failed: %v", err)
+	}
+
+	if result.AgentsInstalled == 0 {
+		t.Error("expected agent templates to be installed")
+	}
+	if result.CommandsInstalled == 0 {
+		t.Error("expected command templates to be installed")
+	}
+	if result.SkillsInstalled == 0 {
+		t.Error("expected phase skills to be installed")
+	}
+	if result.RoleSkillsInstalled == 0 {
+		t.Error("expected agent role skills to be installed")
+	}
+	if result.DocsInstalled == 0 {
+		t.Error("expected doc templates to be installed")
+	}
+	if !result.AgentsMdUpdated {
+		t.Error("expected AGENTS.md to be updated")
+	}
+	if !result.ClaudeMdUpdated {
+		t.Error("expected CLAUDE.md to be updated")
+	}
+
+	// Verify a sample file exists
+	repoAnalyst := filepath.Join(dir, ".claude", "agents", "compound", "repo-analyst.md")
+	if _, err := os.Stat(repoAnalyst); os.IsNotExist(err) {
+		t.Error("missing repo-analyst.md agent template")
+	}
+
+	// Verify idempotency on second run
+	result2, err := InitRepo(dir, InitOptions{SkipHooks: true, SkipModel: true})
+	if err != nil {
+		t.Fatalf("second InitRepo failed: %v", err)
+	}
+	totalTemplates := result2.AgentsInstalled + result2.CommandsInstalled +
+		result2.SkillsInstalled + result2.RoleSkillsInstalled + result2.DocsInstalled
+	if totalTemplates != 0 {
+		t.Errorf("idempotent init installed %d templates, want 0", totalTemplates)
+	}
+	if result2.AgentsMdUpdated {
+		t.Error("expected AGENTS.md not to be updated on second call")
 	}
 }
 
