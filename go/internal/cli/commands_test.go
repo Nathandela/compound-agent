@@ -69,7 +69,7 @@ func TestFormatSearchResults(t *testing.T) {
 
 func TestFormatSearchResultsEmpty(t *testing.T) {
 	got := formatSearchResults(nil)
-	want := "No lessons match your search. Try a different query or use \"list\" to see all lessons."
+	want := "No lessons match your search. Try a different query or use \"list\" to see all lessons.\n"
 	if got != want {
 		t.Errorf("got %q, want %q", got, want)
 	}
@@ -148,7 +148,7 @@ func TestFormatSessionHuman(t *testing.T) {
 
 func TestFormatSessionHumanEmpty(t *testing.T) {
 	got := formatSessionHuman(nil, 5)
-	if got != "No high-severity lessons found." {
+	if got != "No high-severity lessons found.\n" {
 		t.Errorf("got %q", got)
 	}
 }
@@ -258,7 +258,7 @@ func TestFormatCheckPlanHuman(t *testing.T) {
 
 func TestFormatCheckPlanHumanEmpty(t *testing.T) {
 	got := formatCheckPlanHuman(nil)
-	if got != "No relevant lessons found for this plan." {
+	if got != "No relevant lessons found for this plan.\n" {
 		t.Errorf("got %q", got)
 	}
 }

@@ -334,7 +334,7 @@ func datePrefix(created string) string {
 
 func formatSearchResults(items []memory.MemoryItem) string {
 	if len(items) == 0 {
-		return "No lessons match your search. Try a different query or use \"list\" to see all lessons."
+		return "No lessons match your search. Try a different query or use \"list\" to see all lessons.\n"
 	}
 
 	var b strings.Builder
@@ -374,7 +374,7 @@ func formatListResults(items []memory.MemoryItem, total int, skippedCount int) s
 
 func formatSessionHuman(items []memory.MemoryItem, totalCount int) string {
 	if len(items) == 0 {
-		return "No high-severity lessons found."
+		return "No high-severity lessons found.\n"
 	}
 
 	var b strings.Builder
@@ -424,7 +424,7 @@ func formatSessionJSON(items []memory.MemoryItem, totalCount int) (string, error
 
 func formatCheckPlanHuman(ranked []search.RankedItem) string {
 	if len(ranked) == 0 {
-		return "No relevant lessons found for this plan."
+		return "No relevant lessons found for this plan.\n"
 	}
 
 	var b strings.Builder
