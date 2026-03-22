@@ -92,7 +92,10 @@ func IndexDocs(repoRoot string, kdb *storage.KnowledgeDB, opts *IndexOptions) (*
 				continue
 			}
 		}
-		kdb.SetFileHash(relPath, hash)
+		if err := kdb.SetFileHash(relPath, hash); err != nil {
+			stats.FilesErrored++
+			continue
+		}
 
 		stats.FilesIndexed++
 		stats.ChunksCreated += len(kChunks)
@@ -120,11 +123,13 @@ func IndexDocs(repoRoot string, kdb *storage.KnowledgeDB, opts *IndexOptions) (*
 			return stats, fmt.Errorf("delete stale chunks: %w", err)
 		}
 		for _, p := range stalePaths {
-			kdb.RemoveFileHash(p)
+			// Non-fatal: stale hash metadata is harmless if removal fails
+			_ = kdb.RemoveFileHash(p)
 		}
 	}
 
-	kdb.SetLastIndexTime(time.Now().UTC().Format(time.RFC3339))
+	// Non-fatal: failing to record index time doesn't affect correctness
+	_ = kdb.SetLastIndexTime(time.Now().UTC().Format(time.RFC3339))
 
 	stats.DurationMs = time.Since(start).Milliseconds()
 	return stats, nil

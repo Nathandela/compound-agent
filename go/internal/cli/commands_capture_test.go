@@ -450,9 +450,11 @@ func TestCaptureCmd_WithInputFile(t *testing.T) {
 	dir := setupTestRepo(t, nil)
 	t.Setenv("COMPOUND_AGENT_ROOT", dir)
 
-	// Create input file with user correction signal
+	// Create input file with user correction signal (actionable insight).
+	// The insight must be actionable but NOT match pattern indicators
+	// ("use X instead of", "prefer X over/to") to avoid needing Pattern field.
 	input := map[string]interface{}{
-		"messages": []string{"Do X", "No, actually do Y instead"},
+		"messages": []string{"Do X", "No, actually avoid using globals in production code"},
 		"context":  map[string]string{"tool": "editor", "intent": "refactoring"},
 	}
 	inputData, _ := json.Marshal(input)
@@ -492,8 +494,8 @@ func TestDetectCmd_UserCorrection(t *testing.T) {
 	t.Setenv("COMPOUND_AGENT_ROOT", dir)
 
 	input := map[string]interface{}{
-		"messages": []string{"Do X with fmt.Sprintf", "No, actually use parameterized queries"},
-		"context":  map[string]string{"tool": "editor", "intent": "sql query"},
+		"messages": []string{"Do X with globals", "No, actually avoid using globals in production code"},
+		"context":  map[string]string{"tool": "editor", "intent": "code review"},
 	}
 	inputData, _ := json.Marshal(input)
 	inputFile := filepath.Join(dir, "input.json")
@@ -521,7 +523,7 @@ func TestDetectCmd_TestFailure(t *testing.T) {
 	input := map[string]interface{}{
 		"testResult": capture.TestResult{
 			Passed:   false,
-			Output:   "FAIL: TestFoo - expected 42 got 0\nError: assertion failed",
+			Output:   "FAIL: TestFoo - avoid using globals in production code\nError: assertion failed",
 			TestFile: "foo_test.go",
 		},
 	}
@@ -545,6 +547,8 @@ func TestDetectCmd_SelfCorrection(t *testing.T) {
 	dir := setupTestRepo(t, nil)
 	t.Setenv("COMPOUND_AGENT_ROOT", dir)
 
+	// Self-correction generates "Self-correction detected on <file>" as insight,
+	// which is not actionable. The quality gate correctly rejects it.
 	input := map[string]interface{}{
 		"editHistory": capture.EditHistory{
 			Edits: []capture.EditEntry{
@@ -565,8 +569,8 @@ func TestDetectCmd_SelfCorrection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stdout, "Source:   self_correction") {
-		t.Errorf("expected 'Source:   self_correction' in output, got: %s", stdout)
+	if !strings.Contains(stdout, "Not captured:") {
+		t.Errorf("expected 'Not captured:' for non-actionable self-correction insight, got: %s", stdout)
 	}
 }
 
@@ -610,7 +614,7 @@ func TestDetectCmd_SaveWithYes(t *testing.T) {
 	t.Setenv("COMPOUND_AGENT_ROOT", dir)
 
 	input := map[string]interface{}{
-		"messages": []string{"Do X", "No, actually do Y instead"},
+		"messages": []string{"Do X", "No, actually avoid using globals in production code"},
 		"context":  map[string]string{"tool": "editor", "intent": "refactoring"},
 	}
 	inputData, _ := json.Marshal(input)
@@ -658,7 +662,7 @@ func TestDetectCmd_JSONOutput(t *testing.T) {
 	t.Setenv("COMPOUND_AGENT_ROOT", dir)
 
 	input := map[string]interface{}{
-		"messages": []string{"Do X", "No, actually do Y instead"},
+		"messages": []string{"Do X", "No, actually avoid using globals in production code"},
 		"context":  map[string]string{"tool": "editor", "intent": "refactoring"},
 	}
 	inputData, _ := json.Marshal(input)

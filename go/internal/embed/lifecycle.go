@@ -301,7 +301,19 @@ func DownloadModel(repoRoot string, progress func(string)) (*DownloadResult, err
 }
 
 // httpClient is used for model downloads with a 10-minute timeout.
-var httpClient = &http.Client{Timeout: 10 * time.Minute}
+// CheckRedirect rejects redirects to non-HTTPS URLs to prevent downgrade attacks.
+var httpClient = &http.Client{
+	Timeout: 10 * time.Minute,
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		if req.URL.Scheme != "https" {
+			return fmt.Errorf("refusing redirect to non-HTTPS URL: %s", req.URL)
+		}
+		if len(via) >= 10 {
+			return fmt.Errorf("too many redirects")
+		}
+		return nil
+	},
+}
 
 // downloadFile downloads a URL to a local file path.
 func downloadFile(url, destPath string) error {

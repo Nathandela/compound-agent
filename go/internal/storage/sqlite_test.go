@@ -223,6 +223,25 @@ func TestOpenDB_FTS5Works(t *testing.T) {
 	}
 }
 
+func TestBuildDSN(t *testing.T) {
+	tests := []struct {
+		path     string
+		isMemory bool
+		want     string
+	}{
+		{"test.sqlite", false, "test.sqlite?_journal_mode=WAL"},
+		{"test.sqlite?mode=rwc", false, "test.sqlite?mode=rwc&_journal_mode=WAL"},
+		{":memory:", true, ":memory:"},
+		{"file::memory:?cache=shared", true, "file::memory:?cache=shared"},
+	}
+	for _, tt := range tests {
+		got := buildDSN(tt.path, tt.isMemory)
+		if got != tt.want {
+			t.Errorf("buildDSN(%q, %v) = %q, want %q", tt.path, tt.isMemory, got, tt.want)
+		}
+	}
+}
+
 func TestOpenDB_VersionMismatch_Rebuild(t *testing.T) {
 	dir := t.TempDir()
 	dbPath := dir + "/test.sqlite"

@@ -8,7 +8,7 @@ RUST_DIR  := ../rust/embed-daemon
 
 PLATFORMS := darwin-arm64 darwin-amd64 linux-arm64 linux-amd64
 
-.PHONY: build build-release build-all build-daemon build-daemon-all test lint clean
+.PHONY: build build-release build-all build-daemon build-daemon-all test test-integration lint clean
 
 # Build for local platform (development).
 build:
@@ -55,6 +55,9 @@ build-daemon-all: $(DIST)
 
 test:
 	go test -tags "$(TAGS)" ./...
+
+test-integration:
+	go test -tags "$(TAGS) integration" ./...
 
 lint:
 	go vet -tags "$(TAGS)" ./...

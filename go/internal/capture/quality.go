@@ -118,11 +118,16 @@ func isNovelWithDB(db *sql.DB, insight string, embedder search.Embedder, thresho
 }
 
 // ShouldPropose checks if an insight should be proposed as a new lesson.
-// Checks specificity first (fast, no DB), then novelty via embedder.
+// Checks specificity first (fast, no DB), then actionability, then novelty via embedder.
 func ShouldPropose(repoRoot string, insight string, embedder search.Embedder) (shouldPropose bool, reason string) {
 	specific, specificReason := isSpecific(insight)
 	if !specific {
 		return false, specificReason
+	}
+
+	actionable, actionableReason := isActionable(insight)
+	if !actionable {
+		return false, actionableReason
 	}
 
 	novelty := isNovel(repoRoot, insight, embedder, DuplicateThreshold)

@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math"
+	"os"
 )
 
 // EmbeddingModelID is the model identifier included in content hashes
@@ -52,6 +53,10 @@ func GetCachedEmbeddingsBulk(db *sql.DB) map[string]CachedEmbeddingEntry {
 		vec := blobToFloat64(blob)
 		result[id] = CachedEmbeddingEntry{Vector: vec, Hash: hash.String}
 	}
+	// rows.Err() is non-fatal for cache reads; log and return what we have
+	if err := rows.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "[ca] cache iteration error: %v\n", err)
+	}
 
 	return result
 }
@@ -89,6 +94,10 @@ func GetCachedInsightEmbeddingsBulk(db *sql.DB) map[string]CachedEmbeddingEntry 
 
 		vec := blobToFloat64(blob)
 		result[id] = CachedEmbeddingEntry{Vector: vec, Hash: hash.String}
+	}
+	// rows.Err() is non-fatal for cache reads; log and return what we have
+	if err := rows.Err(); err != nil {
+		fmt.Fprintf(os.Stderr, "[ca] cache iteration error: %v\n", err)
 	}
 
 	return result

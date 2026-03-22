@@ -402,6 +402,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Bind socket
     let listener = UnixListener::bind(&socket_path)?;
+    // Restrict socket access to owner only (security: prevent other local users from connecting)
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&socket_path, fs::Permissions::from_mode(0o600))?;
+    }
     listener
         .set_nonblocking(true)
         .expect("set_nonblocking failed");

@@ -11,6 +11,13 @@ import (
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
 )
 
+// lessonSelectCols is the explicit column list for lessons queries (no table alias).
+// Matches the scan order in scanRowWithRank.
+const lessonSelectCols = `id, type, trigger, insight, evidence, severity, tags, source, context, supersedes, related, created, confirmed, deleted, retrieval_count, last_retrieved, embedding, content_hash, embedding_insight, content_hash_insight, invalidated_at, invalidation_reason, citation_file, citation_line, citation_commit, compaction_level, compacted_at, pattern_bad, pattern_good`
+
+// lessonSelectColsAliased is the same column list with "l." table alias prefix for JOIN queries.
+const lessonSelectColsAliased = `l.id, l.type, l.trigger, l.insight, l.evidence, l.severity, l.tags, l.source, l.context, l.supersedes, l.related, l.created, l.confirmed, l.deleted, l.retrieval_count, l.last_retrieved, l.embedding, l.content_hash, l.embedding_insight, l.content_hash_insight, l.invalidated_at, l.invalidation_reason, l.citation_file, l.citation_line, l.citation_commit, l.compaction_level, l.compacted_at, l.pattern_bad, l.pattern_good`
+
 // ftsOperators are FTS5 special tokens to strip from queries.
 var ftsOperators = map[string]bool{
 	"AND": true, "OR": true, "NOT": true, "NEAR": true,
@@ -89,14 +96,7 @@ func (s *SearchDB) SearchKeywordScored(query string, limit int, typeFilter memor
 
 // ReadAll reads all non-invalidated memory items from SQLite.
 func (s *SearchDB) ReadAll() ([]memory.MemoryItem, error) {
-	rows, err := s.db.Query(`SELECT id, type, trigger, insight, evidence, severity,
-		tags, source, context, supersedes, related,
-		created, confirmed, deleted, retrieval_count, last_retrieved,
-		embedding, content_hash, embedding_insight, content_hash_insight,
-		invalidated_at, invalidation_reason,
-		citation_file, citation_line, citation_commit,
-		compaction_level, compacted_at,
-		pattern_bad, pattern_good
+	rows, err := s.db.Query(`SELECT ` + lessonSelectCols + `
 		FROM lessons WHERE invalidated_at IS NULL`)
 	if err != nil {
 		return nil, err
@@ -115,10 +115,10 @@ func (s *SearchDB) ReadAll() ([]memory.MemoryItem, error) {
 }
 
 func (s *SearchDB) executeFts(sanitized string, limit int, typeFilter memory.MemoryItemType, withRank bool) ([]ScoredResult, error) {
-	selectCols := "l.*"
+	selectCols := lessonSelectColsAliased
 	orderClause := ""
 	if withRank {
-		selectCols = "l.*, fts.rank"
+		selectCols = lessonSelectColsAliased + ", fts.rank"
 		orderClause = "ORDER BY fts.rank"
 	}
 

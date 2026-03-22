@@ -39,19 +39,25 @@ func compoundCmd() *cobra.Command {
 				return compoundFromCache(cmd, repoRoot, items)
 			}
 
-			// Compute embeddings for all items, filtering out failures
+			// Collect all texts for batch embedding
+			texts := make([]string, len(items))
+			for i, item := range items {
+				texts[i] = item.Trigger + " " + item.Insight
+			}
+
+			vecs, err := embedder.Embed(texts)
+			if err != nil {
+				cmd.Printf("[warn] Batch embedding failed: %v\n", err)
+				return compoundFromCache(cmd, repoRoot, items)
+			}
+
+			// Filter items with valid embeddings
 			var filtered []memory.MemoryItem
 			var filteredEmbeddings [][]float64
-			for _, item := range items {
-				text := item.Trigger + " " + item.Insight
-				vecs, err := embedder.Embed([]string{text})
-				if err != nil {
-					cmd.Printf("[warn] Could not embed item %s, skipping: %v\n", item.ID, err)
-					continue
-				}
-				if len(vecs) > 0 && vecs[0] != nil {
+			for i, item := range items {
+				if i < len(vecs) && vecs[i] != nil {
 					filtered = append(filtered, item)
-					filteredEmbeddings = append(filteredEmbeddings, vecs[0])
+					filteredEmbeddings = append(filteredEmbeddings, vecs[i])
 				}
 			}
 

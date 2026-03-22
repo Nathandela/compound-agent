@@ -137,21 +137,27 @@ func TestMetadata_FileHash(t *testing.T) {
 		t.Errorf("expected empty hash, got %q", hash)
 	}
 
-	kdb.SetFileHash("docs/a.md", "abc123")
+	if err := kdb.SetFileHash("docs/a.md", "abc123"); err != nil {
+		t.Fatalf("SetFileHash: %v", err)
+	}
 	hash = kdb.GetFileHash("docs/a.md")
 	if hash != "abc123" {
 		t.Errorf("hash = %q, want %q", hash, "abc123")
 	}
 
 	// Update
-	kdb.SetFileHash("docs/a.md", "def456")
+	if err := kdb.SetFileHash("docs/a.md", "def456"); err != nil {
+		t.Fatalf("SetFileHash update: %v", err)
+	}
 	hash = kdb.GetFileHash("docs/a.md")
 	if hash != "def456" {
 		t.Errorf("hash = %q, want %q", hash, "def456")
 	}
 
 	// Remove
-	kdb.RemoveFileHash("docs/a.md")
+	if err := kdb.RemoveFileHash("docs/a.md"); err != nil {
+		t.Fatalf("RemoveFileHash: %v", err)
+	}
 	hash = kdb.GetFileHash("docs/a.md")
 	if hash != "" {
 		t.Errorf("expected empty hash after remove, got %q", hash)
@@ -168,7 +174,9 @@ func TestMetadata_LastIndexTime(t *testing.T) {
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
-	kdb.SetLastIndexTime(now)
+	if err := kdb.SetLastIndexTime(now); err != nil {
+		t.Fatalf("SetLastIndexTime: %v", err)
+	}
 	ts = kdb.GetLastIndexTime()
 	if ts != now {
 		t.Errorf("last index time = %q, want %q", ts, now)
@@ -241,7 +249,9 @@ func TestGetAllEmbeddings(t *testing.T) {
 
 	// Set embedding for c1 only
 	vec := []float64{0.1, 0.2, 0.3}
-	kdb.SetChunkEmbedding("c1", vec, "h1")
+	if err := kdb.SetChunkEmbedding("c1", vec, "h1"); err != nil {
+		t.Fatalf("SetChunkEmbedding: %v", err)
+	}
 
 	entries := kdb.GetAllEmbeddings()
 	if len(entries) != 1 {
@@ -264,7 +274,9 @@ func TestGetUnembeddedChunks(t *testing.T) {
 	kdb.UpsertChunks(chunks)
 
 	// Set embedding for c1
-	kdb.SetChunkEmbedding("c1", []float64{0.1, 0.2}, "h1")
+	if err := kdb.SetChunkEmbedding("c1", []float64{0.1, 0.2}, "h1"); err != nil {
+		t.Fatalf("SetChunkEmbedding: %v", err)
+	}
 
 	unembedded := kdb.GetUnembeddedChunks()
 	if len(unembedded) != 1 {
@@ -349,5 +361,72 @@ func TestHydrateChunks(t *testing.T) {
 	hydrated := kdb.HydrateChunks([]string{"c1", "c2"})
 	if len(hydrated) != 2 {
 		t.Errorf("expected 2 hydrated chunks, got %d", len(hydrated))
+	}
+}
+
+func TestSetFileHash_ReturnsError(t *testing.T) {
+	db := openTestKnowledgeDB(t)
+	kdb := NewKnowledgeDB(db)
+	db.Close() // force error
+
+	err := kdb.SetFileHash("docs/a.md", "hash")
+	if err == nil {
+		t.Error("expected error from SetFileHash on closed DB, got nil")
+	}
+}
+
+func TestRemoveFileHash_ReturnsError(t *testing.T) {
+	db := openTestKnowledgeDB(t)
+	kdb := NewKnowledgeDB(db)
+	db.Close()
+
+	err := kdb.RemoveFileHash("docs/a.md")
+	if err == nil {
+		t.Error("expected error from RemoveFileHash on closed DB, got nil")
+	}
+}
+
+func TestSetLastIndexTime_ReturnsError(t *testing.T) {
+	db := openTestKnowledgeDB(t)
+	kdb := NewKnowledgeDB(db)
+	db.Close()
+
+	err := kdb.SetLastIndexTime("2026-01-01T00:00:00Z")
+	if err == nil {
+		t.Error("expected error from SetLastIndexTime on closed DB, got nil")
+	}
+}
+
+func TestSetChunkEmbedding_ReturnsError(t *testing.T) {
+	db := openTestKnowledgeDB(t)
+	kdb := NewKnowledgeDB(db)
+	db.Close()
+
+	err := kdb.SetChunkEmbedding("c1", []float64{0.1}, "h1")
+	if err == nil {
+		t.Error("expected error from SetChunkEmbedding on closed DB, got nil")
+	}
+}
+
+func TestSetFileHash_SuccessReturnsNil(t *testing.T) {
+	db := openTestKnowledgeDB(t)
+	kdb := NewKnowledgeDB(db)
+
+	if err := kdb.SetFileHash("docs/a.md", "hash"); err != nil {
+		t.Errorf("expected nil error on success, got %v", err)
+	}
+}
+
+func TestSetChunkEmbedding_SuccessReturnsNil(t *testing.T) {
+	db := openTestKnowledgeDB(t)
+	kdb := NewKnowledgeDB(db)
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	kdb.UpsertChunks([]KnowledgeChunk{
+		{ID: "c1", FilePath: "docs/a.md", StartLine: 1, EndLine: 5, ContentHash: "h1", Text: "text", UpdatedAt: now},
+	})
+
+	if err := kdb.SetChunkEmbedding("c1", []float64{0.1, 0.2}, "h1"); err != nil {
+		t.Errorf("expected nil error on success, got %v", err)
 	}
 }

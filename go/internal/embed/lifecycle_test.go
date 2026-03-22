@@ -2,6 +2,8 @@ package embed
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -84,6 +86,66 @@ func TestModelDownloadDir(t *testing.T) {
 	if got != want {
 		t.Errorf("ModelDownloadDir = %v, want %v", got, want)
 	}
+}
+
+func TestHTTPClientRejectsHTTPRedirect(t *testing.T) {
+	// Server that redirects to a plain HTTP URL
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://evil.example.com/payload", http.StatusFound)
+	}))
+	defer srv.Close()
+
+	// Use the TLS test server's client for trusted certs, but swap in our CheckRedirect
+	client := srv.Client()
+	client.CheckRedirect = httpClient.CheckRedirect
+
+	_, err := client.Get(srv.URL + "/model")
+	if err == nil {
+		t.Fatal("expected error when redirected to HTTP, got nil")
+	}
+	// The error should mention refusing non-HTTPS
+	if got := err.Error(); !contains(got, "non-HTTPS") {
+		t.Errorf("error = %q, want it to mention non-HTTPS redirect", got)
+	}
+}
+
+func TestHTTPClientAllowsHTTPSRedirect(t *testing.T) {
+	// Final destination server
+	dest := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer dest.Close()
+
+	// Redirecting server that points to the destination (both HTTPS)
+	srv := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, dest.URL+"/final", http.StatusFound)
+	}))
+	defer srv.Close()
+
+	// We need a client that trusts both test servers' certs.
+	// Use srv's client and add our CheckRedirect. Since httptest.NewTLSServer
+	// uses the same CA in a test, this works for same-process servers.
+	client := srv.Client()
+	client.CheckRedirect = httpClient.CheckRedirect
+
+	resp, err := client.Get(srv.URL + "/start")
+	if err != nil {
+		t.Fatalf("expected HTTPS redirect to succeed, got error: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Errorf("status = %d, want 200", resp.StatusCode)
+	}
+}
+
+// contains checks if substr is in s (avoids importing strings in test).
+func contains(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
 
 func TestFindModelFiles_InCacheDir(t *testing.T) {

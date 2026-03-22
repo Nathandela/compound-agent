@@ -78,19 +78,17 @@ npx ca prime                                 # Reload workflow context after com
 
 ```bash
 npx ca init                    # Initialize in current repo
-npx ca init --skip-agents      # Skip AGENTS.md and template installation
-npx ca init --skip-hooks       # Skip git hook installation
-npx ca init --skip-claude      # Skip Claude Code hooks
+npx ca init --skip-hooks       # Skip hook installation
 npx ca init --json             # Output result as JSON
-npx ca setup                   # Full setup (init + model download)
-npx ca setup --update          # Regenerate templates (preserves user files)
-npx ca setup --uninstall       # Remove compound-agent integration
-npx ca setup --status          # Show installation status
-npx ca setup --skip-model      # Skip embedding model download
+npx ca init --repo-root <path> # Specify repository root
+npx ca setup                   # Full setup (init + hooks + templates)
+npx ca setup --skip-hooks      # Skip hook installation
+npx ca setup --json            # Output result as JSON
+npx ca setup --repo-root <path> # Specify repository root
 npx ca setup claude            # Install Claude Code hooks only
 npx ca setup claude --status   # Check hook status
-npx ca hooks                   # Install git hooks
-npx ca download-model          # Download embedding model (~23MB)
+npx ca setup claude --uninstall # Remove Claude Code hooks
+npx ca setup claude --global   # Use global ~/.claude/ settings
 ```
 
 ## Reviewer commands

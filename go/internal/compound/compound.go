@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
+	"github.com/nathandelacretaz/compound-agent/internal/util"
 )
 
 const (
@@ -58,29 +58,15 @@ func BuildSimilarityMatrix(embeddings [][]float64) [][]float64 {
 
 	for i := 0; i < n; i++ {
 		for j := i + 1; j < n; j++ {
-			sim := cosineSimilarity(embeddings[i], embeddings[j])
+			sim, err := util.CosineSimilarity(embeddings[i], embeddings[j])
+			if err != nil {
+				continue // skip pair with mismatched dimensions
+			}
 			matrix[i][j] = sim
 			matrix[j][i] = sim
 		}
 	}
 	return matrix
-}
-
-func cosineSimilarity(a, b []float64) float64 {
-	if len(a) != len(b) || len(a) == 0 {
-		return 0
-	}
-	var dot, normA, normB float64
-	for i := range a {
-		dot += a[i] * b[i]
-		normA += a[i] * a[i]
-		normB += b[i] * b[i]
-	}
-	mag := math.Sqrt(normA) * math.Sqrt(normB)
-	if mag == 0 {
-		return 0
-	}
-	return dot / mag
 }
 
 // ClusterBySimilarity clusters items using single-linkage agglomerative clustering with union-find.

@@ -24,6 +24,9 @@ func isConnectionError(err error) bool {
 // RetryClient wraps a Client with automatic retry on connection failure (H2).
 // On broken connection, it reconnects via the provided connect function
 // and retries the request once.
+//
+// RetryClient is not safe for concurrent use. Callers must serialize
+// access or use separate RetryClient instances per goroutine.
 type RetryClient struct {
 	client  *Client
 	connect func() (*Client, error)

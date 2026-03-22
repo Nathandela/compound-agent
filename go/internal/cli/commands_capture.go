@@ -455,8 +455,10 @@ func detectAndPropose(input DetectInput, repoRoot string) detectResult {
 		return detectResult{Detected: false}
 	}
 
-	// Quality gate: check specificity (nil embedder skips novelty gracefully)
-	shouldPropose, reason := capture.ShouldPropose(repoRoot, insight, nil)
+	// Quality gate: check specificity, actionability, and novelty
+	embedder, closeEmbedder := getOrStartEmbedder(repoRoot)
+	defer closeEmbedder()
+	shouldPropose, reason := capture.ShouldPropose(repoRoot, insight, embedder)
 	if !shouldPropose {
 		return detectResult{Detected: false, Reason: reason}
 	}

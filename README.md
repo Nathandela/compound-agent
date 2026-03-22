@@ -229,11 +229,8 @@ Three human approval gates separate the phases. Each output epic is sized for on
 # Install as dev dependency
 pnpm add -D compound-agent
 
-# One-shot setup (creates dirs, hooks, downloads model)
+# One-shot setup (creates dirs, hooks, templates)
 npx ca setup
-
-# Skip the ~278MB model download (do it later)
-npx ca setup --skip-model
 ```
 
 ### Requirements
@@ -342,15 +339,14 @@ The CLI binary is `ca` (alias: `compound-agent`).
 
 | Command | Description |
 |---------|-------------|
-| `ca setup` | One-shot setup (hooks + git pre-commit + model) |
-| `ca setup --skip-model` | Setup without model download |
-| `ca setup --uninstall` | Remove all generated files |
-| `ca setup --update` | Regenerate files (preserves user customisations) |
-| `ca setup --status` | Show installation status |
-| `ca setup --dry-run` | Show what would change without changing |
+| `ca setup` | One-shot setup (hooks + templates) |
+| `ca setup --skip-hooks` | Setup without installing hooks |
+| `ca setup --json` | Output result as JSON |
+| `ca setup --repo-root <path>` | Specify repository root |
+| `ca setup claude` | Install Claude Code hooks only |
 | `ca setup claude --status` | Check Claude Code integration health |
 | `ca setup claude --uninstall` | Remove Claude hooks only |
-| `ca download-model` | Download the embedding model |
+| `ca init` | Initialize compound-agent in current repo |
 | `ca about` | Show version, animation, and recent changelog |
 | `ca doctor` | Verify external dependencies and project health |
 

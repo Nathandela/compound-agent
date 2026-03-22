@@ -394,6 +394,25 @@ func TestShouldPropose_NilEmbedderPasses(t *testing.T) {
 	}
 }
 
+func TestShouldPropose_RejectsNonActionable(t *testing.T) {
+	// An insight that is specific but not actionable should be rejected
+	shouldPropose, reason := ShouldPropose(t.TempDir(), "the system has many components and layers", nil)
+	if shouldPropose {
+		t.Error("expected rejection for non-actionable insight")
+	}
+	if reason == "" {
+		t.Error("expected non-empty reason")
+	}
+}
+
+func TestShouldPropose_AcceptsActionable(t *testing.T) {
+	// An insight that is specific AND actionable should pass
+	shouldPropose, _ := ShouldPropose(t.TempDir(), "Use parameterized queries instead of string interpolation for SQL", nil)
+	if !shouldPropose {
+		t.Error("expected acceptance for specific actionable insight")
+	}
+}
+
 func TestShouldPropose_BothPassAccepted(t *testing.T) {
 	// No DB items, so novel=true. Specific insight.
 	embedder := &mockEmbedder{vectors: map[string][]float64{

@@ -18,7 +18,12 @@ func ReadStdinFrom(r io.Reader, timeout time.Duration, maxBytes int) (string, er
 	ch := make(chan result, 1)
 	pr, pw := io.Pipe()
 
-	// Copy goroutine: reads from r, writes to pipe
+	// Copy goroutine: reads from r, writes to pipe.
+	// NOTE: On timeout, this goroutine may remain blocked on r.Read() if the
+	// underlying reader (e.g. stdin) never returns. This is an inherent limitation
+	// of Go's non-interruptible blocking reads. The goroutine is cleaned up when
+	// the process exits. This is acceptable because ReadStdinFrom is only used
+	// in short-lived hook contexts, never in long-lived servers.
 	go func() {
 		_, err := io.Copy(pw, io.LimitReader(r, int64(maxBytes)+1))
 		pw.CloseWithError(err)

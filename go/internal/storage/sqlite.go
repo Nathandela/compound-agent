@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -99,10 +100,7 @@ func OpenDB(path string) (*sql.DB, error) {
 		}
 	}
 
-	dsn := path
-	if !isMemory {
-		dsn = path + "?_journal_mode=WAL"
-	}
+	dsn := buildDSN(path, isMemory)
 
 	db, err := sql.Open("sqlite3", dsn)
 	if err != nil {
@@ -146,4 +144,17 @@ func needsRebuild(path string) bool {
 	}
 
 	return version != SchemaVersion
+}
+
+// buildDSN constructs a SQLite DSN from a path, appending WAL journal mode
+// for on-disk databases. Handles paths that already contain query parameters.
+func buildDSN(path string, isMemory bool) string {
+	if isMemory {
+		return path
+	}
+	sep := "?"
+	if strings.Contains(path, "?") {
+		sep = "&"
+	}
+	return path + sep + "_journal_mode=WAL"
 }

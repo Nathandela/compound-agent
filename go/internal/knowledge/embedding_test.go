@@ -68,7 +68,9 @@ func TestEmbedChunks_SkipsAlreadyEmbedded(t *testing.T) {
 	embedder := &mockEmbedder{}
 
 	// Embed one chunk manually
-	kdb.SetChunkEmbedding("c1", []float64{0.1, 0.2, 0.3}, "h1")
+	if err := kdb.SetChunkEmbedding("c1", []float64{0.1, 0.2, 0.3}, "h1"); err != nil {
+		t.Fatalf("SetChunkEmbedding: %v", err)
+	}
 
 	result, err := EmbedChunks(kdb, embedder, nil)
 	if err != nil {
@@ -88,7 +90,9 @@ func TestEmbedChunks_OnlyMissingFalse(t *testing.T) {
 	embedder := &mockEmbedder{}
 
 	// Embed one chunk manually
-	kdb.SetChunkEmbedding("c1", []float64{0.1, 0.2, 0.3}, "h1")
+	if err := kdb.SetChunkEmbedding("c1", []float64{0.1, 0.2, 0.3}, "h1"); err != nil {
+		t.Fatalf("SetChunkEmbedding: %v", err)
+	}
 
 	result, err := EmbedChunks(kdb, embedder, &EmbedChunksOptions{OnlyMissing: false})
 	if err != nil {

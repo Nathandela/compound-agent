@@ -3,7 +3,6 @@ package storage
 import (
 	"database/sql"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 )
@@ -277,13 +276,15 @@ func (k *KnowledgeDB) GetFileHash(relativePath string) string {
 }
 
 // SetFileHash stores the hash for a file path.
-func (k *KnowledgeDB) SetFileHash(relativePath, hash string) {
-	k.db.Exec("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", fileHashKey(relativePath), hash)
+func (k *KnowledgeDB) SetFileHash(relativePath, hash string) error {
+	_, err := k.db.Exec("INSERT OR REPLACE INTO metadata (key, value) VALUES (?, ?)", fileHashKey(relativePath), hash)
+	return err
 }
 
 // RemoveFileHash removes the stored hash for a file path.
-func (k *KnowledgeDB) RemoveFileHash(relativePath string) {
-	k.db.Exec("DELETE FROM metadata WHERE key = ?", fileHashKey(relativePath))
+func (k *KnowledgeDB) RemoveFileHash(relativePath string) error {
+	_, err := k.db.Exec("DELETE FROM metadata WHERE key = ?", fileHashKey(relativePath))
+	return err
 }
 
 // GetLastIndexTime retrieves the last index timestamp.
@@ -297,8 +298,9 @@ func (k *KnowledgeDB) GetLastIndexTime() string {
 }
 
 // SetLastIndexTime stores the last index timestamp.
-func (k *KnowledgeDB) SetLastIndexTime(t string) {
-	k.db.Exec("INSERT OR REPLACE INTO metadata (key, value) VALUES ('last_index_time', ?)", t)
+func (k *KnowledgeDB) SetLastIndexTime(t string) error {
+	_, err := k.db.Exec("INSERT OR REPLACE INTO metadata (key, value) VALUES ('last_index_time', ?)", t)
+	return err
 }
 
 // --- FTS5 search ---
@@ -339,18 +341,10 @@ func (k *KnowledgeDB) SearchChunksKeywordScored(query string, limit int) []Score
 		if model.Valid {
 			chunk.Model = model.String
 		}
-		results = append(results, ScoredKnowledgeChunk{Chunk: chunk, Score: knowledgeNormalizeBm25(rank)})
+		results = append(results, ScoredKnowledgeChunk{Chunk: chunk, Score: normalizeBm25Rank(rank)})
 	}
 	// rows.Err() is non-fatal for search results; return what we have
 	return results
-}
-
-func knowledgeNormalizeBm25(rank float64) float64 {
-	if math.IsInf(rank, 0) || math.IsNaN(rank) {
-		return 0
-	}
-	abs := math.Abs(rank)
-	return abs / (1 + abs)
 }
 
 // --- Embedding operations ---
@@ -385,9 +379,10 @@ func (k *KnowledgeDB) GetAllEmbeddings() map[string]CachedEmbeddingEntry {
 }
 
 // SetChunkEmbedding stores an embedding vector for a single chunk.
-func (k *KnowledgeDB) SetChunkEmbedding(id string, embedding []float64, contentHash string) {
+func (k *KnowledgeDB) SetChunkEmbedding(id string, embedding []float64, contentHash string) error {
 	blob := float64ToBlob(embedding)
-	k.db.Exec("UPDATE chunks SET embedding = ?, content_hash = ? WHERE id = ?", blob, contentHash, id)
+	_, err := k.db.Exec("UPDATE chunks SET embedding = ?, content_hash = ? WHERE id = ?", blob, contentHash, id)
+	return err
 }
 
 // SetChunkEmbeddingBatch stores embeddings for multiple chunks in a transaction.
