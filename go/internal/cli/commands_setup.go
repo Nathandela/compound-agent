@@ -112,14 +112,24 @@ func setupCmd() *cobra.Command {
 
 		if jsonOut {
 			data, _ := json.Marshal(map[string]any{
-				"success":        result.Success,
-				"hooksInstalled": result.HooksInstalled,
+				"success":             result.Success,
+				"hooksInstalled":      result.HooksInstalled,
+				"agentsInstalled":     result.AgentsInstalled,
+				"commandsInstalled":   result.CommandsInstalled,
+				"skillsInstalled":     result.SkillsInstalled,
+				"roleSkillsInstalled": result.RoleSkillsInstalled,
+				"docsInstalled":       result.DocsInstalled,
 			})
 			cmd.Println(string(data))
 		} else {
 			cmd.Println("[ok] Compound agent setup complete")
 			if result.HooksInstalled {
 				cmd.Println("  Hooks: installed to .claude/settings.json")
+			}
+			totalTemplates := result.AgentsInstalled + result.CommandsInstalled +
+				result.SkillsInstalled + result.RoleSkillsInstalled + result.DocsInstalled
+			if totalTemplates > 0 {
+				cmd.Printf("  Templates: %d installed\n", totalTemplates)
 			}
 		}
 		return nil

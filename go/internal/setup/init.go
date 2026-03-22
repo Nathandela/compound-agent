@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/nathandelacretaz/compound-agent/internal/build"
 )
@@ -170,25 +171,14 @@ func EnsureGitignore(repoRoot string) error {
 	// If gitignore exists, check if patterns are already there
 	existing, err := os.ReadFile(gitignorePath)
 	if err == nil && len(existing) > 0 {
-		// File exists, check if it has our patterns
 		content := string(existing)
-		if contains(content, ".cache/") && contains(content, "*.sqlite") {
+		if strings.Contains(content, ".cache/") && strings.Contains(content, "*.sqlite") {
 			return nil // Already has our patterns
 		}
+		// Append our patterns to existing content
+		combined := strings.TrimRight(content, "\n") + "\n" + patterns
+		return os.WriteFile(gitignorePath, []byte(combined), 0644)
 	}
 
 	return os.WriteFile(gitignorePath, []byte(patterns), 0644)
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && findSubstring(s, substr))
-}
-
-func findSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
 }

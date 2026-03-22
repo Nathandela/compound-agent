@@ -252,9 +252,7 @@ func phaseCheckCmd() *cobra.Command {
 
 // installBeadsCmd outputs the install command for the beads CLI.
 func installBeadsCmd() *cobra.Command {
-	var yes bool
-
-	cmd := &cobra.Command{
+	return &cobra.Command{
 		Use:   "install-beads",
 		Short: "Install the beads CLI via the official install script",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -268,19 +266,10 @@ func installBeadsCmd() *cobra.Command {
 			}
 
 			cmd.Printf("Install script: %s\n", installURL)
-			if !yes {
-				cmd.Printf("Run manually: %s\n", installCmd)
-				return nil
-			}
-
-			// --yes flag: run the install
-			cmd.Printf("Running: %s\n", installCmd)
-			cmd.Println("(Install execution not implemented in Go binary — run the command manually)")
+			cmd.Printf("Run: %s\n", installCmd)
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&yes, "yes", false, "Skip confirmation and install immediately")
-	return cmd
 }
 
 // rulesCmd is a stub for the rules command.
