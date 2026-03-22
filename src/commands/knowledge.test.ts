@@ -56,6 +56,7 @@ vi.mock('../memory/knowledge/search.js', () => ({
 vi.mock('../memory/embeddings/index.js', () => ({
   unloadEmbeddingResources: vi.fn(async () => {}),
   withEmbedding: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+  withBoundedEmbedding: vi.fn(async (_repoRoot: string, fn: () => Promise<unknown>) => fn()),
 }));
 
 vi.mock('../memory/storage/sqlite-knowledge/connection.js', () => ({
@@ -63,6 +64,21 @@ vi.mock('../memory/storage/sqlite-knowledge/connection.js', () => ({
     prepare: vi.fn(() => ({ get: vi.fn(() => ({ cnt: 5 })) })),
   })),
   closeKnowledgeDb: vi.fn(),
+  KNOWLEDGE_DB_PATH: 'knowledge.sqlite',
+}));
+
+vi.mock('../memory/storage/sqlite-knowledge/sync.js', () => ({
+  getChunkCount: vi.fn(() => 5),
+  upsertChunks: vi.fn(),
+  deleteChunksByFilePath: vi.fn(),
+  getIndexedFilePaths: vi.fn(() => []),
+  getChunkCountByFilePath: vi.fn(() => 0),
+  getLastIndexTime: vi.fn(() => null),
+  setLastIndexTime: vi.fn(),
+}));
+
+vi.mock('../memory/storage/sqlite-knowledge/search.js', () => ({
+  searchChunksKeywordScored: vi.fn(() => []),
 }));
 
 describe('knowledge command', () => {
@@ -180,7 +196,7 @@ describe('knowledge command', () => {
 
     await program.parseAsync(['node', 'ca', 'knowledge', 'test']);
 
-    const { withEmbedding } = await import('../memory/embeddings/index.js');
-    expect(withEmbedding).toHaveBeenCalled();
+    const { withBoundedEmbedding } = await import('../memory/embeddings/index.js');
+    expect(withBoundedEmbedding).toHaveBeenCalled();
   });
 });

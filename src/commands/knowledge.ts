@@ -8,9 +8,9 @@ import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { formatError } from '../cli-error-format.js';
-import { withEmbedding } from '../memory/embeddings/index.js';
+import { withBoundedEmbedding } from '../memory/embeddings/index.js';
 import { searchKnowledge } from '../memory/knowledge/index.js';
-import { openKnowledgeDb, closeKnowledgeDb, getChunkCount } from '../memory/storage/sqlite-knowledge/index.js';
+import { openKnowledgeDb, closeKnowledgeDb, getChunkCount, searchChunksKeywordScored } from '../memory/storage/sqlite-knowledge/index.js';
 import { getGlobalOpts, out } from './shared.js';
 
 const MAX_DISPLAY_TEXT = 200;
@@ -52,7 +52,15 @@ export function registerKnowledgeCommand(program: Command): void {
           }
         }
 
-        const results = await withEmbedding(async () => searchKnowledge(repoRoot, query, { limit }));
+        const results = await withBoundedEmbedding(
+          repoRoot,
+          async () => searchKnowledge(repoRoot, query, { limit }),
+          async () => {
+            // Keyword-only fallback when no embedding slot available
+            const kwResults = searchChunksKeywordScored(repoRoot, query, limit);
+            return kwResults.map((k) => ({ item: k.chunk, score: k.score }));
+          },
+        );
 
         if (results.length === 0) {
           out.info('No matching results found.');

@@ -93,4 +93,5 @@ describe('embeddings', () => {
       expect(typeof ctx.dispose).toBe('function');
     });
   });
+
 });

@@ -9,7 +9,7 @@ import type { Command } from 'commander';
 
 import { getRepoRoot, parseLimit } from '../cli-utils.js';
 import { isModelAvailable, loadSessionLessons, retrieveForPlan } from '../index.js';
-import { withEmbedding } from '../memory/embeddings/index.js';
+import { withBoundedEmbedding } from '../memory/embeddings/index.js';
 import { incrementRetrievalCount, readLessons, readMemoryItems, searchKeyword, searchKeywordScored, syncIfNeeded } from '../memory/storage/index.js';
 import type { MemoryItem } from '../memory/index.js';
 import { CANDIDATE_MULTIPLIER, MIN_HYBRID_SCORE, mergeHybridResults, rankLessons, searchVector } from '../memory/search/index.js';
@@ -157,26 +157,32 @@ async function searchAction(cmd: Command, query: string, options: { limit: strin
 
   await syncIfNeeded(repoRoot);
 
-  const results = await withEmbedding(async () => {
-    if (isModelAvailable()) {
-      try {
-        // Hybrid search: blend vector + keyword
-        const candidateLimit = limit * CANDIDATE_MULTIPLIER;
-        const [vectorResults, keywordResults] = await Promise.all([
-          searchVector(repoRoot, query, { limit: candidateLimit }),
-          searchKeywordScored(repoRoot, query, candidateLimit),
-        ]);
-        const merged = mergeHybridResults(vectorResults, keywordResults, { minScore: MIN_HYBRID_SCORE });
-        const ranked = rankLessons(merged);
-        return ranked.slice(0, limit).map((r) => r.lesson);
-      } catch {
-        // Model failed at runtime — fall back to keyword-only search
-        return await searchKeyword(repoRoot, query, limit);
+  const keywordFallback = () => searchKeyword(repoRoot, query, limit);
+
+  const results = await withBoundedEmbedding(
+    repoRoot,
+    async () => {
+      if (isModelAvailable()) {
+        try {
+          // Hybrid search: blend vector + keyword
+          const candidateLimit = limit * CANDIDATE_MULTIPLIER;
+          const [vectorResults, keywordResults] = await Promise.all([
+            searchVector(repoRoot, query, { limit: candidateLimit }),
+            searchKeywordScored(repoRoot, query, candidateLimit),
+          ]);
+          const merged = mergeHybridResults(vectorResults, keywordResults, { minScore: MIN_HYBRID_SCORE });
+          const ranked = rankLessons(merged);
+          return ranked.slice(0, limit).map((r) => r.lesson);
+        } catch {
+          // Model failed at runtime -- fall back to keyword-only search
+          return await searchKeyword(repoRoot, query, limit);
+        }
       }
-    }
-    // FTS-only fallback when embedding model unavailable
-    return await searchKeyword(repoRoot, query, limit);
-  });
+      // FTS-only fallback when embedding model unavailable
+      return await searchKeyword(repoRoot, query, limit);
+    },
+    keywordFallback,
+  );
 
   if (results.length > 0) {
     incrementRetrievalCount(repoRoot, results.map((lesson) => lesson.id));
@@ -334,7 +340,20 @@ async function checkPlanAction(cmd: Command, options: { plan?: string; json?: bo
   }
 
   try {
-    const result = await withEmbedding(async () => retrieveForPlan(repoRoot, planText, limit));
+    const result = await withBoundedEmbedding(
+      repoRoot,
+      async () => retrieveForPlan(repoRoot, planText, limit),
+      async () => {
+        // Keyword-only fallback when no embedding slot available
+        const keywordResults = searchKeywordScored(repoRoot, planText, limit * CANDIDATE_MULTIPLIER);
+        const ranked = rankLessons(mergeHybridResults([], keywordResults, { minScore: 0 }));
+        const topLessons = ranked.slice(0, limit);
+        if (topLessons.length > 0) {
+          incrementRetrievalCount(repoRoot, topLessons.map((item) => item.lesson.id));
+        }
+        return { lessons: topLessons, message: '' };
+      },
+    );
 
     if (options.json) {
       outputCheckPlanJson(result.lessons);

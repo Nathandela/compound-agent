@@ -19,6 +19,7 @@
 import type { FeatureExtractionPipeline } from '@huggingface/transformers';
 
 import { isModelAvailable, MODEL_URI } from './model-info.js';
+import { acquireSearchSlot } from './search-semaphore.js';
 
 /** Opaque handle to the loaded embedding pipeline. */
 export interface EmbeddingContext {
@@ -159,6 +160,33 @@ export async function withEmbedding<T>(fn: () => Promise<T>): Promise<T> {
     return await fn();
   } finally {
     await unloadEmbeddingResources();
+  }
+}
+
+/**
+ * Run a callback with bounded embedding resources.
+ *
+ * Acquires a cross-process semaphore slot before loading the embedding model.
+ * If no slot is available (too many concurrent loaders), calls the fallback
+ * instead (typically keyword-only search).
+ *
+ * @param repoRoot - Repository root for slot directory
+ * @param fn - Callback that uses embedding (runs inside withEmbedding)
+ * @param fallback - Callback when no slot available (e.g. keyword search)
+ */
+export async function withBoundedEmbedding<T>(
+  repoRoot: string,
+  fn: () => Promise<T>,
+  fallback: () => Promise<T>,
+): Promise<T> {
+  const slot = acquireSearchSlot(repoRoot);
+  if (!slot.acquired) {
+    return fallback();
+  }
+  try {
+    return await withEmbedding(fn);
+  } finally {
+    slot.release();
   }
 }
 
