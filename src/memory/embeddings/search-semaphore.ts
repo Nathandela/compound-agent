@@ -105,6 +105,9 @@ function tryClaimSlot(filePath: string): boolean {
       try { unlinkSync(filePath); } catch { /* already gone */ }
       try {
         writeFileSync(filePath, JSON.stringify(content), { flag: 'wx' });
+        // Verify we still own it (another process may have stolen it via TOCTOU)
+        const verify = readSlot(filePath);
+        if (!verify || verify.pid !== process.pid) return false;
         return true;
       } catch {
         // Another process won the race
@@ -118,6 +121,9 @@ function tryClaimSlot(filePath: string): boolean {
 
 function releaseSlot(filePath: string): void {
   try {
+    // Verify ownership before deleting (prevents releasing another process's slot)
+    const content = readSlot(filePath);
+    if (content && content.pid !== process.pid) return;
     unlinkSync(filePath);
   } catch {
     // Silently ignore -- slot may already be removed
