@@ -24,9 +24,8 @@ jobs:
           - runner: macos-latest
             target: aarch64-apple-darwin
             artifact: ca-embed-darwin-arm64
-          - runner: macos-13
-            target: x86_64-apple-darwin
-            artifact: ca-embed-darwin-amd64
+          # x86_64 macOS: no native runner available, ort-sys can't cross-compile.
+          # Intel Mac users run the arm64 binary via Rosetta.
     steps:
       - uses: actions/checkout@v4
 
@@ -91,9 +90,15 @@ jobs:
       - name: Download release binaries
         run: |
           mkdir -p release-bins
+          # Go CLI binary: all 4 platforms (cross-compiled by GoReleaser)
           for P in darwin-amd64 darwin-arm64 linux-amd64 linux-arm64; do
             gh release download "${GITHUB_REF_NAME}" \
               --pattern "ca-${P}" \
+              --dir release-bins
+          done
+          # Rust embed daemon: 3 platforms (no x86_64 macOS — Intel uses Rosetta)
+          for P in darwin-arm64 linux-amd64 linux-arm64; do
+            gh release download "${GITHUB_REF_NAME}" \
               --pattern "ca-embed-${P}" \
               --dir release-bins
           done

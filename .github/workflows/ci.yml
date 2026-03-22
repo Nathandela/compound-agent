@@ -118,9 +118,8 @@ jobs:
           - runner: macos-latest
             target: aarch64-apple-darwin
             artifact: ca-embed-darwin-arm64
-          - runner: macos-13
-            target: x86_64-apple-darwin
-            artifact: ca-embed-darwin-amd64
+          # x86_64 macOS: no native runner available, ort-sys can't cross-compile.
+          # Intel Mac users run the arm64 embed binary via Rosetta.
     steps:
       - uses: actions/checkout@v4
 

@@ -20,11 +20,13 @@ const { execFileSync } = require("child_process");
 
 // Maps npm platform names to GoReleaser artifact names.
 // npm uses "x64", GoReleaser uses "amd64".
+// embedGoreleaser: which embed binary to ship. darwin-x64 uses the arm64
+// embed binary (runs via Rosetta) because ort-sys has no x86_64 macOS build.
 const PLATFORMS = [
-  { npm: "darwin-arm64", goreleaser: "darwin-arm64", os: "darwin", cpu: "arm64" },
-  { npm: "darwin-x64",   goreleaser: "darwin-amd64", os: "darwin", cpu: "x64" },
-  { npm: "linux-arm64",  goreleaser: "linux-arm64",  os: "linux",  cpu: "arm64" },
-  { npm: "linux-x64",    goreleaser: "linux-amd64",  os: "linux",  cpu: "x64" },
+  { npm: "darwin-arm64", goreleaser: "darwin-arm64", embedGoreleaser: "darwin-arm64", os: "darwin", cpu: "arm64" },
+  { npm: "darwin-x64",   goreleaser: "darwin-amd64", embedGoreleaser: "darwin-arm64", os: "darwin", cpu: "x64" },
+  { npm: "linux-arm64",  goreleaser: "linux-arm64",  embedGoreleaser: "linux-arm64",  os: "linux",  cpu: "arm64" },
+  { npm: "linux-x64",    goreleaser: "linux-amd64",  embedGoreleaser: "linux-amd64",  os: "linux",  cpu: "x64" },
 ];
 
 function main() {
@@ -48,7 +50,7 @@ function main() {
 
       // Copy and rename binaries
       const caSrc = path.join(binDir, `ca-${platform.goreleaser}`);
-      const embedSrc = path.join(binDir, `ca-embed-${platform.goreleaser}`);
+      const embedSrc = path.join(binDir, `ca-embed-${platform.embedGoreleaser}`);
 
       if (!fs.existsSync(caSrc)) {
         console.error(`[publish-platforms] Missing: ${caSrc}`);

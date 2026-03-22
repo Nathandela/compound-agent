@@ -189,7 +189,9 @@ async function main() {
 
     // Download both binaries in parallel (to .tmp names)
     const caArtifact = `ca-${platformKey}`;
-    const embedArtifact = `ca-embed-${platformKey}`;
+    // No x86_64 macOS embed build (ort-sys limitation) — use arm64 via Rosetta
+    const embedKey = platformKey === "darwin-amd64" ? "darwin-arm64" : platformKey;
+    const embedArtifact = `ca-embed-${embedKey}`;
 
     await Promise.all([
       downloadBinary(binDir, `${baseUrl}/${caArtifact}`, "ca-binary", "CLI binary"),
