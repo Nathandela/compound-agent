@@ -4,7 +4,7 @@
 
 [![npm version](https://img.shields.io/npm/v/compound-agent)](https://www.npmjs.com/package/compound-agent)
 [![license](https://img.shields.io/npm/l/compound-agent)](LICENSE)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.3+-blue)](https://www.typescriptlang.org/)
+[![Go](https://img.shields.io/badge/Go-1.24+-00ADD8)](https://go.dev/)
 
 <p align="center">
   <img src="docs/assets/diagram-4.png" alt="Compound-agent ecosystem overview: Architect phase decomposes work via Socratic dialogue into a dependency graph. ca loop chains tasks with cross-model review, retry, and fresh sessions. Scenario evaluation validates changes with iterative refinement. All backed by persistent memory (lessons + knowledge across all sessions) and verification gates (tests, lint, type checks on every task)." width="700">
@@ -342,11 +342,14 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca setup` | One-shot setup (hooks + templates) |
 | `ca setup --skip-hooks` | Setup without installing hooks |
 | `ca setup --json` | Output result as JSON |
-| `ca setup --repo-root <path>` | Specify repository root |
 | `ca setup claude` | Install Claude Code hooks only |
 | `ca setup claude --status` | Check Claude Code integration health |
 | `ca setup claude --uninstall` | Remove Claude hooks only |
+| `ca setup claude --dry-run` | Preview what would change without writing |
 | `ca init` | Initialize compound-agent in current repo |
+| `ca init --skip-agents` | Skip AGENTS.md and template installation |
+| `ca init --skip-claude` | Skip Claude Code hooks installation |
+| `ca download-model --json` | Download embedding model with JSON output |
 | `ca about` | Show version, animation, and recent changelog |
 | `ca doctor` | Verify external dependencies and project health |
 
@@ -394,32 +397,23 @@ A: The loop works and has been used to ship real projects, including compound-ag
 ## Development
 
 ```bash
-pnpm install          # Install dependencies
-pnpm build            # Build with tsup
-pnpm dev              # Watch mode (rebuild on changes)
-pnpm lint             # Type check + ESLint
+cd go && go build -tags sqlite_fts5 ./cmd/ca   # Build CLI binary
+cd go && go test -tags sqlite_fts5 ./...        # Full test suite
+cd go && go vet -tags sqlite_fts5 ./...         # Static analysis
 ```
-
-| Script | Duration | Use Case |
-|--------|----------|----------|
-| `pnpm test:fast` | ~12s | Rapid feedback during development |
-| `pnpm test` | ~60s | Full suite before committing |
-| `pnpm test:changed` | varies | Only tests affected by recent changes |
-| `pnpm test:watch` | - | Watch mode for TDD workflow |
-| `pnpm test:all` | ~60s | Full suite with model download |
 
 ## Technology Stack
 
 | Component | Technology |
 |-----------|------------|
-| Language | TypeScript (ESM) |
-| Package Manager | pnpm |
-| Build | tsup |
-| Testing | Vitest + fast-check (property tests) |
-| Storage | better-sqlite3 + FTS5 |
-| Embeddings | @huggingface/transformers + nomic-embed-text-v1.5 (Q8 ONNX) |
-| CLI | Commander.js |
-| Schema | Zod |
+| Language | Go |
+| Package Manager | Go modules (+ pnpm for npm wrapper) |
+| Build | go build with CGO + sqlite_fts5 tag |
+| Testing | go test + table-driven tests |
+| Storage | mattn/go-sqlite3 + FTS5 |
+| Embeddings | ca-embed (Rust daemon via IPC) |
+| CLI | Cobra |
+| Release | GoReleaser |
 | Issue Tracking | Beads (bd) |
 
 ## Documentation

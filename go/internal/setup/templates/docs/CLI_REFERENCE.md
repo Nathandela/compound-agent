@@ -88,8 +88,11 @@ ca setup --uninstall       # Remove compound-agent integration
 ca setup --status          # Show installation status
 ca setup claude            # Install Claude Code hooks only
 ca setup claude --status   # Check hook status
-ca hooks                   # Install git hooks
+ca setup claude --dry-run  # Preview changes without writing
+ca setup claude --global   # Use global ~/.claude/ settings
+ca setup claude --uninstall # Remove compound-agent hooks
 ca download-model          # Download embedding model (~23MB)
+ca download-model --json   # Output result as JSON
 ```
 
 ## Reviewer commands

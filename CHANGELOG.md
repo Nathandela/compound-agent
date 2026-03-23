@@ -7,6 +7,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-03-23
+
+### Added
+
+- **CLI flag parity with TypeScript**: Ported 5 missing flags from the former TS CLI to the Go implementation for full migration parity:
+  - `--quiet` / `-q` global flag — suppresses non-essential `[ok]`/status output in `init` and `setup`
+  - `init --skip-agents` — skips template installation (AGENTS.md, skills, commands, docs)
+  - `init --skip-claude` — skips Claude Code hooks installation (alias for `--skip-hooks`)
+  - `setup claude --dry-run` — previews what would be installed/upgraded/reconciled without writing
+  - `download-model --json` — outputs download result as JSON
+- **Stack-aware quality gates**: `ca setup` now detects the project stack (Go, Rust, Python, Node, Make) and substitutes `{{QUALITY_GATE_TEST}}` / `{{QUALITY_GATE_LINT}}` placeholders in skill and doc templates with the correct commands. Non-JS codebases no longer see hardcoded `pnpm test` / `pnpm lint`.
+
+### Changed
+
+- **Refactored `main.go`**: Extracted `buildHooksCmd()` helper from `main()` to stay within 50-line function limit.
+- **Refactored `commands_setup.go`**: Extracted `setupClaudeOpts` struct and `runSetupClaude()` function from the `registerSetupClaudeCmd` inline closure.
+- **Refactored `commands_advanced.go`**: Extracted `printDownloadModelResult()` helper from `downloadModelCmd`.
+
 ## [2.1.2] - 2026-03-23
 
 ### Fixed
