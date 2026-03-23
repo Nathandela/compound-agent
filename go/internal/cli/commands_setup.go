@@ -52,6 +52,7 @@ func initCmd() *cobra.Command {
 					"roleSkillsUpdated":   result.RoleSkillsUpdated,
 					"docsInstalled":       result.DocsInstalled,
 					"docsUpdated":         result.DocsUpdated,
+					"templatesPruned":     result.TemplatesPruned,
 				})
 				cmd.Println(string(data))
 			} else {
@@ -128,6 +129,7 @@ func setupCmd() *cobra.Command {
 				"roleSkillsUpdated":   result.RoleSkillsUpdated,
 				"docsInstalled":       result.DocsInstalled,
 				"docsUpdated":         result.DocsUpdated,
+				"templatesPruned":     result.TemplatesPruned,
 			})
 			cmd.Println(string(data))
 		} else {
@@ -341,6 +343,9 @@ func printTemplatesSummary(cmd *cobra.Command, result *setup.InitResult) {
 		cmd.Printf("  Templates: %d updated (agents:%d commands:%d skills:%d roles:%d docs:%d)\n",
 			totalUpdated, result.AgentsUpdated, result.CommandsUpdated,
 			result.SkillsUpdated, result.RoleSkillsUpdated, result.DocsUpdated)
+	}
+	if result.TemplatesPruned > 0 {
+		cmd.Printf("  Templates: %d retired files removed\n", result.TemplatesPruned)
 	}
 }
 

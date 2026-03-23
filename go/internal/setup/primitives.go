@@ -256,6 +256,106 @@ func CreatePluginManifest(repoRoot string, version string) (bool, bool, error) {
 	return false, true, os.WriteFile(pluginPath, []byte(content), 0644)
 }
 
+// PruneStaleTemplates removes managed files and directories that no longer
+// exist in the current template set. Only touches compound/ namespaces.
+// Returns count of items removed.
+func PruneStaleTemplates(repoRoot string) (int, error) {
+	pruned := 0
+
+	// Flat directories: prune files not in current template set
+	flatDirs := []struct {
+		dir      string
+		expected map[string]string
+	}{
+		{filepath.Join(repoRoot, ".claude", "agents", "compound"), templates.AgentTemplates()},
+		{filepath.Join(repoRoot, ".claude", "commands", "compound"), templates.CommandTemplates()},
+		{filepath.Join(repoRoot, "docs", "compound"), templates.DocTemplates()},
+	}
+	for _, fd := range flatDirs {
+		n, err := pruneStaleFiles(fd.dir, fd.expected)
+		if err != nil {
+			return pruned, err
+		}
+		pruned += n
+	}
+
+	// Phase skills: prune stale phase directories (skip "agents/" subdir)
+	skillsDir := filepath.Join(repoRoot, ".claude", "skills", "compound")
+	n, err := pruneStaleSubdirs(skillsDir, templates.PhaseSkills(), []string{"agents"})
+	if err != nil {
+		return pruned, err
+	}
+	pruned += n
+
+	// Agent role skills: prune stale role directories
+	rolesDir := filepath.Join(repoRoot, ".claude", "skills", "compound", "agents")
+	n, err = pruneStaleSubdirs(rolesDir, templates.AgentRoleSkills(), nil)
+	if err != nil {
+		return pruned, err
+	}
+	pruned += n
+
+	return pruned, nil
+}
+
+// pruneStaleFiles removes files from dir that are not in the expected map (by filename key).
+// Skips subdirectories. Returns count of files removed.
+func pruneStaleFiles(dir string, expected map[string]string) (int, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("read %s: %w", dir, err)
+	}
+	pruned := 0
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if _, ok := expected[entry.Name()]; !ok {
+			if rErr := os.Remove(filepath.Join(dir, entry.Name())); rErr != nil {
+				return pruned, fmt.Errorf("remove %s: %w", entry.Name(), rErr)
+			}
+			pruned++
+		}
+	}
+	return pruned, nil
+}
+
+// pruneStaleSubdirs removes subdirectories from dir that are not in the expected map (by key).
+// skip contains directory names to always preserve (e.g., "agents" within skills/compound/).
+// Returns count of directories removed.
+func pruneStaleSubdirs(dir string, expected map[string]string, skip []string) (int, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("read %s: %w", dir, err)
+	}
+	skipSet := make(map[string]bool, len(skip))
+	for _, s := range skip {
+		skipSet[s] = true
+	}
+	pruned := 0
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		if skipSet[entry.Name()] {
+			continue
+		}
+		if _, ok := expected[entry.Name()]; !ok {
+			if rErr := os.RemoveAll(filepath.Join(dir, entry.Name())); rErr != nil {
+				return pruned, fmt.Errorf("remove %s: %w", entry.Name(), rErr)
+			}
+			pruned++
+		}
+	}
+	return pruned, nil
+}
+
 // installMapToDir writes files from a map to a directory.
 // Creates missing files and updates existing files whose content has changed.
 // Returns (created count, updated count, error).

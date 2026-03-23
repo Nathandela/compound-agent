@@ -33,6 +33,7 @@ type InitResult struct {
 	RoleSkillsUpdated   int
 	DocsInstalled       int
 	DocsUpdated         int
+	TemplatesPruned     int
 	AgentsMdUpdated     bool
 	ClaudeMdUpdated     bool
 	PluginCreated       bool
@@ -164,6 +165,13 @@ func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
 		}
 		result.DocsInstalled = n
 		result.DocsUpdated = u
+
+		// Prune retired templates from managed directories
+		pruned, err := PruneStaleTemplates(repoRoot)
+		if err != nil {
+			return nil, fmt.Errorf("prune stale templates: %w", err)
+		}
+		result.TemplatesPruned = pruned
 	}
 
 	return result, nil

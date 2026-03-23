@@ -558,6 +558,152 @@ func TestInstallDocTemplates_VersionChangeUpdates(t *testing.T) {
 	}
 }
 
+func TestPruneStaleTemplates_RemovesExtraFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install all templates first
+	if _, _, err := InstallAgentTemplates(dir); err != nil {
+		t.Fatalf("InstallAgentTemplates: %v", err)
+	}
+	if _, _, err := InstallWorkflowCommands(dir); err != nil {
+		t.Fatalf("InstallWorkflowCommands: %v", err)
+	}
+
+	// Add extra files to managed directories (simulating retired templates)
+	agentsDir := filepath.Join(dir, ".claude", "agents", "compound")
+	if err := os.WriteFile(filepath.Join(agentsDir, "retired-agent.md"), []byte("# old\n"), 0644); err != nil {
+		t.Fatalf("write retired agent: %v", err)
+	}
+	cmdsDir := filepath.Join(dir, ".claude", "commands", "compound")
+	if err := os.WriteFile(filepath.Join(cmdsDir, "retired-command.md"), []byte("# old\n"), 0644); err != nil {
+		t.Fatalf("write retired command: %v", err)
+	}
+
+	pruned, err := PruneStaleTemplates(dir)
+	if err != nil {
+		t.Fatalf("PruneStaleTemplates: %v", err)
+	}
+	if pruned < 2 {
+		t.Errorf("expected at least 2 pruned, got %d", pruned)
+	}
+
+	// Verify retired files are gone
+	if _, err := os.Stat(filepath.Join(agentsDir, "retired-agent.md")); !os.IsNotExist(err) {
+		t.Error("retired-agent.md should be removed")
+	}
+	if _, err := os.Stat(filepath.Join(cmdsDir, "retired-command.md")); !os.IsNotExist(err) {
+		t.Error("retired-command.md should be removed")
+	}
+}
+
+func TestPruneStaleTemplates_PreservesCurrentFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install all templates
+	if _, _, err := InstallAgentTemplates(dir); err != nil {
+		t.Fatalf("InstallAgentTemplates: %v", err)
+	}
+
+	// Count files before prune
+	agentsDir := filepath.Join(dir, ".claude", "agents", "compound")
+	before, err := os.ReadDir(agentsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+
+	// Prune with no extras should remove nothing
+	pruned, err := PruneStaleTemplates(dir)
+	if err != nil {
+		t.Fatalf("PruneStaleTemplates: %v", err)
+	}
+	if pruned != 0 {
+		t.Errorf("expected 0 pruned when no stale files, got %d", pruned)
+	}
+
+	// Verify file count unchanged
+	after, err := os.ReadDir(agentsDir)
+	if err != nil {
+		t.Fatalf("ReadDir after: %v", err)
+	}
+	if len(after) != len(before) {
+		t.Errorf("file count changed: %d -> %d", len(before), len(after))
+	}
+}
+
+func TestPruneStaleTemplates_RemovesStaleSkillDirs(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install phase skills
+	if _, _, err := InstallPhaseSkills(dir); err != nil {
+		t.Fatalf("InstallPhaseSkills: %v", err)
+	}
+
+	// Add a retired phase directory
+	stalePhase := filepath.Join(dir, ".claude", "skills", "compound", "retired-phase")
+	if err := os.MkdirAll(stalePhase, 0755); err != nil {
+		t.Fatalf("mkdir retired-phase: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(stalePhase, "SKILL.md"), []byte("# old\n"), 0644); err != nil {
+		t.Fatalf("write retired SKILL.md: %v", err)
+	}
+
+	pruned, err := PruneStaleTemplates(dir)
+	if err != nil {
+		t.Fatalf("PruneStaleTemplates: %v", err)
+	}
+	if pruned == 0 {
+		t.Error("expected at least 1 pruned (retired phase dir)")
+	}
+
+	// Verify retired dir is gone
+	if _, err := os.Stat(stalePhase); !os.IsNotExist(err) {
+		t.Error("retired-phase directory should be removed")
+	}
+}
+
+func TestPruneStaleTemplates_RemovesStaleRoleDirs(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install role skills
+	if _, _, err := InstallAgentRoleSkills(dir); err != nil {
+		t.Fatalf("InstallAgentRoleSkills: %v", err)
+	}
+
+	// Add a retired role directory
+	staleRole := filepath.Join(dir, ".claude", "skills", "compound", "agents", "retired-role")
+	if err := os.MkdirAll(staleRole, 0755); err != nil {
+		t.Fatalf("mkdir retired-role: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(staleRole, "SKILL.md"), []byte("# old\n"), 0644); err != nil {
+		t.Fatalf("write retired SKILL.md: %v", err)
+	}
+
+	pruned, err := PruneStaleTemplates(dir)
+	if err != nil {
+		t.Fatalf("PruneStaleTemplates: %v", err)
+	}
+	if pruned == 0 {
+		t.Error("expected at least 1 pruned (retired role dir)")
+	}
+
+	if _, err := os.Stat(staleRole); !os.IsNotExist(err) {
+		t.Error("retired-role directory should be removed")
+	}
+}
+
+func TestPruneStaleTemplates_NonExistentDirs(t *testing.T) {
+	dir := t.TempDir()
+
+	// Prune on a repo with no managed dirs should succeed with 0
+	pruned, err := PruneStaleTemplates(dir)
+	if err != nil {
+		t.Fatalf("PruneStaleTemplates: %v", err)
+	}
+	if pruned != 0 {
+		t.Errorf("expected 0 pruned, got %d", pruned)
+	}
+}
+
 func TestCreatePluginManifest_UpdatesStaleVersion(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0755); err != nil {

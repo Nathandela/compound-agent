@@ -374,6 +374,49 @@ func TestInitRepo_UpdatesStaleTemplates(t *testing.T) {
 	}
 }
 
+func TestInitRepo_PrunesStaleTemplates(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+
+	// First install
+	_, err := InitRepo(dir, InitOptions{SkipHooks: true})
+	if err != nil {
+		t.Fatalf("first InitRepo: %v", err)
+	}
+
+	// Add retired files to managed directories
+	agentsDir := filepath.Join(dir, ".claude", "agents", "compound")
+	if err := os.WriteFile(filepath.Join(agentsDir, "retired-agent.md"), []byte("# old\n"), 0644); err != nil {
+		t.Fatalf("write retired: %v", err)
+	}
+	staleRole := filepath.Join(dir, ".claude", "skills", "compound", "agents", "retired-role")
+	if err := os.MkdirAll(staleRole, 0755); err != nil {
+		t.Fatalf("mkdir retired-role: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(staleRole, "SKILL.md"), []byte("# old\n"), 0644); err != nil {
+		t.Fatalf("write retired SKILL.md: %v", err)
+	}
+
+	// Re-init should prune stale files
+	result, err := InitRepo(dir, InitOptions{SkipHooks: true})
+	if err != nil {
+		t.Fatalf("second InitRepo: %v", err)
+	}
+	if result.TemplatesPruned == 0 {
+		t.Error("expected TemplatesPruned > 0")
+	}
+
+	// Verify retired files are gone
+	if _, err := os.Stat(filepath.Join(agentsDir, "retired-agent.md")); !os.IsNotExist(err) {
+		t.Error("retired-agent.md should be removed")
+	}
+	if _, err := os.Stat(staleRole); !os.IsNotExist(err) {
+		t.Error("retired-role directory should be removed")
+	}
+}
+
 func TestInitRepo_DirsCreatedAccurate(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
