@@ -7,6 +7,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.0] - 2026-03-23
+
+### Added
+
+- **Structured logging via `log/slog`**: Replaced all ad-hoc `fmt.Fprintf(os.Stderr, ...)` calls in production code with structured `slog` calls (Error/Warn/Debug levels). No external dependencies — uses Go stdlib only.
+- **`--verbose` / `-v` global flag**: New persistent flag on the root command enables debug-level JSON logging to stderr. Default level is Warn (silent in normal operation).
+- **Dependabot configuration**: Added `.github/dependabot.yml` for automated weekly dependency update PRs targeting Go modules (`/go`) and Cargo (`/rust/embed-daemon`).
+
+### Changed
+
+- **AGENTS.md rewritten for Go**: Complete rewrite of AGENTS.md to reflect the Go-based architecture. Removed all stale TypeScript/pnpm/vitest/Commander.js references. Now accurately documents Cobra CLI commands, `go/internal/` package layout, Go conventions, and build/test commands.
+
+### Fixed
+
+- **CI lint pipeline**: Upgraded golangci-lint to v2.11.4 (Go 1.26 support), migrated `.golangci.yml` from v1 to v2 format, resolved all 313 pre-existing lint violations across 72 files. All refactoring is purely structural — no behavior changes.
+- **Stale `npx ca` references in runtime strings**: Replaced `npx ca` with `ca` in user-facing hook messages (pre-commit reminder, correction/planning reminders, failure tips) and AI context strings (`ca prime` trust language, loop prompt builder).
+- **Setup upgrade reconciliation**: `ca setup` now reconciles existing managed files during upgrades, prunes retired templates and nested phase reference files from managed `compound/` directories.
+- **GoReleaser config**: Fixed deprecated `.goreleaser.yml` fields (`format` → `formats`, `builds` → `ids`).
+- **Duplicate function**: Removed duplicate `countOldLessons` definition in `commands_scripts.go`.
+
 ## [2.0.3] - 2026-03-22
 
 ### Fixed
