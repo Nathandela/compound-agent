@@ -59,6 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Managed repo artifact upgrades**: `ca setup` now reconciles existing managed compound-agent files during upgrades instead of only creating missing files, so already-initialized repos receive updated templates and metadata.
+- **Retired managed template cleanup**: Setup upgrades now remove stale files and directories that are no longer shipped from managed `compound/` directories under `.claude/commands/`, `.claude/skills/`, `.claude/agents/`, and `docs/`.
+- **Nested phase reference cleanup**: Setup upgrades now prune retired nested files and directories inside phase skill `references/` trees, preventing removed or renamed reference docs from lingering after reruns.
 - **Embedding memory pressure remediation**: Lazy-load native modules (@huggingface/transformers (onnxruntime-node), better-sqlite3) behind dynamic `import()`, reducing CLI cold-start RSS. Singleton embedding model uses explicit `dispose()`. Added RSS measurement script and integration tests for memory lifecycle.
 - **Review phase resilience**: Fixed jq stdin pipe handling, added auth health checks, and improved error isolation in loop review templates.
 - **Quality-filter-before-storage test ordering**: Resolved flaky test ordering in compound skill tests.
