@@ -244,7 +244,7 @@ pnpm add -D ../compound_agent
 
 # Usage via package.json scripts or npx
 pnpm learn "Use Polars not pandas"
-npx ca search "data processing"
+ca search "data processing"
 ```
 
 The package installs a CLI (`ca` / `learn`) that:

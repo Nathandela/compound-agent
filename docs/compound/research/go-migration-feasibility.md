@@ -12,7 +12,7 @@ This document assesses whether migrating Compound Agent from TypeScript/Node.js 
 
 ## 1. Current Performance Profile
 
-Measured: `time npx ca search "error handling"` → **4.39s wall, 2.8s user, 0.9s sys**
+Measured: `time ca search "error handling"` → **4.39s wall, 2.8s user, 0.9s sys**
 
 ### Cost Breakdown (per invocation)
 

@@ -12,7 +12,7 @@ Analyze the current session's work context: what was accomplished, what problems
 1. Run git diff and git log to review recent changes
 2. Check test results and test output for failures or regressions
 3. Review plan context to understand what was intended
-4. Use `npx ca search` to check existing knowledge for relevant context
+4. Use `ca search` to check existing knowledge for relevant context
 5. Identify problems encountered and how they were solved
 6. Note any user corrections or redirections
 7. Summarize the work context for lesson extraction
@@ -20,7 +20,7 @@ Analyze the current session's work context: what was accomplished, what problems
 
 ## Literature
 - Consult `docs/compound/research/learning-systems/` for knowledge compounding theory and context analysis methodology
-- Run `npx ca knowledge "context analysis work review"` for indexed knowledge
+- Run `ca knowledge "context analysis work review"` for indexed knowledge
 
 ## Collaboration
 Share findings with lesson-extractor via direct message so it can extract actionable lessons from the context. Pass results to other compound agents as needed.

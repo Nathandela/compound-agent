@@ -26,7 +26,7 @@ invariant-designer -> **CCT Subagent** -> test-first-enforcer
 ## Literature
 - Consult `docs/compound/research/tdd/` for corrective testing theory and mistake-driven test design
 - Consult `docs/compound/research/learning-systems/` for pattern clustering and knowledge synthesis methodology
-- Run `npx ca knowledge "corrective testing patterns"` for indexed knowledge
+- Run `ca knowledge "corrective testing patterns"` for indexed knowledge
 
 ## Deployment
 Subagent in the TDD pipeline. Return findings directly to the caller.

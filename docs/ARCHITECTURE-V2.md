@@ -340,16 +340,16 @@ Skills can reference each other and can be project-specific or shared.
 ```json
 {
   "hooks": {
-    "SessionStart": [{ "type": "command", "command": "npx ca prime" }],
-    "PreCompact": [{ "type": "command", "command": "npx ca prime" }],
-    "UserPromptSubmit": [{ "type": "command", "command": "npx ca hooks run user-prompt" }],
-    "PostToolUseFailure": [{ "type": "command", "command": "npx ca hooks run post-tool-failure" }],
+    "SessionStart": [{ "type": "command", "command": "ca prime" }],
+    "PreCompact": [{ "type": "command", "command": "ca prime" }],
+    "UserPromptSubmit": [{ "type": "command", "command": "ca hooks run user-prompt" }],
+    "PostToolUseFailure": [{ "type": "command", "command": "ca hooks run post-tool-failure" }],
     "PostToolUse": [
-      { "type": "command", "command": "npx ca hooks run post-tool-success" },
-      { "type": "command", "command": "npx ca hooks run read-tracker" }
+      { "type": "command", "command": "ca hooks run post-tool-success" },
+      { "type": "command", "command": "ca hooks run read-tracker" }
     ],
-    "PreToolUse": [{ "type": "command", "command": "npx ca hooks run phase-guard" }],
-    "Stop": [{ "type": "command", "command": "npx ca hooks run stop-audit" }]
+    "PreToolUse": [{ "type": "command", "command": "ca hooks run phase-guard" }],
+    "Stop": [{ "type": "command", "command": "ca hooks run stop-audit" }]
   }
 }
 ```

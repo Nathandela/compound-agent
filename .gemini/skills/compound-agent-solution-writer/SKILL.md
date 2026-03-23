@@ -19,11 +19,11 @@ Transform approved lessons into properly formatted memory items that follow the 
    - Is it specific? (not vague advice)
 4. Assign severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
 5. Set supersedes or related links when the lesson updates existing knowledge
-6. Store via `npx ca learn`
+6. Store via `ca learn`
 
 ## Literature
 - Consult `docs/compound/research/learning-systems/` for knowledge representation and lesson schema design
-- Run `npx ca knowledge "knowledge storage representation"` for indexed knowledge
+- Run `ca knowledge "knowledge storage representation"` for indexed knowledge
 
 ## Collaboration
 Share findings with other agents via direct message to communicate storage outcomes. Collaborate with pattern-matcher on borderline classifications.

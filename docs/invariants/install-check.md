@@ -268,7 +268,7 @@ assertValidInstall(); // Dies here if invalid
 **Rationale**: Hooks fail early with clear error if invalid install
 
 ### src/commands/setup/templates.ts (COMPOUND_AGENT_HOOK_BLOCK)
-**Invariant**: Hook template uses `npx ca hooks run pre-commit`
+**Invariant**: Hook template uses `ca hooks run pre-commit`
 **Rationale**: npx resolves to installed package, which includes install check
 
 ### package.json bin field

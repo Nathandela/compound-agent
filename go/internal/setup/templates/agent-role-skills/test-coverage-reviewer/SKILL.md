@@ -21,7 +21,7 @@ Review tests for meaningful assertions, edge case coverage, and absence of cargo
 ## Literature
 - Consult `docs/compound/research/tdd/` for test quality assessment and coverage methodology
 - Consult `docs/compound/research/property-testing/` for property-based testing theory
-- Run `npx ca knowledge "test coverage quality"` for indexed knowledge
+- Run `ca knowledge "test coverage quality"` for indexed knowledge
 
 ## Collaboration
 Share cross-cutting findings via SendMessage: cargo-cult tests hiding security issues go to security-reviewer; unnecessary test complexity goes to simplicity-reviewer.

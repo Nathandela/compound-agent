@@ -10,7 +10,7 @@ Cluster similar lessons from memory and synthesize them into testable CCT (Compo
 
 ## Instructions
 1. Read existing lessons from `.claude/lessons/index.jsonl`
-2. Use `npx ca search` with broad queries to find related items
+2. Use `ca search` with broad queries to find related items
 3. Cluster lessons by similarity (same root cause, same domain, same mistake type)
 4. For each cluster with 2+ items, synthesize a CCT pattern:
    - Pattern name and trigger condition
@@ -22,7 +22,7 @@ Cluster similar lessons from memory and synthesize them into testable CCT (Compo
 
 ## Literature
 - Consult `docs/compound/research/learning-systems/` for knowledge compounding theory and pattern synthesis
-- Run `npx ca knowledge "lesson clustering compounding"` for indexed knowledge on learning systems
+- Run `ca knowledge "lesson clustering compounding"` for indexed knowledge on learning systems
 
 ## Collaboration
 Share synthesized patterns with the team lead via direct message for review.

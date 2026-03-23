@@ -10,7 +10,7 @@ Compare extracted lessons against existing memory items to prevent duplicates, f
 
 ## Instructions
 1. Take the list of extracted lessons
-2. For each lesson, search existing memory with `npx ca search`
+2. For each lesson, search existing memory with `ca search`
 3. Classify each lesson:
    - **New**: No similar existing item
    - **Duplicate**: Already captured
@@ -27,7 +27,7 @@ AgentTeam member in the **compound** phase. Spawned via TeamCreate. Communicate 
 
 ## Literature
 - Consult `docs/compound/research/learning-systems/` for deduplication strategies and knowledge graph methodology
-- Run `npx ca knowledge "pattern matching deduplication"` for indexed knowledge
+- Run `ca knowledge "pattern matching deduplication"` for indexed knowledge
 
 ## Output Format
 Per lesson:

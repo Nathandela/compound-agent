@@ -37,7 +37,7 @@ Mandatory core-4 reviewer responsible for identifying security vulnerabilities u
 - Consult `docs/compound/research/security/data-exposure.md` for data leak detection
 - Consult `docs/compound/research/security/dependency-security.md` for dependency risk assessment
 - Consult `docs/compound/research/security/secure-coding-failure.md` for full theoretical foundation
-- Run `npx ca knowledge "security review OWASP"` for indexed security knowledge
+- Run `ca knowledge "security review OWASP"` for indexed security knowledge
 
 ## Collaboration
 Share cross-cutting findings via SendMessage: security issues impacting architecture go to architecture-reviewer; secrets in test fixtures go to test-coverage-reviewer. Escalate to specialist skills via SendMessage when deep analysis needed.

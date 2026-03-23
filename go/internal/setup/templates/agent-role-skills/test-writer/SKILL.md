@@ -23,10 +23,10 @@ Write comprehensive failing tests that define expected behavior before any imple
 
 ## Literature
 - Consult `docs/compound/research/tdd/` for test-first development evidence and methodology
-- Run `npx ca knowledge "TDD test design"` for indexed knowledge on testing patterns
+- Run `ca knowledge "TDD test design"` for indexed knowledge on testing patterns
 
 ## Memory Integration
-Run `npx ca search` with the task description before writing tests. Look for known patterns, edge cases, and past mistakes relevant to the feature area.
+Run `ca search` with the task description before writing tests. Look for known patterns, edge cases, and past mistakes relevant to the feature area.
 
 ## Collaboration
 Communicate with the implementer via direct message when tests are ready for implementation.

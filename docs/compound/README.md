@@ -29,13 +29,13 @@ Memory items have four types: `lesson`, `solution`, `pattern`, and `preference`.
 
 ```bash
 # Initialize in your project:
-npx ca init
+ca init
 
 # Full setup:
-npx ca setup
+ca setup
 
 # Verify installation:
-npx ca doctor
+ca doctor
 ```
 
 ### What `init` does
@@ -58,7 +58,7 @@ npx ca doctor
 ```
 .claude/
   CLAUDE.md                    # Project instructions (always loaded)
-  compound-agent.json          # Config (created by `npx ca reviewer enable`)
+  compound-agent.json          # Config (created by `ca reviewer enable`)
   settings.json                # Claude Code hooks
   plugin.json                  # Plugin manifest
   agents/compound/             # Subagent definitions
@@ -78,13 +78,13 @@ docs/compound/
 
 | Task | Command |
 |------|---------|
-| Capture a lesson | `npx ca learn "insight" --trigger "what happened"` |
-| Search memory | `npx ca search "keywords"` |
-| Search docs knowledge | `npx ca knowledge "query"` |
-| Check plan against memory | `npx ca check-plan --plan "description"` |
-| View stats | `npx ca stats` |
+| Capture a lesson | `ca learn "insight" --trigger "what happened"` |
+| Search memory | `ca search "keywords"` |
+| Search docs knowledge | `ca knowledge "query"` |
+| Check plan against memory | `ca check-plan --plan "description"` |
+| View stats | `ca stats` |
 | Run full workflow | `/compound:cook-it <epic-id>` |
-| Health check | `npx ca doctor` |
+| Health check | `ca doctor` |
 
 ---
 

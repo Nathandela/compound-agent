@@ -10,7 +10,7 @@ Conduct deep research on a topic and produce a structured survey document follow
 
 ## Methodology
 1. Identify the research question, scope, and exclusions
-2. Search memory with `npx ca search` for existing knowledge on the topic
+2. Search memory with `ca search` for existing knowledge on the topic
 3. Spawn parallel research subagents via Task tool:
    - **Web search specialist**: Uses WebSearch/WebFetch for academic papers, blog posts, benchmarks, and tools
    - **Codebase explorer**: Uses `subagent_type: Explore` to find relevant existing code patterns
@@ -31,9 +31,9 @@ Conduct deep research on a topic and produce a structured survey document follow
 7. Report key findings back for upstream skill (spec-dev/plan) to act on
 
 ## Memory Integration
-- Run `npx ca search` with topic keywords before starting research
+- Run `ca search` with topic keywords before starting research
 - Check for existing research docs in `docs/research/` and `docs/compound/research/` that overlap
-- After completion, key findings can be captured via `npx ca learn`
+- After completion, key findings can be captured via `ca learn`
 
 ## Docs Integration
 - Scan `docs/research/` and `docs/compound/research/` for prior survey documents on related topics

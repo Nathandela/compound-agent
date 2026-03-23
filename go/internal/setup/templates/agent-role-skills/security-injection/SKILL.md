@@ -28,7 +28,7 @@ On-demand specialist for deep injection vulnerability analysis. Traces data flow
 ## Literature
 - Consult `docs/compound/research/security/injection-patterns.md` for unsafe/safe pattern pairs and detection heuristics
 - Consult `docs/compound/research/security/secure-coding-failure.md` sections 4.1-4.5 for theoretical foundation
-- Run `npx ca knowledge "injection SQL command XSS SSRF SSTI"` for indexed knowledge
+- Run `ca knowledge "injection SQL command XSS SSRF SSTI"` for indexed knowledge
 
 ## Collaboration
 Report findings to security-reviewer via SendMessage with severity classification. Flag architecture-level injection risks (e.g., missing parameterization layer) to architecture-reviewer.

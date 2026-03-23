@@ -19,7 +19,7 @@ Review code for performance bottlenecks, algorithmic complexity issues, unnecess
 
 ## Literature
 - Consult `docs/compound/research/code-review/` for systematic performance analysis frameworks
-- Run `npx ca knowledge "performance review"` for indexed knowledge on performance patterns
+- Run `ca knowledge "performance review"` for indexed knowledge on performance patterns
 
 ## Collaboration
 Share cross-cutting findings via SendMessage: performance issues needing test coverage go to test-coverage-reviewer; performance fixes requiring architectural changes go to architecture-reviewer.

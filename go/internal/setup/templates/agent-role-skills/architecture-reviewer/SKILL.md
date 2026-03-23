@@ -19,7 +19,7 @@ Review code for architectural consistency, pattern compliance, module boundary i
 
 ## Literature
 - Consult `docs/compound/research/code-review/` for systematic review methodology and architectural assessment frameworks
-- Run `npx ca knowledge "architecture module design"` for indexed knowledge on design patterns
+- Run `ca knowledge "architecture module design"` for indexed knowledge on design patterns
 
 ## Collaboration
 Share cross-cutting findings via SendMessage: architecture issues with performance implications go to performance-reviewer; structural violations creating security risks go to security-reviewer.

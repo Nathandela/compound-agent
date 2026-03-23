@@ -12,7 +12,7 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 1. Pick tasks from `bd ready` or `$ARGUMENTS`
 2. Mark tasks in progress: `bd update <id> --status=in_progress`
 3. Read the epic description (`bd show <epic>`) for spec context -- EARS requirements guide what "done" looks like
-4. Run `npx ca search` per agent/subtask for targeted context. Display results.
+4. Run `ca search` per agent/subtask for targeted context. Display results.
 5. Assess parallelization: identify independent tasks that can be worked simultaneously
 6. Deploy an **AgentTeam** (TeamCreate + Task with `team_name`) with MULTIPLE test-writers and implementers:
    - Role skills: `.claude/skills/compound/agents/{test-writer,implementer}/SKILL.md`
@@ -27,9 +27,9 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 14. Close tasks: `bd close <id>`
 
 ## Memory Integration
-- Run `npx ca search` per delegated subtask with the subtask's specific description
+- Run `ca search` per delegated subtask with the subtask's specific description
 - Each agent receives memory items tailored to their assigned task, not a shared blob
-- Run `npx ca learn` after corrections or novel discoveries
+- Run `ca learn` after corrections or novel discoveries
 
 ## MANDATORY VERIFICATION -- DO NOT CLOSE TASK WITHOUT THIS
 Before `bd close`, you MUST:
@@ -54,8 +54,8 @@ for complex changes. For all changes, `/implementation-reviewer` is the minimum 
 ## Literature
 - Consult `docs/compound/research/tdd/` for TDD methodology, test-first development evidence, and best practices
 - Consult `docs/compound/research/property-testing/` for property-based testing theory and invariant design
-- Run `npx ca knowledge "TDD test-first"` for indexed knowledge on testing methodology
-- Run `npx ca search "testing"` for lessons from past TDD cycles
+- Run `ca knowledge "TDD test-first"` for indexed knowledge on testing methodology
+- Run `ca search "testing"` for lessons from past TDD cycles
 
 ## Technical Debt Protocol
 When shortcuts are proposed, classify using Fowler's quadrant: only **Prudent/Deliberate** debt is rational (conscious choice, known trade-off, explicit repayment plan). Reckless or Inadvertent debt must be fixed immediately. Document debt decisions in epic notes.

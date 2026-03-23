@@ -11,7 +11,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 ## Methodology
 1. Run quality gates first: `pnpm test && pnpm lint`
 2. Read the epic description (`bd show <epic>`) for EARS requirements -- reviewers verify each requirement is met
-3. Search memory with `npx ca search` for known patterns and recurring issues
+3. Search memory with `ca search` for known patterns and recurring issues
 4. Select reviewer tier based on diff size:
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
    - **Medium** (100-500): add architecture, performance, edge-case, scenario-coverage (8 total)
@@ -29,13 +29,13 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 11. Verify spec alignment: flag unmet EARS requirements as P1. Verify assumptions from architect phase still hold. Check change coupling: do modified files cluster within epic boundaries or leak across?
 12. Fix all P1 findings before proceeding
 13. Run `/implementation-reviewer` as mandatory gate
-14. Capture novel findings with `npx ca learn`; pattern-matcher auto-reinforces recurring issues
+14. Capture novel findings with `ca learn`; pattern-matcher auto-reinforces recurring issues
 
 ## Memory Integration
-- Run `npx ca search` before review for known recurring issues
-- **pattern-matcher** auto-reinforces: recurring findings get severity increased via `npx ca learn`
+- Run `ca search` before review for known recurring issues
+- **pattern-matcher** auto-reinforces: recurring findings get severity increased via `ca learn`
 - **cct-reviewer** reads CCT patterns for known Claude failure patterns
-- Capture the review report via `npx ca learn` with `type=solution`
+- Capture the review report via `ca learn` with `type=solution`
 
 ## Docs Integration
 - **docs-reviewer** checks code/docs alignment and ADR compliance
@@ -43,8 +43,8 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 
 ## Literature
 - Consult `docs/compound/research/code-review/` for systematic review methodology, severity taxonomies, and evidence-based review practices
-- Run `npx ca knowledge "code review methodology"` for indexed knowledge on review techniques
-- Run `npx ca search "review"` for lessons from past review cycles
+- Run `ca knowledge "code review methodology"` for indexed knowledge on review techniques
+- Run `ca search "review"` for lessons from past review cycles
 
 ## Common Pitfalls
 - Ignoring reviewer feedback because "it works"
@@ -75,5 +75,5 @@ Before starting Compound, verify review is complete:
 - `/implementation-reviewer` must have returned APPROVED
 - All P1 findings must be resolved
 
-**CRITICAL**: Use `npx ca learn` for ALL lesson storage -- NOT MEMORY.md.
+**CRITICAL**: Use `ca learn` for ALL lesson storage -- NOT MEMORY.md.
 

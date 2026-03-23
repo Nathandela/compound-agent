@@ -320,9 +320,9 @@ test('syncIfNeeded rebuilds when JSONL modified', async () => {
 **Implementation needed:**
 ```bash
 # .git/hooks/pre-commit (addition)
-if ! npx ca validate --quiet; then
+if ! ca validate --quiet; then
   echo "Error: .claude/lessons/index.jsonl contains invalid lessons"
-  echo "Run: npx ca validate --fix"
+  echo "Run: ca validate --fix"
   exit 1
 fi
 ```
@@ -369,7 +369,7 @@ fi
 
 1. **Add `validate` CLI command**
    ```bash
-   npx ca validate
+   ca validate
    # Output: "✅ All lessons valid" or "❌ 3 lessons failed validation (lines 10, 15, 22)"
    ```
 
@@ -406,7 +406,7 @@ fi
    // When no high-severity lessons found, hint at common issues:
    if (lessons.length === 0) {
      console.log('No high-severity lessons found.');
-     console.log('Tip: Run `npx ca validate` to check for parse errors.');
+     console.log('Tip: Run `ca validate` to check for parse errors.');
    }
    ```
 

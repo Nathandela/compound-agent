@@ -150,7 +150,7 @@ Score 2: Well-decomposed with clear interfaces
 
 ### Audit Execution Steps
 
-1. Run \`npx ca search "agentic codebase"\` for relevant lessons
+1. Run \`ca search "agentic codebase"\` for relevant lessons
 2. Detect project stack (see Stack Detection above)
 3. Use Glob and Grep to check for evidence of each principle:
    - Glob for: docs/**, *.test.*, .eslintrc*, AGENTS.md, CLAUDE.md
@@ -218,8 +218,8 @@ After all approved actions are applied, verify:
 
 ## Memory Integration
 
-- Before analysis: \`npx ca search "agentic codebase"\` for relevant lessons
-- After completing: offer \`npx ca learn\` to capture insights
+- Before analysis: \`ca search "agentic codebase"\` for relevant lessons
+- After completing: offer \`ca learn\` to capture insights
 
 ## Common Pitfalls
 

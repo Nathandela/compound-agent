@@ -232,7 +232,7 @@ func rulesCmd() *cobra.Command {
 		Short: "Check codebase against project rules",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			cmd.Println("[info] Rules checking is not yet implemented in the Go binary.")
-			cmd.Println("Use: npx ca rules check")
+			cmd.Println("Use: ca rules check")
 			return nil
 		},
 	}
@@ -240,6 +240,7 @@ func rulesCmd() *cobra.Command {
 
 func registerPhaseCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(phaseCheckCmd())
+	rootCmd.AddCommand(verifyGatesCmd())
 	rootCmd.AddCommand(installBeadsCmd())
 	rootCmd.AddCommand(rulesCmd())
 }

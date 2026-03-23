@@ -13,7 +13,7 @@ The compound-agent TypeScript codebase has two structural defects unfixable with
 
 1. **ONNX Runtime zombie processes**: Native C++ threads prevent Node.js process exit after `dispose()`. Every CLI command that loads the embedding model (search, learn, knowledge, index-docs, embed-worker) creates a process that hangs forever. Each zombie: 420MB RSS, 14 threads. `process.exit()` causes SIGABRT (exit 134) due to corrupted C++ mutex. Only SIGKILL works.
 
-2. **Hook process storm**: Claude Code hooks invoke `npx ca hooks run <hook>` on every tool call. Each invocation: ~126MB RSS, 200-450ms startup. 13+ concurrent hook processes observed during normal operation, consuming ~900MB total.
+2. **Hook process storm**: Claude Code hooks invoke `ca hooks run <hook>` on every tool call. Each invocation: ~126MB RSS, 200-450ms startup. 13+ concurrent hook processes observed during normal operation, consuming ~900MB total.
 
 These problems are inherent to the Node.js + NAPI + ONNX Runtime architecture. Research in `docs/research/memory-leakage/` (6 papers) confirms subprocess isolation is the only guarantee for native addon cleanup.
 
@@ -345,7 +345,7 @@ flowchart TD
 ---
 
 #### E2: Hook Runner — Go Binary for Claude Code Hooks
-**Scope**: Replace `npx ca hooks run` with native Go binary. Highest-impact, lowest-risk epic.
+**Scope**: Replace `ca hooks run` with native Go binary. Highest-impact, lowest-risk epic.
 **EARS subset**: U2 (<50ms startup), U5 (<50ms hook completion), N1 (no zombies), N2 (no JS runtime)
 **Effort**: ~4 days
 

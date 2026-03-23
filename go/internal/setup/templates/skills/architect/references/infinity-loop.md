@@ -44,7 +44,7 @@ Before launching, verify:
 
 ### Generate script
 \`\`\`bash
-npx ca loop --epics E1 E2 E3 \\
+ca loop --epics E1 E2 E3 \\
   --reviewers claude-sonnet claude-opus gemini codex \\
   --max-retries 1 \\
   --max-review-cycles 3 \\
@@ -72,10 +72,10 @@ screen -ls | grep compound-loop
 
 ### Real-time watch
 \`\`\`bash
-npx ca watch                    # Live trace from active session
-npx ca watch --epic <id>        # Watch specific epic
-npx ca watch --improve          # Watch improvement phase
-npx ca watch --no-follow        # Print current trace and exit
+ca watch                    # Live trace from active session
+ca watch --epic <id>        # Watch specific epic
+ca watch --improve          # Watch improvement phase
+ca watch --no-follow        # Print current trace and exit
 \`\`\`
 
 ### Status files
@@ -133,14 +133,14 @@ Passive monitoring checks to run periodically:
 
 ### Minimal (auto-discover epics, no review)
 \`\`\`bash
-npx ca loop --force
+ca loop --force
 LOOP_DRY_RUN=1 ./infinity-loop.sh
 screen -dmS compound-loop ./infinity-loop.sh
 \`\`\`
 
 ### Full review fleet with improvement phase
 \`\`\`bash
-npx ca loop --epics E1 E2 E3 \\
+ca loop --epics E1 E2 E3 \\
   --reviewers claude-sonnet claude-opus gemini codex \\
   --max-review-cycles 3 \\
   --review-blocking \\
@@ -151,7 +151,7 @@ npx ca loop --epics E1 E2 E3 \\
 
 ### Conservative (review every 2 epics, blocking)
 \`\`\`bash
-npx ca loop --epics E1 E2 E3 E4 \\
+ca loop --epics E1 E2 E3 E4 \\
   --reviewers claude-sonnet gemini \\
   --review-every 2 \\
   --review-blocking \\

@@ -12,7 +12,7 @@ Extract actionable, specific lessons from analyzed work context. Identify correc
 1. Review the context analysis output
 2. Look for mistake patterns, correction moments, and surprises
 3. Discover insights from how problems were solved
-4. Use `npx ca search` to check for duplicate lessons
+4. Use `ca search` to check for duplicate lessons
 5. For each problem/correction, ask: "What should be done differently next time?"
 6. Filter out lessons that are too generic or obvious
 7. Each lesson must be specific; prefer actionable guidance when possible
@@ -26,7 +26,7 @@ AgentTeam member in the **compound** phase. Spawned via TeamCreate. Communicate 
 
 ## Literature
 - Consult `docs/compound/research/learning-systems/` for lesson extraction methodology and knowledge representation
-- Run `npx ca knowledge "lesson extraction knowledge management"` for indexed knowledge
+- Run `ca knowledge "lesson extraction knowledge management"` for indexed knowledge
 
 ## Output Format
 Per lesson:

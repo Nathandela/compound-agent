@@ -18,7 +18,7 @@ Review code for unnecessary complexity, over-engineering, premature abstraction,
 
 ## Literature
 - Consult `docs/compound/research/code-review/` for over-engineering detection and YAGNI assessment methodology
-- Run `npx ca knowledge "simplicity over-engineering"` for indexed knowledge
+- Run `ca knowledge "simplicity over-engineering"` for indexed knowledge
 
 ## Collaboration
 Share cross-cutting findings via SendMessage: over-engineering obscuring security concerns goes to security-reviewer; premature abstractions creating wrong module boundaries goes to architecture-reviewer.

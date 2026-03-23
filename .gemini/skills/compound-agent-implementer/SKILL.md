@@ -20,10 +20,10 @@ Write the minimum code necessary to make failing tests pass. Follow the TDD gree
 
 ## Literature
 - Consult `docs/compound/research/tdd/` for TDD green-phase methodology and minimal implementation strategies
-- Run `npx ca knowledge "TDD implementation"` for indexed knowledge on implementation patterns
+- Run `ca knowledge "TDD implementation"` for indexed knowledge on implementation patterns
 
 ## Memory Integration
-Run `npx ca search` with the task description for known patterns, solutions, and implementation approaches relevant to the feature area.
+Run `ca search` with the task description for known patterns, solutions, and implementation approaches relevant to the feature area.
 
 ## Collaboration
 Communicate with the test-writer via direct message when implementation questions arise.

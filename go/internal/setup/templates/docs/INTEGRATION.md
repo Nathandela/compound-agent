@@ -24,29 +24,29 @@ Memory items are stored as newline-delimited JSON in `.claude/lessons/index.json
 
 The SQLite index at `.claude/.cache/lessons.sqlite` provides:
 
-- **FTS5 full-text search** for keyword queries (`npx ca search`)
+- **FTS5 full-text search** for keyword queries (`ca search`)
 - **Embedding cache** for vector similarity (avoids re-computing embeddings)
 - **Retrieval count tracking** for usage statistics
 
-The index is rebuilt automatically when the JSONL changes. Force rebuild with `npx ca rebuild --force`.
+The index is rebuilt automatically when the JSONL changes. Force rebuild with `ca rebuild --force`.
 
 ### Search mechanisms
 
-**Keyword search** (`npx ca search`): Uses SQLite FTS5 to match words in trigger, insight, and tags.
+**Keyword search** (`ca search`): Uses SQLite FTS5 to match words in trigger, insight, and tags.
 
-**Semantic search** (`npx ca check-plan`): Embeds the query text and compares cosine similarity against stored lesson embeddings. Results are ranked with configurable boosts for severity, recency, and confirmation status.
+**Semantic search** (`ca check-plan`): Embeds the query text and compares cosine similarity against stored lesson embeddings. Results are ranked with configurable boosts for severity, recency, and confirmation status.
 
-**Session loading** (`npx ca load-session`): Returns high-severity confirmed lessons for injection at session start.
+**Session loading** (`ca load-session`): Returns high-severity confirmed lessons for injection at session start.
 
 ### Data lifecycle
 
 | Operation | Effect |
 |-----------|--------|
-| `npx ca learn` | Appends a new item to JSONL |
-| `npx ca update` | Appends an updated version (last-write-wins) |
-| `npx ca delete` | Appends with `deleted: true` flag |
-| `npx ca wrong` | Sets `invalidatedAt` (excluded from retrieval, preserved in storage) |
-| `npx ca compact` | Removes tombstones, then rebuilds index |
+| `ca learn` | Appends a new item to JSONL |
+| `ca update` | Appends an updated version (last-write-wins) |
+| `ca delete` | Appends with `deleted: true` flag |
+| `ca wrong` | Sets `invalidatedAt` (excluded from retrieval, preserved in storage) |
+| `ca compact` | Removes tombstones, then rebuilds index |
 
 ---
 
@@ -56,10 +56,10 @@ Compound-agent installs five hooks into `.claude/settings.json`:
 
 | Hook | Trigger | Action |
 |------|---------|--------|
-| **SessionStart** | New session or resume | Runs `npx ca prime` to load workflow context and high-severity lessons |
-| **PreCompact** | Before context compaction | Runs `npx ca prime` to preserve context across compaction |
+| **SessionStart** | New session or resume | Runs `ca prime` to load workflow context and high-severity lessons |
+| **PreCompact** | Before context compaction | Runs `ca prime` to preserve context across compaction |
 | **UserPromptSubmit** | Every user message | Detects correction/planning language, injects memory reminders |
-| **PostToolUseFailure** | Bash/Edit/Write failures | After 2 failures on same file or 3 total, suggests `npx ca search` |
+| **PostToolUseFailure** | Bash/Edit/Write failures | After 2 failures on same file or 3 total, suggests `ca search` |
 | **PostToolUse** | After successful tool use | Resets failure tracking; tracks skill file reads for phase guard |
 
 ### Memory usage during sessions
@@ -69,21 +69,21 @@ Compound-agent installs five hooks into `.claude/settings.json`:
 **Before planning**: Search memory for relevant context:
 
 ```bash
-npx ca search "feature area keywords"
-npx ca knowledge "architecture topic"
-npx ca check-plan --plan "description of what you are about to implement"
+ca search "feature area keywords"
+ca knowledge "architecture topic"
+ca check-plan --plan "description of what you are about to implement"
 ```
 
 **After corrections**: Capture what you learned:
 
 ```bash
-npx ca learn "The insight" --trigger "What happened" --severity medium
+ca learn "The insight" --trigger "What happened" --severity medium
 ```
 
 **At session end**: Run the compound phase to extract patterns:
 
 ```bash
-npx ca compound
+ca compound
 ```
 
 ---
@@ -108,7 +108,7 @@ The plan phase creates Review and Compound blocking tasks that depend on work ta
 Before closing an epic, verify all gates pass:
 
 ```bash
-npx ca verify-gates <epic-id>
+ca verify-gates <epic-id>
 ```
 
 This checks that a Review task and Compound task both exist and are closed.
@@ -127,12 +127,12 @@ Add a reference to compound-agent in your project's `.claude/CLAUDE.md`:
 - docs/compound/README.md -- Compound-agent overview and getting started
 ```
 
-The `npx ca init` command does this automatically.
+The `ca init` command does this automatically.
 
 ### Session completion checklist
 
 ```bash
-npx ca verify-gates <epic-id>    # Verify review + compound tasks closed
+ca verify-gates <epic-id>    # Verify review + compound tasks closed
 git status                        # Check what changed
 git add <files>                   # Stage code changes
 bd sync                           # Commit beads changes

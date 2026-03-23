@@ -353,7 +353,7 @@ pnpm add -D @scope/compound-agent
 
 # Use via scripts or npx
 pnpm learn "Use Polars not pandas"
-npx ca search "data"
+ca search "data"
 ```
 
 ### 9. Embedding Model Download on First Use

@@ -191,7 +191,7 @@ Create `src/commands/loop-review-templates.test.ts`:
 3. `buildSessionIdManagement()` -- `init_review_sessions()` using `uuidgen`
 4. `buildReviewPrompt()` -- `build_review_prompt()` with incremental git diff + bead context
 5. `buildSpawnReviewers()` -- `spawn_reviewers()` launching parallel background processes
-6. `buildImplementerPhase()` -- `feed_implementer()` with full project context (`npx ca load-session`)
+6. `buildImplementerPhase()` -- `feed_implementer()` with full project context (`ca load-session`)
 7. `buildReviewLoop()` -- `run_review_phase()` orchestrating cycles
 
 ### Step 3: Extend `loop.ts`
@@ -229,7 +229,7 @@ Create `src/commands/loop-review-templates.test.ts`:
 
 1. **Review scope**: Incremental diff (since last review) for periodic reviews. Final review covers full diff since loop start.
 2. **Resumption**: Accept "latest" limitation for Gemini/Codex in v1. Document as known constraint.
-3. **Implementer context**: Full context -- runs `npx ca load-session` and loads CLAUDE.md, same as main loop sessions.
+3. **Implementer context**: Full context -- runs `ca load-session` and loads CLAUDE.md, same as main loop sessions.
 
 ## Test Strategy
 

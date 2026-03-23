@@ -18,7 +18,7 @@ If a **researcher** skill exists at `.claude/skills/compound/researcher/SKILL.md
 
 ## Default Workflow
 
-1. **Gather context**: Run `npx ca search "<topic>"` and `npx ca knowledge "<topic>"` to check existing knowledge. Scan `docs/research/` and `docs/compound/research/` for prior work.
+1. **Gather context**: Run `ca search "<topic>"` and `ca knowledge "<topic>"` to check existing knowledge. Scan `docs/research/` and `docs/compound/research/` for prior work.
 2. **Investigate**: Use every tool at your disposal — WebSearch/WebFetch for external sources, Glob/Grep/Read for codebase exploration, Bash for running experiments or validating claims.
 3. **Synthesize**: Combine findings into a structured document. Follow the researcher skill output format when producing survey papers (Abstract → Introduction → Foundations → Taxonomy → Analysis → Comparative Synthesis → Open Problems → Conclusion → References → Practitioner Resources).
 4. **Write output**: Save deliverables to `docs/research/<topic-slug>/<specific-slug>.md`. Create directories as needed. Edit existing documents if updating prior research.

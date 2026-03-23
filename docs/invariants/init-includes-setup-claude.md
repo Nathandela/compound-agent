@@ -301,11 +301,11 @@ Initialize compound-agent in a repository with a single command that sets up:
 **Invariant**: `init` is equivalent to running these commands:
 ```bash
 # These three commands:
-npx ca init --skip-claude
-npx ca setup claude
+ca init --skip-claude
+ca setup claude
 
 # Are equivalent to:
-npx ca init
+ca init
 ```
 
 **Verification**: Integration test comparing state after both sequences

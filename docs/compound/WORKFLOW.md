@@ -50,8 +50,8 @@ Multi-agent code review with severity classification.
 Extract and store lessons learned. This is what makes the system compound.
 
 - Analyze what happened during the cycle
-- Capture lessons via `npx ca learn`
-- Cluster patterns via `npx ca compound`
+- Capture lessons via `ca learn`
+- Cluster patterns via `ca compound`
 - Update outdated docs and ADRs
 
 ---
@@ -72,9 +72,9 @@ Extract and store lessons learned. This is what makes the system compound.
 For each phase, cook-it:
 
 1. Announces progress: `[Phase N/5] PHASE_NAME`
-2. Initializes state: `npx ca phase-check start <phase>`
+2. Initializes state: `ca phase-check start <phase>`
 3. Reads the phase skill file (non-negotiable -- never from memory)
-4. Runs `npx ca search` with the current goal
+4. Runs `ca search` with the current goal
 5. Executes the phase following skill instructions
 6. Updates epic notes: `bd update <epic-id> --notes="Phase: NAME COMPLETE | Next: NEXT"`
 7. Verifies the phase gate before proceeding
@@ -86,7 +86,7 @@ For each phase, cook-it:
 | Post-plan | After Plan | `bd list --status=open` shows Review + Compound tasks |
 | Gate 3 | After Work | `bd list --status=in_progress` returns empty |
 | Gate 4 | After Review | `/implementation-reviewer` returned APPROVED |
-| Final | After Compound | `npx ca verify-gates <epic-id>` passes, `pnpm test` and `pnpm lint` pass |
+| Final | After Compound | `ca verify-gates <epic-id>` passes, `pnpm test` and `pnpm lint` pass |
 
 If any gate fails, cook-it stops. You must fix the issue before proceeding.
 
@@ -102,8 +102,8 @@ If interrupted, cook-it can resume:
 Cook-it persists state in `.claude/.ca-phase-state.json`. Useful commands:
 
 ```bash
-npx ca phase-check status      # See current phase state
-npx ca phase-check clean       # Reset phase state (escape hatch)
+ca phase-check status      # See current phase state
+ca phase-check clean       # Reset phase state (escape hatch)
 ```
 
 ### Session close

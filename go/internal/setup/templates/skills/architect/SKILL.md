@@ -17,8 +17,8 @@ Take a large system specification and decompose it into naturally-scoped epic be
 
 ## Phase 1: Socratic
 **Goal**: Understand the system domain before decomposing.
-1. Search memory: \`npx ca search\` for past features, constraints, decisions
-2. Search knowledge: \`npx ca knowledge "relevant terms"\`
+1. Search memory: \`ca search\` for past features, constraints, decisions
+2. Search knowledge: \`ca knowledge "relevant terms"\`
 3. Ask "why" before "how" -- understand the real need
 4. Build a **domain glossary** (ubiquitous language) from the dialogue
 5. Produce a **discovery mindmap** (Mermaid \`mindmap\`) to expose assumptions
@@ -71,7 +71,7 @@ Spawn **6 parallel subagents** (via Task tool):
 3. Define **fitness functions** per epic to monitor assumptions. Document re-decomposition trigger.
 4. Wire dependencies via \`bd dep add\` for all relationships
 5. Store processing order as notes on the meta-epic
-6. Capture lessons via \`npx ca learn\`
+6. Capture lessons via \`ca learn\`
 
 ## Phase 5: Launch (Opt-in)
 **Goal**: Configure and launch the infinity loop on the materialized epics.
@@ -102,7 +102,7 @@ This phase is OPT-IN. After Phase 4:
 
 3. **Generate script** (produces \`./infinity-loop.sh\`):
    \`\`\`bash
-   npx ca loop --epics <id1> <id2> ... \\
+   ca loop --epics <id1> <id2> ... \\
      --model <model> \\
      --reviewers <reviewer1> <reviewer2> ... \\
      --review-every <N> --max-review-cycles <N> \\
@@ -123,7 +123,7 @@ This phase is OPT-IN. After Phase 4:
    Verify: \`screen -ls | grep compound-loop\`
 
 6. **Report monitoring commands** to the user:
-   - Live watch: \`npx ca watch\`
+   - Live watch: \`ca watch\`
    - Status: \`cat agent_logs/.loop-status.json\`
    - Attach: \`screen -r compound-loop\`
    - Execution log: \`cat agent_logs/loop-execution.jsonl\`
@@ -132,9 +132,9 @@ This phase is OPT-IN. After Phase 4:
 See \`architect/references/infinity-loop.md\` for full parameter reference and monitoring guide.
 
 ## Memory Integration
-- \`npx ca search\` before starting each phase
-- \`npx ca knowledge\` for indexed project docs
-- \`npx ca learn\` after corrections or discoveries
+- \`ca search\` before starting each phase
+- \`ca knowledge\` for indexed project docs
+- \`ca learn\` after corrections or discoveries
 
 ## Common Pitfalls
 - Jumping to decomposition without understanding the domain (skip Socratic)

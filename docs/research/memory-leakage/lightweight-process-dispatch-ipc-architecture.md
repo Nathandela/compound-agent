@@ -16,13 +16,13 @@ High-frequency hook dispatch in agentic CLI tools exposes a fundamental tension 
 
 Modern agentic AI systems such as Claude Code fire lifecycle hooks on every tool invocation: before a file write, after a shell command, when the user submits a prompt. In a compound multi-agent setup with three parallel agent instances each performing fifty tool calls per session, a conservative estimate places hook invocations at 300 to 450 events per session. If each hook is dispatched by spawning a fresh Node.js process via `npx`, the system sustains a continuous process birth-and-death rate of several processes per second.
 
-The consequences are severe. On macOS, the default system process limit (`kern.maxproc`) is 2,666. A session with 200 concurrent in-flight hooks—each awaiting stdin from the parent process—can exhaust this limit within minutes. Memory pressure follows immediately: a single `npx ca hooks run <hook>` process loads the npm resolution machinery plus the full Commander.js CLI tree plus any lazy-loaded modules, producing a resident set size (RSS) of approximately 55 to 120 MB for a stripped hook runner and 2.86 GB when the full npx + CLI pipeline remains in memory. At 200 processes, this saturates available RAM on development machines.
+The consequences are severe. On macOS, the default system process limit (`kern.maxproc`) is 2,666. A session with 200 concurrent in-flight hooks—each awaiting stdin from the parent process—can exhaust this limit within minutes. Memory pressure follows immediately: a single `ca hooks run <hook>` process loads the npm resolution machinery plus the full Commander.js CLI tree plus any lazy-loaded modules, producing a resident set size (RSS) of approximately 55 to 120 MB for a stripped hook runner and 2.86 GB when the full npx + CLI pipeline remains in memory. At 200 processes, this saturates available RAM on development machines.
 
 This paper surveys the architectural patterns that practitioners and infrastructure projects have deployed to eliminate or amortize per-invocation process overhead, and characterizes the trade-offs among them.
 
 ### 1.2 The Compound Agent Hook Context
 
-The motivating deployment is the `compound-agent` project, a TypeScript CLI that attaches learning and audit hooks to Claude Code. Its `.claude/settings.json` defines seven hook registrations covering `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `UserPromptSubmit`, and `Stop` events. Each registration calls `npx ca hooks run <hook-name>`, passing a JSON payload on stdin and reading a JSON response from stdout.
+The motivating deployment is the `compound-agent` project, a TypeScript CLI that attaches learning and audit hooks to Claude Code. Its `.claude/settings.json` defines seven hook registrations covering `PreToolUse`, `PostToolUse`, `PostToolUseFailure`, `UserPromptSubmit`, and `Stop` events. Each registration calls `ca hooks run <hook-name>`, passing a JSON payload on stdin and reading a JSON response from stdout.
 
 The existing `hook-runner.ts` module represents a first-generation thin-dispatcher optimization: it bypasses Commander.js, SQLite connection initialization, and embedding model loading, importing only the specific handler modules needed per hook type. Measured wall-clock time for `node dist/hook-runner.js pre-commit` is approximately 40 ms cold-start on a modern MacBook. The `npx` wrapper adds 150–350 ms of resolution overhead on top.
 
@@ -97,7 +97,7 @@ The wall-clock total for phases 1-4 (runtime initialization, independent of appl
 `npx` (npm's package executor) performs the following resolution before executing a binary:
 
 ```
-npx ca hooks run <hook>
+ca hooks run <hook>
        |
        v
 [1] Check $PATH for 'ca' binary (~1ms)
@@ -207,7 +207,7 @@ The hook handler is compiled to a native executable (Go, Rust, C) or a language 
 
 #### 4.1.1 Theory and Mechanism
 
-The fork-per-invocation model provides complete isolation between hook executions. Each call to `npx ca hooks run <hook>` produces the following kernel-level sequence:
+The fork-per-invocation model provides complete isolation between hook executions. Each call to `ca hooks run <hook>` produces the following kernel-level sequence:
 
 ```
 Claude Code process
@@ -235,7 +235,7 @@ ca process (node.js, ~40-120ms startup)
 
 Total wall-clock from hook event to first handler line: 200–450 ms (warm npm cache).
 
-The RSS profile under concurrent load follows a linear model: each active process contributes its working set. For the thin hook-runner variant (without Commander, SQLite, or embeddings), RSS is approximately 55–80 MB per process. For the full CLI (which `npx ca hooks run` uses), RSS is 100–200 MB per process. Under 200 concurrent hooks, the system-wide hook runner footprint is 11–40 GB—exceeding available RAM on most development machines.
+The RSS profile under concurrent load follows a linear model: each active process contributes its working set. For the thin hook-runner variant (without Commander, SQLite, or embeddings), RSS is approximately 55–80 MB per process. For the full CLI (which `ca hooks run` uses), RSS is 100–200 MB per process. Under 200 concurrent hooks, the system-wide hook runner footprint is 11–40 GB—exceeding available RAM on most development machines.
 
 #### 4.1.2 Literature Evidence
 
@@ -251,7 +251,7 @@ The esbuild project eliminated per-invocation process cost by compiling to a Go 
 
 | Implementation | Mechanism | Approx cold-start latency |
 |---|---|---|
-| `npx ca hooks run <hook>` | npx + full CLI | 200–450 ms |
+| `ca hooks run <hook>` | npx + full CLI | 200–450 ms |
 | `node dist/hook-runner.js <hook>` | Node.js + thin runner | 35–80 ms |
 | `bun dist/hook-runner.js <hook>` | Bun + thin runner | 8–20 ms |
 | `./hook-runner-native <hook>` (Go) | Go binary | 2–8 ms |
@@ -620,7 +620,7 @@ The compound-agent `hook-runner.ts` implementation demonstrates the achievable o
 
 | Invocation | Approx wall-clock | RSS |
 |---|---|---|
-| `npx ca hooks run phase-guard` | 200–450 ms | 150–300 MB |
+| `ca hooks run phase-guard` | 200–450 ms | 150–300 MB |
 | `node dist/cli.js hooks run phase-guard` | 60–120 ms | 80–150 MB |
 | `node dist/hook-runner.js phase-guard` | 35–80 ms | 55–80 MB |
 
@@ -855,7 +855,7 @@ Claude Code's `PostToolUse` matcher supports regex patterns (e.g., `"Bash|Edit|W
 
 ### 6.6 Memory Accounting for `npx` Process Trees
 
-When `npx ca hooks run <hook>` is called, the resulting process tree includes: the shell, npx (a Node.js process), and the `ca` process. The shell exits quickly, but the npx process may linger until the `ca` process exits. This means RSS measurements of individual hook invocations undercount the true system-wide memory impact. No established methodology exists for attributing the shared cost of the npm resolution layer to individual hook invocations in the same session.
+When `ca hooks run <hook>` is called, the resulting process tree includes: the shell, npx (a Node.js process), and the `ca` process. The shell exits quickly, but the npx process may linger until the `ca` process exits. This means RSS measurements of individual hook invocations undercount the true system-wide memory impact. No established methodology exists for attributing the shared cost of the npm resolution layer to individual hook invocations in the same session.
 
 ---
 
@@ -941,7 +941,7 @@ To baseline the current `npx` overhead in a project:
 
 ```bash
 # Measure npx overhead
-time npx ca hooks run pre-commit < /dev/null
+time ca hooks run pre-commit < /dev/null
 
 # Measure direct node invocation
 time node dist/hook-runner.js pre-commit < /dev/null
@@ -957,7 +957,7 @@ The minimal change to eliminate the 150–300 ms `npx` overhead: replace hook co
 
 ```json
 // Before:
-"command": "npx ca hooks run user-prompt 2>/dev/null || true"
+"command": "ca hooks run user-prompt 2>/dev/null || true"
 
 // After (requires compound-agent in node_modules):
 "command": "node node_modules/compound-agent/dist/hook-runner.js user-prompt 2>/dev/null || true"

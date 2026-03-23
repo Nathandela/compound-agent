@@ -15,8 +15,8 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 ### Phase 1: Explore
 **Goal**: Map the problem domain before narrowing.
 1. Ask "why" before "how" -- understand the real need
-2. Search memory: `npx ca search` for past features, constraints, decisions
-3. Search knowledge: `npx ca knowledge "relevant terms"`
+2. Search memory: `ca search` for past features, constraints, decisions
+3. Search knowledge: `ca knowledge "relevant terms"`
 4. Spawn subagents for research (`.claude/agents/compound/repo-analyst.md`, `memory-analyst.md`, or `subagent_type: Explore`)
 5. For deep domain knowledge, consider `/get-a-phd`
 6. Build a discovery mindmap (Mermaid `mindmap`) -- makes implicit assumptions visible
@@ -58,11 +58,11 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 1. Create beads epic if needed (`bd create --title="..." --type=epic --priority=<N>`)
 2. Store spec in the epic description (`bd update <epic-id> --description="..."`) -- single source of truth, including both EARS requirements and scenario table
 3. Flag open questions for plan phase
-4. Capture lessons: `npx ca learn`
+4. Capture lessons: `ca learn`
 
 ## Memory Integration
-- `npx ca search` and `npx ca knowledge` before generating approaches
-- `npx ca learn` after corrections or discoveries
+- `ca search` and `ca knowledge` before generating approaches
+- `ca learn` after corrections or discoveries
 
 ## Reference Material
 Read `references/spec-guide.md` on demand for EARS patterns, Mermaid templates, and ambiguity checklists.
@@ -99,7 +99,7 @@ End each spec with:
 - [ ] Requirements use EARS notation
 - [ ] Ambiguities detected and resolved via dialogue
 - [ ] Mermaid diagrams used as thinking tools
-- [ ] Memory searched (`npx ca search`)
+- [ ] Memory searched (`ca search`)
 - [ ] Trade-offs documented with rationale
 - [ ] User engaged via `AskUserQuestion` at decisions
 - [ ] Scenario table generated from EARS requirements and diagrams

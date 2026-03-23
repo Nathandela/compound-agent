@@ -60,7 +60,7 @@ func ProcessStopAudit(repoRoot string, stopHookActive bool) StopAuditResult {
 	return StopAuditResult{
 		Continue: &f,
 		StopReason: fmt.Sprintf(
-			"PHASE GATE NOT VERIFIED: %s requires gate '%s'. Run: npx ca phase-check gate %s",
+			"PHASE GATE NOT VERIFIED: %s requires gate '%s'. Run: ca phase-check gate %s",
 			state.CurrentPhase, expectedGate, expectedGate,
 		),
 	}

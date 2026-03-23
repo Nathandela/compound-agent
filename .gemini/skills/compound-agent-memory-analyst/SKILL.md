@@ -10,7 +10,7 @@ Search compound-agent memory to find relevant lessons, patterns, and decisions f
 
 ## Instructions
 1. Identify the key topics from the current task
-2. Use `npx ca search` with relevant queries
+2. Use `ca search` with relevant queries
 3. Search with multiple query variations for coverage
 4. Filter results by relevance and recency
 5. Summarize applicable lessons concisely

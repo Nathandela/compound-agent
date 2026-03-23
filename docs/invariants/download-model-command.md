@@ -1,6 +1,6 @@
 # Download-Model Command Invariants
 
-## CLI Command: `npx ca download-model`
+## CLI Command: `ca download-model`
 
 **Purpose**: Download the nomic-embed-text-v1.5 embedding model (~23MB ONNX Q8) required for semantic search.
 
@@ -196,14 +196,14 @@ Embedding model already downloaded
 ```
 [error] Failed to download embedding model
   Error: Connection timeout after 60s
-  Try again: npx ca download-model
+  Try again: ca download-model
 ```
 
 ### Failure (disk full)
 ```
 [error] Failed to download embedding model
   Error: No space left on device
-  Free up space and try again: npx ca download-model
+  Free up space and try again: ca download-model
 ```
 
 ### With --json flag
@@ -231,7 +231,7 @@ Embedding model already downloaded
 {
   "success": false,
   "error": "Connection timeout after 60s",
-  "action": "Try again: npx ca download-model"
+  "action": "Try again: ca download-model"
 }
 ```
 
@@ -241,7 +241,7 @@ Embedding model already downloaded
 
 ### Called from check-plan error message (src/cli.ts:1336, 1341)
 **Invariant**: Error message must match actual command name
-**Current**: `npx ca download-model`
+**Current**: `ca download-model`
 **Test**: Verify command name in error matches registered command
 
 ### Uses resolveModel() from src/embeddings/model.ts

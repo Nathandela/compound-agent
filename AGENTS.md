@@ -368,13 +368,13 @@ This section explains HOW and WHEN Claude should interact with the compound-agen
 
 | Command | Purpose |
 |---------|---------|
-| `npx ca prime` | Load session context (high-severity lessons) |
-| `npx ca search <query>` | Search lessons |
-| `npx ca learn --trigger "..." --insight "..."` | Capture a lesson |
-| `npx ca list` | List all lessons |
-| `npx ca stats` | Database health |
-| `npx ca verify-gates <epic-id>` | Verify review + compound tasks exist and are closed |
-| `npx ca phase-check` | Manage cook-it phase state (init/status/clean/gate) |
+| `ca prime` | Load session context (high-severity lessons) |
+| `ca search <query>` | Search lessons |
+| `ca learn --trigger "..." --insight "..."` | Capture a lesson |
+| `ca list` | List all lessons |
+| `ca stats` | Database health |
+| `ca verify-gates <epic-id>` | Verify review + compound tasks exist and are closed |
+| `ca phase-check` | Manage cook-it phase state (init/status/clean/gate) |
 
 ### Core Principle
 
@@ -389,11 +389,11 @@ This section explains HOW and WHEN Claude should interact with the compound-agen
 
 #### Session Start (Automatic via hooks)
 
-`npx ca prime` runs automatically via `.claude/settings.json` hooks at SessionStart and PreCompact.
+`ca prime` runs automatically via `.claude/settings.json` hooks at SessionStart and PreCompact.
 
 #### Before Architectural Decisions
 
-Before making architectural decisions or choosing between approaches, run `npx ca search <query>` to check for relevant past lessons.
+Before making architectural decisions or choosing between approaches, run `ca search <query>` to check for relevant past lessons.
 
 ---
 
@@ -432,7 +432,7 @@ Learned: [insight]. Confirm to save?
 - Keep insight concise (one sentence)
 - User must explicitly confirm with "yes" or similar
 - Silence or other response = do not save
-- After confirmation, use `npx ca learn --yes`
+- After confirmation, use `ca learn --yes`
 
 ---
 
@@ -441,7 +441,7 @@ Learned: [insight]. Confirm to save?
 **WARNING: NEVER directly edit `.claude/lessons/index.jsonl`.**
 
 Direct edits bypass schema validation, embedding sync, and SQLite index updates. Always use:
-1. `npx ca learn` CLI
+1. `ca learn` CLI
 
 ---
 
@@ -459,7 +459,7 @@ Direct edits bypass schema validation, embedding sync, and SQLite index updates.
 
 ### Setup
 
-Run `npx ca init` in a project root to configure:
+Run `ca init` in a project root to configure:
 - `.claude/settings.json` - Hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse)
 - `AGENTS.md` - Agent instructions
 - `.claude/CLAUDE.md` - Project reference
@@ -503,7 +503,7 @@ Run `npx ca init` in a project root to configure:
 - NEVER say "ready to push when you are" - YOU must push
 - If push fails, resolve and retry until it succeeds
 
-<!-- BEGIN BEADS INTEGRATION v:1 profile:full hash:d4f96305 -->
+<!-- BEGIN BEADS INTEGRATION v:1 profile:full hash:f65d5d33 -->
 ## Issue Tracking with bd (beads)
 
 **IMPORTANT**: This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
@@ -568,6 +568,16 @@ bd close bd-42 --reason "Completed" --json
    - `bd create "Found bug" --description="Details about what was found" -p 1 --deps discovered-from:<parent-id>`
 5. **Complete**: `bd close <id> --reason "Done"`
 
+### Quality
+- Use `--acceptance` and `--design` fields when creating issues
+- Use `--validate` to check description completeness
+
+### Lifecycle
+- `bd defer <id>` / `bd supersede <id>` for issue management
+- `bd stale` / `bd orphans` / `bd lint` for hygiene
+- `bd human <id>` to flag for human decisions
+- `bd formula list` / `bd mol pour <name>` for structured workflows
+
 ### Auto-Sync
 
 bd automatically syncs via Dolt:
@@ -588,7 +598,7 @@ bd automatically syncs via Dolt:
 
 For more details, see README.md and docs/QUICKSTART.md.
 
-## Landing the Plane (Session Completion)
+## Session Completion
 
 **When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
 

@@ -8,7 +8,7 @@ argument-hint: "<query to search for>"
 If $ARGUMENTS is provided, use it as the search query. Otherwise, infer from current context.
 
 ```bash
-npx ca search "$ARGUMENTS"
+ca search "$ARGUMENTS"
 ```
 
 Analyze the results and proactively suggest or apply relevant lessons to the current work.

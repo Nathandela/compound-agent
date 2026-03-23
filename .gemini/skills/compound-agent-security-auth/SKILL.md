@@ -36,7 +36,7 @@ On-demand specialist for auditing authentication and authorization enforcement a
 ## Literature
 - Consult `docs/compound/research/security/auth-patterns.md` for broken auth patterns and detection methodology
 - Consult `docs/compound/research/security/secure-coding-failure.md` section 4.7 for theoretical foundation
-- Run `npx ca knowledge "authentication authorization IDOR"` for indexed knowledge
+- Run `ca knowledge "authentication authorization IDOR"` for indexed knowledge
 
 ## Collaboration
 Report findings to security-reviewer via SendMessage with severity classification. Flag missing middleware patterns to architecture-reviewer.

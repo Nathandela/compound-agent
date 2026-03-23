@@ -10,7 +10,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 
 ## Methodology
 1. Read the spec from the epic description (`bd show <epic>`) for EARS requirements, decisions, and open questions. Verify its type is `epic` -- if it was created as `task`, fix with `bd update <id> --type=epic`
-2. Search memory with `npx ca search` and docs with `npx ca knowledge "relevant topic"` for architectural patterns and past mistakes
+2. Search memory with `ca search` and docs with `ca knowledge "relevant topic"` for architectural patterns and past mistakes
 3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
    - Available agents: `.claude/agents/compound/repo-analyst.md`, `memory-analyst.md`
    - For complex features, deploy MULTIPLE analysts per domain area
@@ -29,7 +29,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 15. Create review and compound blocking tasks (`bd create` + `bd dep add`) that depend on work tasks — these survive compaction and surface via `bd ready` after work completes
 
 ## Memory Integration
-- Run `npx ca search` and `npx ca knowledge "relevant topic"` for patterns related to the feature area
+- Run `ca search` and `ca knowledge "relevant topic"` for patterns related to the feature area
 - Look for past planning mistakes (missing dependencies, unclear criteria)
 - Check for preferred architectural patterns in this codebase
 

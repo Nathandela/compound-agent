@@ -145,7 +145,7 @@ The security-reviewer (core 4) can escalate to 5 on-demand specialist skills for
 
 **P0 findings block merge.** No exceptions. P1 findings require explicit acknowledgment.
 
-All reference docs are at `docs/research/security/` (source repo) or `docs/compound/research/security/` (consumer repos after `npx ca setup`).
+All reference docs are at `docs/research/security/` (source repo) or `docs/compound/research/security/` (consumer repos after `ca setup`).
 
 ## Inviolable TDD Rules
 
@@ -160,7 +160,7 @@ All reference docs are at `docs/research/security/` (source repo) or `docs/compo
 
 After `/implementation-reviewer` approves, configured external reviewers run as **advisory (non-blocking)** cross-model checks.
 
-**Setup**: `npx ca reviewer enable gemini` or `npx ca reviewer enable codex`
+**Setup**: `ca reviewer enable gemini` or `ca reviewer enable codex`
 **Config**: `.claude/compound-agent.json` — `{ "externalReviewers": ["gemini", "codex"] }`
 
 External reviewers:

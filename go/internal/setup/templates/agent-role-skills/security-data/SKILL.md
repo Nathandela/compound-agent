@@ -31,7 +31,7 @@ On-demand specialist for detecting sensitive data exposure through logging, erro
 ## Literature
 - Consult `docs/compound/research/security/data-exposure.md` for exposure patterns and detection heuristics
 - Consult `docs/compound/research/security/secure-coding-failure.md` section 4.8 for theoretical foundation
-- Run `npx ca knowledge "data exposure PII logging"` for indexed knowledge
+- Run `ca knowledge "data exposure PII logging"` for indexed knowledge
 
 ## Collaboration
 Report findings to security-reviewer via SendMessage with severity classification. Flag logging architecture issues to architecture-reviewer.

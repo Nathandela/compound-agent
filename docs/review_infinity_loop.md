@@ -421,28 +421,28 @@
 ⏺ All three background agents have completed and confirmed my findings. The report above is the
   comprehensive audit. Let me capture the key lessons from this forensic analysis.
 
-⏺ Bash(npx ca learn "Infinity loop extract_text pipeline can produce 0-byte log files even when the trace
+⏺ Bash(ca learn "Infinity loop extract_text pipeline can produce 0-byte log files even when the trace
        JSONL has valid assistant text blocks (44 blocks in drift-wat…)
   ⎿  [ok] Learned: Infinity loop extract_text pipeline can produce 0-byte log files even when the tr
      ace JSONL has valid assistant text blocks (44 blocks in drift-watch E2 case). The tee-to-jq/pyt
      hon3 pipeline fails silently. Root cause: stream-json format parsing in extract_text() doesn't
      … +4 lines (ctrl+o to expand)
 
-⏺ Bash(npx ca learn "Infinity loop EPIC_COMPLETE marker detection is fragile. The grep pattern
+⏺ Bash(ca learn "Infinity loop EPIC_COMPLETE marker detection is fragile. The grep pattern
       '^EPIC_COMPLETE$' requires the marker on its own line, but extract_text…)
   ⎿  [ok] Learned: Infinity loop EPIC_COMPLETE marker detection is fragile. The grep pattern '^EPIC_
      COMPLETE$' requires the marker on its own line, but extract_text can concatenate adjacent text
      blocks without preserving newlines (e.g. 'final state:EPIC_COMPLETE'). 10/11 successful session
      … +3 lines (ctrl+o to expand)
 
-⏺ Bash(npx ca learn "In autonomous loop runs, Claude sessions show strong self-correction: detecting
+⏺ Bash(ca learn "In autonomous loop runs, Claude sessions show strong self-correction: detecting
       already-closed epics with no implementation and reopening them, ha…)
   ⎿  [ok] Learned: In autonomous loop runs, Claude sessions show strong self-correction: detecting a
      lready-closed epics with no implementation and reopening them, handling multiple related beads
      in a single session (e.g. review + parent epic + compound task), and detecting completed work w
      … +3 lines (ctrl+o to expand)
 
-⏺ Bash(npx ca learn "First drift-watch infinity loop audit results: 5,740 lines across 59 files, 211
+⏺ Bash(ca learn "First drift-watch infinity loop audit results: 5,740 lines across 59 files, 211
       tests (100% pass), 22 lessons captured, 50+ beads closed. Total ru…)
   ⎿  [ok] Learned: First drift-watch infinity loop audit results: 5,740 lines across 59 files, 211 t
      ests (100% pass), 22 lessons captured, 50+ beads closed. Total runtime ~2h50m. Code quality is

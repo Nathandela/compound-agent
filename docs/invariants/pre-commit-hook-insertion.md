@@ -134,7 +134,7 @@ When appending the Compound Agent hook to an existing git pre-commit hook, the c
 **Test strategy**:
 - Run installation twice on same hook
 - Verify marker appears exactly once
-- Count occurrences of `npx ca hooks run pre-commit`
+- Count occurrences of `ca hooks run pre-commit`
 
 ### S5: Permission Loss
 **Property**: The hook file must NEVER lose executable permissions after modification.
@@ -363,7 +363,7 @@ One test per edge case (EC1-EC10) listed above.
 ### Integration Tests
 
 1. Create real git repo with various hook configurations
-2. Run `npx ca init`
+2. Run `ca init`
 3. Manually trigger pre-commit hook
 4. Verify Compound Agent prompt appears
 

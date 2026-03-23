@@ -2,6 +2,7 @@ package hook
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -159,6 +160,22 @@ func IsValidGate(s string) bool {
 // PhaseIndexOf returns the 1-based index for a phase name, or 0 if not found.
 func PhaseIndexOf(phase string) int {
 	return phaseIndexMap[phase]
+}
+
+// CleanPhaseStateIfFinal removes the phase state file if the "final" gate has been recorded.
+func CleanPhaseStateIfFinal(repoRoot string) {
+	state := GetPhaseState(repoRoot)
+	if state == nil || !state.CookitActive {
+		return
+	}
+	for _, g := range state.GatesPassed {
+		if g == "final" {
+			if err := os.Remove(PhaseStatePath(repoRoot)); err != nil && !os.IsNotExist(err) {
+				fmt.Fprintf(os.Stderr, "[warn] clean phase state: %v\n", err)
+			}
+			return
+		}
+	}
 }
 
 // ExpectedGateForPhase returns the required gate name for a phase index, or "" for none.

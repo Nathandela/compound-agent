@@ -29,7 +29,7 @@ On-demand specialist for auditing dependency security, lockfile changes, and sup
 ## Literature
 - Consult `docs/compound/research/security/dependency-security.md` for risk assessment methodology
 - Consult `docs/compound/research/security/secure-coding-failure.md` section 4.9 for theoretical foundation
-- Run `npx ca knowledge "dependency vulnerability supply chain"` for indexed knowledge
+- Run `ca knowledge "dependency vulnerability supply chain"` for indexed knowledge
 
 ## Collaboration
 Report findings to security-reviewer via SendMessage with severity classification. Flag architecture-level dependency concerns (e.g., replacing a core library) to architecture-reviewer.

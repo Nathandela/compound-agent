@@ -17,5 +17,5 @@ Confirm with the user via AskUserQuestion before saving.
 Then run:
 
 ```bash
-npx ca learn "$ARGUMENTS" --tags "<tag1>,<tag2>"
+ca learn "$ARGUMENTS" --tags "<tag1>,<tag2>"
 ```

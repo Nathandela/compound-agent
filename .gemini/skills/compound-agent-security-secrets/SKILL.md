@@ -31,7 +31,7 @@ On-demand specialist for detecting hardcoded credentials, leaked secrets, and im
 ## Literature
 - Consult `docs/compound/research/security/secrets-checklist.md` for format patterns and hiding spots
 - Consult `docs/compound/research/security/secure-coding-failure.md` section 4.6 for theoretical foundation
-- Run `npx ca knowledge "secrets credentials hardcoded"` for indexed knowledge
+- Run `ca knowledge "secrets credentials hardcoded"` for indexed knowledge
 
 ## Collaboration
 Report findings to security-reviewer via SendMessage with severity classification. Flag secrets in test files to test-coverage-reviewer.

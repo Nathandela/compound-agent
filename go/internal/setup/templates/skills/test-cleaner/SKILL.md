@@ -47,7 +47,7 @@ Apply the agreed changes:
 ### Phase 5: Verification
 - Run full test suite after changes
 - Compare before/after metrics (count, duration, coverage)
-- Feed findings into compound-agent memory via `npx ca learn`
+- Feed findings into compound-agent memory via `ca learn`
 
 ## Test Scripts Integration
 - `pnpm test:segment <module>` -- Test specific module in isolation
@@ -55,8 +55,8 @@ Apply the agreed changes:
 - `pnpm test:critical` -- P1/critical tests only (fast CI feedback)
 
 ## Memory Integration
-- Run `npx ca search "test optimization"` before starting
-- After completion, capture findings via `npx ca learn`
+- Run `ca search "test optimization"` before starting
+- After completion, capture findings via `ca learn`
 - Feed patterns into CCT system for future sessions
 
 ## Common Pitfalls

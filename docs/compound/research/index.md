@@ -73,6 +73,6 @@ Use `/compound:get-a-phd` to produce new research documents. The command:
 
 Skills and agents reference research via `## Literature` sections. Agents can also query indexed knowledge:
 ```bash
-npx ca knowledge "relevant query"  # Search docs knowledge base
-npx ca search "relevant query"     # Search lessons memory
+ca knowledge "relevant query"  # Search docs knowledge base
+ca search "relevant query"     # Search lessons memory
 ```

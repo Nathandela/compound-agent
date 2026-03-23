@@ -47,7 +47,7 @@ npm install -g compound-agent
 The setup command reconfigures hooks, AGENTS.md, and slash commands:
 
 ```bash
-npx ca setup
+ca setup
 ```
 
 This is idempotent and safe to run multiple times. It will:
@@ -79,7 +79,7 @@ Restart Claude Code to pick up the new hooks configuration.
 ### 6. Verify
 
 ```bash
-npx ca setup --status
+ca setup --status
 ```
 
 All items should show `installed`.
@@ -146,21 +146,21 @@ The package is not installed or not in your PATH. Run `npm install --save-dev co
 **MCP tools not appearing in Claude Code**
 > Not applicable in v1.2.9 -- the MCP server was removed. There are no MCP tools to register.
 
-(For pre-v1.2.9) Run `npx ca setup` to register the MCP server, then restart Claude Code. Verify with `npx ca setup --status`.
+(For pre-v1.2.9) Run `ca setup` to register the MCP server, then restart Claude Code. Verify with `ca setup --status`.
 
 **Old hooks still firing**
-Check `.claude/settings.json` for references to `lna` or `learning-agent`. Remove them and run `npx ca setup` to install the new hooks.
+Check `.claude/settings.json` for references to `lna` or `learning-agent`. Remove them and run `ca setup` to install the new hooks.
 
 **SQLite cache errors after upgrade**
 Delete the cache file and let it rebuild:
 ```bash
 rm .claude/.cache/lessons.sqlite
-npx ca rebuild
+ca rebuild
 ```
 
 **Embedding model missing**
 ```bash
-npx ca download-model
+ca download-model
 ```
 The model is stored in `~/.cache/huggingface/hub/models--nomic-ai--nomic-embed-text-v1.5/` and is shared across projects.
 
@@ -176,7 +176,7 @@ The `compound-agent-mcp` binary and `@modelcontextprotocol/sdk` dependency have 
 
 **Migration steps:**
 1. Remove any `.mcp.json` entry for `compound-agent-mcp` if present
-2. Run `npx ca setup` to install the updated Claude Code hooks (now 8 hook registrations)
+2. Run `ca setup` to install the updated Claude Code hooks (now 8 hook registrations)
 3. Update any scripts calling `compound-agent-mcp` to use `npx ca` instead
 
 ### New Features in v1.2.9
@@ -185,4 +185,4 @@ The `compound-agent-mcp` binary and `@modelcontextprotocol/sdk` dependency have 
 - PreToolUse phase guard hook — enforces reading phase skill before editing
 - PostToolUse read tracker — tracks skill file reads in phase state
 - Stop audit hook — blocks phase transitions without gate verification
-- Run `npx ca setup` to get all new hooks installed
+- Run `ca setup` to get all new hooks installed

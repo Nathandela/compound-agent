@@ -35,21 +35,21 @@ When a cooking session begins, IMMEDIATELY print the banner below (copy it verba
 Then proceed with the protocol below.
 
 ## Phase Execution Protocol
-0. Initialize state: `npx ca phase-check init <epic-id>`
+0. Initialize state: `ca phase-check init <epic-id>`
 For each phase:
 1. Announce: "[Phase N/5] PHASE_NAME"
-2. Start state: `npx ca phase-check start <phase>`
+2. Start state: `ca phase-check start <phase>`
 3. Read the phase skill file (see above)
-4. Run `npx ca search` and `npx ca knowledge` with the current goal -- display results before proceeding
+4. Run `ca search` and `ca knowledge` with the current goal -- display results before proceeding
 5. Execute the phase following the skill instructions
 6. Update epic state: `bd update <epic-id> --notes="Phase: NAME COMPLETE | Next: NEXT"`
 7. Verify phase gate before proceeding to the next phase
 
 ## Phase Gates (MANDATORY)
-- **After Plan**: Run `bd list --status=open` and verify Review + Compound tasks exist, then run `npx ca phase-check gate post-plan`
-- **After Work (GATE 3)**: `bd list --status=in_progress` must be empty. Then run `npx ca phase-check gate gate-3`
-- **After Review (GATE 4)**: /implementation-reviewer must have returned APPROVED. Then run `npx ca phase-check gate gate-4`
-- **After Compound (FINAL GATE)**: Run `npx ca verify-gates <epic-id>` (must PASS), `pnpm test`, and `pnpm lint`, then run `npx ca phase-check gate final` (auto-cleans phase state)
+- **After Plan**: Run `bd list --status=open` and verify Review + Compound tasks exist, then run `ca phase-check gate post-plan`
+- **After Work (GATE 3)**: `bd list --status=in_progress` must be empty. Then run `ca phase-check gate gate-3`
+- **After Review (GATE 4)**: /implementation-reviewer must have returned APPROVED. Then run `ca phase-check gate gate-4`
+- **After Compound (FINAL GATE)**: Run `ca verify-gates <epic-id>` (must PASS), `pnpm test`, and `pnpm lint`, then run `ca phase-check gate final` (auto-cleans phase state)
 
 If a gate fails, DO NOT proceed. Fix the issue first.
 
@@ -78,9 +78,9 @@ If a gate fails, DO NOT proceed. Fix the issue first.
 - Phase gates verified between each transition
 - Epic notes updated after each phase
 - Memory searched at the start of each phase
-- `npx ca verify-gates` passed at the end
+- `ca verify-gates` passed at the end
 
 ## SESSION CLOSE -- INVIOLABLE
 Before saying "done": git status, git add, bd sync, git commit, bd sync, git push.
-If phase state gets stuck, use the escape hatch: `npx ca phase-check clean` (or `npx ca phase-clean`).
+If phase state gets stuck, use the escape hatch: `ca phase-check clean` (or `ca phase-clean`).
 

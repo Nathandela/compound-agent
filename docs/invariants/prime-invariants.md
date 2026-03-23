@@ -6,7 +6,7 @@ The `prime` command generates trust language guidelines for Claude Code that inc
 
 ## Module Overview
 
-**Command**: `npx ca prime`
+**Command**: `ca prime`
 
 **Inputs**:
 - Repository root directory (implicit)

@@ -240,6 +240,59 @@ func TestPhaseIndex(t *testing.T) {
 	}
 }
 
+func TestCleanPhaseStateIfFinal(t *testing.T) {
+	t.Run("cleans when final gate present", func(t *testing.T) {
+		dir := t.TempDir()
+		stateDir := filepath.Join(dir, ".claude")
+		os.MkdirAll(stateDir, 0o755)
+
+		state := &PhaseState{
+			CookitActive: true,
+			EpicID:       "cleanup-test",
+			CurrentPhase: "compound",
+			PhaseIndex:   5,
+			SkillsRead:   []string{},
+			GatesPassed:  []string{"post-plan", "gate-3", "gate-4", "final"},
+			StartedAt:    time.Now().Format(time.RFC3339),
+		}
+		WritePhaseState(dir, state)
+
+		CleanPhaseStateIfFinal(dir)
+
+		if _, err := os.Stat(PhaseStatePath(dir)); !os.IsNotExist(err) {
+			t.Error("state file should be removed when final gate present")
+		}
+	})
+
+	t.Run("preserves when final gate absent", func(t *testing.T) {
+		dir := t.TempDir()
+		stateDir := filepath.Join(dir, ".claude")
+		os.MkdirAll(stateDir, 0o755)
+
+		state := &PhaseState{
+			CookitActive: true,
+			EpicID:       "keep-test",
+			CurrentPhase: "review",
+			PhaseIndex:   4,
+			SkillsRead:   []string{},
+			GatesPassed:  []string{"post-plan", "gate-3"},
+			StartedAt:    time.Now().Format(time.RFC3339),
+		}
+		WritePhaseState(dir, state)
+
+		CleanPhaseStateIfFinal(dir)
+
+		if _, err := os.Stat(PhaseStatePath(dir)); err != nil {
+			t.Error("state file should be preserved when final gate absent")
+		}
+	})
+
+	t.Run("noop when no state file", func(t *testing.T) {
+		dir := t.TempDir()
+		CleanPhaseStateIfFinal(dir) // should not panic
+	})
+}
+
 func TestExpectedGateForPhase(t *testing.T) {
 	tests := []struct {
 		index int

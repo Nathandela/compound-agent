@@ -5,5 +5,5 @@ description: Load compound-agent workflow context after compaction or context lo
 Load compound-agent workflow context after compaction or context loss.
 
 ```bash
-npx ca prime
+ca prime
 ```

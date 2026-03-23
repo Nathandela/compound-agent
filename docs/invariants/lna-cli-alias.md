@@ -25,9 +25,9 @@ Feature: Add `ca` as the PRIMARY CLI alias for compound-agent.
 All strings intended for Claude Code MUST use `npx ca`, not `npx compound-agent`:
 
 - **AGENTS_MD_TEMPLATE**: All command examples use `npx ca`
-- **PRE_COMMIT_MESSAGE**: Hint uses `npx ca capture`
-- **CLAUDE_HOOK_CONFIG.hooks[0].command**: Uses `npx ca load-session`
-- **Error messages**: Model download hint uses `npx ca download-model`
+- **PRE_COMMIT_MESSAGE**: Hint uses `ca capture`
+- **CLAUDE_HOOK_CONFIG.hooks[0].command**: Uses `ca load-session`
+- **Error messages**: Model download hint uses `ca download-model`
 - **Rationale**: Claude should learn the shorter form as primary
 
 ### Backwards compatibility strings
@@ -53,7 +53,7 @@ User-facing documentation MAY mention both:
 - **Why**: Breaks CLI invocation entirely
 - **Test strategy**:
   - JSON schema validation on package.json
-  - Integration test: `npx ca --version` and `npx compound-agent --version` both succeed
+  - Integration test: `ca --version` and `npx compound-agent --version` both succeed
 
 ### 4. Name collision
 - **Property**: `ca` package name MUST NOT be registered on npm
@@ -68,7 +68,7 @@ User-facing documentation MAY mention both:
 - **Monitoring**: Integration tests run both commands
 
 ### 2. Help text displays correctly
-- **Property**: `npx ca --help` shows appropriate usage within 100ms
+- **Property**: `ca --help` shows appropriate usage within 100ms
 - **Timeline**: Immediate (synchronous operation)
 - **Monitoring**: Integration test verifies help output
 
@@ -99,14 +99,14 @@ User-facing documentation MAY mention both:
 ### Code Changes
 - [ ] package.json: Add `"ca": "./dist/cli.js"` to bin field
 - [ ] cli.ts: Update AGENTS_MD_TEMPLATE to use `npx ca`
-- [ ] cli.ts: Update PRE_COMMIT_MESSAGE to use `npx ca capture`
-- [ ] cli.ts: Update CLAUDE_HOOK_CONFIG to use `npx ca load-session`
-- [ ] cli.ts: Update check-plan error message to use `npx ca download-model`
+- [ ] cli.ts: Update PRE_COMMIT_MESSAGE to use `ca capture`
+- [ ] cli.ts: Update CLAUDE_HOOK_CONFIG to use `ca load-session`
+- [ ] cli.ts: Update check-plan error message to use `ca download-model`
 
 ### Tests
 - [ ] Unit: Verify package.json has both bin entries
-- [ ] Integration: `npx ca --version` succeeds
-- [ ] Integration: `npx ca learn "test" --yes` creates lesson
+- [ ] Integration: `ca --version` succeeds
+- [ ] Integration: `ca learn "test" --yes` creates lesson
 - [ ] Integration: `npx compound-agent list` still works
 - [ ] Documentation: Grep for incorrect usage in templates
 
@@ -127,11 +127,11 @@ grep "npx compound-agent" src/cli.ts | grep -v "backwards compat"  # Should be m
 ### Runtime Tests
 ```bash
 # Both commands work
-npx ca --version
+ca --version
 npx compound-agent --version
 
 # Same behavior
-npx ca list > /tmp/ca.txt
+ca list > /tmp/ca.txt
 npx compound-agent list > /tmp/compound-agent.txt
 diff /tmp/ca.txt /tmp/compound-agent.txt  # Should be identical
 ```
