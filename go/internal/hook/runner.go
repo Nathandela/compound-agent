@@ -22,7 +22,7 @@ const preCommitMessage = `
 ║ [ ] Is there anything worth remembering for next time?       ║
 ║                                                              ║
 ║ If so, consider capturing a lesson:                          ║
-║   ca learn "<insight>" --trigger "<what happened>"           ║
+║   npx ca learn "<insight>" --trigger "<what happened>"       ║
 ╚══════════════════════════════════════════════════════════════╝`
 
 // hookInput holds the raw JSON input read from stdin for a hook invocation.

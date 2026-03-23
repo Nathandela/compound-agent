@@ -449,7 +449,7 @@ func importItems(repoRoot string, f *os.File, existingIDs map[string]bool) (impo
 
 const trustLanguage = `# Compound Agent Active
 
-> **Context Recovery**: Run ` + "`ca prime`" + ` after compaction, clear, or new session
+> **Context Recovery**: Run ` + "`npx ca prime`" + ` after compaction, clear, or new session
 
 ## CLI Commands (ALWAYS USE THESE)
 
@@ -457,8 +457,8 @@ const trustLanguage = `# Compound Agent Active
 
 | Command | Purpose |
 |---------|---------|
-| ` + "`ca search \"query\"`" + ` | Search lessons - MUST call before architectural decisions; use anytime you need context |
-| ` + "`ca learn \"insight\"`" + ` | Capture lessons - call AFTER corrections or discoveries |
+| ` + "`npx ca search \"query\"`" + ` | Search lessons - MUST call before architectural decisions; use anytime you need context |
+| ` + "`npx ca learn \"insight\"`" + ` | Capture lessons - call AFTER corrections or discoveries |
 
 ## Core Constraints
 
@@ -470,7 +470,7 @@ const trustLanguage = `# Compound Agent Active
 
 ## Retrieval Protocol
 
-You MUST call ` + "`ca search`" + ` BEFORE:
+You MUST call ` + "`npx ca search`" + ` BEFORE:
 - Architectural decisions or complex planning
 - Implementing patterns you've done before in this repo
 
@@ -480,7 +480,7 @@ Beyond mandatory triggers, use these commands freely — they are lightweight qu
 
 ## Capture Protocol
 
-Run ` + "`ca learn`" + ` AFTER:
+Run ` + "`npx ca learn`" + ` AFTER:
 - User corrects you ("no", "wrong", "actually...")
 - You self-correct after iteration failures
 - Test fails then you fix it

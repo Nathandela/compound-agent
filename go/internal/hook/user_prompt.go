@@ -3,10 +3,10 @@ package hook
 import "regexp"
 
 // CorrectionReminder is the message shown when a correction pattern is detected.
-const CorrectionReminder = "Remember: You have memory tools available - `ca learn` to save insights, `ca search` to find past solutions."
+const CorrectionReminder = "Remember: You have memory tools available - `npx ca learn` to save insights, `npx ca search` to find past solutions."
 
 // PlanningReminder is the message shown when a planning pattern is detected.
-const PlanningReminder = "If you're uncertain or hesitant, remember your memory tools: `ca search` may have relevant context from past sessions."
+const PlanningReminder = "If you're uncertain or hesitant, remember your memory tools: `npx ca search` may have relevant context from past sessions."
 
 var correctionPatterns = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\bactually\b`),

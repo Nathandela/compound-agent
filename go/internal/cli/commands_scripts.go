@@ -428,7 +428,7 @@ func loopScriptPromptBuilder(bt string) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# --- Prompt Builder ---\nbuild_prompt() {\n  local epic_id=\"$1\"\n  cat <<PROMPT_EOF\n")
 	fmt.Fprintf(&b, "You are running in an autonomous infinity loop. Your task is to fully implement a beads epic.\n\n")
-	fmt.Fprintf(&b, "## Step 1: Load context\nRun these commands to prime your session:\n%s%s%sbash\nca load-session\nbd show $epic_id\n%s%s%s\n\n", bt, bt, bt, bt, bt, bt)
+	fmt.Fprintf(&b, "## Step 1: Load context\nRun these commands to prime your session:\n%s%s%sbash\nnpx ca load-session\nbd show $epic_id\n%s%s%s\n\n", bt, bt, bt, bt, bt, bt)
 	fmt.Fprintf(&b, "## Step 2: Execute the workflow\n/compound:cook-it from plan -- Epic: $epic_id\n\n")
 	fmt.Fprintf(&b, "## Step 3: On completion\n1. Close the epic: %sbd close $epic_id%s\n2. Commit and push all changes\n3. Output this marker on its own line:\n\nEPIC_COMPLETE\n\n", bt, bt)
 	fmt.Fprintf(&b, "## Step 4: On failure\n1. Add a note: %sbd update $epic_id --notes \"Loop failed: <reason>\"%s\n2. Output this marker:\n\nEPIC_FAILED\n\n", bt, bt)

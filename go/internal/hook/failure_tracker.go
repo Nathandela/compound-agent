@@ -15,7 +15,7 @@ const (
 	stateMaxAge           = time.Hour
 )
 
-const failureTip = "Tip: Multiple failures detected. `ca search` may have solutions for similar issues."
+const failureTip = "Tip: Multiple failures detected. `npx ca search` may have solutions for similar issues."
 
 type failureState struct {
 	Count           int    `json:"count"`
