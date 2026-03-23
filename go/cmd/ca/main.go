@@ -27,6 +27,8 @@ func main() {
 			}
 		},
 	}
+	rootCmd.SetOut(os.Stdout)
+	rootCmd.SetErr(os.Stderr)
 
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose (debug-level) logging")
 

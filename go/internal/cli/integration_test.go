@@ -262,6 +262,26 @@ func TestE2E_LoadSessionJSON(t *testing.T) {
 	}
 }
 
+func TestE2E_PrimeHookCommandWritesToStdout(t *testing.T) {
+	repo := setupTestRepo(t)
+	cmd := exec.Command("sh", "-c", fmt.Sprintf("'%s' prime 2>/dev/null || true", binaryPath))
+	cmd.Dir = repo
+	cmd.Env = append(os.Environ(), "COMPOUND_AGENT_ROOT="+repo)
+
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("hook-style prime command failed: %v", err)
+	}
+
+	stdout := string(out)
+	if !strings.Contains(stdout, "Compound Agent Active") {
+		t.Fatalf("expected prime output on stdout, got: %q", stdout)
+	}
+	if !strings.Contains(stdout, "npx ca search") {
+		t.Errorf("expected CLI guidance in stdout, got: %q", stdout)
+	}
+}
+
 func TestE2E_MigrateFromTS_DryRun(t *testing.T) {
 	repo := setupTestRepo(t)
 	writeTestLessons(t, repo, []map[string]any{
