@@ -77,6 +77,130 @@ func TestSetupCommand_NoSkipModelFlag(t *testing.T) {
 	}
 }
 
+func TestInitCommand_SkipAgentsFlag(t *testing.T) {
+	cmd := initCmd()
+
+	flag := cmd.Flags().Lookup("skip-agents")
+	if flag == nil {
+		t.Fatal("expected --skip-agents flag to exist on init command")
+	}
+	if flag.DefValue != "false" {
+		t.Errorf("expected default false, got %s", flag.DefValue)
+	}
+}
+
+func TestInitCommand_SkipAgents_SkipsTemplates(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
+
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(initCmd())
+
+	out, err := executeCommand(root, "init", "--repo-root", dir, "--skip-agents")
+	if err != nil {
+		t.Fatalf("init --skip-agents failed: %v\nOutput: %s", err, out)
+	}
+
+	// AGENTS.md should NOT be created when --skip-agents is set
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err == nil {
+		t.Error("expected AGENTS.md to NOT be created with --skip-agents")
+	}
+}
+
+func TestInitCommand_SkipClaudeFlag(t *testing.T) {
+	cmd := initCmd()
+
+	flag := cmd.Flags().Lookup("skip-claude")
+	if flag == nil {
+		t.Fatal("expected --skip-claude flag to exist on init command")
+	}
+	if flag.DefValue != "false" {
+		t.Errorf("expected default false, got %s", flag.DefValue)
+	}
+}
+
+func TestInitCommand_SkipClaude_SkipsHooks(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
+
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(initCmd())
+
+	out, err := executeCommand(root, "init", "--repo-root", dir, "--skip-claude")
+	if err != nil {
+		t.Fatalf("init --skip-claude failed: %v\nOutput: %s", err, out)
+	}
+
+	// settings.json should NOT have hooks when --skip-claude is set
+	settingsPath := filepath.Join(dir, ".claude", "settings.json")
+	if _, err := os.Stat(settingsPath); err == nil {
+		settings, readErr := setup.ReadClaudeSettings(settingsPath)
+		if readErr == nil && setup.HasAllHooks(settings) {
+			t.Error("expected hooks to NOT be installed with --skip-claude")
+		}
+	}
+}
+
+func TestSetupClaudeCommand_DryRunFlag(t *testing.T) {
+	cmd := setupCmd()
+	claudeCmd, _, err := cmd.Find([]string{"claude"})
+	if err != nil {
+		t.Fatalf("could not find claude subcommand: %v", err)
+	}
+
+	flag := claudeCmd.Flags().Lookup("dry-run")
+	if flag == nil {
+		t.Fatal("expected --dry-run flag to exist on setup claude command")
+	}
+	if flag.DefValue != "false" {
+		t.Errorf("expected default false, got %s", flag.DefValue)
+	}
+}
+
+func TestSetupClaudeCommand_DryRun_NoWrite(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+
+	root := &cobra.Command{Use: "ca"}
+	setupC := &cobra.Command{Use: "setup", Short: "Setup commands"}
+	root.AddCommand(setupC)
+	registerSetupClaudeCmd(setupC)
+
+	out, err := executeCommand(root, "setup", "claude", "--repo-root", dir, "--dry-run")
+	if err != nil {
+		t.Fatalf("setup claude --dry-run failed: %v\nOutput: %s", err, out)
+	}
+
+	// settings.json should NOT exist after --dry-run
+	settingsPath := filepath.Join(dir, ".claude", "settings.json")
+	if _, statErr := os.Stat(settingsPath); statErr == nil {
+		t.Error("expected settings.json to NOT be written with --dry-run")
+	}
+}
+
+func TestSetupClaudeCommand_DryRun_JSON(t *testing.T) {
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+
+	root := &cobra.Command{Use: "ca"}
+	setupC := &cobra.Command{Use: "setup", Short: "Setup commands"}
+	root.AddCommand(setupC)
+	registerSetupClaudeCmd(setupC)
+
+	out, err := executeCommand(root, "setup", "claude", "--repo-root", dir, "--dry-run", "--json")
+	if err != nil {
+		t.Fatalf("setup claude --dry-run --json failed: %v\nOutput: %s", err, out)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &result); err != nil {
+		t.Fatalf("expected valid JSON output, got: %s", out)
+	}
+	if result["dryRun"] != true {
+		t.Errorf("expected dryRun=true in JSON output, got %v", result["dryRun"])
+	}
+}
+
 func TestSetupClaudeCommand_Install(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)

@@ -9,8 +9,34 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// buildHooksCmd creates the "hooks run" command tree.
+func buildHooksCmd() *cobra.Command {
+	hooksCmd := &cobra.Command{
+		Use:   "hooks",
+		Short: "Hook management commands",
+	}
+	runCmd := &cobra.Command{
+		Use:   "run [hook-name]",
+		Short: "Run a hook handler",
+		Args:  cobra.MaximumNArgs(1),
+		Run: func(cmd *cobra.Command, args []string) {
+			hookName := ""
+			if len(args) > 0 {
+				hookName = args[0]
+			}
+			exitCode := hook.RunHook(hookName, os.Stdin, os.Stdout)
+			os.Exit(exitCode)
+		},
+	}
+	hooksCmd.AddCommand(runCmd)
+	return hooksCmd
+}
+
 func main() {
-	var verbose bool
+	var (
+		verbose bool
+		quiet   bool
+	)
 
 	rootCmd := &cobra.Command{
 		Use:   "ca",
@@ -31,28 +57,9 @@ func main() {
 	rootCmd.SetErr(os.Stderr)
 
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose (debug-level) logging")
+	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "suppress non-essential output")
 
-	hooksCmd := &cobra.Command{
-		Use:   "hooks",
-		Short: "Hook management commands",
-	}
-
-	runCmd := &cobra.Command{
-		Use:   "run [hook-name]",
-		Short: "Run a hook handler",
-		Args:  cobra.MaximumNArgs(1),
-		Run: func(cmd *cobra.Command, args []string) {
-			hookName := ""
-			if len(args) > 0 {
-				hookName = args[0]
-			}
-			exitCode := hook.RunHook(hookName, os.Stdin, os.Stdout)
-			os.Exit(exitCode)
-		},
-	}
-
-	hooksCmd.AddCommand(runCmd)
-	rootCmd.AddCommand(hooksCmd)
+	rootCmd.AddCommand(buildHooksCmd())
 	cli.RegisterCommands(rootCmd)
 
 	if err := rootCmd.Execute(); err != nil {
