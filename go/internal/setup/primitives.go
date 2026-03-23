@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -287,6 +288,14 @@ func PruneStaleTemplates(repoRoot string) (int, error) {
 	}
 	pruned += n
 
+	// Phase skill internals: prune retired nested files/dirs (for example old
+	// references under a still-valid phase directory).
+	n, err = prunePhaseSkillInternals(skillsDir)
+	if err != nil {
+		return pruned, err
+	}
+	pruned += n
+
 	// Agent role skills: prune stale role directories
 	rolesDir := filepath.Join(repoRoot, ".claude", "skills", "compound", "agents")
 	n, err = pruneStaleSubdirs(rolesDir, templates.AgentRoleSkills(), nil)
@@ -296,6 +305,26 @@ func PruneStaleTemplates(repoRoot string) (int, error) {
 	pruned += n
 
 	return pruned, nil
+}
+
+// prunePhaseSkillInternals removes retired files and directories inside current
+// phase skill directories while preserving the current SKILL.md and reference files.
+func prunePhaseSkillInternals(skillsDir string) (int, error) {
+	expectedFiles := make(map[string]bool)
+	expectedDirs := make(map[string]bool)
+
+	for phase := range templates.PhaseSkills() {
+		expectedDirs[phase] = true
+		expectedFiles[path.Join(phase, "SKILL.md")] = true
+	}
+	for relPath := range templates.PhaseSkillReferences() {
+		expectedFiles[relPath] = true
+		for dir := path.Dir(relPath); dir != "." && dir != ""; dir = path.Dir(dir) {
+			expectedDirs[dir] = true
+		}
+	}
+
+	return pruneManagedSubtree(skillsDir, "", expectedFiles, expectedDirs, map[string]bool{"agents": true})
 }
 
 // pruneStaleFiles removes files from dir that are not in the expected map (by filename key).
@@ -320,6 +349,67 @@ func pruneStaleFiles(dir string, expected map[string]string) (int, error) {
 			pruned++
 		}
 	}
+	return pruned, nil
+}
+
+// pruneManagedSubtree removes files and directories below root that are not in
+// the expected sets. Relative paths in expectedFiles/expectedDirs use slash
+// separators. skipTopLevel names are preserved only at the root level.
+func pruneManagedSubtree(
+	root string,
+	relDir string,
+	expectedFiles map[string]bool,
+	expectedDirs map[string]bool,
+	skipTopLevel map[string]bool,
+) (int, error) {
+	dirPath := root
+	if relDir != "" {
+		dirPath = filepath.Join(root, filepath.FromSlash(relDir))
+	}
+
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return 0, nil
+		}
+		return 0, fmt.Errorf("read %s: %w", dirPath, err)
+	}
+
+	pruned := 0
+	for _, entry := range entries {
+		relPath := entry.Name()
+		if relDir != "" {
+			relPath = path.Join(relDir, entry.Name())
+		}
+
+		if entry.IsDir() {
+			if relDir == "" && skipTopLevel[entry.Name()] {
+				continue
+			}
+			if !expectedDirs[relPath] {
+				if rErr := os.RemoveAll(filepath.Join(root, filepath.FromSlash(relPath))); rErr != nil {
+					return pruned, fmt.Errorf("remove %s: %w", relPath, rErr)
+				}
+				pruned++
+				continue
+			}
+
+			n, recurseErr := pruneManagedSubtree(root, relPath, expectedFiles, expectedDirs, skipTopLevel)
+			if recurseErr != nil {
+				return pruned, recurseErr
+			}
+			pruned += n
+			continue
+		}
+
+		if !expectedFiles[relPath] {
+			if rErr := os.Remove(filepath.Join(root, filepath.FromSlash(relPath))); rErr != nil {
+				return pruned, fmt.Errorf("remove %s: %w", relPath, rErr)
+			}
+			pruned++
+		}
+	}
+
 	return pruned, nil
 }
 
