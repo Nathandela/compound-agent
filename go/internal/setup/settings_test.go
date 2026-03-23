@@ -223,3 +223,61 @@ func TestAddAllHooks_WithSpacesInPath(t *testing.T) {
 		t.Errorf("expected shell-escaped path, got: %s", cmd)
 	}
 }
+
+func TestHooksNeedUpgrade_NpxWithBinary(t *testing.T) {
+	// Hooks installed with npx, binary now available → needs upgrade
+	settings := map[string]any{}
+	AddAllHooks(settings, "") // Install with npx fallback
+
+	if !HooksNeedUpgrade(settings, "/usr/local/bin/ca") {
+		t.Error("expected true: npx hooks should need upgrade when binary available")
+	}
+}
+
+func TestHooksNeedUpgrade_AlreadyBinary(t *testing.T) {
+	// Hooks already use binary path → no upgrade needed
+	settings := map[string]any{}
+	AddAllHooks(settings, "/usr/local/bin/ca")
+
+	if HooksNeedUpgrade(settings, "/usr/local/bin/ca") {
+		t.Error("expected false: binary hooks should not need upgrade")
+	}
+}
+
+func TestHooksNeedUpgrade_NoBinaryPath(t *testing.T) {
+	// No binary available → can't upgrade, return false
+	settings := map[string]any{}
+	AddAllHooks(settings, "")
+
+	if HooksNeedUpgrade(settings, "") {
+		t.Error("expected false: can't upgrade without binary path")
+	}
+}
+
+func TestHooksNeedUpgrade_NoHooks(t *testing.T) {
+	// No hooks at all → nothing to upgrade
+	settings := map[string]any{}
+
+	if HooksNeedUpgrade(settings, "/usr/local/bin/ca") {
+		t.Error("expected false: no hooks to upgrade")
+	}
+}
+
+func TestHooksNeedUpgrade_MixedHooks(t *testing.T) {
+	// Some hooks are npx, some are binary (shouldn't happen but test boundary)
+	settings := map[string]any{}
+	AddAllHooks(settings, "") // All npx
+
+	// Manually upgrade just SessionStart
+	hooks := settings["hooks"].(map[string]any)
+	arr := hooks["SessionStart"].([]any)
+	entry := arr[0].(map[string]any)
+	hooksList := entry["hooks"].([]any)
+	h := hooksList[0].(map[string]any)
+	h["command"] = "/usr/local/bin/ca prime 2>/dev/null || true"
+
+	// Other hooks still use npx → needs upgrade
+	if !HooksNeedUpgrade(settings, "/usr/local/bin/ca") {
+		t.Error("expected true: some hooks still use npx")
+	}
+}

@@ -250,17 +250,25 @@ func TestEnsureClaudeMdReferenceAppends(t *testing.T) {
 
 func TestCreatePluginManifest(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
 
-	created, err := CreatePluginManifest(dir, "1.2.3")
+	created, updated, err := CreatePluginManifest(dir, "1.2.3")
 	if err != nil {
 		t.Fatalf("CreatePluginManifest: %v", err)
 	}
 	if !created {
 		t.Error("expected plugin.json to be created")
 	}
+	if updated {
+		t.Error("expected updated=false on first create")
+	}
 
-	content, _ := os.ReadFile(filepath.Join(dir, ".claude", "plugin.json"))
+	content, err := os.ReadFile(filepath.Join(dir, ".claude", "plugin.json"))
+	if err != nil {
+		t.Fatalf("read plugin.json: %v", err)
+	}
 	if !strings.Contains(string(content), "1.2.3") {
 		t.Error("plugin.json missing version")
 	}
@@ -268,9 +276,52 @@ func TestCreatePluginManifest(t *testing.T) {
 		t.Error("plugin.json still has VERSION placeholder")
 	}
 
-	// Idempotent
-	created2, _ := CreatePluginManifest(dir, "1.2.3")
+	// Idempotent: same version → no change
+	created2, updated2, err := CreatePluginManifest(dir, "1.2.3")
+	if err != nil {
+		t.Fatalf("CreatePluginManifest idempotent: %v", err)
+	}
 	if created2 {
-		t.Error("expected no update on second call")
+		t.Error("expected created=false on same-version call")
+	}
+	if updated2 {
+		t.Error("expected updated=false on same-version call")
+	}
+}
+
+func TestCreatePluginManifest_UpdatesStaleVersion(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+
+	// Create with old version
+	created, _, err := CreatePluginManifest(dir, "1.8.0")
+	if err != nil {
+		t.Fatalf("CreatePluginManifest: %v", err)
+	}
+	if !created {
+		t.Error("expected plugin.json to be created")
+	}
+
+	// Re-run with newer version → should update
+	created2, updated, err := CreatePluginManifest(dir, "2.0.3")
+	if err != nil {
+		t.Fatalf("CreatePluginManifest (update): %v", err)
+	}
+	if created2 {
+		t.Error("expected created=false on update")
+	}
+	if !updated {
+		t.Error("expected updated=true when version changed")
+	}
+
+	// Verify the new version is written
+	content, _ := os.ReadFile(filepath.Join(dir, ".claude", "plugin.json"))
+	if !strings.Contains(string(content), "2.0.3") {
+		t.Error("plugin.json should contain new version 2.0.3")
+	}
+	if strings.Contains(string(content), "1.8.0") {
+		t.Error("plugin.json should not contain old version 1.8.0")
 	}
 }

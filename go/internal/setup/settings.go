@@ -278,6 +278,53 @@ func HasAllHooks(settings map[string]any) bool {
 	return true
 }
 
+// hookArrayHasNpx checks if any entry in a hook array contains npx commands.
+func hookArrayHasNpx(arr []any) bool {
+	for _, entry := range arr {
+		entryMap, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		hooksList, ok := entryMap["hooks"].([]any)
+		if !ok {
+			continue
+		}
+		for _, h := range hooksList {
+			hMap, ok := h.(map[string]any)
+			if !ok {
+				continue
+			}
+			cmd, _ := hMap["command"].(string)
+			if strings.Contains(cmd, "npx ca ") {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// HooksNeedUpgrade returns true if hooks exist but use npx commands
+// and a binary path is available for upgrade.
+func HooksNeedUpgrade(settings map[string]any, binaryPath string) bool {
+	if binaryPath == "" {
+		return false
+	}
+	hooks, ok := settings["hooks"].(map[string]any)
+	if !ok {
+		return false
+	}
+	for _, hookType := range HookTypes {
+		arr, ok := hooks[hookType].([]any)
+		if !ok {
+			continue
+		}
+		if hookArrayHasNpx(arr) {
+			return true
+		}
+	}
+	return false
+}
+
 // RemoveAllHooks removes all compound-agent hooks from settings.
 func RemoveAllHooks(settings map[string]any) bool {
 	hooks, ok := settings["hooks"].(map[string]any)

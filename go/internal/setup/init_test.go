@@ -236,6 +236,94 @@ func TestEnsureGitignore_AppendsToExisting(t *testing.T) {
 	}
 }
 
+func TestInitRepo_UpgradesStaleHooks(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+
+	// First install with npx fallback (no binary path)
+	_, err := InitRepo(dir, InitOptions{
+		SkipTemplates: true,
+		BinaryPath:    "", // npx fallback
+	})
+	if err != nil {
+		t.Fatalf("first InitRepo failed: %v", err)
+	}
+
+	// Verify hooks use npx
+	settingsPath := filepath.Join(dir, ".claude", "settings.json")
+	settings, err := ReadClaudeSettings(settingsPath)
+	if err != nil {
+		t.Fatalf("read settings: %v", err)
+	}
+	hooks := settings["hooks"].(map[string]any)
+	sessionStart := hooks["SessionStart"].([]any)
+	entry := sessionStart[0].(map[string]any)
+	hooksList := entry["hooks"].([]any)
+	cmd := hooksList[0].(map[string]any)["command"].(string)
+	if !strings.Contains(cmd, "npx ca") {
+		t.Fatalf("expected npx hooks after first install, got: %s", cmd)
+	}
+
+	// Second init with binary path → should upgrade stale hooks
+	result, err := InitRepo(dir, InitOptions{
+		SkipTemplates: true,
+		BinaryPath:    "/usr/local/bin/ca",
+	})
+	if err != nil {
+		t.Fatalf("second InitRepo failed: %v", err)
+	}
+	if !result.HooksUpgraded {
+		t.Error("expected HooksUpgraded=true")
+	}
+
+	// Verify hooks now use binary path
+	settings, err = ReadClaudeSettings(settingsPath)
+	if err != nil {
+		t.Fatalf("read settings after upgrade: %v", err)
+	}
+	hooks = settings["hooks"].(map[string]any)
+	sessionStart = hooks["SessionStart"].([]any)
+	entry = sessionStart[0].(map[string]any)
+	hooksList = entry["hooks"].([]any)
+	cmd = hooksList[0].(map[string]any)["command"].(string)
+	if strings.Contains(cmd, "npx") {
+		t.Errorf("hooks still use npx after upgrade: %s", cmd)
+	}
+	if !strings.Contains(cmd, "/usr/local/bin/ca") {
+		t.Errorf("hooks should use binary path, got: %s", cmd)
+	}
+}
+
+func TestInitRepo_UpdatesStalePlugin(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+
+	// First install
+	_, err := InitRepo(dir, InitOptions{SkipHooks: true})
+	if err != nil {
+		t.Fatalf("first InitRepo failed: %v", err)
+	}
+
+	// Manually write stale plugin.json
+	pluginPath := filepath.Join(dir, ".claude", "plugin.json")
+	if err := os.WriteFile(pluginPath, []byte(`{"name":"compound-agent","version":"1.8.0"}`), 0644); err != nil {
+		t.Fatalf("write stale plugin.json: %v", err)
+	}
+
+	// Second init should update plugin version
+	result, err := InitRepo(dir, InitOptions{SkipHooks: true})
+	if err != nil {
+		t.Fatalf("second InitRepo failed: %v", err)
+	}
+	if !result.PluginUpdated {
+		t.Error("expected PluginUpdated=true")
+	}
+}
+
 func TestInitRepo_DirsCreatedAccurate(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)

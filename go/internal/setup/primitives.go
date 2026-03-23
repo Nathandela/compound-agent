@@ -2,6 +2,7 @@
 package setup
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -162,23 +163,38 @@ func EnsureClaudeMdReference(repoRoot string) (bool, error) {
 	return true, os.WriteFile(claudeMdPath, []byte(content), 0644)
 }
 
-// CreatePluginManifest creates .claude/plugin.json.
-// Substitutes {{VERSION}} placeholder. Idempotent: does not overwrite existing file.
-func CreatePluginManifest(repoRoot string, version string) (bool, error) {
+// CreatePluginManifest creates or updates .claude/plugin.json.
+// Substitutes {{VERSION}} placeholder. Creates if missing, updates if version differs.
+// Returns (created, updated, error).
+func CreatePluginManifest(repoRoot string, version string) (bool, bool, error) {
 	pluginPath := filepath.Join(repoRoot, ".claude", "plugin.json")
 
 	if err := os.MkdirAll(filepath.Join(repoRoot, ".claude"), 0755); err != nil {
-		return false, fmt.Errorf("mkdir .claude: %w", err)
-	}
-
-	if _, err := os.Stat(pluginPath); err == nil {
-		return false, nil // Already exists
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return false, fmt.Errorf("stat plugin.json: %w", err)
+		return false, false, fmt.Errorf("mkdir .claude: %w", err)
 	}
 
 	content := strings.ReplaceAll(templates.PluginJSON(), "{{VERSION}}", version)
-	return true, os.WriteFile(pluginPath, []byte(content), 0644)
+
+	existing, readErr := os.ReadFile(pluginPath)
+	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
+		return false, false, fmt.Errorf("read plugin.json: %w", readErr)
+	}
+
+	if errors.Is(readErr, os.ErrNotExist) {
+		// File doesn't exist — create
+		return true, false, os.WriteFile(pluginPath, []byte(content), 0644)
+	}
+
+	// File exists — check if version matches
+	var manifest map[string]any
+	if err := json.Unmarshal(existing, &manifest); err == nil {
+		if manifest["version"] == version {
+			return false, false, nil // Already up to date
+		}
+	}
+
+	// Version mismatch or unparseable — update
+	return false, true, os.WriteFile(pluginPath, []byte(content), 0644)
 }
 
 // installMapToDir writes files from a map to a directory.

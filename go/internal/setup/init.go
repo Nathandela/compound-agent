@@ -11,25 +11,27 @@ import (
 
 // InitOptions controls what init creates.
 type InitOptions struct {
-	SkipHooks      bool
-	SkipTemplates  bool   // Skip installing agent/command/skill/doc templates.
-	BinaryPath     string // Path to the Go binary for hook commands. Empty = npx fallback.
+	SkipHooks     bool
+	SkipTemplates bool   // Skip installing agent/command/skill/doc templates.
+	BinaryPath    string // Path to the Go binary for hook commands. Empty = npx fallback.
 }
 
 // InitResult reports what init did.
 type InitResult struct {
-	Success           bool
-	HooksInstalled    bool
-	DirsCreated       []string
-	FilesCreated      []string
-	AgentsInstalled   int
-	CommandsInstalled int
-	SkillsInstalled   int
+	Success             bool
+	HooksInstalled      bool
+	HooksUpgraded       bool
+	DirsCreated         []string
+	FilesCreated        []string
+	AgentsInstalled     int
+	CommandsInstalled   int
+	SkillsInstalled     int
 	RoleSkillsInstalled int
-	DocsInstalled     int
-	AgentsMdUpdated   bool
-	ClaudeMdUpdated   bool
-	PluginCreated     bool
+	DocsInstalled       int
+	AgentsMdUpdated     bool
+	ClaudeMdUpdated     bool
+	PluginCreated       bool
+	PluginUpdated       bool
 }
 
 // InitRepo initializes compound-agent in a repository.
@@ -79,11 +81,15 @@ func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
 			return nil, fmt.Errorf("read settings: %w", err)
 		}
 
-		if !HasAllHooks(settings) {
+		needsInstall := !HasAllHooks(settings)
+		needsUpgrade := HooksNeedUpgrade(settings, opts.BinaryPath)
+
+		if needsInstall || needsUpgrade {
 			AddAllHooks(settings, opts.BinaryPath)
 			if err := WriteClaudeSettings(settingsPath, settings); err != nil {
 				return nil, fmt.Errorf("write settings: %w", err)
 			}
+			result.HooksUpgraded = needsUpgrade && !needsInstall
 		}
 		result.HooksInstalled = true
 	}
@@ -107,11 +113,12 @@ func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
 		result.ClaudeMdUpdated = updated
 
 		// plugin.json
-		created, err := CreatePluginManifest(repoRoot, version)
+		created, pluginUpdated, err := CreatePluginManifest(repoRoot, version)
 		if err != nil {
 			return nil, fmt.Errorf("create plugin.json: %w", err)
 		}
 		result.PluginCreated = created
+		result.PluginUpdated = pluginUpdated
 
 		// Agent templates
 		n, err := InstallAgentTemplates(repoRoot)
