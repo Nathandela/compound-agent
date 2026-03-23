@@ -80,6 +80,30 @@ func TestPhaseSkills(t *testing.T) {
 	t.Logf("phase skills: %d", len(skills))
 }
 
+func TestPhaseSkills_QualityGatePlaceholders(t *testing.T) {
+	skills := PhaseSkills()
+
+	// Skills that must have quality gate placeholders
+	needsPlaceholders := []string{"cook-it", "review", "work", "compound", "agentic", "test-cleaner"}
+	for _, phase := range needsPlaceholders {
+		content, ok := skills[phase]
+		if !ok {
+			t.Errorf("missing phase skill: %s", phase)
+			continue
+		}
+		if !strings.Contains(content, "{{QUALITY_GATE_TEST}}") {
+			t.Errorf("phase skill %s missing {{QUALITY_GATE_TEST}} placeholder", phase)
+		}
+		if !strings.Contains(content, "{{QUALITY_GATE_LINT}}") {
+			t.Errorf("phase skill %s missing {{QUALITY_GATE_LINT}} placeholder", phase)
+		}
+		// Verify no hardcoded pnpm commands remain
+		if strings.Contains(content, "pnpm test") || strings.Contains(content, "pnpm lint") {
+			t.Errorf("phase skill %s still has hardcoded pnpm commands", phase)
+		}
+	}
+}
+
 func TestPhaseSkillReferences(t *testing.T) {
 	refs := PhaseSkillReferences()
 	if len(refs) == 0 {
@@ -155,6 +179,24 @@ func TestDocTemplates(t *testing.T) {
 		}
 	}
 	t.Logf("doc templates: %d", len(docs))
+}
+
+func TestDocTemplates_QualityGatePlaceholders(t *testing.T) {
+	docs := DocTemplates()
+	// WORKFLOW.md should have quality gate placeholders
+	content, ok := docs["WORKFLOW.md"]
+	if !ok {
+		t.Fatal("missing WORKFLOW.md doc template")
+	}
+	if !strings.Contains(content, "{{QUALITY_GATE_TEST}}") {
+		t.Error("WORKFLOW.md missing {{QUALITY_GATE_TEST}} placeholder")
+	}
+	if !strings.Contains(content, "{{QUALITY_GATE_LINT}}") {
+		t.Error("WORKFLOW.md missing {{QUALITY_GATE_LINT}} placeholder")
+	}
+	if strings.Contains(content, "pnpm test") || strings.Contains(content, "pnpm lint") {
+		t.Error("WORKFLOW.md still has hardcoded pnpm commands")
+	}
 }
 
 func TestAgentsMdTemplate(t *testing.T) {

@@ -69,12 +69,22 @@ func writeSkillFile(filePath string, content string) (bool, bool, error) {
 	return reconcileFile(filePath, content)
 }
 
+// substituteQualityGates replaces {{QUALITY_GATE_TEST}} and {{QUALITY_GATE_LINT}}
+// placeholders in content with the detected stack commands.
+func substituteQualityGates(content string, stack StackInfo) string {
+	content = strings.ReplaceAll(content, "{{QUALITY_GATE_TEST}}", stack.TestCmd)
+	content = strings.ReplaceAll(content, "{{QUALITY_GATE_LINT}}", stack.LintCmd)
+	return content
+}
+
 // InstallPhaseSkills writes phase SKILL.md files to .claude/skills/compound/<phase>/SKILL.md.
-// Also writes reference files alongside skills. Creates missing and updates stale files.
-// Returns (created, updated, error).
-func InstallPhaseSkills(repoRoot string) (int, int, error) {
+// Also writes reference files alongside skills. Substitutes {{QUALITY_GATE_TEST}} and
+// {{QUALITY_GATE_LINT}} placeholders with detected stack commands.
+// Creates missing and updates stale files. Returns (created, updated, error).
+func InstallPhaseSkills(repoRoot string, stack StackInfo) (int, int, error) {
 	created, updated := 0, 0
 	for phase, content := range templates.PhaseSkills() {
+		content = substituteQualityGates(content, stack)
 		filePath := filepath.Join(repoRoot, ".claude", "skills", "compound", phase, "SKILL.md")
 		c, u, err := writeSkillFile(filePath, content)
 		if err != nil {
@@ -89,6 +99,7 @@ func InstallPhaseSkills(repoRoot string) (int, int, error) {
 	}
 
 	for relPath, content := range templates.PhaseSkillReferences() {
+		content = substituteQualityGates(content, stack)
 		filePath := filepath.Join(repoRoot, ".claude", "skills", "compound", relPath)
 		c, u, err := writeSkillFile(filePath, content)
 		if err != nil {
@@ -131,9 +142,10 @@ func InstallAgentRoleSkills(repoRoot string) (int, int, error) {
 }
 
 // InstallDocTemplates writes documentation .md files to docs/compound/.
-// Substitutes {{VERSION}} and {{DATE}} placeholders. Creates missing and updates
-// stale files (date-only changes are ignored). Returns (created, updated, error).
-func InstallDocTemplates(repoRoot string, version string) (int, int, error) {
+// Substitutes {{VERSION}}, {{DATE}}, {{QUALITY_GATE_TEST}}, and {{QUALITY_GATE_LINT}}
+// placeholders. Creates missing and updates stale files (date-only changes are ignored).
+// Returns (created, updated, error).
+func InstallDocTemplates(repoRoot string, version string, stack StackInfo) (int, int, error) {
 	dir := filepath.Join(repoRoot, "docs", "compound")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return 0, 0, fmt.Errorf("mkdir %s: %w", dir, err)
@@ -145,6 +157,7 @@ func InstallDocTemplates(repoRoot string, version string) (int, int, error) {
 		filePath := filepath.Join(dir, filename)
 		content := strings.ReplaceAll(tmpl, "{{VERSION}}", version)
 		content = strings.ReplaceAll(content, "{{DATE}}", date)
+		content = substituteQualityGates(content, stack)
 
 		existing, err := os.ReadFile(filePath)
 		if errors.Is(err, os.ErrNotExist) {

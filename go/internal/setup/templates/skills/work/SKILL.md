@@ -33,7 +33,7 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 
 ## MANDATORY VERIFICATION -- DO NOT CLOSE TASK WITHOUT THIS
 Before `bd close`, you MUST:
-1. Run `pnpm test` then `pnpm lint` (quality gates)
+1. Run `{{QUALITY_GATE_TEST}}` then `{{QUALITY_GATE_LINT}}` (quality gates)
 2. Run `/implementation-reviewer` on changed code -- wait for APPROVED
 If REJECTED: fix ALL issues, re-run tests, resubmit. INVIOLABLE per CLAUDE.md.
 

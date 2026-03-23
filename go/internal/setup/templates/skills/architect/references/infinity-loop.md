@@ -188,14 +188,16 @@ trap _loop_cleanup EXIT
 
 Long-running loops can exhaust system memory through zombie test processes or large Claude sessions. The script uses three layers of protection:
 
-**Layer 1 -- Orphan Cleanup** between sessions. Kills leftover node/vitest processes scoped to the current repo directory (avoids killing unrelated processes):
+**Layer 1 -- Orphan Cleanup** between sessions. Kills leftover test/build processes scoped to the current repo directory (avoids killing unrelated processes). Adapt the `pgrep` pattern to your stack (shown: Node/vitest; for Go use `go.test`; for Python use `pytest`; for Rust use `cargo.test`):
 
 ```bash
 cleanup_orphans() {
   local killed=0
   local repo_dir
   repo_dir=$(pwd)
-  for pid in $(pgrep -f "vitest|node.*\.test\." 2>/dev/null || true); do
+  # Adapt pattern to your stack: "vitest|node.*\.test\." | "go\.test" | "pytest" | "cargo.test"
+  local proc_pattern="${ORPHAN_PROC_PATTERN:-vitest|node.*\.test\.|go\.test|pytest|cargo\.test}"
+  for pid in $(pgrep -f "$proc_pattern" 2>/dev/null || true); do
     local proc_cwd=""
     if [ "$(uname)" = "Darwin" ]; then
       proc_cwd=$(lsof -p "$pid" -Fn 2>/dev/null | grep '^ncwd' | sed 's/^n//' || true)

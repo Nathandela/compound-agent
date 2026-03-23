@@ -9,7 +9,7 @@ description: Multi-agent review with parallel specialized reviewers and severity
 Perform thorough code review by spawning specialized reviewers in parallel, consolidating findings with severity classification (P0/P1/P2/P3), and gating completion on implementation-reviewer approval.
 
 ## Methodology
-1. Run quality gates first: `pnpm test && pnpm lint`
+1. Run quality gates first: `{{QUALITY_GATE_TEST}} && {{QUALITY_GATE_LINT}}`
 2. Read the epic description (`bd show <epic>`) for EARS requirements -- reviewers verify each requirement is met
 3. Search memory with `ca search` for known patterns and recurring issues
 4. Select reviewer tier based on diff size:
@@ -55,7 +55,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 - Not checking CCT patterns for known Claude mistakes
 
 ## Quality Criteria
-- All quality gates pass (`pnpm test`, lint)
+- All quality gates pass (`{{QUALITY_GATE_TEST}}`, `{{QUALITY_GATE_LINT}}`)
 - All 12 reviewer perspectives were applied in parallel
 - Findings are classified P0/P1/P2/P3 and deduplicated
 - pattern-matcher checked memory and reinforced recurring issues

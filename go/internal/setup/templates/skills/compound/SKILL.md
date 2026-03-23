@@ -64,6 +64,6 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 ## FINAL GATE -- EPIC CLOSURE
 Before closing the epic:
 - Run `ca verify-gates <epic-id>` -- must return PASS for both gates
-- Run `pnpm test` and `pnpm lint` -- must pass
+- Run `{{QUALITY_GATE_TEST}}` and `{{QUALITY_GATE_LINT}}` -- must pass
 If verify-gates fails, the missing phase was SKIPPED. Go back and complete it.
 CRITICAL: 3/5 phases is NOT success. All 5 phases are required.

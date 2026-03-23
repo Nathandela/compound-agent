@@ -49,7 +49,7 @@ For each phase:
 - **After Plan**: Run `bd list --status=open` and verify Review + Compound tasks exist, then run `ca phase-check gate post-plan`
 - **After Work (GATE 3)**: `bd list --status=in_progress` must be empty. Then run `ca phase-check gate gate-3`
 - **After Review (GATE 4)**: /implementation-reviewer must have returned APPROVED. Then run `ca phase-check gate gate-4`
-- **After Compound (FINAL GATE)**: Run `ca verify-gates <epic-id>` (must PASS), `pnpm test`, and `pnpm lint`, then run `ca phase-check gate final` (auto-cleans phase state)
+- **After Compound (FINAL GATE)**: Run `ca verify-gates <epic-id>` (must PASS), `{{QUALITY_GATE_TEST}}`, and `{{QUALITY_GATE_LINT}}`, then run `ca phase-check gate final` (auto-cleans phase state)
 
 If a gate fails, DO NOT proceed. Fix the issue first.
 

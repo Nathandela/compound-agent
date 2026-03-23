@@ -96,6 +96,7 @@ func initHooks(repoRoot string, binaryPath string, result *InitResult) error {
 }
 
 // installTemplates installs all template assets (agents, commands, skills, docs).
+// Detects the project stack to substitute quality gate placeholders.
 func installTemplates(repoRoot string, result *InitResult) error {
 	version := build.Version
 
@@ -118,11 +119,13 @@ func installTemplates(repoRoot string, result *InitResult) error {
 	result.PluginCreated = created
 	result.PluginUpdated = pluginUpdated
 
-	return installTemplateGroups(repoRoot, version, result)
+	stack := DetectStack(repoRoot)
+	return installTemplateGroups(repoRoot, version, stack, result)
 }
 
 // installTemplateGroups installs agent, command, skill, role skill, and doc templates.
-func installTemplateGroups(repoRoot string, version string, result *InitResult) error {
+// Stack info is used to substitute quality gate placeholders in skills and docs.
+func installTemplateGroups(repoRoot string, version string, stack StackInfo, result *InitResult) error {
 	type installFunc struct {
 		fn   func() (int, int, error)
 		setN func(int)
@@ -134,11 +137,11 @@ func installTemplateGroups(repoRoot string, version string, result *InitResult) 
 			func(n int) { result.AgentsInstalled = n }, func(u int) { result.AgentsUpdated = u }, "agent templates"},
 		{func() (int, int, error) { return InstallWorkflowCommands(repoRoot) },
 			func(n int) { result.CommandsInstalled = n }, func(u int) { result.CommandsUpdated = u }, "workflow commands"},
-		{func() (int, int, error) { return InstallPhaseSkills(repoRoot) },
+		{func() (int, int, error) { return InstallPhaseSkills(repoRoot, stack) },
 			func(n int) { result.SkillsInstalled = n }, func(u int) { result.SkillsUpdated = u }, "phase skills"},
 		{func() (int, int, error) { return InstallAgentRoleSkills(repoRoot) },
 			func(n int) { result.RoleSkillsInstalled = n }, func(u int) { result.RoleSkillsUpdated = u }, "agent role skills"},
-		{func() (int, int, error) { return InstallDocTemplates(repoRoot, version) },
+		{func() (int, int, error) { return InstallDocTemplates(repoRoot, version, stack) },
 			func(n int) { result.DocsInstalled = n }, func(u int) { result.DocsUpdated = u }, "doc templates"},
 	}
 

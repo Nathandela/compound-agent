@@ -80,7 +80,7 @@ func TestInstallWorkflowCommands(t *testing.T) {
 func TestInstallPhaseSkills(t *testing.T) {
 	dir := t.TempDir()
 
-	n, u, err := InstallPhaseSkills(dir)
+	n, u, err := InstallPhaseSkills(dir, StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallPhaseSkills: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestInstallPhaseSkills(t *testing.T) {
 	}
 
 	// Verify idempotency
-	n2, u2, _ := InstallPhaseSkills(dir)
+	n2, u2, _ := InstallPhaseSkills(dir, StackInfo{})
 	if n2 != 0 {
 		t.Errorf("idempotent install created %d files, want 0", n2)
 	}
@@ -146,7 +146,7 @@ func TestInstallAgentRoleSkills(t *testing.T) {
 func TestInstallDocTemplates(t *testing.T) {
 	dir := t.TempDir()
 
-	n, u, err := InstallDocTemplates(dir, "1.0.0")
+	n, u, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates: %v", err)
 	}
@@ -171,7 +171,7 @@ func TestInstallDocTemplates(t *testing.T) {
 	}
 
 	// Verify idempotency
-	n2, u2, _ := InstallDocTemplates(dir, "1.0.0")
+	n2, u2, _ := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if n2 != 0 {
 		t.Errorf("idempotent install created %d files, want 0", n2)
 	}
@@ -402,7 +402,7 @@ func TestInstallWorkflowCommands_UpdatesStaleContent(t *testing.T) {
 func TestInstallPhaseSkills_UpdatesStaleContent(t *testing.T) {
 	dir := t.TempDir()
 
-	created, _, err := InstallPhaseSkills(dir)
+	created, _, err := InstallPhaseSkills(dir, StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallPhaseSkills: %v", err)
 	}
@@ -416,7 +416,7 @@ func TestInstallPhaseSkills_UpdatesStaleContent(t *testing.T) {
 		t.Fatalf("write stale: %v", err)
 	}
 
-	_, updated, err := InstallPhaseSkills(dir)
+	_, updated, err := InstallPhaseSkills(dir, StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallPhaseSkills (update): %v", err)
 	}
@@ -430,6 +430,101 @@ func TestInstallPhaseSkills_UpdatesStaleContent(t *testing.T) {
 	}
 	if string(content) == "# stale skill\n" {
 		t.Error("stale skill was not overwritten")
+	}
+}
+
+func TestInstallPhaseSkills_SubstitutesQualityGates(t *testing.T) {
+	dir := t.TempDir()
+	stack := StackInfo{TestCmd: "go test ./...", LintCmd: "golangci-lint run ./..."}
+
+	_, _, err := InstallPhaseSkills(dir, stack)
+	if err != nil {
+		t.Fatalf("InstallPhaseSkills: %v", err)
+	}
+
+	// Check that a skill with quality gate placeholders got them substituted
+	workSkill := filepath.Join(dir, ".claude", "skills", "compound", "work", "SKILL.md")
+	content, err := os.ReadFile(workSkill)
+	if err != nil {
+		t.Fatalf("read work/SKILL.md: %v", err)
+	}
+	if strings.Contains(string(content), "{{QUALITY_GATE_TEST}}") {
+		t.Error("work/SKILL.md still has {{QUALITY_GATE_TEST}} placeholder")
+	}
+	if strings.Contains(string(content), "{{QUALITY_GATE_LINT}}") {
+		t.Error("work/SKILL.md still has {{QUALITY_GATE_LINT}} placeholder")
+	}
+	if !strings.Contains(string(content), "go test ./...") {
+		t.Error("work/SKILL.md missing substituted test command")
+	}
+	if !strings.Contains(string(content), "golangci-lint run ./...") {
+		t.Error("work/SKILL.md missing substituted lint command")
+	}
+}
+
+func TestInstallDocTemplates_SubstitutesQualityGates(t *testing.T) {
+	dir := t.TempDir()
+	stack := StackInfo{TestCmd: "cargo test", LintCmd: "cargo clippy"}
+
+	_, _, err := InstallDocTemplates(dir, "1.0.0", stack)
+	if err != nil {
+		t.Fatalf("InstallDocTemplates: %v", err)
+	}
+
+	// WORKFLOW.md has quality gate references
+	workflowPath := filepath.Join(dir, "docs", "compound", "WORKFLOW.md")
+	content, err := os.ReadFile(workflowPath)
+	if err != nil {
+		t.Fatalf("read WORKFLOW.md: %v", err)
+	}
+	if strings.Contains(string(content), "{{QUALITY_GATE_TEST}}") {
+		t.Error("WORKFLOW.md still has {{QUALITY_GATE_TEST}} placeholder")
+	}
+	if !strings.Contains(string(content), "cargo test") {
+		t.Error("WORKFLOW.md missing substituted test command")
+	}
+}
+
+func TestInstallPhaseSkills_StackChangeUpdatesContent(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install with Node/npm stack
+	npmStack := StackInfo{TestCmd: "npm test", LintCmd: "npm run lint"}
+	_, _, err := InstallPhaseSkills(dir, npmStack)
+	if err != nil {
+		t.Fatalf("InstallPhaseSkills (npm): %v", err)
+	}
+
+	// Verify npm commands are in the file
+	workSkill := filepath.Join(dir, ".claude", "skills", "compound", "work", "SKILL.md")
+	content, err := os.ReadFile(workSkill)
+	if err != nil {
+		t.Fatalf("read work/SKILL.md: %v", err)
+	}
+	if !strings.Contains(string(content), "npm test") {
+		t.Fatal("work/SKILL.md should contain npm test after first install")
+	}
+
+	// Re-install with Go stack (simulates user adding go.mod)
+	goStack := StackInfo{TestCmd: "go test ./...", LintCmd: "golangci-lint run ./..."}
+	_, updated, err := InstallPhaseSkills(dir, goStack)
+	if err != nil {
+		t.Fatalf("InstallPhaseSkills (go): %v", err)
+	}
+	if updated == 0 {
+		t.Error("expected skills to be updated when stack changed")
+	}
+
+	// Verify Go commands replaced npm commands
+	content, err = os.ReadFile(workSkill)
+	if err != nil {
+		t.Fatalf("read work/SKILL.md after update: %v", err)
+	}
+	if strings.Contains(string(content), "npm test") {
+		t.Error("work/SKILL.md should no longer contain npm test")
+	}
+	if !strings.Contains(string(content), "go test ./...") {
+		t.Error("work/SKILL.md should contain go test ./... after stack change")
 	}
 }
 
@@ -462,7 +557,7 @@ func TestInstallAgentRoleSkills_UpdatesStaleContent(t *testing.T) {
 func TestInstallDocTemplates_UpdatesStaleContent(t *testing.T) {
 	dir := t.TempDir()
 
-	created, _, err := InstallDocTemplates(dir, "1.0.0")
+	created, _, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates: %v", err)
 	}
@@ -481,7 +576,7 @@ func TestInstallDocTemplates_UpdatesStaleContent(t *testing.T) {
 		t.Fatalf("write stale: %v", err)
 	}
 
-	_, updated, err := InstallDocTemplates(dir, "1.0.0")
+	_, updated, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates (update): %v", err)
 	}
@@ -494,7 +589,7 @@ func TestInstallDocTemplates_DateChangeNotStale(t *testing.T) {
 	dir := t.TempDir()
 
 	// Install
-	_, _, err := InstallDocTemplates(dir, "1.0.0")
+	_, _, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates: %v", err)
 	}
@@ -517,7 +612,7 @@ func TestInstallDocTemplates_DateChangeNotStale(t *testing.T) {
 	}
 
 	// Re-install should NOT trigger update (only date changed)
-	_, updated, err := InstallDocTemplates(dir, "1.0.0")
+	_, updated, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates (date check): %v", err)
 	}
@@ -530,13 +625,13 @@ func TestInstallDocTemplates_VersionChangeUpdates(t *testing.T) {
 	dir := t.TempDir()
 
 	// Install with version 1.0.0
-	_, _, err := InstallDocTemplates(dir, "1.0.0")
+	_, _, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates: %v", err)
 	}
 
 	// Re-install with new version should update
-	_, updated, err := InstallDocTemplates(dir, "2.0.0")
+	_, updated, err := InstallDocTemplates(dir, "2.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates (version change): %v", err)
 	}
@@ -634,7 +729,7 @@ func TestPruneStaleTemplates_RemovesStaleSkillDirs(t *testing.T) {
 	dir := t.TempDir()
 
 	// Install phase skills
-	if _, _, err := InstallPhaseSkills(dir); err != nil {
+	if _, _, err := InstallPhaseSkills(dir, StackInfo{}); err != nil {
 		t.Fatalf("InstallPhaseSkills: %v", err)
 	}
 
@@ -665,7 +760,7 @@ func TestPruneStaleTemplates_RemovesStalePhaseReferenceEntries(t *testing.T) {
 	dir := t.TempDir()
 
 	// Install phase skills and references.
-	if _, _, err := InstallPhaseSkills(dir); err != nil {
+	if _, _, err := InstallPhaseSkills(dir, StackInfo{}); err != nil {
 		t.Fatalf("InstallPhaseSkills: %v", err)
 	}
 
