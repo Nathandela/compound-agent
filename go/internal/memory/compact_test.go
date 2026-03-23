@@ -44,7 +44,7 @@ func readJSONLItems(t *testing.T, dir string) []map[string]interface{} {
 }
 
 func makeLesson(id, insight string) string {
-	item := MemoryItem{
+	item := Item{
 		ID:         id,
 		Type:       TypeLesson,
 		Trigger:    "test trigger",

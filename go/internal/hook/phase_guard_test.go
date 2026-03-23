@@ -29,7 +29,7 @@ func TestProcessPhaseGuard_NonEditTool(t *testing.T) {
 	})
 
 	result := ProcessPhaseGuard(dir, "Read", map[string]interface{}{})
-	if result.HookSpecificOutput != nil {
+	if result.SpecificOutput != nil {
 		t.Error("Read tool should not trigger phase guard")
 	}
 }
@@ -47,11 +47,11 @@ func TestProcessPhaseGuard_SkillNotRead(t *testing.T) {
 	})
 
 	result := ProcessPhaseGuard(dir, "Edit", map[string]interface{}{})
-	if result.HookSpecificOutput == nil {
+	if result.SpecificOutput == nil {
 		t.Fatal("expected warning when skill not read")
 	}
-	if result.HookSpecificOutput.HookEventName != "PreToolUse" {
-		t.Errorf("got event %q, want PreToolUse", result.HookSpecificOutput.HookEventName)
+	if result.SpecificOutput.HookEventName != "PreToolUse" {
+		t.Errorf("got event %q, want PreToolUse", result.SpecificOutput.HookEventName)
 	}
 }
 
@@ -68,7 +68,7 @@ func TestProcessPhaseGuard_SkillAlreadyRead(t *testing.T) {
 	})
 
 	result := ProcessPhaseGuard(dir, "Write", map[string]interface{}{})
-	if result.HookSpecificOutput != nil {
+	if result.SpecificOutput != nil {
 		t.Error("should allow write when skill has been read")
 	}
 }
@@ -76,7 +76,7 @@ func TestProcessPhaseGuard_SkillAlreadyRead(t *testing.T) {
 func TestProcessPhaseGuard_NoStateFile(t *testing.T) {
 	dir := t.TempDir()
 	result := ProcessPhaseGuard(dir, "Edit", map[string]interface{}{})
-	if result.HookSpecificOutput != nil {
+	if result.SpecificOutput != nil {
 		t.Error("should return empty when no state file")
 	}
 }
@@ -94,7 +94,7 @@ func TestProcessPhaseGuard_Inactive(t *testing.T) {
 	})
 
 	result := ProcessPhaseGuard(dir, "Edit", map[string]interface{}{})
-	if result.HookSpecificOutput != nil {
+	if result.SpecificOutput != nil {
 		t.Error("should return empty when cookit inactive")
 	}
 }

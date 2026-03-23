@@ -24,22 +24,22 @@ func buildMaintenanceRoot() *cobra.Command {
 func writeTombstone(t *testing.T, dir, id string) {
 	t.Helper()
 	deleted := true
-	tombstone := memory.MemoryItem{
+	tombstone := memory.Item{
 		ID: id, Type: memory.TypeLesson, Trigger: "x", Insight: "x",
 		Source: memory.SourceManual, Context: memory.Context{}, Created: "2026-03-01T10:00:00Z",
 		Tags: []string{}, Deleted: &deleted, DeletedAt: strPtr("2026-03-10T10:00:00Z"),
 	}
-	if err := memory.AppendMemoryItem(dir, tombstone); err != nil {
+	if err := memory.AppendItem(dir, tombstone); err != nil {
 		t.Fatal(err)
 	}
 }
 
 // maintenanceSeedItems returns test items with varying ages and severities.
-func maintenanceSeedItems() []memory.MemoryItem {
+func maintenanceSeedItems() []memory.Item {
 	sevHigh := memory.SeverityHigh
 	sevMed := memory.SeverityMedium
 	rc := 3
-	return []memory.MemoryItem{
+	return []memory.Item{
 		{
 			ID: "L0001", Type: memory.TypeLesson, Trigger: "Bad error handling",
 			Insight: "Always check error returns", Tags: []string{"go", "errors"},
@@ -143,7 +143,7 @@ func TestCompactCmd_Force(t *testing.T) {
 	}
 
 	// Verify tombstones are gone
-	result, err := memory.ReadMemoryItems(dir)
+	result, err := memory.ReadItems(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +275,7 @@ func TestExportCmd_AllItems(t *testing.T) {
 
 	// Each line should be valid JSON
 	for i, line := range lines {
-		var item memory.MemoryItem
+		var item memory.Item
 		if err := json.Unmarshal([]byte(line), &item); err != nil {
 			t.Errorf("line %d: invalid JSON: %v", i, err)
 		}
@@ -370,7 +370,7 @@ func TestImportCmd_BasicImport(t *testing.T) {
 	t.Setenv("COMPOUND_AGENT_ROOT", dir)
 
 	// Write an import file
-	importItems := []memory.MemoryItem{
+	importItems := []memory.Item{
 		{
 			ID: "LIMP1", Type: memory.TypeLesson, Trigger: "import trigger",
 			Insight: "imported insight", Tags: []string{"imported"},
@@ -399,7 +399,7 @@ func TestImportCmd_BasicImport(t *testing.T) {
 	}
 
 	// Verify item was written
-	result, err := memory.ReadMemoryItems(dir)
+	result, err := memory.ReadItems(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -420,7 +420,7 @@ func TestImportCmd_SkipsDuplicates(t *testing.T) {
 	t.Setenv("COMPOUND_AGENT_ROOT", dir)
 
 	// Import file contains L0001 (already exists) + a new item
-	importItems := []memory.MemoryItem{
+	importItems := []memory.Item{
 		{
 			ID: "L0001", Type: memory.TypeLesson, Trigger: "duplicate",
 			Insight: "Already exists", Tags: []string{},
@@ -468,7 +468,7 @@ func TestImportCmd_InvalidItems(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	validItem := memory.MemoryItem{
+	validItem := memory.Item{
 		ID: "LVALID", Type: memory.TypeLesson, Trigger: "trigger",
 		Insight: "valid insight", Tags: []string{},
 		Source: memory.SourceManual, Context: memory.Context{}, Created: "2026-03-10T10:00:00Z",
@@ -543,7 +543,7 @@ func TestPrimeCmd_Output(t *testing.T) {
 
 func TestPrimeCmd_WithHighSeverityLessons(t *testing.T) {
 	sevHigh := memory.SeverityHigh
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{
 			ID: "LHIGH1", Type: memory.TypeLesson, Trigger: "test",
 			Insight: "Critical lesson one", Tags: []string{"security"},
@@ -576,7 +576,7 @@ func TestPrimeCmd_WithHighSeverityLessons(t *testing.T) {
 
 func TestPrimeCmd_NoHighSeverity(t *testing.T) {
 	// Items with no high severity + confirmed
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{
 			ID: "L001", Type: memory.TypeLesson, Trigger: "test",
 			Insight: "Medium lesson", Tags: []string{},
@@ -642,7 +642,7 @@ func TestExportCmd_SinceAndTags(t *testing.T) {
 
 func TestStatsCmd_TypeBreakdown(t *testing.T) {
 	sevHigh := memory.SeverityHigh
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{
 			ID: "L0001", Type: memory.TypeLesson, Trigger: "t", Insight: "i", Tags: []string{},
 			Source: memory.SourceManual, Context: memory.Context{}, Created: "2026-03-01T10:00:00Z",
@@ -703,7 +703,7 @@ func TestExportImportRoundTrip(t *testing.T) {
 	}
 
 	// Verify items match
-	result, err := memory.ReadMemoryItems(dir2)
+	result, err := memory.ReadItems(dir2)
 	if err != nil {
 		t.Fatal(err)
 	}

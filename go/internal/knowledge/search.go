@@ -16,8 +16,8 @@ const (
 	defaultTextWeight     = 0.3
 )
 
-// KnowledgeSearchOptions controls knowledge search behavior.
-type KnowledgeSearchOptions struct {
+// SearchOptions controls knowledge search behavior.
+type SearchOptions struct {
 	Limit int
 }
 
@@ -29,7 +29,7 @@ type ScoredChunkResult struct {
 
 // SearchKnowledge performs hybrid search over the knowledge database.
 // If embedder is nil or no embeddings exist, falls back to FTS5-only.
-func SearchKnowledge(kdb *storage.KnowledgeDB, embedder search.Embedder, query string, opts *KnowledgeSearchOptions) ([]ScoredChunkResult, error) {
+func SearchKnowledge(kdb *storage.KnowledgeDB, embedder search.Embedder, query string, opts *SearchOptions) ([]ScoredChunkResult, error) {
 	limit := DefaultKnowledgeLimit
 	if opts != nil && opts.Limit > 0 {
 		limit = opts.Limit
@@ -61,11 +61,16 @@ func SearchKnowledge(kdb *storage.KnowledgeDB, embedder search.Embedder, query s
 	return toScoredChunkResults(keywordResults), nil
 }
 
+// scoredEntry pairs an embedding ID with its similarity score.
+type scoredEntry struct {
+	id    string
+	score float64
+}
+
 // SearchKnowledgeVector performs two-phase vector search over knowledge chunks.
 // Phase 1: Load only IDs + embeddings, compute similarity, select top-k.
 // Phase 2: Hydrate full chunk data for top-k results only.
 func SearchKnowledgeVector(kdb *storage.KnowledgeDB, embedder search.Embedder, query string, limit int) ([]ScoredChunkResult, error) {
-	// Phase 1: get all embeddings (lightweight)
 	entries := kdb.GetAllEmbeddings()
 	if len(entries) == 0 {
 		return nil, nil
@@ -75,19 +80,25 @@ func SearchKnowledgeVector(kdb *storage.KnowledgeDB, embedder search.Embedder, q
 	if err != nil {
 		return nil, err
 	}
-	queryVec := queryVecs[0]
 
-	type scored struct {
-		id    string
-		score float64
+	topK := scoreAndRankEmbeddings(queryVecs[0], entries, limit)
+	if len(topK) == 0 {
+		return nil, nil
 	}
-	var results []scored
+
+	return hydrateScoredChunks(kdb, topK), nil
+}
+
+// scoreAndRankEmbeddings computes cosine similarity for all entries, sorts
+// descending, and returns the top `limit` results.
+func scoreAndRankEmbeddings(queryVec []float64, entries map[string]storage.CachedEmbeddingEntry, limit int) []scoredEntry {
+	var results []scoredEntry
 	for id, entry := range entries {
 		score, err := util.CosineSimilarity(queryVec, entry.Vector)
 		if err != nil {
 			continue
 		}
-		results = append(results, scored{id: id, score: score})
+		results = append(results, scoredEntry{id: id, score: score})
 	}
 
 	sort.Slice(results, func(i, j int) bool {
@@ -97,13 +108,13 @@ func SearchKnowledgeVector(kdb *storage.KnowledgeDB, embedder search.Embedder, q
 	if len(results) > limit {
 		results = results[:limit]
 	}
-	if len(results) == 0 {
-		return nil, nil
-	}
+	return results
+}
 
-	// Phase 2: hydrate top-k
-	ids := make([]string, len(results))
-	for i, r := range results {
+// hydrateScoredChunks loads full chunk data for scored entries.
+func hydrateScoredChunks(kdb *storage.KnowledgeDB, scored []scoredEntry) []ScoredChunkResult {
+	ids := make([]string, len(scored))
+	for i, r := range scored {
 		ids[i] = r.id
 	}
 
@@ -114,15 +125,14 @@ func SearchKnowledgeVector(kdb *storage.KnowledgeDB, embedder search.Embedder, q
 	}
 
 	var final []ScoredChunkResult
-	for _, r := range results {
+	for _, r := range scored {
 		chunk, ok := dataMap[r.id]
 		if !ok {
 			continue
 		}
 		final = append(final, ScoredChunkResult{Chunk: chunk, Score: r.score})
 	}
-
-	return final, nil
+	return final
 }
 
 // mergeKnowledgeScores blends vector and keyword results for knowledge chunks.

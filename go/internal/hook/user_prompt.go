@@ -48,15 +48,15 @@ var lowConfidencePlanning = []*regexp.Regexp{
 	regexp.MustCompile(`(?i)\bdevelop\b`),
 }
 
-// HookSpecificOutput is the Claude Code hook output structure.
-type HookSpecificOutput struct {
+// SpecificOutput is the Claude Code hook output structure.
+type SpecificOutput struct {
 	HookEventName     string `json:"hookEventName"`
 	AdditionalContext string `json:"additionalContext,omitempty"`
 }
 
 // UserPromptResult is the output of the user-prompt hook.
 type UserPromptResult struct {
-	HookSpecificOutput *HookSpecificOutput `json:"hookSpecificOutput,omitempty"`
+	SpecificOutput *SpecificOutput `json:"hookSpecificOutput,omitempty"`
 }
 
 func detectCorrection(prompt string) bool {
@@ -87,7 +87,7 @@ func detectPlanning(prompt string) bool {
 func ProcessUserPrompt(prompt string) UserPromptResult {
 	if detectCorrection(prompt) {
 		return UserPromptResult{
-			HookSpecificOutput: &HookSpecificOutput{
+			SpecificOutput: &SpecificOutput{
 				HookEventName:     "UserPromptSubmit",
 				AdditionalContext: CorrectionReminder,
 			},
@@ -95,7 +95,7 @@ func ProcessUserPrompt(prompt string) UserPromptResult {
 	}
 	if detectPlanning(prompt) {
 		return UserPromptResult{
-			HookSpecificOutput: &HookSpecificOutput{
+			SpecificOutput: &SpecificOutput{
 				HookEventName:     "UserPromptSubmit",
 				AdditionalContext: PlanningReminder,
 			},

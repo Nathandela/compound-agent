@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log/slog"
 	"os"
 
 	"github.com/nathandelacretaz/compound-agent/internal/cli"
@@ -9,10 +10,25 @@ import (
 )
 
 func main() {
+	var verbose bool
+
 	rootCmd := &cobra.Command{
 		Use:   "ca",
 		Short: "compound-agent — learning system for Claude Code",
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			if verbose {
+				slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+					Level: slog.LevelDebug,
+				})))
+			} else {
+				slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+					Level: slog.LevelWarn,
+				})))
+			}
+		},
 	}
+
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "enable verbose (debug-level) logging")
 
 	hooksCmd := &cobra.Command{
 		Use:   "hooks",

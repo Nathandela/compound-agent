@@ -24,7 +24,7 @@ const insertSQL = `INSERT INTO lessons (
 
 // RebuildIndex rebuilds the SQLite index from JSONL source of truth.
 func RebuildIndex(db *sql.DB, repoRoot string) error {
-	result, err := memory.ReadMemoryItems(repoRoot)
+	result, err := memory.ReadItems(repoRoot)
 	if err != nil {
 		return fmt.Errorf("read JSONL: %w", err)
 	}
@@ -33,7 +33,7 @@ func RebuildIndex(db *sql.DB, repoRoot string) error {
 	if err != nil {
 		return fmt.Errorf("begin tx: %w", err)
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 
 	if _, err := tx.Exec("DELETE FROM lessons"); err != nil {
 		return fmt.Errorf("delete: %w", err)
@@ -82,7 +82,7 @@ func SyncIfNeeded(db *sql.DB, repoRoot string, force bool) (bool, error) {
 	return true, nil
 }
 
-func insertItem(stmt *sql.Stmt, item *memory.MemoryItem) error {
+func insertItem(stmt *sql.Stmt, item *memory.Item) error {
 	contextJSON, _ := json.Marshal(item.Context)
 	supersedesJSON, _ := json.Marshal(item.Supersedes)
 	relatedJSON, _ := json.Marshal(item.Related)

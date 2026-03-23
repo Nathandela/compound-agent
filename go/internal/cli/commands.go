@@ -2,8 +2,10 @@
 package cli
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -56,73 +58,89 @@ func searchCmd() *cobra.Command {
 			if limit < 1 {
 				limit = DefaultSearchLimit
 			}
-			query := strings.Join(args, " ")
-			repoRoot := util.GetRepoRoot()
-
-			db, err := storage.OpenRepoDB(repoRoot)
-			if err != nil {
-				return fmt.Errorf("open database: %w", err)
-			}
-			defer db.Close()
-
-			if _, err := storage.SyncIfNeeded(db, repoRoot, false); err != nil {
-				return fmt.Errorf("sync: %w", err)
-			}
-
-			embedder, closeEmbedder := getOrStartEmbedder(repoRoot)
-			defer closeEmbedder()
-
-			var items []memory.MemoryItem
-			if embedder != nil {
-				candidateLimit := limit * search.CandidateMultiplier
-
-				vecResults, vecErr := search.SearchVector(db, embedder, query, candidateLimit, repoRoot)
-
-				sdb := storage.NewSearchDB(db)
-				kwScored, kwErr := sdb.SearchKeywordScored(query, candidateLimit, "")
-				if kwErr != nil {
-					return fmt.Errorf("keyword search: %w", kwErr)
-				}
-
-				kwItems := make([]search.ScoredItem, len(kwScored))
-				for i, r := range kwScored {
-					kwItems[i] = search.ScoredItem{Item: r.MemoryItem, Score: r.Score}
-				}
-
-				var merged []search.ScoredItem
-				if vecErr != nil {
-					// Vector search failed, keyword-only fallback
-					merged = kwItems
-				} else {
-					merged = search.MergeHybridScores(vecResults, kwItems, &search.HybridMergeOptions{
-						MinScore: search.MinHybridScore,
-					})
-				}
-
-				ranked := search.RankItems(merged)
-				if len(ranked) > limit {
-					ranked = ranked[:limit]
-				}
-
-				items = make([]memory.MemoryItem, len(ranked))
-				for i, r := range ranked {
-					items[i] = r.Item
-				}
-			} else {
-				sdb := storage.NewSearchDB(db)
-				var kwErr error
-				items, kwErr = sdb.SearchKeyword(query, limit, "")
-				if kwErr != nil {
-					return fmt.Errorf("keyword search: %w", kwErr)
-				}
-			}
-
-			cmd.Print(formatSearchResults(items))
-			return nil
+			return runSearch(cmd, args, limit)
 		},
 	}
 	cmd.Flags().IntVarP(&limit, "limit", "n", DefaultSearchLimit, "maximum results to return")
 	return cmd
+}
+
+// runSearch executes the search command logic.
+func runSearch(cmd *cobra.Command, args []string, limit int) error {
+	query := strings.Join(args, " ")
+	repoRoot := util.GetRepoRoot()
+
+	db, err := storage.OpenRepoDB(repoRoot)
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer db.Close()
+
+	if _, err := storage.SyncIfNeeded(db, repoRoot, false); err != nil {
+		return fmt.Errorf("sync: %w", err)
+	}
+
+	embedder, closeEmbedder := getOrStartEmbedder(repoRoot)
+	defer closeEmbedder()
+
+	items, err := executeSearch(db, embedder, query, limit, repoRoot)
+	if err != nil {
+		return err
+	}
+
+	cmd.Print(formatSearchResults(items))
+	return nil
+}
+
+// executeSearch performs hybrid or keyword-only search depending on embedder availability.
+func executeSearch(db *sql.DB, embedder search.Embedder, query string, limit int, repoRoot string) ([]memory.Item, error) {
+	if embedder != nil {
+		return executeHybridSearch(db, embedder, query, limit, repoRoot)
+	}
+	sdb := storage.NewSearchDB(db)
+	items, err := sdb.SearchKeyword(query, limit, "")
+	if err != nil {
+		return nil, fmt.Errorf("keyword search: %w", err)
+	}
+	return items, nil
+}
+
+// executeHybridSearch runs vector + keyword search and merges results.
+func executeHybridSearch(db *sql.DB, embedder search.Embedder, query string, limit int, repoRoot string) ([]memory.Item, error) {
+	candidateLimit := limit * search.CandidateMultiplier
+
+	vecResults, vecErr := search.Vector(db, embedder, query, candidateLimit, repoRoot)
+
+	sdb := storage.NewSearchDB(db)
+	kwScored, kwErr := sdb.SearchKeywordScored(query, candidateLimit, "")
+	if kwErr != nil {
+		return nil, fmt.Errorf("keyword search: %w", kwErr)
+	}
+
+	kwItems := make([]search.ScoredItem, len(kwScored))
+	for i, r := range kwScored {
+		kwItems[i] = search.ScoredItem{Item: r.Item, Score: r.Score}
+	}
+
+	var merged []search.ScoredItem
+	if vecErr != nil {
+		merged = kwItems
+	} else {
+		merged = search.MergeHybridScores(vecResults, kwItems, &search.HybridMergeOptions{
+			MinScore: search.MinHybridScore,
+		})
+	}
+
+	ranked := search.RankItems(merged)
+	if len(ranked) > limit {
+		ranked = ranked[:limit]
+	}
+
+	items := make([]memory.Item, len(ranked))
+	for i, r := range ranked {
+		items[i] = r.Item
+	}
+	return items, nil
 }
 
 // --- list command ---
@@ -138,12 +156,12 @@ func listCmd() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoRoot := util.GetRepoRoot()
 
-			result, err := memory.ReadMemoryItems(repoRoot)
+			result, err := memory.ReadItems(repoRoot)
 			if err != nil {
 				return fmt.Errorf("read lessons: %w", err)
 			}
 
-			var filtered []memory.MemoryItem
+			var filtered []memory.Item
 			for _, item := range result.Items {
 				isInvalidated := item.InvalidatedAt != nil
 				if invalidated == isInvalidated {
@@ -180,7 +198,7 @@ func loadSessionCmd() *cobra.Command {
 				return fmt.Errorf("load session lessons: %w", err)
 			}
 
-			allResult, err := memory.ReadMemoryItems(repoRoot)
+			allResult, err := memory.ReadItems(repoRoot)
 			if err != nil {
 				return fmt.Errorf("read all lessons: %w", err)
 			}
@@ -217,57 +235,69 @@ func checkPlanCmd() *cobra.Command {
 			if limit < 1 {
 				limit = DefaultCheckPlanLimit
 			}
-			// Read plan from flag or stdin
-			if planText == "" {
-				fi, _ := os.Stdin.Stat()
-				if fi != nil && (fi.Mode()&os.ModeCharDevice) == 0 {
-					text, err := util.ReadStdinFrom(os.Stdin, 5*time.Second, 1024*1024)
-					if err != nil {
-						return fmt.Errorf("read stdin: %w", err)
-					}
-					planText = strings.TrimSpace(text)
-				}
-			}
-			if planText == "" {
-				return fmt.Errorf("No plan provided. Use --plan <text> or pipe text to stdin.")
-			}
-
-			repoRoot := util.GetRepoRoot()
-
-			db, err := storage.OpenRepoDB(repoRoot)
+			resolved, err := resolvePlanText(planText)
 			if err != nil {
-				return fmt.Errorf("open database: %w", err)
+				return err
 			}
-			defer db.Close()
-
-			if _, err := storage.SyncIfNeeded(db, repoRoot, false); err != nil {
-				return fmt.Errorf("sync: %w", err)
-			}
-
-			embedder, closeEmbedder := getOrStartEmbedder(repoRoot)
-			defer closeEmbedder()
-
-			result, err := retrieval.RetrieveForPlan(db, repoRoot, embedder, planText, limit)
-			if err != nil {
-				return fmt.Errorf("retrieve: %w", err)
-			}
-
-			if jsonOut {
-				out, err := formatCheckPlanJSON(result.Lessons)
-				if err != nil {
-					return err
-				}
-				cmd.Println(out)
-			} else {
-				cmd.Print(formatCheckPlanHuman(result.Lessons))
-			}
-			return nil
+			return runCheckPlan(cmd, resolved, jsonOut, limit)
 		},
 	}
 	cmd.Flags().StringVar(&planText, "plan", "", "plan text to check")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
 	cmd.Flags().IntVarP(&limit, "limit", "n", DefaultCheckPlanLimit, "maximum lessons to return")
 	return cmd
+}
+
+// resolvePlanText returns the plan text from the flag or stdin.
+func resolvePlanText(planText string) (string, error) {
+	if planText == "" {
+		fi, _ := os.Stdin.Stat()
+		if fi != nil && (fi.Mode()&os.ModeCharDevice) == 0 {
+			text, err := util.ReadStdinFrom(os.Stdin, 5*time.Second, 1024*1024)
+			if err != nil {
+				return "", fmt.Errorf("read stdin: %w", err)
+			}
+			planText = strings.TrimSpace(text)
+		}
+	}
+	if planText == "" {
+		return "", fmt.Errorf("no plan provided; use --plan <text> or pipe text to stdin")
+	}
+	return planText, nil
+}
+
+// runCheckPlan executes the check-plan command logic.
+func runCheckPlan(cmd *cobra.Command, planText string, jsonOut bool, limit int) error {
+	repoRoot := util.GetRepoRoot()
+
+	db, err := storage.OpenRepoDB(repoRoot)
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer db.Close()
+
+	if _, err := storage.SyncIfNeeded(db, repoRoot, false); err != nil {
+		return fmt.Errorf("sync: %w", err)
+	}
+
+	embedder, closeEmbedder := getOrStartEmbedder(repoRoot)
+	defer closeEmbedder()
+
+	result, err := retrieval.RetrieveForPlan(db, repoRoot, embedder, planText, limit)
+	if err != nil {
+		return fmt.Errorf("retrieve: %w", err)
+	}
+
+	if jsonOut {
+		out, err := formatCheckPlanJSON(result.Lessons)
+		if err != nil {
+			return err
+		}
+		cmd.Println(out)
+	} else {
+		cmd.Print(formatCheckPlanHuman(result.Lessons))
+	}
+	return nil
 }
 
 // --- embedder adapter ---
@@ -313,7 +343,7 @@ func getOrStartEmbedder(repoRoot string) (search.Embedder, func()) {
 
 	client, err = embed.EnsureDaemon(repoRoot, modelPath, tokenizerPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[ca] embed daemon failed: %v (falling back to keyword search)\n", err)
+		slog.Warn("embed daemon failed, falling back to keyword search", "error", err)
 		return nil, noopClose
 	}
 	return &embedderAdapter{client: client}, func() { client.Close() }
@@ -332,7 +362,7 @@ func datePrefix(created string) string {
 	return created
 }
 
-func formatSearchResults(items []memory.MemoryItem) string {
+func formatSearchResults(items []memory.Item) string {
 	if len(items) == 0 {
 		return "No lessons match your search. Try a different query or use \"list\" to see all lessons.\n"
 	}
@@ -350,7 +380,7 @@ func formatSearchResults(items []memory.MemoryItem) string {
 	return b.String()
 }
 
-func formatListResults(items []memory.MemoryItem, total int, skippedCount int) string {
+func formatListResults(items []memory.Item, total int, skippedCount int) string {
 	var b strings.Builder
 
 	if len(items) == 0 {
@@ -372,7 +402,7 @@ func formatListResults(items []memory.MemoryItem, total int, skippedCount int) s
 	return b.String()
 }
 
-func formatSessionHuman(items []memory.MemoryItem, totalCount int) string {
+func formatSessionHuman(items []memory.Item, totalCount int) string {
 	if len(items) == 0 {
 		return "No high-severity lessons found.\n"
 	}
@@ -402,18 +432,18 @@ func formatSessionHuman(items []memory.MemoryItem, totalCount int) string {
 	return b.String()
 }
 
-func formatSessionJSON(items []memory.MemoryItem, totalCount int) (string, error) {
+func formatSessionJSON(items []memory.Item, totalCount int) (string, error) {
 	data := struct {
-		Lessons    []memory.MemoryItem `json:"lessons"`
-		Count      int                 `json:"count"`
-		TotalCount int                 `json:"totalCount"`
+		Lessons    []memory.Item `json:"lessons"`
+		Count      int           `json:"count"`
+		TotalCount int           `json:"totalCount"`
 	}{
 		Lessons:    items,
 		Count:      len(items),
 		TotalCount: totalCount,
 	}
 	if data.Lessons == nil {
-		data.Lessons = []memory.MemoryItem{}
+		data.Lessons = []memory.Item{}
 	}
 	out, err := json.Marshal(data)
 	if err != nil {
@@ -470,7 +500,7 @@ func formatCheckPlanJSON(ranked []search.RankedItem) (string, error) {
 	return string(out), nil
 }
 
-func countOldLessons(items []memory.MemoryItem) int {
+func countOldLessons(items []memory.Item) int {
 	threshold := time.Now().AddDate(0, 0, -AgeFlagThresholdDays)
 	count := 0
 	for _, item := range items {

@@ -10,7 +10,7 @@ func setupSearchDB(t *testing.T) (*SearchDB, string) {
 	t.Helper()
 	dir := setupSyncTestDir(t)
 
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		makeItem("L001", "database connection fails", "use connection pooling for reliability"),
 		makeItem("L002", "test flaky on CI", "add retry logic for network-dependent tests"),
 		makeItem("L003", "memory leak in goroutine", "always close channels after use"),
@@ -22,7 +22,7 @@ func setupSearchDB(t *testing.T) (*SearchDB, string) {
 	items = append(items, pItem)
 
 	for _, item := range items {
-		memory.AppendMemoryItem(dir, item)
+		memory.AppendItem(dir, item)
 	}
 
 	db, err := OpenDB(":memory:")
@@ -191,7 +191,7 @@ func TestSearchKeyword_InvalidatedExcluded(t *testing.T) {
 	item := makeItem("L001", "invalidated trigger", "invalidated insight")
 	inv := "2026-03-21T00:00:00Z"
 	item.InvalidatedAt = &inv
-	memory.AppendMemoryItem(dir, item)
+	memory.AppendItem(dir, item)
 
 	db, err := OpenDB(":memory:")
 	if err != nil {
@@ -234,7 +234,7 @@ func TestExecuteFts_PropagatesQueryError(t *testing.T) {
 	}
 }
 
-func TestRowToMemoryItem(t *testing.T) {
+func TestRowToItem(t *testing.T) {
 	dir := setupSyncTestDir(t)
 
 	sev := memory.SeverityMedium
@@ -243,7 +243,7 @@ func TestRowToMemoryItem(t *testing.T) {
 	item.Severity = &sev
 	item.Pattern = &memory.Pattern{Bad: "bad", Good: "good"}
 	item.Citation = &memory.Citation{File: "f.go", Line: intPtr(10)}
-	memory.AppendMemoryItem(dir, item)
+	memory.AppendItem(dir, item)
 
 	db, err := OpenDB(":memory:")
 	if err != nil {

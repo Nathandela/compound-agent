@@ -8,9 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
 	"github.com/nathandelacretaz/compound-agent/internal/storage"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // --- mockEmbedder ---
@@ -37,7 +37,7 @@ func (m *mockEmbedder) Embed(texts []string) ([][]float64, error) {
 }
 
 // setupTestDB creates a fresh in-memory DB and inserts test items.
-func setupTestDB(t *testing.T, items []memory.MemoryItem) *sql.DB {
+func setupTestDB(t *testing.T, items []memory.Item) *sql.DB {
 	t.Helper()
 	db, err := storage.OpenDB(":memory:")
 	if err != nil {
@@ -305,7 +305,7 @@ func TestIsNovel_EmbedderError(t *testing.T) {
 }
 
 func TestIsNovel_NoDuplicateFound(t *testing.T) {
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "trigger", Insight: "completely different insight", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 	}
 	db := setupTestDB(t, items)
@@ -313,7 +313,7 @@ func TestIsNovel_NoDuplicateFound(t *testing.T) {
 
 	// Use distinct vectors so similarity is low
 	embedder := &mockEmbedder{vectors: map[string][]float64{
-		"Use Polars for large files":  {1.0, 0.0, 0.0, 0.0},
+		"Use Polars for large files":   {1.0, 0.0, 0.0, 0.0},
 		"completely different insight": {0.0, 1.0, 0.0, 0.0},
 	}}
 
@@ -324,7 +324,7 @@ func TestIsNovel_NoDuplicateFound(t *testing.T) {
 }
 
 func TestIsNovel_DuplicateAboveThreshold(t *testing.T) {
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "trigger", Insight: "Use Polars for large files", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 	}
 	db := setupTestDB(t, items)

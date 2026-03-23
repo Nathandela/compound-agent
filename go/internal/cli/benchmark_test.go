@@ -78,7 +78,7 @@ func BenchmarkListLessons(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		result, err := memory.ReadMemoryItems(dir)
+		result, err := memory.ReadItems(dir)
 		if err != nil {
 			b.Fatal(err)
 		}

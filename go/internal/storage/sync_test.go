@@ -17,8 +17,8 @@ func setupSyncTestDir(t *testing.T) string {
 	return dir
 }
 
-func makeItem(id string, trigger, insight string) memory.MemoryItem {
-	return memory.MemoryItem{
+func makeItem(id string, trigger, insight string) memory.Item {
+	return memory.Item{
 		ID: id, Type: memory.TypeLesson,
 		Trigger: trigger, Insight: insight,
 		Tags: []string{"tag1"}, Source: memory.SourceManual,
@@ -54,13 +54,13 @@ func TestRebuildIndex_InsertsItems(t *testing.T) {
 	dir := setupSyncTestDir(t)
 
 	// Write 3 items to JSONL
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		makeItem("L001", "trigger1", "insight1"),
 		makeItem("L002", "trigger2", "insight2"),
 		makeItem("L003", "trigger3", "insight3"),
 	}
 	for _, item := range items {
-		memory.AppendMemoryItem(dir, item)
+		memory.AppendItem(dir, item)
 	}
 
 	db, err := OpenDB(":memory:")
@@ -90,7 +90,7 @@ func TestRebuildIndex_FieldMapping(t *testing.T) {
 	item.Pattern = &memory.Pattern{Bad: "old code", Good: "new code"}
 	item.Citation = &memory.Citation{File: "test.go", Line: intPtr(42), Commit: strPtr("abc123")}
 
-	memory.AppendMemoryItem(dir, item)
+	memory.AppendItem(dir, item)
 
 	db, err := OpenDB(":memory:")
 	if err != nil {
@@ -165,7 +165,7 @@ func TestRebuildIndex_ClearsOldData(t *testing.T) {
 		VALUES ('OLD', 'lesson', 't', 'i', '', 'manual', '{}', '[]', '[]', '2026-01-01', 0)`)
 
 	// Write new JSONL
-	memory.AppendMemoryItem(dir, makeItem("NEW", "t", "i"))
+	memory.AppendItem(dir, makeItem("NEW", "t", "i"))
 
 	RebuildIndex(db, dir)
 
@@ -184,7 +184,7 @@ func TestRebuildIndex_ClearsOldData(t *testing.T) {
 
 func TestRebuildIndex_FTS5Populated(t *testing.T) {
 	dir := setupSyncTestDir(t)
-	memory.AppendMemoryItem(dir, makeItem("L001", "search trigger", "search insight"))
+	memory.AppendItem(dir, makeItem("L001", "search trigger", "search insight"))
 
 	db, err := OpenDB(":memory:")
 	if err != nil {
@@ -204,7 +204,7 @@ func TestRebuildIndex_FTS5Populated(t *testing.T) {
 
 func TestSyncIfNeeded_FirstSync(t *testing.T) {
 	dir := setupSyncTestDir(t)
-	memory.AppendMemoryItem(dir, makeItem("L001", "t", "i"))
+	memory.AppendItem(dir, makeItem("L001", "t", "i"))
 
 	db, err := OpenDB(":memory:")
 	if err != nil {
@@ -230,7 +230,7 @@ func TestSyncIfNeeded_FirstSync(t *testing.T) {
 
 func TestSyncIfNeeded_NoChangeNoSync(t *testing.T) {
 	dir := setupSyncTestDir(t)
-	memory.AppendMemoryItem(dir, makeItem("L001", "t", "i"))
+	memory.AppendItem(dir, makeItem("L001", "t", "i"))
 
 	db, err := OpenDB(":memory:")
 	if err != nil {
@@ -253,7 +253,7 @@ func TestSyncIfNeeded_NoChangeNoSync(t *testing.T) {
 
 func TestSyncIfNeeded_ForceSync(t *testing.T) {
 	dir := setupSyncTestDir(t)
-	memory.AppendMemoryItem(dir, makeItem("L001", "t", "i"))
+	memory.AppendItem(dir, makeItem("L001", "t", "i"))
 
 	db, err := OpenDB(":memory:")
 	if err != nil {
@@ -296,7 +296,7 @@ func TestRebuildIndex_HandlesDeletedItems(t *testing.T) {
 
 	// Write item then delete it in JSONL
 	item := makeItem("L001", "t", "i")
-	memory.AppendMemoryItem(dir, item)
+	memory.AppendItem(dir, item)
 
 	// Append tombstone
 	path := filepath.Join(dir, memory.LessonsPath)
@@ -345,7 +345,7 @@ func TestRebuildIndex_PropagatesSetLastSyncMtimeError(t *testing.T) {
 	// Actual propagation is verified by checking that RebuildIndex succeeds
 	// on a normal path (mtime is set correctly).
 	dir := setupSyncTestDir(t)
-	memory.AppendMemoryItem(dir, makeItem("L001", "t", "i"))
+	memory.AppendItem(dir, makeItem("L001", "t", "i"))
 
 	db, err := OpenDB(":memory:")
 	if err != nil {

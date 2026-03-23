@@ -176,9 +176,9 @@ var (
 	}
 )
 
-// InferMemoryItemType classifies insight text into a memory item type.
+// InferItemType classifies insight text into a memory item type.
 // Priority order: pattern > solution > preference > lesson (default).
-func InferMemoryItemType(insight string) memory.MemoryItemType {
+func InferItemType(insight string) memory.ItemType {
 	for _, pat := range patternIndicators {
 		if pat.MatchString(insight) {
 			return memory.TypePattern

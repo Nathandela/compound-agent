@@ -38,7 +38,7 @@ func TestLearnCmd_BasicInsight(t *testing.T) {
 	}
 
 	// Verify persisted
-	result, err := memory.ReadMemoryItems(dir)
+	result, err := memory.ReadItems(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -86,7 +86,7 @@ func TestLearnCmd_WithFlags(t *testing.T) {
 		t.Errorf("expected 'Learned:' in output, got: %s", stdout)
 	}
 
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	if len(result.Items) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(result.Items))
 	}
@@ -126,7 +126,7 @@ func TestLearnCmd_WithCitationCommit(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	item := result.Items[0]
 	if item.Citation == nil {
 		t.Fatal("expected citation")
@@ -152,7 +152,7 @@ func TestLearnCmd_PatternType(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	item := result.Items[0]
 	if item.Type != memory.TypePattern {
 		t.Errorf("type = %q, want pattern", item.Type)
@@ -299,7 +299,7 @@ func TestLearnCmd_SolutionType(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	if result.Items[0].Type != memory.TypeSolution {
 		t.Errorf("type = %q, want solution", result.Items[0].Type)
 	}
@@ -329,7 +329,7 @@ func TestCaptureCmd_WithTriggerAndInsight(t *testing.T) {
 	}
 
 	// Verify nothing saved
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	if len(result.Items) != 0 {
 		t.Errorf("expected 0 items (preview only), got %d", len(result.Items))
 	}
@@ -354,7 +354,7 @@ func TestCaptureCmd_WithYes(t *testing.T) {
 	}
 
 	// Verify saved
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	if len(result.Items) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(result.Items))
 	}
@@ -477,7 +477,7 @@ func TestCaptureCmd_WithInputFile(t *testing.T) {
 	}
 
 	// Verify saved
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	if len(result.Items) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(result.Items))
 	}
@@ -633,7 +633,7 @@ func TestDetectCmd_SaveWithYes(t *testing.T) {
 	}
 
 	// Verify persisted
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	if len(result.Items) != 1 {
 		t.Fatalf("expected 1 saved item, got %d", len(result.Items))
 	}

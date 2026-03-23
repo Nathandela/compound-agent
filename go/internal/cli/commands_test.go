@@ -10,8 +10,7 @@ import (
 	"github.com/nathandelacretaz/compound-agent/internal/search"
 )
 
-func strPtr(s string) *string   { return &s }
-func sevPtr(s memory.Severity) *memory.Severity { return &s }
+func strPtr(s string) *string { return &s }
 
 func TestFormatSource(t *testing.T) {
 	tests := []struct {
@@ -33,7 +32,7 @@ func TestFormatSource(t *testing.T) {
 }
 
 func TestFormatSearchResults(t *testing.T) {
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{
 			ID:      "L001",
 			Insight: "Always check error returns",
@@ -76,7 +75,7 @@ func TestFormatSearchResultsEmpty(t *testing.T) {
 }
 
 func TestFormatListResults(t *testing.T) {
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{
 			ID:      "L001",
 			Type:    memory.TypeLesson,
@@ -117,7 +116,7 @@ func TestFormatListResultsSkippedWarning(t *testing.T) {
 }
 
 func TestFormatSessionHuman(t *testing.T) {
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{
 			ID:      "L001",
 			Insight: "Always validate input",
@@ -154,8 +153,8 @@ func TestFormatSessionHumanEmpty(t *testing.T) {
 }
 
 func TestFormatSessionHumanCompactWarning(t *testing.T) {
-	items := make([]memory.MemoryItem, 1)
-	items[0] = memory.MemoryItem{
+	items := make([]memory.Item, 1)
+	items[0] = memory.Item{
 		ID:      "L001",
 		Insight: "test",
 		Tags:    []string{},
@@ -173,7 +172,7 @@ func TestFormatSessionHumanCompactWarning(t *testing.T) {
 func TestFormatSessionHumanAgeWarning(t *testing.T) {
 	// Create a lesson older than 90 days
 	old := time.Now().AddDate(0, 0, -100).Format(time.RFC3339)
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{
 			ID:      "L001",
 			Insight: "old lesson",
@@ -190,7 +189,7 @@ func TestFormatSessionHumanAgeWarning(t *testing.T) {
 }
 
 func TestFormatSessionJSON(t *testing.T) {
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{
 			ID:      "L001",
 			Type:    memory.TypeLesson,
@@ -207,9 +206,9 @@ func TestFormatSessionJSON(t *testing.T) {
 	}
 
 	var parsed struct {
-		Lessons    []memory.MemoryItem `json:"lessons"`
-		Count      int                 `json:"count"`
-		TotalCount int                 `json:"totalCount"`
+		Lessons    []memory.Item `json:"lessons"`
+		Count      int           `json:"count"`
+		TotalCount int           `json:"totalCount"`
 	}
 	if err := json.Unmarshal([]byte(got), &parsed); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
@@ -229,7 +228,7 @@ func TestFormatCheckPlanHuman(t *testing.T) {
 	ranked := []search.RankedItem{
 		{
 			ScoredItem: search.ScoredItem{
-				Item: memory.MemoryItem{
+				Item: memory.Item{
 					ID:      "L001",
 					Insight: "Always use parameterized queries",
 					Source:  memory.SourceManual,
@@ -267,7 +266,7 @@ func TestFormatCheckPlanJSON(t *testing.T) {
 	ranked := []search.RankedItem{
 		{
 			ScoredItem: search.ScoredItem{
-				Item: memory.MemoryItem{
+				Item: memory.Item{
 					ID:      "L001",
 					Insight: "test",
 					Source:  memory.SourceManual,
@@ -313,7 +312,7 @@ func TestCountOldLessons(t *testing.T) {
 	recent := time.Now().AddDate(0, 0, -10).Format(time.RFC3339)
 	old := time.Now().AddDate(0, 0, -100).Format(time.RFC3339)
 
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{ID: "L1", Created: recent},
 		{ID: "L2", Created: old},
 		{ID: "L3", Created: old},
@@ -326,7 +325,7 @@ func TestCountOldLessons(t *testing.T) {
 }
 
 func TestCountOldLessonsUnparseable(t *testing.T) {
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{ID: "L1", Created: "not-a-date"},
 	}
 	got := countOldLessons(items)

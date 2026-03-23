@@ -4,7 +4,7 @@ import "fmt"
 
 // PhaseGuardResult is the output of the phase-guard hook.
 type PhaseGuardResult struct {
-	HookSpecificOutput *HookSpecificOutput `json:"hookSpecificOutput,omitempty"`
+	SpecificOutput *SpecificOutput `json:"hookSpecificOutput,omitempty"`
 }
 
 // ProcessPhaseGuard checks if Edit/Write is allowed without reading the phase skill.
@@ -26,7 +26,7 @@ func ProcessPhaseGuard(repoRoot, toolName string, toolInput map[string]interface
 	}
 
 	return PhaseGuardResult{
-		HookSpecificOutput: &HookSpecificOutput{
+		SpecificOutput: &SpecificOutput{
 			HookEventName: "PreToolUse",
 			AdditionalContext: fmt.Sprintf(
 				"PHASE GUARD WARNING: You are in cook-it phase %d/5 (%s) but have NOT read the skill file yet. Read %s before continuing.",

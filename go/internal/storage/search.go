@@ -4,8 +4,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"math"
-	"os"
 	"strings"
 
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
@@ -38,9 +38,9 @@ func (s *SearchDB) Close() error {
 	return s.db.Close()
 }
 
-// ScoredResult pairs a MemoryItem with a BM25-normalized score.
+// ScoredResult pairs a Item with a BM25-normalized score.
 type ScoredResult struct {
-	memory.MemoryItem
+	memory.Item
 	Score float64
 }
 
@@ -66,7 +66,7 @@ func SanitizeFtsQuery(query string) string {
 }
 
 // SearchKeyword searches using FTS5 MATCH.
-func (s *SearchDB) SearchKeyword(query string, limit int, typeFilter memory.MemoryItemType) ([]memory.MemoryItem, error) {
+func (s *SearchDB) SearchKeyword(query string, limit int, typeFilter memory.ItemType) ([]memory.Item, error) {
 	sanitized := SanitizeFtsQuery(query)
 	if sanitized == "" {
 		return nil, nil
@@ -77,15 +77,15 @@ func (s *SearchDB) SearchKeyword(query string, limit int, typeFilter memory.Memo
 		return nil, err
 	}
 
-	var items []memory.MemoryItem
+	var items []memory.Item
 	for _, r := range rows {
-		items = append(items, r.MemoryItem)
+		items = append(items, r.Item)
 	}
 	return items, nil
 }
 
 // SearchKeywordScored searches using FTS5 with normalized BM25 scores.
-func (s *SearchDB) SearchKeywordScored(query string, limit int, typeFilter memory.MemoryItemType) ([]ScoredResult, error) {
+func (s *SearchDB) SearchKeywordScored(query string, limit int, typeFilter memory.ItemType) ([]ScoredResult, error) {
 	sanitized := SanitizeFtsQuery(query)
 	if sanitized == "" {
 		return nil, nil
@@ -95,7 +95,7 @@ func (s *SearchDB) SearchKeywordScored(query string, limit int, typeFilter memor
 }
 
 // ReadAll reads all non-invalidated memory items from SQLite.
-func (s *SearchDB) ReadAll() ([]memory.MemoryItem, error) {
+func (s *SearchDB) ReadAll() ([]memory.Item, error) {
 	rows, err := s.db.Query(`SELECT ` + lessonSelectCols + `
 		FROM lessons WHERE invalidated_at IS NULL`)
 	if err != nil {
@@ -103,7 +103,7 @@ func (s *SearchDB) ReadAll() ([]memory.MemoryItem, error) {
 	}
 	defer rows.Close()
 
-	var items []memory.MemoryItem
+	var items []memory.Item
 	for rows.Next() {
 		item, err := scanRow(rows)
 		if err != nil {
@@ -114,7 +114,7 @@ func (s *SearchDB) ReadAll() ([]memory.MemoryItem, error) {
 	return items, rows.Err()
 }
 
-func (s *SearchDB) executeFts(sanitized string, limit int, typeFilter memory.MemoryItemType, withRank bool) ([]ScoredResult, error) {
+func (s *SearchDB) executeFts(sanitized string, limit int, typeFilter memory.ItemType, withRank bool) ([]ScoredResult, error) {
 	selectCols := lessonSelectColsAliased
 	orderClause := ""
 	if withRank {
@@ -155,7 +155,7 @@ func (s *SearchDB) executeFts(sanitized string, limit int, typeFilter memory.Mem
 		if withRank {
 			score = normalizeBm25Rank(rank)
 		}
-		results = append(results, ScoredResult{MemoryItem: item, Score: score})
+		results = append(results, ScoredResult{Item: item, Score: score})
 	}
 	return results, rows.Err()
 }
@@ -170,83 +170,90 @@ func normalizeBm25Rank(rank float64) float64 {
 	return abs / (1 + abs)
 }
 
-// scanRow scans a lessons row into a MemoryItem.
-func scanRow(rows *sql.Rows) (memory.MemoryItem, error) {
+// scanRow scans a lessons row into a Item.
+func scanRow(rows *sql.Rows) (memory.Item, error) {
 	item, _, err := scanRowWithRank(rows, false)
 	return item, err
 }
 
-// scanRowWithRank scans a lessons row, optionally including FTS5 rank.
-func scanRowWithRank(rows *sql.Rows, withRank bool) (memory.MemoryItem, float64, error) {
-	var (
-		id, typ, trigger, insight string
-		evidence, severity        sql.NullString
-		tags, source, context     string
-		supersedes, related       string
-		created                   string
-		confirmed, deleted        int
-		retrievalCount            int
-		lastRetrieved             sql.NullString
-		embedding                 sql.RawBytes
-		contentHash               sql.NullString
-		embeddingInsight          sql.RawBytes
-		contentHashInsight        sql.NullString
-		invalidatedAt             sql.NullString
-		invalidationReason        sql.NullString
-		citFile                   sql.NullString
-		citLine                   sql.NullInt64
-		citCommit                 sql.NullString
-		compactionLevel           sql.NullInt64
-		compactedAt               sql.NullString
-		patternBad                sql.NullString
-		patternGood               sql.NullString
-		rank                      float64
-	)
+// rawFields holds the raw scanned SQL values before conversion to memory.Item.
+type rawFields struct {
+	id, typ, trigger, insight string
+	evidence, severity        sql.NullString
+	tags, source, context     string
+	supersedes, related       string
+	created                   string
+	confirmed, deleted        int
+	retrievalCount            int
+	lastRetrieved             sql.NullString
+	embedding                 sql.RawBytes
+	contentHash               sql.NullString
+	embeddingInsight          sql.RawBytes
+	contentHashInsight        sql.NullString
+	invalidatedAt             sql.NullString
+	invalidationReason        sql.NullString
+	citFile                   sql.NullString
+	citLine                   sql.NullInt64
+	citCommit                 sql.NullString
+	compactionLevel           sql.NullInt64
+	compactedAt               sql.NullString
+	patternBad                sql.NullString
+	patternGood               sql.NullString
+}
+
+// scanNullableFields scans a SQL row into rawFields and an optional rank value.
+func scanNullableFields(rows *sql.Rows, withRank bool) (rawFields, float64, error) {
+	var raw rawFields
+	var rank float64
 
 	dest := []interface{}{
-		&id, &typ, &trigger, &insight, &evidence, &severity,
-		&tags, &source, &context, &supersedes, &related,
-		&created, &confirmed, &deleted, &retrievalCount, &lastRetrieved,
-		&embedding, &contentHash, &embeddingInsight, &contentHashInsight,
-		&invalidatedAt, &invalidationReason,
-		&citFile, &citLine, &citCommit,
-		&compactionLevel, &compactedAt,
-		&patternBad, &patternGood,
+		&raw.id, &raw.typ, &raw.trigger, &raw.insight, &raw.evidence, &raw.severity,
+		&raw.tags, &raw.source, &raw.context, &raw.supersedes, &raw.related,
+		&raw.created, &raw.confirmed, &raw.deleted, &raw.retrievalCount, &raw.lastRetrieved,
+		&raw.embedding, &raw.contentHash, &raw.embeddingInsight, &raw.contentHashInsight,
+		&raw.invalidatedAt, &raw.invalidationReason,
+		&raw.citFile, &raw.citLine, &raw.citCommit,
+		&raw.compactionLevel, &raw.compactedAt,
+		&raw.patternBad, &raw.patternGood,
 	}
 	if withRank {
 		dest = append(dest, &rank)
 	}
 
 	if err := rows.Scan(dest...); err != nil {
-		return memory.MemoryItem{}, 0, err
+		return rawFields{}, 0, err
 	}
+	return raw, rank, nil
+}
 
-	item := memory.MemoryItem{
-		ID:        id,
-		Type:      memory.MemoryItemType(typ),
-		Trigger:   trigger,
-		Insight:   insight,
-		Source:    memory.Source(source),
-		Created:   created,
-		Confirmed: confirmed == 1,
+// convertToItem maps raw scanned fields to a memory.Item.
+func convertToItem(raw rawFields) memory.Item {
+	item := memory.Item{
+		ID:        raw.id,
+		Type:      memory.ItemType(raw.typ),
+		Trigger:   raw.trigger,
+		Insight:   raw.insight,
+		Source:    memory.Source(raw.source),
+		Created:   raw.created,
+		Confirmed: raw.confirmed == 1,
 	}
 
 	// Tags: comma-separated
-	if tags != "" {
-		item.Tags = strings.Split(tags, ",")
+	if raw.tags != "" {
+		item.Tags = strings.Split(raw.tags, ",")
 	} else {
 		item.Tags = []string{}
 	}
 
 	// JSON fields — log but don't fail on corrupt data
-	if err := json.Unmarshal([]byte(context), &item.Context); err != nil {
-		fmt.Fprintf(os.Stderr, "[ca] warning: corrupt context JSON for %s: %v\n", id, err)
+	if err := json.Unmarshal([]byte(raw.context), &item.Context); err != nil {
+		slog.Warn("corrupt context JSON", "id", raw.id, "error", err)
 	}
-	if err := json.Unmarshal([]byte(supersedes), &item.Supersedes); err != nil {
-		fmt.Fprintf(os.Stderr, "[ca] warning: corrupt supersedes JSON for %s: %v\n", id, err)
+	if err := json.Unmarshal([]byte(raw.supersedes), &item.Supersedes); err != nil {
+		slog.Warn("corrupt supersedes JSON", "id", raw.id, "error", err)
 	}
-	if err := json.Unmarshal([]byte(related), &item.Related); err != nil {
-		fmt.Fprintf(os.Stderr, "[ca] warning: corrupt related JSON for %s: %v\n", id, err)
+	if err := json.Unmarshal([]byte(raw.related), &item.Related); err != nil {
+		slog.Warn("corrupt related JSON", "id", raw.id, "error", err)
 	}
 	if item.Supersedes == nil {
 		item.Supersedes = []string{}
@@ -255,51 +262,78 @@ func scanRowWithRank(rows *sql.Rows, withRank bool) (memory.MemoryItem, float64,
 		item.Related = []string{}
 	}
 
-	// Optional fields
-	if evidence.Valid {
-		item.Evidence = &evidence.String
+	applyOptionalFields(&item, raw)
+	return item
+}
+
+// applyOptionalFields sets optional/nullable fields on a memory.Item from raw scan data.
+func applyOptionalFields(item *memory.Item, raw rawFields) {
+	applyScalarFields(item, raw)
+	applyCitationAndPattern(item, raw)
+}
+
+// applyScalarFields sets simple optional scalar fields from raw scan data.
+func applyScalarFields(item *memory.Item, raw rawFields) {
+	if raw.evidence.Valid {
+		item.Evidence = &raw.evidence.String
 	}
-	if severity.Valid {
-		sev := memory.Severity(severity.String)
+	if raw.severity.Valid {
+		sev := memory.Severity(raw.severity.String)
 		item.Severity = &sev
 	}
-	if deleted == 1 {
+	if raw.deleted == 1 {
 		b := true
 		item.Deleted = &b
 	}
-	if retrievalCount > 0 {
-		item.RetrievalCount = &retrievalCount
+	if raw.retrievalCount > 0 {
+		item.RetrievalCount = &raw.retrievalCount
 	}
-	if lastRetrieved.Valid {
-		item.LastRetrieved = &lastRetrieved.String
+	applyTimestampFields(item, raw)
+}
+
+// applyTimestampFields sets time-related and compaction optional fields.
+func applyTimestampFields(item *memory.Item, raw rawFields) {
+	if raw.lastRetrieved.Valid {
+		item.LastRetrieved = &raw.lastRetrieved.String
 	}
-	if invalidatedAt.Valid {
-		item.InvalidatedAt = &invalidatedAt.String
+	if raw.invalidatedAt.Valid {
+		item.InvalidatedAt = &raw.invalidatedAt.String
 	}
-	if invalidationReason.Valid {
-		item.InvalidationReason = &invalidationReason.String
+	if raw.invalidationReason.Valid {
+		item.InvalidationReason = &raw.invalidationReason.String
 	}
-	if citFile.Valid {
-		cit := memory.Citation{File: citFile.String}
-		if citLine.Valid {
-			l := int(citLine.Int64)
+	if raw.compactionLevel.Valid && raw.compactionLevel.Int64 != 0 {
+		cl := int(raw.compactionLevel.Int64)
+		item.CompactionLevel = &cl
+	}
+	if raw.compactedAt.Valid {
+		item.CompactedAt = &raw.compactedAt.String
+	}
+}
+
+// applyCitationAndPattern sets the compound citation and pattern fields from raw scan data.
+func applyCitationAndPattern(item *memory.Item, raw rawFields) {
+	if raw.citFile.Valid {
+		cit := memory.Citation{File: raw.citFile.String}
+		if raw.citLine.Valid {
+			l := int(raw.citLine.Int64)
 			cit.Line = &l
 		}
-		if citCommit.Valid {
-			cit.Commit = &citCommit.String
+		if raw.citCommit.Valid {
+			cit.Commit = &raw.citCommit.String
 		}
 		item.Citation = &cit
 	}
-	if compactionLevel.Valid && compactionLevel.Int64 != 0 {
-		cl := int(compactionLevel.Int64)
-		item.CompactionLevel = &cl
+	if raw.patternBad.Valid && raw.patternGood.Valid {
+		item.Pattern = &memory.Pattern{Bad: raw.patternBad.String, Good: raw.patternGood.String}
 	}
-	if compactedAt.Valid {
-		item.CompactedAt = &compactedAt.String
-	}
-	if patternBad.Valid && patternGood.Valid {
-		item.Pattern = &memory.Pattern{Bad: patternBad.String, Good: patternGood.String}
-	}
+}
 
-	return item, rank, nil
+// scanRowWithRank scans a lessons row, optionally including FTS5 rank.
+func scanRowWithRank(rows *sql.Rows, withRank bool) (memory.Item, float64, error) {
+	raw, rank, err := scanNullableFields(rows, withRank)
+	if err != nil {
+		return memory.Item{}, 0, err
+	}
+	return convertToItem(raw), rank, nil
 }

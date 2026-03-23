@@ -34,7 +34,7 @@ func TestContentHash_IncludesModelID(t *testing.T) {
 
 	// The hash should be non-empty hex string
 	for _, c := range h1 {
-		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
 			t.Errorf("hash contains non-hex char: %c", c)
 		}
 	}

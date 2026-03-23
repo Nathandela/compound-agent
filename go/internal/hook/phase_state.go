@@ -2,7 +2,7 @@ package hook
 
 import (
 	"encoding/json"
-	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -51,13 +51,7 @@ func GetPhaseState(repoRoot string) *PhaseState {
 		return nil
 	}
 
-	// Migrate legacy lfg_active -> cookit_active
-	if _, ok := raw["cookit_active"]; !ok {
-		if lfg, ok := raw["lfg_active"]; ok {
-			raw["cookit_active"] = lfg
-			delete(raw, "lfg_active")
-		}
-	}
+	migratePhaseState(raw)
 
 	// Re-marshal and unmarshal into struct
 	migrated, err := json.Marshal(raw)
@@ -70,12 +64,32 @@ func GetPhaseState(repoRoot string) *PhaseState {
 		return nil
 	}
 
-	// Validate required fields
-	if state.PhaseIndex < 1 || state.PhaseIndex > 5 {
+	if !validatePhaseState(&state, repoRoot) {
 		return nil
 	}
+
+	return &state
+}
+
+// migratePhaseState applies legacy field migrations to the raw JSON map.
+// Renames lfg_active to cookit_active if the new field is not already present.
+func migratePhaseState(raw map[string]interface{}) {
+	if _, ok := raw["cookit_active"]; !ok {
+		if lfg, ok := raw["lfg_active"]; ok {
+			raw["cookit_active"] = lfg
+			delete(raw, "lfg_active")
+		}
+	}
+}
+
+// validatePhaseState checks required fields, initializes nil slices, and enforces TTL.
+// Returns false if the state is invalid or stale, cleaning up stale files as a side effect.
+func validatePhaseState(state *PhaseState, repoRoot string) bool {
+	if state.PhaseIndex < 1 || state.PhaseIndex > 5 {
+		return false
+	}
 	if state.StartedAt == "" {
-		return nil
+		return false
 	}
 	if state.SkillsRead == nil {
 		state.SkillsRead = []string{}
@@ -87,19 +101,17 @@ func GetPhaseState(repoRoot string) *PhaseState {
 	// TTL check
 	startedAt, err := time.Parse(time.RFC3339, state.StartedAt)
 	if err != nil {
-		// Try RFC3339Nano (ISO 8601 with sub-second precision)
 		startedAt, err = time.Parse(time.RFC3339Nano, state.StartedAt)
 		if err != nil {
-			return nil
+			return false
 		}
 	}
 	if time.Since(startedAt) > phaseStateMaxAge {
-		// Clean up stale file
 		os.Remove(PhaseStatePath(repoRoot))
-		return nil
+		return false
 	}
 
-	return &state
+	return true
 }
 
 // UpdatePhaseState reads the current state, applies partial updates, and writes back.
@@ -171,7 +183,7 @@ func CleanPhaseStateIfFinal(repoRoot string) {
 	for _, g := range state.GatesPassed {
 		if g == "final" {
 			if err := os.Remove(PhaseStatePath(repoRoot)); err != nil && !os.IsNotExist(err) {
-				fmt.Fprintf(os.Stderr, "[warn] clean phase state: %v\n", err)
+				slog.Warn("clean phase state failed", "error", err)
 			}
 			return
 		}

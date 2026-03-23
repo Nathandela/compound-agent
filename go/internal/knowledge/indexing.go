@@ -49,62 +49,90 @@ func IndexDocs(repoRoot string, kdb *storage.KnowledgeDB, opts *IndexOptions) (*
 		return stats, fmt.Errorf("walk docs: %w", err)
 	}
 
-	// Process each file
-	for _, relPath := range filePaths {
-		fullPath := filepath.Join(repoRoot, relPath)
-		content, err := os.ReadFile(fullPath)
-		if err != nil {
-			stats.FilesErrored++
-			continue
-		}
+	indexFiles(repoRoot, kdb, filePaths, force, stats)
 
-		hash := fileHash(string(content))
-		storedHash := kdb.GetFileHash(relPath)
-
-		if !force && storedHash == hash {
-			stats.FilesSkipped++
-			continue
-		}
-
-		chunks := ChunkFile(relPath, string(content), nil)
-		now := time.Now().UTC().Format(time.RFC3339)
-		kChunks := make([]storage.KnowledgeChunk, len(chunks))
-		for i, c := range chunks {
-			kChunks[i] = storage.KnowledgeChunk{
-				ID:          c.ID,
-				FilePath:    c.FilePath,
-				StartLine:   c.StartLine,
-				EndLine:     c.EndLine,
-				ContentHash: c.ContentHash,
-				Text:        c.Text,
-				UpdatedAt:   now,
-			}
-		}
-
-		// Atomic replacement: delete old, insert new, update hash
-		if err := kdb.DeleteChunksByFilePath([]string{relPath}); err != nil {
-			stats.FilesErrored++
-			continue
-		}
-		if len(kChunks) > 0 {
-			if err := kdb.UpsertChunks(kChunks); err != nil {
-				stats.FilesErrored++
-				continue
-			}
-		}
-		if err := kdb.SetFileHash(relPath, hash); err != nil {
-			stats.FilesErrored++
-			continue
-		}
-
-		stats.FilesIndexed++
-		stats.ChunksCreated += len(kChunks)
+	if err := syncDeletedFiles(kdb, filePaths, stats); err != nil {
+		return stats, err
 	}
 
-	// Clean up stale files
+	// Non-fatal: failing to record index time doesn't affect correctness
+	_ = kdb.SetLastIndexTime(time.Now().UTC().Format(time.RFC3339))
+
+	stats.DurationMs = time.Since(start).Milliseconds()
+	return stats, nil
+}
+
+// indexFiles processes each file path: reads content, checks hash freshness,
+// chunks the file, and atomically replaces chunks in the database.
+func indexFiles(repoRoot string, kdb *storage.KnowledgeDB, filePaths []string, force bool, stats *IndexResult) {
+	for _, relPath := range filePaths {
+		indexed, chunks := indexSingleFile(repoRoot, kdb, relPath, force)
+		if indexed {
+			stats.FilesIndexed++
+			stats.ChunksCreated += chunks
+		} else if chunks == -1 {
+			stats.FilesErrored++
+		} else {
+			stats.FilesSkipped++
+		}
+	}
+}
+
+// indexSingleFile reads, hashes, chunks, and stores a single file.
+// Returns (true, chunkCount) on success, (false, -1) on error, (false, 0) on skip.
+func indexSingleFile(repoRoot string, kdb *storage.KnowledgeDB, relPath string, force bool) (bool, int) {
+	fullPath := filepath.Join(repoRoot, relPath)
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		return false, -1
+	}
+
+	hash := fileHash(string(content))
+	if !force && kdb.GetFileHash(relPath) == hash {
+		return false, 0
+	}
+
+	kChunks := toKnowledgeChunks(relPath, string(content))
+
+	if err := kdb.DeleteChunksByFilePath([]string{relPath}); err != nil {
+		return false, -1
+	}
+	if len(kChunks) > 0 {
+		if err := kdb.UpsertChunks(kChunks); err != nil {
+			return false, -1
+		}
+	}
+	if err := kdb.SetFileHash(relPath, hash); err != nil {
+		return false, -1
+	}
+
+	return true, len(kChunks)
+}
+
+// toKnowledgeChunks chunks a file and converts to storage-layer chunks.
+func toKnowledgeChunks(relPath, content string) []storage.KnowledgeChunk {
+	chunks := ChunkFile(relPath, content, nil)
+	now := time.Now().UTC().Format(time.RFC3339)
+	kChunks := make([]storage.KnowledgeChunk, len(chunks))
+	for i, c := range chunks {
+		kChunks[i] = storage.KnowledgeChunk{
+			ID:          c.ID,
+			FilePath:    c.FilePath,
+			StartLine:   c.StartLine,
+			EndLine:     c.EndLine,
+			ContentHash: c.ContentHash,
+			Text:        c.Text,
+			UpdatedAt:   now,
+		}
+	}
+	return kChunks
+}
+
+// syncDeletedFiles removes chunks for files that no longer exist on disk.
+func syncDeletedFiles(kdb *storage.KnowledgeDB, currentFiles []string, stats *IndexResult) error {
 	indexedPaths := kdb.GetIndexedFilePaths()
-	currentPathSet := make(map[string]bool, len(filePaths))
-	for _, p := range filePaths {
+	currentPathSet := make(map[string]bool, len(currentFiles))
+	for _, p := range currentFiles {
 		currentPathSet[p] = true
 	}
 
@@ -115,24 +143,21 @@ func IndexDocs(repoRoot string, kdb *storage.KnowledgeDB, opts *IndexOptions) (*
 		}
 	}
 
-	if len(stalePaths) > 0 {
-		for _, p := range stalePaths {
-			stats.ChunksDeleted += kdb.GetChunkCountByFilePath(p)
-		}
-		if err := kdb.DeleteChunksByFilePath(stalePaths); err != nil {
-			return stats, fmt.Errorf("delete stale chunks: %w", err)
-		}
-		for _, p := range stalePaths {
-			// Non-fatal: stale hash metadata is harmless if removal fails
-			_ = kdb.RemoveFileHash(p)
-		}
+	if len(stalePaths) == 0 {
+		return nil
 	}
 
-	// Non-fatal: failing to record index time doesn't affect correctness
-	_ = kdb.SetLastIndexTime(time.Now().UTC().Format(time.RFC3339))
-
-	stats.DurationMs = time.Since(start).Milliseconds()
-	return stats, nil
+	for _, p := range stalePaths {
+		stats.ChunksDeleted += kdb.GetChunkCountByFilePath(p)
+	}
+	if err := kdb.DeleteChunksByFilePath(stalePaths); err != nil {
+		return fmt.Errorf("delete stale chunks: %w", err)
+	}
+	for _, p := range stalePaths {
+		// Non-fatal: stale hash metadata is harmless if removal fails
+		_ = kdb.RemoveFileHash(p)
+	}
+	return nil
 }
 
 func fileHash(content string) string {

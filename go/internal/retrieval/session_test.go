@@ -10,7 +10,7 @@ import (
 )
 
 // writeTestJSONL writes memory items as JSONL to the standard lessons path in tmpDir.
-func writeTestJSONL(t *testing.T, tmpDir string, items []memory.MemoryItem) {
+func writeTestJSONL(t *testing.T, tmpDir string, items []memory.Item) {
 	t.Helper()
 	path := filepath.Join(tmpDir, memory.LessonsPath)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -30,10 +30,10 @@ func writeTestJSONL(t *testing.T, tmpDir string, items []memory.MemoryItem) {
 }
 
 func sevPtr(s memory.Severity) *memory.Severity { return &s }
-func strPtr(s string) *string                    { return &s }
+func strPtr(s string) *string                   { return &s }
 
-func makeTestItem(id, created string, sev *memory.Severity, confirmed bool, invalidatedAt *string) memory.MemoryItem {
-	return memory.MemoryItem{
+func makeTestItem(id, created string, sev *memory.Severity, confirmed bool, invalidatedAt *string) memory.Item {
+	return memory.Item{
 		ID:            id,
 		Type:          memory.TypeLesson,
 		Trigger:       "trigger for " + id,
@@ -51,7 +51,7 @@ func makeTestItem(id, created string, sev *memory.Severity, confirmed bool, inva
 
 func TestLoadSessionLessons_OnlyHighSeverityConfirmed(t *testing.T) {
 	tmpDir := t.TempDir()
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		makeTestItem("L001", "2025-06-01T00:00:00Z", sevPtr(memory.SeverityHigh), true, nil),
 		makeTestItem("L002", "2025-06-02T00:00:00Z", sevPtr(memory.SeverityMedium), true, nil),
 		makeTestItem("L003", "2025-06-03T00:00:00Z", sevPtr(memory.SeverityHigh), false, nil),
@@ -75,7 +75,7 @@ func TestLoadSessionLessons_OnlyHighSeverityConfirmed(t *testing.T) {
 
 func TestLoadSessionLessons_SortsByCreatedDescending(t *testing.T) {
 	tmpDir := t.TempDir()
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		makeTestItem("L001", "2025-06-01T00:00:00Z", sevPtr(memory.SeverityHigh), true, nil),
 		makeTestItem("L002", "2025-06-03T00:00:00Z", sevPtr(memory.SeverityHigh), true, nil),
 		makeTestItem("L003", "2025-06-02T00:00:00Z", sevPtr(memory.SeverityHigh), true, nil),
@@ -104,7 +104,7 @@ func TestLoadSessionLessons_SortsByCreatedDescending(t *testing.T) {
 
 func TestLoadSessionLessons_RespectsLimit(t *testing.T) {
 	tmpDir := t.TempDir()
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		makeTestItem("L001", "2025-06-01T00:00:00Z", sevPtr(memory.SeverityHigh), true, nil),
 		makeTestItem("L002", "2025-06-02T00:00:00Z", sevPtr(memory.SeverityHigh), true, nil),
 		makeTestItem("L003", "2025-06-03T00:00:00Z", sevPtr(memory.SeverityHigh), true, nil),
@@ -130,7 +130,7 @@ func TestLoadSessionLessons_RespectsLimit(t *testing.T) {
 
 func TestLoadSessionLessons_SkipsInvalidated(t *testing.T) {
 	tmpDir := t.TempDir()
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		makeTestItem("L001", "2025-06-01T00:00:00Z", sevPtr(memory.SeverityHigh), true, nil),
 		makeTestItem("L002", "2025-06-02T00:00:00Z", sevPtr(memory.SeverityHigh), true, strPtr("2025-06-10T00:00:00Z")),
 	}
@@ -151,7 +151,7 @@ func TestLoadSessionLessons_SkipsInvalidated(t *testing.T) {
 
 func TestLoadSessionLessons_EmptyForNoMatches(t *testing.T) {
 	tmpDir := t.TempDir()
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		makeTestItem("L001", "2025-06-01T00:00:00Z", sevPtr(memory.SeverityLow), true, nil),
 		makeTestItem("L002", "2025-06-02T00:00:00Z", sevPtr(memory.SeverityMedium), false, nil),
 	}

@@ -105,7 +105,7 @@ func ensureDaemonLocked(sockPath, modelPath, tokenizerPath string) (*Client, err
 	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
 		return nil, fmt.Errorf("acquire lock: %w", err)
 	}
-	defer syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+	defer func() { _ = syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN) }()
 
 	// Re-check after acquiring lock — another process may have started the daemon
 	if client, err := tryConnect(sockPath); err == nil {
@@ -143,8 +143,8 @@ func startDaemon(socketPath, modelPath, tokenizerPath string) error {
 		Dir: filepath.Dir(socketPath),
 		Env: os.Environ(),
 		Files: []*os.File{
-			devNull,   // stdin from /dev/null
-			nil,       // stdout discarded
+			devNull, // stdin from /dev/null
+			nil,     // stdout discarded
 			os.Stderr,
 		},
 	}
@@ -156,7 +156,7 @@ func startDaemon(socketPath, modelPath, tokenizerPath string) error {
 		return fmt.Errorf("exec %s: %w", binPath, err)
 	}
 
-	proc.Release()
+	_ = proc.Release()
 	return nil
 }
 

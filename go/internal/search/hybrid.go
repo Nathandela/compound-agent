@@ -16,7 +16,7 @@ const (
 
 // ScoredItem pairs a memory item with a relevance score.
 type ScoredItem struct {
-	Item  memory.MemoryItem
+	Item  memory.Item
 	Score float64
 }
 
@@ -29,22 +29,17 @@ type HybridMergeOptions struct {
 	MinScore     float64
 }
 
-// MergeHybridScores combines vector and keyword search results into a single
-// ranked list using weighted score blending.
-//
-// Algorithm:
-//  1. If both inputs are empty, return nil.
-//  2. Normalize weights to sum to 1.0.
-//  3. Union both result sets by item ID.
-//  4. Blend: score = vecW*vecScore + txtW*txtScore (missing source = 0).
-//  5. Filter by minScore if set.
-//  6. Sort descending by blended score.
-//  7. Apply limit if > 0.
-func MergeHybridScores(vectorResults, keywordResults []ScoredItem, opts *HybridMergeOptions) []ScoredItem {
-	if len(vectorResults) == 0 && len(keywordResults) == 0 {
-		return nil
-	}
+// resolvedWeights holds the normalized weights and options for hybrid merging.
+type resolvedWeights struct {
+	vecW     float64
+	txtW     float64
+	limit    int
+	minScore float64
+}
 
+// resolveHybridWeights extracts and normalizes weights from options.
+// Returns zero-value resolvedWeights with ok=false if total weight is non-positive.
+func resolveHybridWeights(opts *HybridMergeOptions) (resolvedWeights, bool) {
 	rawVecW := DefaultVectorWeight
 	rawTxtW := DefaultTextWeight
 	var limit int
@@ -63,15 +58,20 @@ func MergeHybridScores(vectorResults, keywordResults []ScoredItem, opts *HybridM
 
 	total := rawVecW + rawTxtW
 	if total <= 0 {
-		return nil
+		return resolvedWeights{}, false
 	}
+	return resolvedWeights{
+		vecW:     rawVecW / total,
+		txtW:     rawTxtW / total,
+		limit:    limit,
+		minScore: minScore,
+	}, true
+}
 
-	vecW := rawVecW / total
-	txtW := rawTxtW / total
-
-	// Union by item ID.
+// blendScores unions vector and keyword results by item ID and computes blended scores.
+func blendScores(vectorResults, keywordResults []ScoredItem, w resolvedWeights) []ScoredItem {
 	type entry struct {
-		item     memory.MemoryItem
+		item     memory.Item
 		vecScore float64
 		txtScore float64
 	}
@@ -81,32 +81,53 @@ func MergeHybridScores(vectorResults, keywordResults []ScoredItem, opts *HybridM
 		merged[v.Item.ID] = &entry{item: v.Item, vecScore: v.Score}
 	}
 	for _, k := range keywordResults {
-		id := k.Item.ID
-		if e, ok := merged[id]; ok {
+		if e, ok := merged[k.Item.ID]; ok {
 			e.txtScore = k.Score
 		} else {
-			merged[id] = &entry{item: k.Item, txtScore: k.Score}
+			merged[k.Item.ID] = &entry{item: k.Item, txtScore: k.Score}
 		}
 	}
 
-	// Blend scores.
 	results := make([]ScoredItem, 0, len(merged))
 	for _, e := range merged {
-		blended := vecW*e.vecScore + txtW*e.txtScore
-		if minScore > 0 && blended < minScore {
+		blended := w.vecW*e.vecScore + w.txtW*e.txtScore
+		if w.minScore > 0 && blended < w.minScore {
 			continue
 		}
 		results = append(results, ScoredItem{Item: e.item, Score: blended})
 	}
+	return results
+}
 
-	// Sort descending by score.
+// MergeHybridScores combines vector and keyword search results into a single
+// ranked list using weighted score blending.
+//
+// Algorithm:
+//  1. If both inputs are empty, return nil.
+//  2. Normalize weights to sum to 1.0.
+//  3. Union both result sets by item ID.
+//  4. Blend: score = vecW*vecScore + txtW*txtScore (missing source = 0).
+//  5. Filter by minScore if set.
+//  6. Sort descending by blended score.
+//  7. Apply limit if > 0.
+func MergeHybridScores(vectorResults, keywordResults []ScoredItem, opts *HybridMergeOptions) []ScoredItem {
+	if len(vectorResults) == 0 && len(keywordResults) == 0 {
+		return nil
+	}
+
+	w, ok := resolveHybridWeights(opts)
+	if !ok {
+		return nil
+	}
+
+	results := blendScores(vectorResults, keywordResults, w)
+
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
 	})
 
-	// Apply limit.
-	if limit > 0 && len(results) > limit {
-		results = results[:limit]
+	if w.limit > 0 && len(results) > w.limit {
+		results = results[:w.limit]
 	}
 
 	return results

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -24,6 +25,26 @@ const preCommitMessage = `
 ║   npx ca learn "<insight>" --trigger "<what happened>"       ║
 ╚══════════════════════════════════════════════════════════════╝`
 
+// hookInput holds the raw JSON input read from stdin for a hook invocation.
+type hookInput struct {
+	raw string
+}
+
+// parseHookInput reads and returns the raw stdin content for hook processing.
+func parseHookInput(stdin io.Reader) (*hookInput, error) {
+	raw, err := util.ReadStdinFrom(stdin, 30*time.Second, 1<<20)
+	if err != nil {
+		return nil, err
+	}
+	return &hookInput{raw: raw}, nil
+}
+
+// writeHookOutput serializes the result as JSON and writes it to stdout.
+func writeHookOutput(stdout io.Writer, result interface{}) {
+	data, _ := json.Marshal(result)
+	fmt.Fprintln(stdout, string(data))
+}
+
 // RunHook dispatches to the appropriate hook handler.
 // Returns exit code (0 = success, 1 = error).
 func RunHook(hookName string, stdin io.Reader, stdout io.Writer) int {
@@ -32,140 +53,137 @@ func RunHook(hookName string, stdin io.Reader, stdout io.Writer) int {
 		return 1
 	}
 
-	writeJSON := func(v interface{}) {
-		data, _ := json.Marshal(v)
-		fmt.Fprintln(stdout, string(data))
-	}
-
-	readInput := func() (string, error) {
-		return util.ReadStdinFrom(stdin, 30*time.Second, 1<<20)
-	}
-
 	// All hooks catch errors and output {} on failure
 	defer func() {
 		if r := recover(); r != nil {
-			if os.Getenv("CA_DEBUG") != "" {
-				fmt.Fprintf(os.Stderr, "[CA_DEBUG] Hook %s panic: %v\n", hookName, r)
-			}
-			writeJSON(map[string]interface{}{})
+			slog.Error("hook panic", "hook", hookName, "error", r)
+			writeHookOutput(stdout, map[string]interface{}{})
 		}
 	}()
 
-	var err error
+	result, code := dispatchHook(hookName, stdin)
+	if result != nil {
+		writeHookOutput(stdout, result)
+	}
+	return code
+}
 
+// dispatchHook routes to the correct hook handler and returns the result to serialize.
+func dispatchHook(hookName string, stdin io.Reader) (interface{}, int) {
 	switch hookName {
 	case "pre-commit":
-		writeJSON(map[string]interface{}{
+		return map[string]interface{}{
 			"hook":    "pre-commit",
 			"message": preCommitMessage,
-		})
-		return 0
-
+		}, 0
 	case "user-prompt":
-		input, readErr := readInput()
-		if readErr != nil {
-			return handleError(hookName, readErr, writeJSON)
-		}
-		var data struct {
-			Prompt string `json:"prompt"`
-		}
-		if err = json.Unmarshal([]byte(input), &data); err != nil {
-			return handleError(hookName, err, writeJSON)
-		}
-		if data.Prompt == "" {
-			writeJSON(map[string]interface{}{})
-			return 0
-		}
-		writeJSON(ProcessUserPrompt(data.Prompt))
-		return 0
-
+		return dispatchUserPrompt(stdin, hookName)
 	case "post-tool-failure":
-		input, readErr := readInput()
-		if readErr != nil {
-			return handleError(hookName, readErr, writeJSON)
-		}
-		var data struct {
-			ToolName  string                 `json:"tool_name"`
-			ToolInput map[string]interface{} `json:"tool_input"`
-		}
-		if err = json.Unmarshal([]byte(input), &data); err != nil {
-			return handleError(hookName, err, writeJSON)
-		}
-		if data.ToolName == "" {
-			writeJSON(map[string]interface{}{})
-			return 0
-		}
-		if data.ToolInput == nil {
-			data.ToolInput = map[string]interface{}{}
-		}
-		stateDir := filepath.Join(util.GetRepoRoot(), ".claude")
-		writeJSON(ProcessToolFailure(data.ToolName, data.ToolInput, stateDir))
-		return 0
-
+		return dispatchToolFailure(stdin, hookName)
 	case "post-tool-success":
-		_, _ = readInput() // consume stdin
-		stateDir := filepath.Join(util.GetRepoRoot(), ".claude")
-		ProcessToolSuccess(stateDir)
-		writeJSON(map[string]interface{}{})
-		return 0
-
+		return dispatchToolSuccess(stdin)
 	case "phase-guard", "post-read", "read-tracker":
-		input, readErr := readInput()
-		if readErr != nil {
-			return handleError(hookName, readErr, writeJSON)
-		}
-		var data struct {
-			ToolName  string                 `json:"tool_name"`
-			ToolInput map[string]interface{} `json:"tool_input"`
-		}
-		if err = json.Unmarshal([]byte(input), &data); err != nil {
-			return handleError(hookName, err, writeJSON)
-		}
-		if data.ToolName == "" {
-			writeJSON(map[string]interface{}{})
-			return 0
-		}
-		if data.ToolInput == nil {
-			data.ToolInput = map[string]interface{}{}
-		}
-		repoRoot := util.GetRepoRoot()
-		if hookName == "phase-guard" {
-			writeJSON(ProcessPhaseGuard(repoRoot, data.ToolName, data.ToolInput))
-		} else {
-			ProcessReadTracker(repoRoot, data.ToolName, data.ToolInput)
-			writeJSON(map[string]interface{}{})
-		}
-		return 0
-
+		return dispatchPhaseGuard(stdin, hookName)
 	case "phase-audit", "stop-audit":
-		input, readErr := readInput()
-		if readErr != nil {
-			return handleError(hookName, readErr, writeJSON)
-		}
-		var data struct {
-			StopHookActive bool `json:"stop_hook_active"`
-		}
-		if err = json.Unmarshal([]byte(input), &data); err != nil {
-			return handleError(hookName, err, writeJSON)
-		}
-		writeJSON(ProcessStopAudit(util.GetRepoRoot(), data.StopHookActive))
-		return 0
-
+		return dispatchStopAudit(stdin, hookName)
 	default:
-		writeJSON(map[string]interface{}{
+		return map[string]interface{}{
 			"error": fmt.Sprintf(
 				"Unknown hook: %s. Valid hooks: pre-commit, user-prompt, post-tool-failure, post-tool-success, post-read (or read-tracker), phase-guard, phase-audit (or stop-audit)",
 				hookName,
 			),
-		})
-		return 1
+		}, 1
 	}
 }
 
-func handleError(hookName string, err error, writeJSON func(interface{})) int {
-	if os.Getenv("CA_DEBUG") != "" {
-		fmt.Fprintf(os.Stderr, "[CA_DEBUG] Hook %s error: %v\n", hookName, err)
+func dispatchUserPrompt(stdin io.Reader, hookName string) (interface{}, int) {
+	input, err := parseHookInput(stdin)
+	if err != nil {
+		return handleErrorResult(hookName, err), 0
 	}
-	writeJSON(map[string]interface{}{})
-	return 0
+	var data struct {
+		Prompt string `json:"prompt"`
+	}
+	if err = json.Unmarshal([]byte(input.raw), &data); err != nil {
+		return handleErrorResult(hookName, err), 0
+	}
+	if data.Prompt == "" {
+		return map[string]interface{}{}, 0
+	}
+	return ProcessUserPrompt(data.Prompt), 0
+}
+
+func dispatchToolFailure(stdin io.Reader, hookName string) (interface{}, int) {
+	input, err := parseHookInput(stdin)
+	if err != nil {
+		return handleErrorResult(hookName, err), 0
+	}
+	var data struct {
+		ToolName  string                 `json:"tool_name"`
+		ToolInput map[string]interface{} `json:"tool_input"`
+	}
+	if err = json.Unmarshal([]byte(input.raw), &data); err != nil {
+		return handleErrorResult(hookName, err), 0
+	}
+	if data.ToolName == "" {
+		return map[string]interface{}{}, 0
+	}
+	if data.ToolInput == nil {
+		data.ToolInput = map[string]interface{}{}
+	}
+	stateDir := filepath.Join(util.GetRepoRoot(), ".claude")
+	return ProcessToolFailure(data.ToolName, data.ToolInput, stateDir), 0
+}
+
+func dispatchToolSuccess(stdin io.Reader) (interface{}, int) {
+	_, _ = parseHookInput(stdin) // consume stdin
+	stateDir := filepath.Join(util.GetRepoRoot(), ".claude")
+	ProcessToolSuccess(stateDir)
+	return map[string]interface{}{}, 0
+}
+
+func dispatchPhaseGuard(stdin io.Reader, hookName string) (interface{}, int) {
+	input, err := parseHookInput(stdin)
+	if err != nil {
+		return handleErrorResult(hookName, err), 0
+	}
+	var data struct {
+		ToolName  string                 `json:"tool_name"`
+		ToolInput map[string]interface{} `json:"tool_input"`
+	}
+	if err = json.Unmarshal([]byte(input.raw), &data); err != nil {
+		return handleErrorResult(hookName, err), 0
+	}
+	if data.ToolName == "" {
+		return map[string]interface{}{}, 0
+	}
+	if data.ToolInput == nil {
+		data.ToolInput = map[string]interface{}{}
+	}
+	repoRoot := util.GetRepoRoot()
+	if hookName == "phase-guard" {
+		return ProcessPhaseGuard(repoRoot, data.ToolName, data.ToolInput), 0
+	}
+	ProcessReadTracker(repoRoot, data.ToolName, data.ToolInput)
+	return map[string]interface{}{}, 0
+}
+
+func dispatchStopAudit(stdin io.Reader, hookName string) (interface{}, int) {
+	input, err := parseHookInput(stdin)
+	if err != nil {
+		return handleErrorResult(hookName, err), 0
+	}
+	var data struct {
+		StopHookActive bool `json:"stop_hook_active"`
+	}
+	if err = json.Unmarshal([]byte(input.raw), &data); err != nil {
+		return handleErrorResult(hookName, err), 0
+	}
+	return ProcessStopAudit(util.GetRepoRoot(), data.StopHookActive), 0
+}
+
+// handleErrorResult logs the error at debug level and returns an empty JSON object.
+func handleErrorResult(hookName string, err error) interface{} {
+	slog.Debug("hook error", "hook", hookName, "error", err)
+	return map[string]interface{}{}
 }

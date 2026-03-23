@@ -32,161 +32,194 @@ func phaseCheckCmd() *cobra.Command {
 		return util.GetRepoRoot()
 	}
 
-	// init <epic-id>
+	initSubCmd := phaseInitSubCmd(getRoot)
+	startSubCmd := phaseStartSubCmd(getRoot)
+	gateSubCmd := phaseGateSubCmd(getRoot)
+	statusSubCmd := phaseStatusSubCmd(getRoot)
+	cleanSubCmd := phaseCleanSubCmd(getRoot)
+
+	cmd.AddCommand(initSubCmd, startSubCmd, gateSubCmd, statusSubCmd, cleanSubCmd)
+	return cmd
+}
+
+// phaseInitSubCmd creates the "init <epic-id>" subcommand.
+func phaseInitSubCmd(getRoot func() string) *cobra.Command {
 	var forceInit bool
-	initSubCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "init <epic-id>",
 		Short: "Initialize phase state for an epic",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			epicID := args[0]
-			root := getRoot()
-			if err := os.MkdirAll(filepath.Join(root, ".claude"), 0755); err != nil {
-				return fmt.Errorf("create .claude dir: %w", err)
-			}
-
-			// Guard against overwriting active state
-			if !forceInit {
-				if existing := hook.GetPhaseState(root); existing != nil {
-					return fmt.Errorf("active phase state exists for epic %q (phase: %s). Use --force to overwrite", existing.EpicID, existing.CurrentPhase)
-				}
-			}
-
-			state := &hook.PhaseState{
-				CookitActive: true,
-				EpicID:       epicID,
-				CurrentPhase: "spec-dev",
-				PhaseIndex:   1,
-				SkillsRead:   []string{},
-				GatesPassed:  []string{},
-				StartedAt:    time.Now().UTC().Format(time.RFC3339),
-			}
-			if err := hook.WritePhaseState(root, state); err != nil {
-				return fmt.Errorf("write state: %w", err)
-			}
-			cmd.Printf("Phase state initialized for %s. Current phase: spec-dev (1/5).\n", epicID)
-			return nil
+			return handlePhaseInit(cmd, getRoot(), args[0], forceInit)
 		},
 	}
-	initSubCmd.Flags().BoolVar(&forceInit, "force", false, "Overwrite existing phase state")
+	cmd.Flags().BoolVar(&forceInit, "force", false, "Overwrite existing phase state")
+	return cmd
+}
 
-	// start <phase>
-	startSubCmd := &cobra.Command{
+// handlePhaseInit initializes phase state for an epic.
+func handlePhaseInit(cmd *cobra.Command, root, epicID string, force bool) error {
+	if err := os.MkdirAll(filepath.Join(root, ".claude"), 0755); err != nil {
+		return fmt.Errorf("create .claude dir: %w", err)
+	}
+
+	if !force {
+		if existing := hook.GetPhaseState(root); existing != nil {
+			return fmt.Errorf("active phase state exists for epic %q (phase: %s). Use --force to overwrite", existing.EpicID, existing.CurrentPhase)
+		}
+	}
+
+	state := &hook.PhaseState{
+		CookitActive: true,
+		EpicID:       epicID,
+		CurrentPhase: "spec-dev",
+		PhaseIndex:   1,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().UTC().Format(time.RFC3339),
+	}
+	if err := hook.WritePhaseState(root, state); err != nil {
+		return fmt.Errorf("write state: %w", err)
+	}
+	cmd.Printf("Phase state initialized for %s. Current phase: spec-dev (1/5).\n", epicID)
+	return nil
+}
+
+// phaseStartSubCmd creates the "start <phase>" subcommand.
+func phaseStartSubCmd(getRoot func() string) *cobra.Command {
+	return &cobra.Command{
 		Use:   "start <phase>",
 		Short: "Start or resume a phase",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			phase := args[0]
-			if !hook.IsValidPhase(phase) {
-				return fmt.Errorf("invalid phase: %q. Valid phases: %v", phase, hook.Phases)
-			}
-			root := getRoot()
-			state := hook.GetPhaseState(root)
-			if state == nil {
-				return fmt.Errorf("no active phase state. Run: ca phase-check init <epic-id>")
-			}
-			state.CurrentPhase = phase
-			state.PhaseIndex = hook.PhaseIndexOf(phase)
-			state.GatesPassed = []string{}
-			state.SkillsRead = []string{}
-			if err := hook.WritePhaseState(root, state); err != nil {
-				return fmt.Errorf("write state: %w", err)
-			}
-			cmd.Printf("Phase updated: %s (%d/5).\n", state.CurrentPhase, state.PhaseIndex)
-			return nil
+			return handlePhaseStart(cmd, getRoot(), args[0])
 		},
 	}
+}
 
-	// gate <gate-name>
-	gateSubCmd := &cobra.Command{
+// handlePhaseStart starts or resumes a phase.
+func handlePhaseStart(cmd *cobra.Command, root, phase string) error {
+	if !hook.IsValidPhase(phase) {
+		return fmt.Errorf("invalid phase: %q. Valid phases: %v", phase, hook.Phases)
+	}
+	state := hook.GetPhaseState(root)
+	if state == nil {
+		return fmt.Errorf("no active phase state. Run: ca phase-check init <epic-id>")
+	}
+	state.CurrentPhase = phase
+	state.PhaseIndex = hook.PhaseIndexOf(phase)
+	state.GatesPassed = []string{}
+	state.SkillsRead = []string{}
+	if err := hook.WritePhaseState(root, state); err != nil {
+		return fmt.Errorf("write state: %w", err)
+	}
+	cmd.Printf("Phase updated: %s (%d/5).\n", state.CurrentPhase, state.PhaseIndex)
+	return nil
+}
+
+// phaseGateSubCmd creates the "gate <gate-name>" subcommand.
+func phaseGateSubCmd(getRoot func() string) *cobra.Command {
+	return &cobra.Command{
 		Use:   "gate <gate-name>",
 		Short: "Record a phase gate as passed",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			gate := args[0]
-			if !hook.IsValidGate(gate) {
-				return fmt.Errorf("invalid gate: %q. Valid gates: %v", gate, hook.Gates)
-			}
-			root := getRoot()
-			state := hook.GetPhaseState(root)
-			if state == nil {
-				return fmt.Errorf("no active phase state. Run: ca phase-check init <epic-id>")
-			}
-
-			// Add gate if not already present
-			found := false
-			for _, g := range state.GatesPassed {
-				if g == gate {
-					found = true
-					break
-				}
-			}
-			if !found {
-				state.GatesPassed = append(state.GatesPassed, gate)
-			}
-
-			// Final gate signals epic completion: clean up state file rather than
-			// persisting the gate, since no further phases will read it.
-			if gate == "final" {
-				if err := os.Remove(hook.PhaseStatePath(root)); err != nil && !os.IsNotExist(err) {
-					return fmt.Errorf("remove phase state: %w", err)
-				}
-				cmd.Println("Final gate recorded. Phase state cleaned.")
-				return nil
-			}
-
-			if err := hook.WritePhaseState(root, state); err != nil {
-				return fmt.Errorf("write state: %w", err)
-			}
-			cmd.Printf("Gate recorded: %s.\n", gate)
-			return nil
+			return handlePhaseGate(cmd, getRoot(), args[0])
 		},
 	}
+}
 
-	// status
+// handlePhaseGate records a phase gate as passed.
+func handlePhaseGate(cmd *cobra.Command, root, gate string) error {
+	if !hook.IsValidGate(gate) {
+		return fmt.Errorf("invalid gate: %q. Valid gates: %v", gate, hook.Gates)
+	}
+	state := hook.GetPhaseState(root)
+	if state == nil {
+		return fmt.Errorf("no active phase state. Run: ca phase-check init <epic-id>")
+	}
+
+	// Add gate if not already present
+	found := false
+	for _, g := range state.GatesPassed {
+		if g == gate {
+			found = true
+			break
+		}
+	}
+	if !found {
+		state.GatesPassed = append(state.GatesPassed, gate)
+	}
+
+	// Final gate signals epic completion: clean up state file rather than
+	// persisting the gate, since no further phases will read it.
+	if gate == "final" {
+		if err := os.Remove(hook.PhaseStatePath(root)); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove phase state: %w", err)
+		}
+		cmd.Println("Final gate recorded. Phase state cleaned.")
+		return nil
+	}
+
+	if err := hook.WritePhaseState(root, state); err != nil {
+		return fmt.Errorf("write state: %w", err)
+	}
+	cmd.Printf("Gate recorded: %s.\n", gate)
+	return nil
+}
+
+// phaseStatusSubCmd creates the "status" subcommand.
+func phaseStatusSubCmd(getRoot func() string) *cobra.Command {
 	var jsonOut bool
-	statusSubCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "status",
 		Short: "Show current phase state",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			root := getRoot()
-			state := hook.GetPhaseState(root)
-			if jsonOut {
-				if state == nil {
-					cmd.Println(`{"cookit_active":false}`)
-					return nil
-				}
-				data, _ := json.Marshal(state)
-				cmd.Println(string(data))
-				return nil
-			}
-
-			if state == nil {
-				cmd.Println("No active cook-it session.")
-				return nil
-			}
-
-			cmd.Println("Active cook-it Session")
-			cmd.Printf("  Epic: %s\n", state.EpicID)
-			cmd.Printf("  Phase: %s (%d/5)\n", state.CurrentPhase, state.PhaseIndex)
-			skills := "(none)"
-			if len(state.SkillsRead) > 0 {
-				skills = fmt.Sprintf("%v", state.SkillsRead)
-			}
-			cmd.Printf("  Skills read: %s\n", skills)
-			gates := "(none)"
-			if len(state.GatesPassed) > 0 {
-				gates = fmt.Sprintf("%v", state.GatesPassed)
-			}
-			cmd.Printf("  Gates passed: %s\n", gates)
-			cmd.Printf("  Started: %s\n", state.StartedAt)
-			return nil
+			return handlePhaseStatus(cmd, getRoot(), jsonOut)
 		},
 	}
-	statusSubCmd.Flags().BoolVar(&jsonOut, "json", false, "Output raw JSON")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output raw JSON")
+	return cmd
+}
 
-	// clean
-	cleanSubCmd := &cobra.Command{
+// handlePhaseStatus displays current phase state.
+func handlePhaseStatus(cmd *cobra.Command, root string, jsonOut bool) error {
+	state := hook.GetPhaseState(root)
+	if jsonOut {
+		if state == nil {
+			cmd.Println(`{"cookit_active":false}`)
+			return nil
+		}
+		data, _ := json.Marshal(state)
+		cmd.Println(string(data))
+		return nil
+	}
+
+	if state == nil {
+		cmd.Println("No active cook-it session.")
+		return nil
+	}
+
+	cmd.Println("Active cook-it Session")
+	cmd.Printf("  Epic: %s\n", state.EpicID)
+	cmd.Printf("  Phase: %s (%d/5)\n", state.CurrentPhase, state.PhaseIndex)
+	skills := "(none)"
+	if len(state.SkillsRead) > 0 {
+		skills = fmt.Sprintf("%v", state.SkillsRead)
+	}
+	cmd.Printf("  Skills read: %s\n", skills)
+	gates := "(none)"
+	if len(state.GatesPassed) > 0 {
+		gates = fmt.Sprintf("%v", state.GatesPassed)
+	}
+	cmd.Printf("  Gates passed: %s\n", gates)
+	cmd.Printf("  Started: %s\n", state.StartedAt)
+	return nil
+}
+
+// phaseCleanSubCmd creates the "clean" subcommand.
+func phaseCleanSubCmd(getRoot func() string) *cobra.Command {
+	return &cobra.Command{
 		Use:   "clean",
 		Short: "Remove phase state file",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -198,9 +231,6 @@ func phaseCheckCmd() *cobra.Command {
 			return nil
 		},
 	}
-
-	cmd.AddCommand(initSubCmd, startSubCmd, gateSubCmd, statusSubCmd, cleanSubCmd)
-	return cmd
 }
 
 // installBeadsCmd outputs the install command for the beads CLI.

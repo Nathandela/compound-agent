@@ -21,8 +21,8 @@ builds:
 
 archives:
   - id: ca-binary
-    builds: [ca]
-    format: binary
+    ids: [ca]
+    formats: [binary]
     name_template: "ca-{{ .Os }}-{{ .Arch }}"
 
 checksum:

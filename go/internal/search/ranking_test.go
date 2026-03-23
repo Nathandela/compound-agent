@@ -10,9 +10,9 @@ import (
 // helper to create a *memory.Severity
 func sevPtr(s memory.Severity) *memory.Severity { return &s }
 
-// helper to create a minimal MemoryItem with ranking-relevant fields.
-func makeRankItem(severity *memory.Severity, confirmed bool, created string) memory.MemoryItem {
-	return memory.MemoryItem{
+// helper to create a minimal Item with ranking-relevant fields.
+func makeRankItem(severity *memory.Severity, confirmed bool, created string) memory.Item {
+	return memory.Item{
 		ID:        "L0000000000000001",
 		Type:      memory.TypeLesson,
 		Trigger:   "test trigger",
@@ -128,7 +128,7 @@ func TestRankItems_SortedDescending(t *testing.T) {
 	old := time.Now().UTC().AddDate(0, 0, -60).Format(time.RFC3339)
 
 	items := []ScoredItem{
-		{Item: makeRankItem(nil, false, old), Score: 0.5},            // no boosts: 0.5
+		{Item: makeRankItem(nil, false, old), Score: 0.5},                        // no boosts: 0.5
 		{Item: makeRankItem(sevPtr(memory.SeverityHigh), true, now), Score: 0.8}, // high+recent+confirmed (capped 1.8): 1.44
 		{Item: makeRankItem(sevPtr(memory.SeverityLow), false, now), Score: 0.9}, // low+recent: 0.9*0.8*1.2 = 0.864
 	}

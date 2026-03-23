@@ -9,7 +9,7 @@ import (
 func TestProcessToolFailure_FirstFailure(t *testing.T) {
 	dir := t.TempDir()
 	result := ProcessToolFailure("Bash", map[string]interface{}{"command": "npm install"}, dir)
-	if result.HookSpecificOutput != nil {
+	if result.SpecificOutput != nil {
 		t.Error("first failure should not trigger tip")
 	}
 }
@@ -22,11 +22,11 @@ func TestProcessToolFailure_SameTargetThreshold(t *testing.T) {
 
 	// Second failure on same target should trigger
 	result := ProcessToolFailure("Bash", map[string]interface{}{"command": "npm test"}, dir)
-	if result.HookSpecificOutput == nil {
+	if result.SpecificOutput == nil {
 		t.Fatal("second failure on same target should trigger tip")
 	}
-	if result.HookSpecificOutput.HookEventName != "PostToolUseFailure" {
-		t.Errorf("got event name %q, want PostToolUseFailure", result.HookSpecificOutput.HookEventName)
+	if result.SpecificOutput.HookEventName != "PostToolUseFailure" {
+		t.Errorf("got event name %q, want PostToolUseFailure", result.SpecificOutput.HookEventName)
 	}
 }
 
@@ -38,7 +38,7 @@ func TestProcessToolFailure_TotalThreshold(t *testing.T) {
 	ProcessToolFailure("Edit", map[string]interface{}{"file_path": "/foo.go"}, dir)
 	result := ProcessToolFailure("Write", map[string]interface{}{"file_path": "/bar.go"}, dir)
 
-	if result.HookSpecificOutput == nil {
+	if result.SpecificOutput == nil {
 		t.Fatal("third failure should trigger tip")
 	}
 }
@@ -52,7 +52,7 @@ func TestProcessToolFailure_ResetAfterTip(t *testing.T) {
 
 	// Next failure should not trigger (state was reset)
 	result := ProcessToolFailure("Bash", map[string]interface{}{"command": "npm test"}, dir)
-	if result.HookSpecificOutput != nil {
+	if result.SpecificOutput != nil {
 		t.Error("after reset, first failure should not trigger tip")
 	}
 }
@@ -103,7 +103,7 @@ func TestProcessToolFailure_StaleState(t *testing.T) {
 
 	// Should treat as fresh start (stale state discarded)
 	result := ProcessToolFailure("Bash", map[string]interface{}{"command": "npm test"}, dir)
-	if result.HookSpecificOutput != nil {
+	if result.SpecificOutput != nil {
 		t.Error("stale state should be discarded, first failure should not trigger tip")
 	}
 }

@@ -86,7 +86,7 @@ func TestSearchKnowledge_WithEmbedder(t *testing.T) {
 func TestSearchKnowledge_Limit(t *testing.T) {
 	kdb := setupSearchTest(t)
 
-	results, err := SearchKnowledge(kdb, nil, "programming", &KnowledgeSearchOptions{Limit: 1})
+	results, err := SearchKnowledge(kdb, nil, "programming", &SearchOptions{Limit: 1})
 	if err != nil {
 		t.Fatal(err)
 	}

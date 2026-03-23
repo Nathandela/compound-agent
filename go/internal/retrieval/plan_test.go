@@ -13,30 +13,8 @@ import (
 	"github.com/nathandelacretaz/compound-agent/internal/storage"
 )
 
-// mockEmbedder returns fixed vectors for testing.
-type mockEmbedder struct {
-	vectors [][]float64
-	err     error
-}
-
-func (m *mockEmbedder) Embed(texts []string) ([][]float64, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	result := make([][]float64, len(texts))
-	for i := range texts {
-		if i < len(m.vectors) {
-			result[i] = m.vectors[i]
-		} else {
-			// Return a default vector
-			result[i] = []float64{0.5, 0.5, 0.5}
-		}
-	}
-	return result, nil
-}
-
 // openTestDB creates an in-memory SQLite DB with the lessons schema and inserts test items.
-func openTestDB(t *testing.T, items []memory.MemoryItem) *sql.DB {
+func openTestDB(t *testing.T, items []memory.Item) *sql.DB {
 	t.Helper()
 	db, err := storage.OpenDB(":memory:")
 	if err != nil {
@@ -50,7 +28,7 @@ func openTestDB(t *testing.T, items []memory.MemoryItem) *sql.DB {
 	return db
 }
 
-func insertTestItem(t *testing.T, db *sql.DB, item memory.MemoryItem) {
+func insertTestItem(t *testing.T, db *sql.DB, item memory.Item) {
 	t.Helper()
 	confirmed := 0
 	if item.Confirmed {
@@ -70,7 +48,7 @@ func insertTestItem(t *testing.T, db *sql.DB, item memory.MemoryItem) {
 }
 
 func TestRetrieveForPlan_NilEmbedderFallsBackToKeywordOnly(t *testing.T) {
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		makeTestItem("L001", "2025-06-01T00:00:00Z", sevPtr(memory.SeverityHigh), true, nil),
 		makeTestItem("L002", "2025-06-02T00:00:00Z", sevPtr(memory.SeverityMedium), true, nil),
 	}
@@ -91,8 +69,8 @@ func TestRetrieveForPlan_NilEmbedderFallsBackToKeywordOnly(t *testing.T) {
 
 func TestFormatLessonsCheck_FormatsCorrectly(t *testing.T) {
 	items := []search.ScoredItem{
-		{Item: memory.MemoryItem{Insight: "Always check error returns"}, Score: 0.9},
-		{Item: memory.MemoryItem{Insight: "Use context for cancellation"}, Score: 0.7},
+		{Item: memory.Item{Insight: "Always check error returns"}, Score: 0.9},
+		{Item: memory.Item{Insight: "Use context for cancellation"}, Score: 0.7},
 	}
 	result := FormatLessonsCheck(items)
 
@@ -122,7 +100,7 @@ func TestFormatLessonsCheck_EmptyLessons(t *testing.T) {
 func TestRetrieveForPlan_ReturnsRankedResults(t *testing.T) {
 	high := memory.SeverityHigh
 	low := memory.SeverityLow
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{
 			ID: "L001", Type: memory.TypeLesson,
 			Trigger: "error handling in Go", Insight: "always wrap errors with context",

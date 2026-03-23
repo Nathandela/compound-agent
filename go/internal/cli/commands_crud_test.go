@@ -13,7 +13,7 @@ import (
 )
 
 // setupTestRepo creates a temp dir with a .claude/lessons/index.jsonl containing seed items.
-func setupTestRepo(t *testing.T, items []memory.MemoryItem) string {
+func setupTestRepo(t *testing.T, items []memory.Item) string {
 	t.Helper()
 	dir := t.TempDir()
 	lessonsDir := filepath.Join(dir, ".claude", "lessons")
@@ -21,7 +21,7 @@ func setupTestRepo(t *testing.T, items []memory.MemoryItem) string {
 		t.Fatal(err)
 	}
 	for _, item := range items {
-		if err := memory.AppendMemoryItem(dir, item); err != nil {
+		if err := memory.AppendItem(dir, item); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -46,9 +46,9 @@ func buildRoot() *cobra.Command {
 }
 
 // seedItems returns a standard set of test lessons.
-func seedItems() []memory.MemoryItem {
+func seedItems() []memory.Item {
 	sev := memory.SeverityHigh
-	return []memory.MemoryItem{
+	return []memory.Item{
 		{
 			ID: "L0001", Type: memory.TypeLesson, Trigger: "Bad error handling",
 			Insight: "Always check error returns", Tags: []string{"go", "errors"},
@@ -102,7 +102,7 @@ func TestShowCmd_JSONFormat(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var item memory.MemoryItem
+	var item memory.Item
 	if err := json.Unmarshal([]byte(stdout), &item); err != nil {
 		t.Fatalf("invalid JSON output: %v\n%s", err, stdout)
 	}
@@ -134,12 +134,12 @@ func TestShowCmd_DeletedLesson(t *testing.T) {
 
 	// Add a tombstone for L0001
 	deleted := true
-	tombstone := memory.MemoryItem{
+	tombstone := memory.Item{
 		ID: "L0001", Type: memory.TypeLesson, Trigger: "x", Insight: "x",
 		Source: memory.SourceManual, Context: memory.Context{}, Created: "2026-03-01T10:00:00Z",
 		Tags: []string{}, Deleted: &deleted, DeletedAt: strPtr("2026-03-10T10:00:00Z"),
 	}
-	if err := memory.AppendMemoryItem(dir, tombstone); err != nil {
+	if err := memory.AppendItem(dir, tombstone); err != nil {
 		t.Fatal(err)
 	}
 
@@ -170,7 +170,7 @@ func TestUpdateCmd_UpdateInsight(t *testing.T) {
 	}
 
 	// Verify the update persisted
-	result, err := memory.ReadMemoryItems(dir)
+	result, err := memory.ReadItems(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +195,7 @@ func TestUpdateCmd_UpdateTags(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	for _, item := range result.Items {
 		if item.ID == "L0001" {
 			// Should be deduplicated
@@ -218,7 +218,7 @@ func TestUpdateCmd_UpdateSeverity(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	for _, item := range result.Items {
 		if item.ID == "L0001" {
 			if item.Severity == nil || *item.Severity != memory.SeverityLow {
@@ -282,7 +282,7 @@ func TestUpdateCmd_JSONOutput(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	var item memory.MemoryItem
+	var item memory.Item
 	if err := json.Unmarshal([]byte(stdout), &item); err != nil {
 		t.Fatalf("invalid JSON: %v\n%s", err, stdout)
 	}
@@ -302,7 +302,7 @@ func TestUpdateCmd_UpdateConfirmed(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	for _, item := range result.Items {
 		if item.ID == "L0002" {
 			if !item.Confirmed {
@@ -330,7 +330,7 @@ func TestDeleteCmd_SingleID(t *testing.T) {
 	}
 
 	// Verify it's gone
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	for _, item := range result.Items {
 		if item.ID == "L0001" {
 			t.Error("L0001 should have been deleted")
@@ -354,7 +354,7 @@ func TestDeleteCmd_MultipleIDs(t *testing.T) {
 		t.Errorf("expected '2 lesson(s)' in output, got: %s", stdout)
 	}
 
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	if len(result.Items) != 0 {
 		t.Errorf("expected 0 items, got %d", len(result.Items))
 	}
@@ -379,12 +379,12 @@ func TestDeleteCmd_AlreadyDeleted(t *testing.T) {
 
 	// Add a tombstone for L0001
 	deleted := true
-	tombstone := memory.MemoryItem{
+	tombstone := memory.Item{
 		ID: "L0001", Type: memory.TypeLesson, Trigger: "x", Insight: "x",
 		Source: memory.SourceManual, Context: memory.Context{}, Created: "2026-03-01T10:00:00Z",
 		Tags: []string{}, Deleted: &deleted, DeletedAt: strPtr("2026-03-10T10:00:00Z"),
 	}
-	if err := memory.AppendMemoryItem(dir, tombstone); err != nil {
+	if err := memory.AppendItem(dir, tombstone); err != nil {
 		t.Fatal(err)
 	}
 
@@ -441,7 +441,7 @@ func TestWrongCmd_MarkInvalid(t *testing.T) {
 	}
 
 	// Verify the invalidation persisted
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	for _, item := range result.Items {
 		if item.ID == "L0001" {
 			if item.InvalidatedAt == nil {
@@ -466,7 +466,7 @@ func TestWrongCmd_NoReason(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	for _, item := range result.Items {
 		if item.ID == "L0001" {
 			if item.InvalidatedAt == nil {
@@ -530,7 +530,7 @@ func TestValidateCmd_ReEnable(t *testing.T) {
 	}
 
 	// Verify invalidation fields cleared
-	result, _ := memory.ReadMemoryItems(dir)
+	result, _ := memory.ReadItems(dir)
 	for _, item := range result.Items {
 		if item.ID == "L0001" {
 			if item.InvalidatedAt != nil {

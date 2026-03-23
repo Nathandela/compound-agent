@@ -30,9 +30,8 @@ jobs:
 
       - uses: golangci/golangci-lint-action@v6
         with:
-          version: latest
+          version: v2.11.4
           working-directory: go
-          args: --timeout=5m
 
   go-test:
     name: Go Tests

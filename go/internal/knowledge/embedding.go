@@ -27,18 +27,7 @@ type EmbedChunksResult struct {
 func EmbedChunks(kdb *storage.KnowledgeDB, embedder search.Embedder, opts *EmbedChunksOptions) (*EmbedChunksResult, error) {
 	start := time.Now()
 
-	onlyMissing := true
-	if opts != nil {
-		onlyMissing = opts.OnlyMissing
-	}
-
-	var chunks []storage.KnowledgeChunk
-	if onlyMissing {
-		chunks = kdb.GetUnembeddedChunks()
-	} else {
-		chunks = kdb.GetAllChunks()
-	}
-
+	chunks := selectChunksToEmbed(kdb, opts)
 	totalCount := kdb.GetChunkCount()
 	skipped := totalCount - len(chunks)
 
@@ -49,37 +38,58 @@ func EmbedChunks(kdb *storage.KnowledgeDB, embedder search.Embedder, opts *Embed
 		if end > len(chunks) {
 			end = len(chunks)
 		}
-		batch := chunks[i:end]
-
-		texts := make([]string, len(batch))
-		for j, c := range batch {
-			texts[j] = c.Text
-		}
-
-		vectors, err := embedder.Embed(texts)
+		n, err := embedBatch(kdb, embedder, chunks[i:end])
+		result.ChunksEmbedded += n
 		if err != nil {
-			return result, fmt.Errorf("embed batch: %w", err)
+			return result, err
 		}
-		if len(vectors) != len(texts) {
-			return result, fmt.Errorf("embedder returned %d vectors for %d inputs", len(vectors), len(texts))
-		}
-
-		embeddings := make([]storage.ChunkEmbedding, len(batch))
-		for j, c := range batch {
-			embeddings[j] = storage.ChunkEmbedding{
-				ID:          c.ID,
-				Vector:      vectors[j],
-				ContentHash: c.ContentHash,
-			}
-		}
-
-		if err := kdb.SetChunkEmbeddingBatch(embeddings); err != nil {
-			return result, fmt.Errorf("write batch: %w", err)
-		}
-
-		result.ChunksEmbedded += len(batch)
 	}
 
 	result.DurationMs = time.Since(start).Milliseconds()
 	return result, nil
+}
+
+// selectChunksToEmbed returns the chunks that need embedding based on options.
+func selectChunksToEmbed(kdb *storage.KnowledgeDB, opts *EmbedChunksOptions) []storage.KnowledgeChunk {
+	onlyMissing := true
+	if opts != nil {
+		onlyMissing = opts.OnlyMissing
+	}
+
+	if onlyMissing {
+		return kdb.GetUnembeddedChunks()
+	}
+	return kdb.GetAllChunks()
+}
+
+// embedBatch embeds a single batch of chunks and writes the results.
+// Returns the number of chunks embedded and any error.
+func embedBatch(kdb *storage.KnowledgeDB, embedder search.Embedder, batch []storage.KnowledgeChunk) (int, error) {
+	texts := make([]string, len(batch))
+	for j, c := range batch {
+		texts[j] = c.Text
+	}
+
+	vectors, err := embedder.Embed(texts)
+	if err != nil {
+		return 0, fmt.Errorf("embed batch: %w", err)
+	}
+	if len(vectors) != len(texts) {
+		return 0, fmt.Errorf("embedder returned %d vectors for %d inputs", len(vectors), len(texts))
+	}
+
+	embeddings := make([]storage.ChunkEmbedding, len(batch))
+	for j, c := range batch {
+		embeddings[j] = storage.ChunkEmbedding{
+			ID:          c.ID,
+			Vector:      vectors[j],
+			ContentHash: c.ContentHash,
+		}
+	}
+
+	if err := kdb.SetChunkEmbeddingBatch(embeddings); err != nil {
+		return 0, fmt.Errorf("write batch: %w", err)
+	}
+
+	return len(batch), nil
 }

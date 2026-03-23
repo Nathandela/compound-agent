@@ -7,9 +7,9 @@ import (
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
 )
 
-// helper to build a minimal MemoryItem with a given ID.
-func makeHybridItem(id string) memory.MemoryItem {
-	return memory.MemoryItem{
+// helper to build a minimal Item with a given ID.
+func makeHybridItem(id string) memory.Item {
+	return memory.Item{
 		ID:      id,
 		Type:    memory.TypeLesson,
 		Trigger: "trigger",

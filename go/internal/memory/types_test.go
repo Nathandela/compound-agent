@@ -5,16 +5,16 @@ import (
 	"testing"
 )
 
-func TestMemoryItemType_Valid(t *testing.T) {
-	for _, typ := range []MemoryItemType{TypeLesson, TypeSolution, TypePattern, TypePreference} {
+func TestItemType_Valid(t *testing.T) {
+	for _, typ := range []ItemType{TypeLesson, TypeSolution, TypePattern, TypePreference} {
 		if !typ.Valid() {
 			t.Errorf("expected %q to be valid", typ)
 		}
 	}
 }
 
-func TestMemoryItemType_Invalid(t *testing.T) {
-	invalid := MemoryItemType("unknown")
+func TestItemType_Invalid(t *testing.T) {
+	invalid := ItemType("unknown")
 	if invalid.Valid() {
 		t.Error("expected unknown type to be invalid")
 	}
@@ -39,7 +39,7 @@ func TestSeverity_Valid(t *testing.T) {
 func TestGenerateID(t *testing.T) {
 	tests := []struct {
 		insight string
-		typ     MemoryItemType
+		typ     ItemType
 		prefix  string
 	}{
 		{"test insight", TypeLesson, "L"},
@@ -75,17 +75,17 @@ func TestGenerateID_DifferentInsights(t *testing.T) {
 	}
 }
 
-func TestMemoryItem_JSONRoundTrip(t *testing.T) {
-	item := MemoryItem{
-		ID:        "L1234567890abcdef",
-		Type:      TypeLesson,
-		Trigger:   "test trigger",
-		Insight:   "test insight",
-		Tags:      []string{"tag1", "tag2"},
-		Source:    SourceManual,
-		Context:   Context{Tool: "bash", Intent: "testing"},
-		Created:   "2026-03-21T00:00:00Z",
-		Confirmed: true,
+func TestItem_JSONRoundTrip(t *testing.T) {
+	item := Item{
+		ID:         "L1234567890abcdef",
+		Type:       TypeLesson,
+		Trigger:    "test trigger",
+		Insight:    "test insight",
+		Tags:       []string{"tag1", "tag2"},
+		Source:     SourceManual,
+		Context:    Context{Tool: "bash", Intent: "testing"},
+		Created:    "2026-03-21T00:00:00Z",
+		Confirmed:  true,
 		Supersedes: []string{},
 		Related:    []string{},
 	}
@@ -95,7 +95,7 @@ func TestMemoryItem_JSONRoundTrip(t *testing.T) {
 		t.Fatalf("marshal: %v", err)
 	}
 
-	var got MemoryItem
+	var got Item
 	if err := json.Unmarshal(data, &got); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
@@ -117,9 +117,9 @@ func TestMemoryItem_JSONRoundTrip(t *testing.T) {
 	}
 }
 
-func TestMemoryItem_JSONFieldNames(t *testing.T) {
+func TestItem_JSONFieldNames(t *testing.T) {
 	// Verify JSON tags match TypeScript field names
-	item := MemoryItem{
+	item := Item{
 		ID:                 "L1234567890abcdef",
 		Type:               TypeLesson,
 		Trigger:            "trigger",
@@ -171,9 +171,9 @@ func TestMemoryItem_JSONFieldNames(t *testing.T) {
 	}
 }
 
-func TestMemoryItem_OmitEmpty(t *testing.T) {
+func TestItem_OmitEmpty(t *testing.T) {
 	// Optional fields should be omitted when nil
-	item := MemoryItem{
+	item := Item{
 		ID:         "L1234567890abcdef",
 		Type:       TypeLesson,
 		Trigger:    "trigger",
@@ -212,8 +212,8 @@ func TestMemoryItem_OmitEmpty(t *testing.T) {
 	}
 }
 
-func TestValidateMemoryItem(t *testing.T) {
-	valid := MemoryItem{
+func TestValidateItem(t *testing.T) {
+	valid := Item{
 		ID:         "L1234567890abcdef",
 		Type:       TypeLesson,
 		Trigger:    "trigger",
@@ -227,33 +227,33 @@ func TestValidateMemoryItem(t *testing.T) {
 		Related:    []string{},
 	}
 
-	if err := ValidateMemoryItem(&valid); err != nil {
+	if err := ValidateItem(&valid); err != nil {
 		t.Errorf("expected valid, got error: %v", err)
 	}
 }
 
-func TestValidateMemoryItem_MissingFields(t *testing.T) {
+func TestValidateItem_MissingFields(t *testing.T) {
 	tests := []struct {
 		name string
-		item MemoryItem
+		item Item
 	}{
-		{"missing ID", MemoryItem{Type: TypeLesson, Trigger: "t", Insight: "i", Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: "2026-01-01T00:00:00Z"}},
-		{"missing Type", MemoryItem{ID: "L123", Trigger: "t", Insight: "i", Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: "2026-01-01T00:00:00Z"}},
-		{"missing Trigger", MemoryItem{ID: "L123", Type: TypeLesson, Insight: "i", Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: "2026-01-01T00:00:00Z"}},
-		{"missing Insight", MemoryItem{ID: "L123", Type: TypeLesson, Trigger: "t", Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: "2026-01-01T00:00:00Z"}},
-		{"missing Source", MemoryItem{ID: "L123", Type: TypeLesson, Trigger: "t", Insight: "i", Context: Context{Tool: "t", Intent: "i"}, Created: "2026-01-01T00:00:00Z"}},
-		{"missing Created", MemoryItem{ID: "L123", Type: TypeLesson, Trigger: "t", Insight: "i", Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}}},
+		{"missing ID", Item{Type: TypeLesson, Trigger: "t", Insight: "i", Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: "2026-01-01T00:00:00Z"}},
+		{"missing Type", Item{ID: "L123", Trigger: "t", Insight: "i", Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: "2026-01-01T00:00:00Z"}},
+		{"missing Trigger", Item{ID: "L123", Type: TypeLesson, Insight: "i", Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: "2026-01-01T00:00:00Z"}},
+		{"missing Insight", Item{ID: "L123", Type: TypeLesson, Trigger: "t", Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: "2026-01-01T00:00:00Z"}},
+		{"missing Source", Item{ID: "L123", Type: TypeLesson, Trigger: "t", Insight: "i", Context: Context{Tool: "t", Intent: "i"}, Created: "2026-01-01T00:00:00Z"}},
+		{"missing Created", Item{ID: "L123", Type: TypeLesson, Trigger: "t", Insight: "i", Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}}},
 	}
 
 	for _, tt := range tests {
-		if err := ValidateMemoryItem(&tt.item); err == nil {
+		if err := ValidateItem(&tt.item); err == nil {
 			t.Errorf("%s: expected error, got nil", tt.name)
 		}
 	}
 }
 
-func TestValidateMemoryItem_InvalidEnums(t *testing.T) {
-	base := MemoryItem{
+func TestValidateItem_InvalidEnums(t *testing.T) {
+	base := Item{
 		ID: "L123", Type: TypeLesson, Trigger: "t", Insight: "i",
 		Tags: []string{}, Supersedes: []string{}, Related: []string{},
 		Source: SourceManual, Context: Context{Tool: "t", Intent: "i"},
@@ -263,46 +263,46 @@ func TestValidateMemoryItem_InvalidEnums(t *testing.T) {
 	// Invalid type
 	bad := base
 	bad.Type = "invalid"
-	if err := ValidateMemoryItem(&bad); err == nil {
+	if err := ValidateItem(&bad); err == nil {
 		t.Error("expected error for invalid type")
 	}
 
 	// Invalid source
 	bad = base
 	bad.Source = "invalid"
-	if err := ValidateMemoryItem(&bad); err == nil {
+	if err := ValidateItem(&bad); err == nil {
 		t.Error("expected error for invalid source")
 	}
 
 	// Invalid severity
 	bad = base
 	bad.Severity = sevPtr("critical")
-	if err := ValidateMemoryItem(&bad); err == nil {
+	if err := ValidateItem(&bad); err == nil {
 		t.Error("expected error for invalid severity")
 	}
 }
 
-func TestValidateMemoryItem_PatternRequired(t *testing.T) {
+func TestValidateItem_PatternRequired(t *testing.T) {
 	// Pattern type requires pattern field
-	item := MemoryItem{
+	item := Item{
 		ID: "P123", Type: TypePattern, Trigger: "t", Insight: "i",
 		Tags: []string{}, Supersedes: []string{}, Related: []string{},
 		Source: SourceManual, Context: Context{Tool: "t", Intent: "i"},
 		Created: "2026-01-01T00:00:00Z",
 	}
 
-	if err := ValidateMemoryItem(&item); err == nil {
+	if err := ValidateItem(&item); err == nil {
 		t.Error("expected error: pattern type requires pattern field")
 	}
 
 	item.Pattern = &Pattern{Bad: "old", Good: "new"}
-	if err := ValidateMemoryItem(&item); err != nil {
+	if err := ValidateItem(&item); err != nil {
 		t.Errorf("expected valid with pattern, got: %v", err)
 	}
 }
 
-func TestValidateMemoryItem_NilArraysRejected(t *testing.T) {
-	base := MemoryItem{
+func TestValidateItem_NilArraysRejected(t *testing.T) {
+	base := Item{
 		ID: "L123", Type: TypeLesson, Trigger: "t", Insight: "i",
 		Tags: []string{}, Supersedes: []string{}, Related: []string{},
 		Source: SourceManual, Context: Context{Tool: "t", Intent: "i"},
@@ -312,27 +312,27 @@ func TestValidateMemoryItem_NilArraysRejected(t *testing.T) {
 	// Nil Tags
 	bad := base
 	bad.Tags = nil
-	if err := ValidateMemoryItem(&bad); err == nil {
+	if err := ValidateItem(&bad); err == nil {
 		t.Error("expected error for nil Tags")
 	}
 
 	// Nil Supersedes
 	bad = base
 	bad.Supersedes = nil
-	if err := ValidateMemoryItem(&bad); err == nil {
+	if err := ValidateItem(&bad); err == nil {
 		t.Error("expected error for nil Supersedes")
 	}
 
 	// Nil Related
 	bad = base
 	bad.Related = nil
-	if err := ValidateMemoryItem(&bad); err == nil {
+	if err := ValidateItem(&bad); err == nil {
 		t.Error("expected error for nil Related")
 	}
 }
 
 func TestEnsureArrayFields(t *testing.T) {
-	item := MemoryItem{}
+	item := Item{}
 	EnsureArrayFields(&item)
 	if item.Tags == nil {
 		t.Error("Tags should be initialized")
@@ -346,7 +346,7 @@ func TestEnsureArrayFields(t *testing.T) {
 }
 
 // Helpers
-func strPtr(s string) *string       { return &s }
-func intPtr(i int) *int             { return &i }
-func boolPtr(b bool) *bool          { return &b }
-func sevPtr(s Severity) *Severity   { return &s }
+func strPtr(s string) *string     { return &s }
+func intPtr(i int) *int           { return &i }
+func boolPtr(b bool) *bool        { return &b }
+func sevPtr(s Severity) *Severity { return &s }

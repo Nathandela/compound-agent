@@ -38,56 +38,65 @@ func compactCmd() *cobra.Command {
 		Use:   "compact",
 		Short: "Remove tombstones and rewrite JSONL",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoRoot := util.GetRepoRoot()
-
-			count, err := memory.CountTombstones(repoRoot)
-			if err != nil {
-				return fmt.Errorf("count tombstones: %w", err)
-			}
-
-			if dryRun {
-				needed := count >= memory.TombstoneThreshold
-				status := "needed"
-				if !needed {
-					status = "not needed"
-				}
-				cmd.Printf("Compaction %s (%d tombstones, threshold is %d).\n", status, count, memory.TombstoneThreshold)
-				return nil
-			}
-
-			if !force && count < memory.TombstoneThreshold {
-				cmd.Printf("Compaction not needed (%d tombstones, threshold is %d).\n", count, memory.TombstoneThreshold)
-				return nil
-			}
-
-			result, err := memory.Compact(repoRoot)
-			if err != nil {
-				return fmt.Errorf("compact: %w", err)
-			}
-
-			cmd.Printf("Compacted: %d tombstones removed, %d lessons remaining", result.TombstonesRemoved, result.LessonsRemaining)
-			if result.DroppedInvalid > 0 {
-				cmd.Printf(", %d invalid dropped", result.DroppedInvalid)
-			}
-			cmd.Println(".")
-
-			db, err := storage.OpenRepoDB(repoRoot)
-			if err != nil {
-				return fmt.Errorf("open database: %w", err)
-			}
-			defer db.Close()
-
-			if err := storage.RebuildIndex(db, repoRoot); err != nil {
-				return fmt.Errorf("rebuild index: %w", err)
-			}
-			cmd.Println("SQLite index rebuilt.")
-
-			return nil
+			return runCompact(cmd, force, dryRun)
 		},
 	}
 	cmd.Flags().BoolVarP(&force, "force", "f", false, "force compaction even below threshold")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "show tombstone count without compacting")
 	return cmd
+}
+
+// runCompact executes the compact command logic.
+func runCompact(cmd *cobra.Command, force, dryRun bool) error {
+	repoRoot := util.GetRepoRoot()
+
+	count, err := memory.CountTombstones(repoRoot)
+	if err != nil {
+		return fmt.Errorf("count tombstones: %w", err)
+	}
+
+	if dryRun {
+		needed := count >= memory.TombstoneThreshold
+		status := "needed"
+		if !needed {
+			status = "not needed"
+		}
+		cmd.Printf("Compaction %s (%d tombstones, threshold is %d).\n", status, count, memory.TombstoneThreshold)
+		return nil
+	}
+
+	if !force && count < memory.TombstoneThreshold {
+		cmd.Printf("Compaction not needed (%d tombstones, threshold is %d).\n", count, memory.TombstoneThreshold)
+		return nil
+	}
+
+	result, err := memory.Compact(repoRoot)
+	if err != nil {
+		return fmt.Errorf("compact: %w", err)
+	}
+
+	cmd.Printf("Compacted: %d tombstones removed, %d lessons remaining", result.TombstonesRemoved, result.LessonsRemaining)
+	if result.DroppedInvalid > 0 {
+		cmd.Printf(", %d invalid dropped", result.DroppedInvalid)
+	}
+	cmd.Println(".")
+
+	return rebuildAfterCompact(cmd, repoRoot)
+}
+
+// rebuildAfterCompact opens the DB and rebuilds the index after compaction.
+func rebuildAfterCompact(cmd *cobra.Command, repoRoot string) error {
+	db, err := storage.OpenRepoDB(repoRoot)
+	if err != nil {
+		return fmt.Errorf("open database: %w", err)
+	}
+	defer db.Close()
+
+	if err := storage.RebuildIndex(db, repoRoot); err != nil {
+		return fmt.Errorf("rebuild index: %w", err)
+	}
+	cmd.Println("SQLite index rebuilt.")
+	return nil
 }
 
 // --- rebuild command ---
@@ -136,95 +145,111 @@ func statsCmd() *cobra.Command {
 		Use:   "stats",
 		Short: "Show database health and statistics",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoRoot := util.GetRepoRoot()
-
-			result, err := memory.ReadMemoryItems(repoRoot)
-			if err != nil {
-				return fmt.Errorf("read lessons: %w", err)
-			}
-
-			tombstones, err := memory.CountTombstones(repoRoot)
-			if err != nil {
-				return fmt.Errorf("count tombstones: %w", err)
-			}
-
-			items := result.Items
-			totalItems := len(items)
-
-			// Type breakdown
-			typeCounts := make(map[memory.MemoryItemType]int)
-			for _, item := range items {
-				typeCounts[item.Type]++
-			}
-
-			// Age breakdown
-			now := time.Now()
-			var under30, between30_90, over90, unknownAge int
-			for _, item := range items {
-				created, parseErr := time.Parse(time.RFC3339, item.Created)
-				if parseErr != nil {
-					unknownAge++
-					continue
-				}
-				days := int(now.Sub(created).Hours() / 24)
-				switch {
-				case days < 30:
-					under30++
-				case days <= 90:
-					between30_90++
-				default:
-					over90++
-				}
-			}
-
-			// Total retrieval count
-			totalRetrievals := 0
-			for _, item := range items {
-				if item.RetrievalCount != nil {
-					totalRetrievals += *item.RetrievalCount
-				}
-			}
-
-			// File sizes
-			jsonlPath := filepath.Join(repoRoot, memory.LessonsPath)
-			jsonlSize := fileSize(jsonlPath)
-			sqlitePath := filepath.Join(repoRoot, storage.DBPath)
-			sqliteSize := fileSize(sqlitePath)
-
-			var b strings.Builder
-			fmt.Fprintf(&b, "Lessons:     %d\n", totalItems)
-			fmt.Fprintf(&b, "Tombstones:  %d\n", tombstones)
-			if result.SkippedCount > 0 {
-				fmt.Fprintf(&b, "Corrupted:   %d\n", result.SkippedCount)
-			}
-
-			// Show type breakdown only if multiple types or non-lesson types
-			if len(typeCounts) > 1 || (len(typeCounts) == 1 && typeCounts[memory.TypeLesson] == 0) {
-				fmt.Fprintf(&b, "\nType breakdown:\n")
-				for typ, count := range typeCounts {
-					fmt.Fprintf(&b, "  %s: %d\n", typ, count)
-				}
-			}
-
-			fmt.Fprintf(&b, "\nAge breakdown:\n")
-			fmt.Fprintf(&b, "  <30d:   %d\n", under30)
-			fmt.Fprintf(&b, "  30-90d: %d\n", between30_90)
-			fmt.Fprintf(&b, "  >90d:   %d\n", over90)
-			if unknownAge > 0 {
-				fmt.Fprintf(&b, "  unknown: %d\n", unknownAge)
-			}
-
-			fmt.Fprintf(&b, "\nRetrievals:  %d total\n", totalRetrievals)
-
-			fmt.Fprintf(&b, "\nStorage:\n")
-			fmt.Fprintf(&b, "  JSONL:  %s\n", formatBytes(jsonlSize))
-			fmt.Fprintf(&b, "  SQLite: %s\n", formatBytes(sqliteSize))
-
-			cmd.Print(b.String())
-			return nil
+			return runStats(cmd)
 		},
 	}
 	return cmd
+}
+
+// statsData holds collected statistics for formatting.
+type statsData struct {
+	totalItems      int
+	tombstones      int
+	skippedCount    int
+	typeCounts      map[memory.ItemType]int
+	under30         int
+	between30_90    int
+	over90          int
+	unknownAge      int
+	totalRetrievals int
+	jsonlSize       int64
+	sqliteSize      int64
+}
+
+// runStats executes the stats command logic.
+func runStats(cmd *cobra.Command) error {
+	repoRoot := util.GetRepoRoot()
+
+	result, err := memory.ReadItems(repoRoot)
+	if err != nil {
+		return fmt.Errorf("read lessons: %w", err)
+	}
+
+	tombstones, err := memory.CountTombstones(repoRoot)
+	if err != nil {
+		return fmt.Errorf("count tombstones: %w", err)
+	}
+
+	stats := collectStats(repoRoot, result.Items, tombstones, result.SkippedCount)
+	cmd.Print(formatStats(stats))
+	return nil
+}
+
+// collectStats gathers all statistics from items into a statsData struct.
+func collectStats(repoRoot string, items []memory.Item, tombstones, skippedCount int) statsData {
+	s := statsData{
+		totalItems:   len(items),
+		tombstones:   tombstones,
+		skippedCount: skippedCount,
+		typeCounts:   make(map[memory.ItemType]int),
+	}
+
+	now := time.Now()
+	for _, item := range items {
+		s.typeCounts[item.Type]++
+		if item.RetrievalCount != nil {
+			s.totalRetrievals += *item.RetrievalCount
+		}
+		created, parseErr := time.Parse(time.RFC3339, item.Created)
+		if parseErr != nil {
+			s.unknownAge++
+			continue
+		}
+		days := int(now.Sub(created).Hours() / 24)
+		switch {
+		case days < 30:
+			s.under30++
+		case days <= 90:
+			s.between30_90++
+		default:
+			s.over90++
+		}
+	}
+
+	s.jsonlSize = fileSize(filepath.Join(repoRoot, memory.LessonsPath))
+	s.sqliteSize = fileSize(filepath.Join(repoRoot, storage.DBPath))
+	return s
+}
+
+// formatStats renders statsData into a human-readable string.
+func formatStats(s statsData) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Lessons:     %d\n", s.totalItems)
+	fmt.Fprintf(&b, "Tombstones:  %d\n", s.tombstones)
+	if s.skippedCount > 0 {
+		fmt.Fprintf(&b, "Corrupted:   %d\n", s.skippedCount)
+	}
+
+	if len(s.typeCounts) > 1 || (len(s.typeCounts) == 1 && s.typeCounts[memory.TypeLesson] == 0) {
+		fmt.Fprintf(&b, "\nType breakdown:\n")
+		for typ, count := range s.typeCounts {
+			fmt.Fprintf(&b, "  %s: %d\n", typ, count)
+		}
+	}
+
+	fmt.Fprintf(&b, "\nAge breakdown:\n")
+	fmt.Fprintf(&b, "  <30d:   %d\n", s.under30)
+	fmt.Fprintf(&b, "  30-90d: %d\n", s.between30_90)
+	fmt.Fprintf(&b, "  >90d:   %d\n", s.over90)
+	if s.unknownAge > 0 {
+		fmt.Fprintf(&b, "  unknown: %d\n", s.unknownAge)
+	}
+
+	fmt.Fprintf(&b, "\nRetrievals:  %d total\n", s.totalRetrievals)
+	fmt.Fprintf(&b, "\nStorage:\n")
+	fmt.Fprintf(&b, "  JSONL:  %s\n", formatBytes(s.jsonlSize))
+	fmt.Fprintf(&b, "  SQLite: %s\n", formatBytes(s.sqliteSize))
+	return b.String()
 }
 
 // --- export command ---
@@ -238,70 +263,94 @@ func exportCmd() *cobra.Command {
 		Use:   "export",
 		Short: "Export lessons as JSONL to stdout",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			repoRoot := util.GetRepoRoot()
-
-			result, err := memory.ReadMemoryItems(repoRoot)
-			if err != nil {
-				return fmt.Errorf("read lessons: %w", err)
-			}
-
-			var sinceTime time.Time
-			hasSince := since != ""
-			if hasSince {
-				sinceTime, err = time.Parse(time.RFC3339, since)
-				if err != nil {
-					sinceTime, err = time.Parse("2006-01-02", since)
-					if err != nil {
-						return fmt.Errorf("invalid --since date %q (use ISO8601 format)", since)
-					}
-				}
-			}
-
-			var tagFilter []string
-			hasTags := tags != ""
-			if hasTags {
-				for _, t := range strings.Split(tags, ",") {
-					tag := strings.TrimSpace(t)
-					if tag != "" {
-						tagFilter = append(tagFilter, tag)
-					}
-				}
-			}
-
-			var exported, skippedDate, skippedMarshal int
-			for _, item := range result.Items {
-				if hasSince {
-					created, parseErr := time.Parse(time.RFC3339, item.Created)
-					if parseErr != nil {
-						skippedDate++
-						continue
-					}
-					if created.Before(sinceTime) {
-						continue
-					}
-				}
-
-				if hasTags && !matchesAnyTag(item.Tags, tagFilter) {
-					continue
-				}
-
-				data, marshalErr := json.Marshal(item)
-				if marshalErr != nil {
-					skippedMarshal++
-					continue
-				}
-				cmd.Println(string(data))
-				exported++
-			}
-			if skippedDate > 0 || skippedMarshal > 0 {
-				cmd.PrintErrln(fmt.Sprintf("[warn] Export skipped %d unparseable date(s), %d marshal error(s)", skippedDate, skippedMarshal))
-			}
-			return nil
+			return runExport(cmd, since, tags)
 		},
 	}
 	cmd.Flags().StringVar(&since, "since", "", "only export items created after this date (ISO8601)")
 	cmd.Flags().StringVar(&tags, "tags", "", "filter by tags (comma-separated, OR logic)")
 	return cmd
+}
+
+// runExport executes the export command logic.
+func runExport(cmd *cobra.Command, since, tags string) error {
+	repoRoot := util.GetRepoRoot()
+
+	result, err := memory.ReadItems(repoRoot)
+	if err != nil {
+		return fmt.Errorf("read lessons: %w", err)
+	}
+
+	sinceTime, hasSince, err := parseSinceFlag(since)
+	if err != nil {
+		return err
+	}
+
+	tagFilter := parseTagFilter(tags)
+
+	skippedDate, skippedMarshal := exportItems(cmd, result.Items, sinceTime, hasSince, tagFilter)
+	if skippedDate > 0 || skippedMarshal > 0 {
+		cmd.PrintErrln(fmt.Sprintf("[warn] Export skipped %d unparseable date(s), %d marshal error(s)", skippedDate, skippedMarshal))
+	}
+	return nil
+}
+
+// parseSinceFlag parses the --since flag value into a time, returning whether the flag was set.
+func parseSinceFlag(since string) (time.Time, bool, error) {
+	if since == "" {
+		return time.Time{}, false, nil
+	}
+	t, err := time.Parse(time.RFC3339, since)
+	if err != nil {
+		t, err = time.Parse("2006-01-02", since)
+		if err != nil {
+			return time.Time{}, false, fmt.Errorf("invalid --since date %q (use ISO8601 format)", since)
+		}
+	}
+	return t, true, nil
+}
+
+// parseTagFilter splits a comma-separated tag string into a slice.
+func parseTagFilter(tags string) []string {
+	if tags == "" {
+		return nil
+	}
+	var result []string
+	for _, t := range strings.Split(tags, ",") {
+		tag := strings.TrimSpace(t)
+		if tag != "" {
+			result = append(result, tag)
+		}
+	}
+	return result
+}
+
+// exportItems writes matching items as JSONL and returns counts of skipped items.
+func exportItems(cmd *cobra.Command, items []memory.Item, sinceTime time.Time, hasSince bool, tagFilter []string) (skippedDate, skippedMarshal int) {
+	hasTags := len(tagFilter) > 0
+	for _, item := range items {
+		if hasSince {
+			created, parseErr := time.Parse(time.RFC3339, item.Created)
+			if parseErr != nil {
+				skippedDate++
+				continue
+			}
+			if created.Before(sinceTime) {
+				continue
+			}
+		}
+
+		if hasTags && !matchesAnyTag(item.Tags, tagFilter) {
+			continue
+		}
+
+		data, marshalErr := json.Marshal(item)
+		if marshalErr != nil {
+			skippedMarshal++
+			continue
+		}
+		cmd.Println(string(data))
+	}
+	return skippedDate, skippedMarshal
 }
 
 // --- import command ---
@@ -312,67 +361,88 @@ func importCmd() *cobra.Command {
 		Short: "Import lessons from a JSONL file",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			filePath := args[0]
-			repoRoot := util.GetRepoRoot()
-
-			f, err := os.Open(filePath)
-			if err != nil {
-				return fmt.Errorf("open import file: %w", err)
-			}
-			defer f.Close()
-
-			existing, err := memory.ReadMemoryItems(repoRoot)
-			if err != nil {
-				return fmt.Errorf("read existing: %w", err)
-			}
-			existingIDs := make(map[string]bool, len(existing.Items))
-			for _, item := range existing.Items {
-				existingIDs[item.ID] = true
-			}
-
-			var imported, skipped, invalid int
-
-			scanner := bufio.NewScanner(f)
-			scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
-
-			for scanner.Scan() {
-				line := strings.TrimSpace(scanner.Text())
-				if line == "" {
-					continue
-				}
-
-				var item memory.MemoryItem
-				if err := json.Unmarshal([]byte(line), &item); err != nil {
-					invalid++
-					continue
-				}
-
-				if err := memory.ValidateMemoryItem(&item); err != nil {
-					invalid++
-					continue
-				}
-
-				if existingIDs[item.ID] {
-					skipped++
-					continue
-				}
-
-				if err := memory.AppendMemoryItem(repoRoot, item); err != nil {
-					return fmt.Errorf("write item %s: %w", item.ID, err)
-				}
-				existingIDs[item.ID] = true
-				imported++
-			}
-
-			if err := scanner.Err(); err != nil {
-				return fmt.Errorf("read import file: %w", err)
-			}
-
-			cmd.Printf("Imported %d lessons (%d skipped, %d invalid).\n", imported, skipped, invalid)
-			return nil
+			return runImport(cmd, args[0])
 		},
 	}
 	return cmd
+}
+
+// runImport executes the import command logic.
+func runImport(cmd *cobra.Command, filePath string) error {
+	repoRoot := util.GetRepoRoot()
+
+	f, err := os.Open(filePath)
+	if err != nil {
+		return fmt.Errorf("open import file: %w", err)
+	}
+	defer f.Close()
+
+	existingIDs, err := loadExistingIDs(repoRoot)
+	if err != nil {
+		return err
+	}
+
+	imported, skipped, invalid, err := importItems(repoRoot, f, existingIDs)
+	if err != nil {
+		return err
+	}
+
+	cmd.Printf("Imported %d lessons (%d skipped, %d invalid).\n", imported, skipped, invalid)
+	return nil
+}
+
+// loadExistingIDs reads existing items and returns a set of their IDs.
+func loadExistingIDs(repoRoot string) (map[string]bool, error) {
+	existing, err := memory.ReadItems(repoRoot)
+	if err != nil {
+		return nil, fmt.Errorf("read existing: %w", err)
+	}
+	ids := make(map[string]bool, len(existing.Items))
+	for _, item := range existing.Items {
+		ids[item.ID] = true
+	}
+	return ids, nil
+}
+
+// importItems reads JSONL lines from r, validates and appends new items, returning counts.
+func importItems(repoRoot string, f *os.File, existingIDs map[string]bool) (imported, skipped, invalid int, err error) {
+	scanner := bufio.NewScanner(f)
+	scanner.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		var item memory.Item
+		if jsonErr := json.Unmarshal([]byte(line), &item); jsonErr != nil {
+			invalid++
+			continue
+		}
+
+		if valErr := memory.ValidateItem(&item); valErr != nil {
+			invalid++
+			continue
+		}
+
+		if existingIDs[item.ID] {
+			skipped++
+			continue
+		}
+
+		if appendErr := memory.AppendItem(repoRoot, item); appendErr != nil {
+			return imported, skipped, invalid, fmt.Errorf("write item %s: %w", item.ID, appendErr)
+		}
+		existingIDs[item.ID] = true
+		imported++
+	}
+
+	if scanErr := scanner.Err(); scanErr != nil {
+		return imported, skipped, invalid, fmt.Errorf("read import file: %w", scanErr)
+	}
+
+	return imported, skipped, invalid, nil
 }
 
 // --- prime command ---

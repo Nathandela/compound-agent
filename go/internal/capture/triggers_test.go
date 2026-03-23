@@ -379,106 +379,106 @@ func TestDetectTestFailure_TruncatesLongErrorLine(t *testing.T) {
 	}
 }
 
-// --- InferMemoryItemType ---
+// --- InferItemType ---
 
-func TestInferMemoryItemType_PatternUseInsteadOf(t *testing.T) {
-	got := InferMemoryItemType("Use Polars instead of pandas for large datasets")
+func TestInferItemType_PatternUseInsteadOf(t *testing.T) {
+	got := InferItemType("Use Polars instead of pandas for large datasets")
 	if got != memory.TypePattern {
 		t.Errorf("expected %q, got %q", memory.TypePattern, got)
 	}
 }
 
-func TestInferMemoryItemType_PatternPreferOver(t *testing.T) {
-	got := InferMemoryItemType("Prefer async functions over callbacks in this codebase")
+func TestInferItemType_PatternPreferOver(t *testing.T) {
+	got := InferItemType("Prefer async functions over callbacks in this codebase")
 	if got != memory.TypePattern {
 		t.Errorf("expected %q, got %q", memory.TypePattern, got)
 	}
 }
 
-func TestInferMemoryItemType_PatternPreferTo(t *testing.T) {
-	got := InferMemoryItemType("Prefer pnpm to npm for this project")
+func TestInferItemType_PatternPreferTo(t *testing.T) {
+	got := InferItemType("Prefer pnpm to npm for this project")
 	if got != memory.TypePattern {
 		t.Errorf("expected %q, got %q", memory.TypePattern, got)
 	}
 }
 
-func TestInferMemoryItemType_SolutionWhen(t *testing.T) {
-	got := InferMemoryItemType("When the database connection fails, restart the pool")
+func TestInferItemType_SolutionWhen(t *testing.T) {
+	got := InferItemType("When the database connection fails, restart the pool")
 	if got != memory.TypeSolution {
 		t.Errorf("expected %q, got %q", memory.TypeSolution, got)
 	}
 }
 
-func TestInferMemoryItemType_SolutionIfThen(t *testing.T) {
-	got := InferMemoryItemType("If tests fail with ENOENT, check that fixtures exist")
+func TestInferItemType_SolutionIfThen(t *testing.T) {
+	got := InferItemType("If tests fail with ENOENT, check that fixtures exist")
 	if got != memory.TypeSolution {
 		t.Errorf("expected %q, got %q", memory.TypeSolution, got)
 	}
 }
 
-func TestInferMemoryItemType_SolutionIfComma(t *testing.T) {
-	got := InferMemoryItemType("If the build breaks, clear the cache first")
+func TestInferItemType_SolutionIfComma(t *testing.T) {
+	got := InferItemType("If the build breaks, clear the cache first")
 	if got != memory.TypeSolution {
 		t.Errorf("expected %q, got %q", memory.TypeSolution, got)
 	}
 }
 
-func TestInferMemoryItemType_SolutionToFix(t *testing.T) {
-	got := InferMemoryItemType("To fix the import error, add the .js extension")
+func TestInferItemType_SolutionToFix(t *testing.T) {
+	got := InferItemType("To fix the import error, add the .js extension")
 	if got != memory.TypeSolution {
 		t.Errorf("expected %q, got %q", memory.TypeSolution, got)
 	}
 }
 
-func TestInferMemoryItemType_PreferenceAlways(t *testing.T) {
-	got := InferMemoryItemType("Always run pnpm lint before committing code changes")
+func TestInferItemType_PreferenceAlways(t *testing.T) {
+	got := InferItemType("Always run pnpm lint before committing code changes")
 	if got != memory.TypePreference {
 		t.Errorf("expected %q, got %q", memory.TypePreference, got)
 	}
 }
 
-func TestInferMemoryItemType_PreferenceNever(t *testing.T) {
-	got := InferMemoryItemType("Never deploy without running the full test suite first")
+func TestInferItemType_PreferenceNever(t *testing.T) {
+	got := InferItemType("Never deploy without running the full test suite first")
 	if got != memory.TypePreference {
 		t.Errorf("expected %q, got %q", memory.TypePreference, got)
 	}
 }
 
-func TestInferMemoryItemType_LessonDefault(t *testing.T) {
-	got := InferMemoryItemType("The database sometimes has connection issues in development")
+func TestInferItemType_LessonDefault(t *testing.T) {
+	got := InferItemType("The database sometimes has connection issues in development")
 	if got != memory.TypeLesson {
 		t.Errorf("expected %q, got %q", memory.TypeLesson, got)
 	}
 }
 
-func TestInferMemoryItemType_LessonGenericStatement(t *testing.T) {
-	got := InferMemoryItemType("This project uses TypeScript with strict mode enabled")
+func TestInferItemType_LessonGenericStatement(t *testing.T) {
+	got := InferItemType("This project uses TypeScript with strict mode enabled")
 	if got != memory.TypeLesson {
 		t.Errorf("expected %q, got %q", memory.TypeLesson, got)
 	}
 }
 
-func TestInferMemoryItemType_CaseInsensitive(t *testing.T) {
+func TestInferItemType_CaseInsensitive(t *testing.T) {
 	tests := []struct {
 		input    string
-		expected memory.MemoryItemType
+		expected memory.ItemType
 	}{
 		{"USE vitest instead of jest for this project", memory.TypePattern},
 		{"WHEN the build fails, clear the cache first", memory.TypeSolution},
 		{"ALWAYS check types before pushing", memory.TypePreference},
 	}
 	for _, tt := range tests {
-		got := InferMemoryItemType(tt.input)
+		got := InferItemType(tt.input)
 		if got != tt.expected {
-			t.Errorf("InferMemoryItemType(%q) = %q, want %q", tt.input, got, tt.expected)
+			t.Errorf("InferItemType(%q) = %q, want %q", tt.input, got, tt.expected)
 		}
 	}
 }
 
-func TestInferMemoryItemType_PatternBeforeSolution(t *testing.T) {
+func TestInferItemType_PatternBeforeSolution(t *testing.T) {
 	// "use X instead of Y" matches pattern, even though "when" could match solution.
 	// Pattern has higher priority.
-	got := InferMemoryItemType("When possible, use goroutines instead of threads")
+	got := InferItemType("When possible, use goroutines instead of threads")
 	if got != memory.TypePattern {
 		t.Errorf("expected pattern (higher priority), got %q", got)
 	}

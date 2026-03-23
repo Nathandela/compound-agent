@@ -10,9 +10,9 @@ import (
 	"strings"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
 	"github.com/nathandelacretaz/compound-agent/internal/storage"
-	_ "github.com/mattn/go-sqlite3"
 )
 
 // mockEmbedder returns pre-configured vectors or a deterministic hash.
@@ -47,7 +47,7 @@ func simpleHash(text string) []float64 {
 }
 
 // setupTestDB creates a fresh in-memory DB and inserts test items.
-func setupTestDB(t *testing.T, items []memory.MemoryItem) *sql.DB {
+func setupTestDB(t *testing.T, items []memory.Item) *sql.DB {
 	t.Helper()
 	db, err := storage.OpenDB(":memory:")
 	if err != nil {
@@ -92,14 +92,14 @@ func setupTestDB(t *testing.T, items []memory.MemoryItem) *sql.DB {
 	return db
 }
 
-// --- SearchVector tests ---
+// --- Vector tests ---
 
-func TestSearchVector_EmptyDB(t *testing.T) {
+func TestVector_EmptyDB(t *testing.T) {
 	db := setupTestDB(t, nil)
 	defer db.Close()
 
 	embedder := &mockEmbedder{vectors: map[string][]float64{}}
-	result, err := SearchVector(db, embedder, "test query", 10, "")
+	result, err := Vector(db, embedder, "test query", 10, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -108,8 +108,8 @@ func TestSearchVector_EmptyDB(t *testing.T) {
 	}
 }
 
-func TestSearchVector_ReturnsSortedByScore(t *testing.T) {
-	items := []memory.MemoryItem{
+func TestVector_ReturnsSortedByScore(t *testing.T) {
+	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "go error", Insight: "handle errors", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 		{ID: "L002", Type: memory.TypeLesson, Trigger: "rust error", Insight: "use Result type", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 		{ID: "L003", Type: memory.TypeLesson, Trigger: "python error", Insight: "try except blocks", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
@@ -119,13 +119,13 @@ func TestSearchVector_ReturnsSortedByScore(t *testing.T) {
 
 	queryVec := []float64{0.9, 0.1, 0.0, 0.0}
 	embedder := &mockEmbedder{vectors: map[string][]float64{
-		"go error":                       queryVec,                   // query
-		"go error handle errors":         queryVec,                   // L001 combined -- same as query, score ~1.0
-		"rust error use Result type":     {0.1, 0.9, 0.0, 0.0},      // L002 -- orthogonal-ish
-		"python error try except blocks": {0.0, 0.0, 0.9, 0.1},      // L003 -- different
+		"go error":                       queryVec,             // query
+		"go error handle errors":         queryVec,             // L001 combined -- same as query, score ~1.0
+		"rust error use Result type":     {0.1, 0.9, 0.0, 0.0}, // L002 -- orthogonal-ish
+		"python error try except blocks": {0.0, 0.0, 0.9, 0.1}, // L003 -- different
 	}}
 
-	result, err := SearchVector(db, embedder, "go error", 10, "")
+	result, err := Vector(db, embedder, "go error", 10, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -147,8 +147,8 @@ func TestSearchVector_ReturnsSortedByScore(t *testing.T) {
 	}
 }
 
-func TestSearchVector_UsesCachedEmbeddings(t *testing.T) {
-	items := []memory.MemoryItem{
+func TestVector_UsesCachedEmbeddings(t *testing.T) {
+	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "trigger1", Insight: "insight1", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 	}
 	db := setupTestDB(t, items)
@@ -166,7 +166,7 @@ func TestSearchVector_UsesCachedEmbeddings(t *testing.T) {
 		// it would get simpleHash (different vector). Cache hit means cachedVec is used.
 	}}
 
-	result, err := SearchVector(db, embedder, "test query", 10, "")
+	result, err := Vector(db, embedder, "test query", 10, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -179,10 +179,10 @@ func TestSearchVector_UsesCachedEmbeddings(t *testing.T) {
 	}
 }
 
-func TestSearchVector_SkipsInvalidatedItems(t *testing.T) {
+func TestVector_SkipsInvalidatedItems(t *testing.T) {
 	inv := "2025-06-01T00:00:00Z"
 	reason := "outdated"
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "valid", Insight: "still good", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 		{ID: "L002", Type: memory.TypeLesson, Trigger: "invalid", Insight: "outdated", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z", InvalidatedAt: &inv, InvalidationReason: &reason},
 	}
@@ -190,7 +190,7 @@ func TestSearchVector_SkipsInvalidatedItems(t *testing.T) {
 	defer db.Close()
 
 	embedder := &mockEmbedder{vectors: map[string][]float64{}}
-	result, err := SearchVector(db, embedder, "test", 10, "")
+	result, err := Vector(db, embedder, "test", 10, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -203,8 +203,8 @@ func TestSearchVector_SkipsInvalidatedItems(t *testing.T) {
 	}
 }
 
-func TestSearchVector_RespectsLimit(t *testing.T) {
-	items := []memory.MemoryItem{
+func TestVector_RespectsLimit(t *testing.T) {
+	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "a", Insight: "a", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 		{ID: "L002", Type: memory.TypeLesson, Trigger: "b", Insight: "b", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 		{ID: "L003", Type: memory.TypeLesson, Trigger: "c", Insight: "c", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
@@ -213,7 +213,7 @@ func TestSearchVector_RespectsLimit(t *testing.T) {
 	defer db.Close()
 
 	embedder := &mockEmbedder{vectors: map[string][]float64{}}
-	result, err := SearchVector(db, embedder, "test", 2, "")
+	result, err := Vector(db, embedder, "test", 2, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -225,7 +225,7 @@ func TestSearchVector_RespectsLimit(t *testing.T) {
 // --- FindSimilarLessons tests ---
 
 func TestFindSimilarLessons_FiltersByThreshold(t *testing.T) {
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "t1", Insight: "very similar insight", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 		{ID: "L002", Type: memory.TypeLesson, Trigger: "t2", Insight: "completely different", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 	}
@@ -234,9 +234,9 @@ func TestFindSimilarLessons_FiltersByThreshold(t *testing.T) {
 
 	queryVec := []float64{1.0, 0.0, 0.0, 0.0}
 	embedder := &mockEmbedder{vectors: map[string][]float64{
-		"find similar text":    queryVec,                   // query
-		"very similar insight": queryVec,                   // score = 1.0 (above threshold)
-		"completely different": {0.0, 1.0, 0.0, 0.0},      // score = 0.0 (below threshold)
+		"find similar text":    queryVec,             // query
+		"very similar insight": queryVec,             // score = 1.0 (above threshold)
+		"completely different": {0.0, 1.0, 0.0, 0.0}, // score = 0.0 (below threshold)
 	}}
 
 	result, err := FindSimilarLessons(db, embedder, "find similar text", 0.80, "")
@@ -252,7 +252,7 @@ func TestFindSimilarLessons_FiltersByThreshold(t *testing.T) {
 }
 
 func TestFindSimilarLessons_ExcludesSpecifiedID(t *testing.T) {
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "t1", Insight: "insight A", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 		{ID: "L002", Type: memory.TypeLesson, Trigger: "t2", Insight: "insight B", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 	}
@@ -279,9 +279,9 @@ func TestFindSimilarLessons_ExcludesSpecifiedID(t *testing.T) {
 	}
 }
 
-func TestSearchVector_IncludesCCTPatterns(t *testing.T) {
-	// SearchVector should also score CCT patterns from cct-patterns.jsonl
-	items := []memory.MemoryItem{
+func TestVector_IncludesCCTPatterns(t *testing.T) {
+	// Vector should also score CCT patterns from cct-patterns.jsonl
+	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "go error", Insight: "handle errors", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 	}
 	db := setupTestDB(t, items)
@@ -297,12 +297,12 @@ func TestSearchVector_IncludesCCTPatterns(t *testing.T) {
 
 	queryVec := []float64{1.0, 0.0, 0.0, 0.0}
 	embedder := &mockEmbedder{vectors: map[string][]float64{
-		"test query":                 queryVec,
-		"go error handle errors":     queryVec,
+		"test query":             queryVec,
+		"go error handle errors": queryVec,
 		"Error Handling Always handle errors explicitly": queryVec,
 	}}
 
-	result, err := SearchVector(db, embedder, "test query", 10, dir)
+	result, err := Vector(db, embedder, "test query", 10, dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -330,9 +330,9 @@ func TestSearchVector_IncludesCCTPatterns(t *testing.T) {
 	}
 }
 
-func TestSearchVector_NoCCTFile(t *testing.T) {
-	// SearchVector should work fine when cct-patterns.jsonl doesn't exist
-	items := []memory.MemoryItem{
+func TestVector_NoCCTFile(t *testing.T) {
+	// Vector should work fine when cct-patterns.jsonl doesn't exist
+	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "test", Insight: "test", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 	}
 	db := setupTestDB(t, items)
@@ -340,7 +340,7 @@ func TestSearchVector_NoCCTFile(t *testing.T) {
 
 	embedder := &mockEmbedder{vectors: map[string][]float64{}}
 	// Pass a dir with no cct-patterns.jsonl
-	result, err := SearchVector(db, embedder, "test", 10, t.TempDir())
+	result, err := Vector(db, embedder, "test", 10, t.TempDir())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

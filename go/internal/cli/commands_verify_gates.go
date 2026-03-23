@@ -3,7 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"os"
+	"log/slog"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -204,7 +204,7 @@ func fetchDeps(epicID string) ([]bdDep, error) {
 			return deps, nil
 		}
 		// JSON parse failed — fall through to plain text
-		fmt.Fprintf(os.Stderr, "[debug] bd show --json parse failed: %v; trying plain text\n", parseErr)
+		slog.Debug("bd show --json parse failed, trying plain text", "error", parseErr)
 	}
 
 	// Fallback: try plain text

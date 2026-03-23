@@ -45,7 +45,7 @@ func knowledgeCmd() *cobra.Command {
 			embedder, closeEmbedder := getOrStartEmbedder(repoRoot)
 			defer closeEmbedder()
 
-			results, err := knowledge.SearchKnowledge(kdb, embedder, query, &knowledge.KnowledgeSearchOptions{Limit: limit})
+			results, err := knowledge.SearchKnowledge(kdb, embedder, query, &knowledge.SearchOptions{Limit: limit})
 			if err != nil {
 				return fmt.Errorf("search: %w", err)
 			}

@@ -22,60 +22,7 @@ func initCmd() *cobra.Command {
 		Use:   "init",
 		Short: "Initialize compound-agent in this repository",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if repoRoot == "" {
-				repoRoot = util.GetRepoRoot()
-			}
-
-			result, err := setup.InitRepo(repoRoot, setup.InitOptions{
-				SkipHooks:  skipHooks,
-				BinaryPath: resolveBinaryPath(),
-			})
-			if err != nil {
-				return fmt.Errorf("init: %w", err)
-			}
-
-			if jsonOut {
-				data, _ := json.Marshal(map[string]any{
-					"success":             result.Success,
-					"hooksInstalled":      result.HooksInstalled,
-					"hooksUpgraded":       result.HooksUpgraded,
-					"pluginUpdated":       result.PluginUpdated,
-					"dirsCreated":         len(result.DirsCreated),
-					"filesCreated":        len(result.FilesCreated),
-					"agentsInstalled":     result.AgentsInstalled,
-					"agentsUpdated":       result.AgentsUpdated,
-					"commandsInstalled":   result.CommandsInstalled,
-					"commandsUpdated":     result.CommandsUpdated,
-					"skillsInstalled":     result.SkillsInstalled,
-					"skillsUpdated":       result.SkillsUpdated,
-					"roleSkillsInstalled": result.RoleSkillsInstalled,
-					"roleSkillsUpdated":   result.RoleSkillsUpdated,
-					"docsInstalled":       result.DocsInstalled,
-					"docsUpdated":         result.DocsUpdated,
-					"templatesPruned":     result.TemplatesPruned,
-				})
-				cmd.Println(string(data))
-			} else {
-				cmd.Printf("[ok] Compound agent initialized in %s\n", repoRoot)
-				if result.HooksUpgraded {
-					cmd.Println("  Hooks: upgraded (npx → binary)")
-				} else if result.HooksInstalled {
-					cmd.Println("  Hooks: installed")
-				}
-				if result.PluginUpdated {
-					cmd.Println("  Plugin: version updated")
-				}
-				cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
-				printTemplatesSummary(cmd, result)
-				if result.AgentsMdUpdated {
-					cmd.Println("  AGENTS.md: updated")
-				}
-				if result.ClaudeMdUpdated {
-					cmd.Println("  CLAUDE.md: reference added")
-				}
-				printBeadsStatus(cmd, repoRoot)
-			}
-			return nil
+			return runInit(cmd, resolveRoot(repoRoot), skipHooks, jsonOut)
 		},
 	}
 
@@ -83,6 +30,27 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root (defaults to git root)")
 	return cmd
+}
+
+// runInit performs the init command logic.
+func runInit(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool) error {
+	result, err := setup.InitRepo(repoRoot, setup.InitOptions{
+		SkipHooks:  skipHooks,
+		BinaryPath: resolveBinaryPath(),
+	})
+	if err != nil {
+		return fmt.Errorf("init: %w", err)
+	}
+
+	if jsonOut {
+		printInitResultJSON(cmd, result)
+		return nil
+	}
+
+	cmd.Printf("[ok] Compound agent initialized in %s\n", repoRoot)
+	printInitResultText(cmd, result)
+	printBeadsStatus(cmd, repoRoot)
+	return nil
 }
 
 func setupCmd() *cobra.Command {
@@ -93,7 +61,6 @@ func setupCmd() *cobra.Command {
 
 	registerSetupClaudeCmd(cmd)
 
-	// Default setup action (no subcommand): runs init + claude hooks
 	var (
 		skipHooks bool
 		jsonOut   bool
@@ -101,64 +68,106 @@ func setupCmd() *cobra.Command {
 	)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		if repoRoot == "" {
-			repoRoot = util.GetRepoRoot()
-		}
-
-		result, err := setup.InitRepo(repoRoot, setup.InitOptions{
-			SkipHooks:  skipHooks,
-			BinaryPath: resolveBinaryPath(),
-		})
-		if err != nil {
-			return fmt.Errorf("setup: %w", err)
-		}
-
-		if jsonOut {
-			data, _ := json.Marshal(map[string]any{
-				"success":             result.Success,
-				"hooksInstalled":      result.HooksInstalled,
-				"hooksUpgraded":       result.HooksUpgraded,
-				"pluginUpdated":       result.PluginUpdated,
-				"agentsInstalled":     result.AgentsInstalled,
-				"agentsUpdated":       result.AgentsUpdated,
-				"commandsInstalled":   result.CommandsInstalled,
-				"commandsUpdated":     result.CommandsUpdated,
-				"skillsInstalled":     result.SkillsInstalled,
-				"skillsUpdated":       result.SkillsUpdated,
-				"roleSkillsInstalled": result.RoleSkillsInstalled,
-				"roleSkillsUpdated":   result.RoleSkillsUpdated,
-				"docsInstalled":       result.DocsInstalled,
-				"docsUpdated":         result.DocsUpdated,
-				"templatesPruned":     result.TemplatesPruned,
-			})
-			cmd.Println(string(data))
-		} else {
-			cmd.Println("[ok] Compound agent setup complete")
-			if result.HooksUpgraded {
-				cmd.Println("  Hooks: upgraded (npx → binary) in .claude/settings.json")
-			} else if result.HooksInstalled {
-				cmd.Println("  Hooks: installed to .claude/settings.json")
-			}
-			if result.PluginUpdated {
-				cmd.Println("  Plugin: version updated in .claude/plugin.json")
-			}
-			cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
-			printTemplatesSummary(cmd, result)
-			if result.AgentsMdUpdated {
-				cmd.Println("  AGENTS.md: updated")
-			}
-			if result.ClaudeMdUpdated {
-				cmd.Println("  CLAUDE.md: reference added")
-			}
-			printBeadsStatus(cmd, repoRoot)
-		}
-		return nil
+		return runSetup(cmd, resolveRoot(repoRoot), skipHooks, jsonOut)
 	}
 
 	cmd.Flags().BoolVar(&skipHooks, "skip-hooks", false, "Skip installing hooks")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root")
 	return cmd
+}
+
+// runSetup performs the setup command logic.
+func runSetup(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool) error {
+	result, err := setup.InitRepo(repoRoot, setup.InitOptions{
+		SkipHooks:  skipHooks,
+		BinaryPath: resolveBinaryPath(),
+	})
+	if err != nil {
+		return fmt.Errorf("setup: %w", err)
+	}
+
+	if jsonOut {
+		printInitResultJSON(cmd, result)
+		return nil
+	}
+
+	cmd.Println("[ok] Compound agent setup complete")
+	printSetupResultText(cmd, result)
+	printBeadsStatus(cmd, repoRoot)
+	return nil
+}
+
+// resolveRoot returns repoRoot if non-empty, otherwise detects the git root.
+func resolveRoot(repoRoot string) string {
+	if repoRoot != "" {
+		return repoRoot
+	}
+	return util.GetRepoRoot()
+}
+
+// printInitResultJSON prints the InitResult as JSON (shared by init and setup).
+func printInitResultJSON(cmd *cobra.Command, result *setup.InitResult) {
+	data, _ := json.Marshal(map[string]any{
+		"success":             result.Success,
+		"hooksInstalled":      result.HooksInstalled,
+		"hooksUpgraded":       result.HooksUpgraded,
+		"pluginUpdated":       result.PluginUpdated,
+		"dirsCreated":         len(result.DirsCreated),
+		"filesCreated":        len(result.FilesCreated),
+		"agentsInstalled":     result.AgentsInstalled,
+		"agentsUpdated":       result.AgentsUpdated,
+		"commandsInstalled":   result.CommandsInstalled,
+		"commandsUpdated":     result.CommandsUpdated,
+		"skillsInstalled":     result.SkillsInstalled,
+		"skillsUpdated":       result.SkillsUpdated,
+		"roleSkillsInstalled": result.RoleSkillsInstalled,
+		"roleSkillsUpdated":   result.RoleSkillsUpdated,
+		"docsInstalled":       result.DocsInstalled,
+		"docsUpdated":         result.DocsUpdated,
+		"templatesPruned":     result.TemplatesPruned,
+	})
+	cmd.Println(string(data))
+}
+
+// printInitResultText prints the text summary for the init command.
+func printInitResultText(cmd *cobra.Command, result *setup.InitResult) {
+	if result.HooksUpgraded {
+		cmd.Println("  Hooks: upgraded (npx → binary)")
+	} else if result.HooksInstalled {
+		cmd.Println("  Hooks: installed")
+	}
+	if result.PluginUpdated {
+		cmd.Println("  Plugin: version updated")
+	}
+	cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
+	printTemplatesSummary(cmd, result)
+	printMdUpdates(cmd, result)
+}
+
+// printSetupResultText prints the text summary for the setup command.
+func printSetupResultText(cmd *cobra.Command, result *setup.InitResult) {
+	if result.HooksUpgraded {
+		cmd.Println("  Hooks: upgraded (npx → binary) in .claude/settings.json")
+	} else if result.HooksInstalled {
+		cmd.Println("  Hooks: installed to .claude/settings.json")
+	}
+	if result.PluginUpdated {
+		cmd.Println("  Plugin: version updated in .claude/plugin.json")
+	}
+	cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
+	printTemplatesSummary(cmd, result)
+	printMdUpdates(cmd, result)
+}
+
+// printMdUpdates prints AGENTS.md and CLAUDE.md update status.
+func printMdUpdates(cmd *cobra.Command, result *setup.InitResult) {
+	if result.AgentsMdUpdated {
+		cmd.Println("  AGENTS.md: updated")
+	}
+	if result.ClaudeMdUpdated {
+		cmd.Println("  CLAUDE.md: reference added")
+	}
 }
 
 func registerSetupClaudeCmd(parent *cobra.Command) {

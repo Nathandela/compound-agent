@@ -70,6 +70,16 @@ func ChunkFile(filePath, content string, opts *ChunkOptions) []Chunk {
 		return nil
 	}
 
+	targetSize, overlapSize := resolveChunkSizes(opts)
+	fileLines := strings.Split(content, "\n")
+	ext := strings.ToLower(filepath.Ext(filePath))
+	sections := splitIntoSections(fileLines, ext)
+
+	return buildChunks(sections, filePath, targetSize, overlapSize)
+}
+
+// resolveChunkSizes returns the effective target and overlap sizes from options.
+func resolveChunkSizes(opts *ChunkOptions) (int, int) {
 	targetSize := DefaultTargetSize
 	overlapSize := DefaultOverlapSize
 	if opts != nil {
@@ -80,12 +90,11 @@ func ChunkFile(filePath, content string, opts *ChunkOptions) []Chunk {
 			overlapSize = opts.OverlapSize
 		}
 	}
+	return targetSize, overlapSize
+}
 
-	fileLines := strings.Split(content, "\n")
-	ext := strings.ToLower(filepath.Ext(filePath))
-
-	sections := splitIntoSections(fileLines, ext)
-
+// buildChunks assembles chunks from sections using the target/overlap sizes.
+func buildChunks(sections [][]lineObj, filePath string, targetSize, overlapSize int) []Chunk {
 	var chunks []Chunk
 	var accumulated []lineObj
 	accumulatedLength := 0
@@ -94,7 +103,6 @@ func ChunkFile(filePath, content string, opts *ChunkOptions) []Chunk {
 	for _, section := range sections {
 		sectionLen := sectionTextLen(section)
 
-		// Emit if accumulated + section exceeds target and we have content
 		if accumulatedLength > 0 && accumulatedLength+sectionLen > targetSize {
 			overlapLines = emitChunk(filePath, accumulated, overlapLines, overlapSize, &chunks)
 			accumulated = nil
@@ -104,7 +112,6 @@ func ChunkFile(filePath, content string, opts *ChunkOptions) []Chunk {
 		accumulated = append(accumulated, section...)
 		accumulatedLength += sectionLen
 
-		// Emit if single section exceeds target
 		if accumulatedLength > targetSize {
 			overlapLines = emitChunk(filePath, accumulated, overlapLines, overlapSize, &chunks)
 			accumulated = nil
@@ -112,7 +119,6 @@ func ChunkFile(filePath, content string, opts *ChunkOptions) []Chunk {
 		}
 	}
 
-	// Emit remaining
 	if len(accumulated) > 0 {
 		emitChunk(filePath, accumulated, overlapLines, overlapSize, &chunks)
 	}
@@ -197,25 +203,17 @@ func splitMarkdown(fileLines []string) [][]lineObj {
 	for i, line := range fileLines {
 		lo := lineObj{lineNumber: i + 1, text: line}
 
-		// Track fenced code blocks
-		if strings.HasPrefix(strings.TrimLeft(line, " \t"), "```") {
+		if isFencedCodeDelimiter(line) {
 			inCodeBlock = !inCodeBlock
 			current = append(current, lo)
 			continue
 		}
 
-		// Split on H2+ headers outside code blocks
-		if !inCodeBlock && headerRegex.MatchString(line) && len(current) > 0 {
-			sections = append(sections, current)
-			current = []lineObj{lo}
-			continue
-		}
-
-		// Split on blank lines (paragraph boundary) outside code blocks
-		if !inCodeBlock && strings.TrimSpace(line) == "" && len(current) > 0 && hasNonBlank(current) {
-			current = append(current, lo)
-			sections = append(sections, current)
-			current = nil
+		if !inCodeBlock {
+			if sections, current = splitMarkdownLine(sections, current, lo, line); current == nil {
+				current = nil // paragraph boundary emitted the section
+				continue
+			}
 			continue
 		}
 
@@ -226,6 +224,34 @@ func splitMarkdown(fileLines []string) [][]lineObj {
 		sections = append(sections, current)
 	}
 	return sections
+}
+
+// splitMarkdownLine handles a non-code-block line in markdown splitting.
+// Returns updated sections and current slice. current is nil when a paragraph
+// boundary was emitted.
+func splitMarkdownLine(sections [][]lineObj, current []lineObj, lo lineObj, line string) ([][]lineObj, []lineObj) {
+	if isMarkdownHeading(line) && len(current) > 0 {
+		sections = append(sections, current)
+		return sections, []lineObj{lo}
+	}
+
+	if strings.TrimSpace(line) == "" && len(current) > 0 && hasNonBlank(current) {
+		current = append(current, lo)
+		sections = append(sections, current)
+		return sections, nil
+	}
+
+	return sections, append(current, lo)
+}
+
+// isFencedCodeDelimiter returns true if the line starts a fenced code block.
+func isFencedCodeDelimiter(line string) bool {
+	return strings.HasPrefix(strings.TrimLeft(line, " \t"), "```")
+}
+
+// isMarkdownHeading returns true if the line is a H2+ markdown heading.
+func isMarkdownHeading(line string) bool {
+	return headerRegex.MatchString(line)
 }
 
 func splitCode(fileLines []string) [][]lineObj {

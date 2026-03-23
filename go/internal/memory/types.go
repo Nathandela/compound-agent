@@ -5,20 +5,20 @@ import (
 	"fmt"
 )
 
-// MemoryItemType discriminates the union of memory item types.
-type MemoryItemType string
+// ItemType discriminates the union of memory item types.
+type ItemType string
 
 // Valid returns true if the type is one of the known memory item types.
-func (t MemoryItemType) Valid() bool { return validTypes[t] }
+func (t ItemType) Valid() bool { return validTypes[t] }
 
 const (
-	TypeLesson     MemoryItemType = "lesson"
-	TypeSolution   MemoryItemType = "solution"
-	TypePattern    MemoryItemType = "pattern"
-	TypePreference MemoryItemType = "preference"
+	TypeLesson     ItemType = "lesson"
+	TypeSolution   ItemType = "solution"
+	TypePattern    ItemType = "pattern"
+	TypePreference ItemType = "preference"
 )
 
-var validTypes = map[MemoryItemType]bool{ //nolint:gochecknoglobals
+var validTypes = map[ItemType]bool{ //nolint:gochecknoglobals
 	TypeLesson: true, TypeSolution: true,
 	TypePattern: true, TypePreference: true,
 }
@@ -76,21 +76,21 @@ type Citation struct {
 	Commit *string `json:"commit,omitempty"`
 }
 
-// MemoryItem is the unified type for all memory items.
+// Item is the unified type for all memory items.
 // JSON tags match the TypeScript field names exactly.
-type MemoryItem struct {
+type Item struct {
 	// Required fields
-	ID         string         `json:"id"`
-	Type       MemoryItemType `json:"type"`
-	Trigger    string         `json:"trigger"`
-	Insight    string         `json:"insight"`
-	Tags       []string       `json:"tags"`
-	Source     Source         `json:"source"`
-	Context    Context        `json:"context"`
-	Created    string         `json:"created"`
-	Confirmed  bool           `json:"confirmed"`
-	Supersedes []string       `json:"supersedes"`
-	Related    []string       `json:"related"`
+	ID         string   `json:"id"`
+	Type       ItemType `json:"type"`
+	Trigger    string   `json:"trigger"`
+	Insight    string   `json:"insight"`
+	Tags       []string `json:"tags"`
+	Source     Source   `json:"source"`
+	Context    Context  `json:"context"`
+	Created    string   `json:"created"`
+	Confirmed  bool     `json:"confirmed"`
+	Supersedes []string `json:"supersedes"`
+	Related    []string `json:"related"`
 
 	// Optional fields
 	Evidence           *string   `json:"evidence,omitempty"`
@@ -108,7 +108,7 @@ type MemoryItem struct {
 }
 
 // TypePrefix maps memory item types to ID prefixes.
-var TypePrefix = map[MemoryItemType]string{
+var TypePrefix = map[ItemType]string{
 	TypeLesson:     "L",
 	TypeSolution:   "S",
 	TypePattern:    "P",
@@ -117,7 +117,7 @@ var TypePrefix = map[MemoryItemType]string{
 
 // GenerateID produces a deterministic ID from insight text.
 // Format: {prefix}{first 16 hex chars of SHA-256(insight)}.
-func GenerateID(insight string, typ MemoryItemType) string {
+func GenerateID(insight string, typ ItemType) string {
 	prefix := TypePrefix[typ]
 	hash := sha256.Sum256([]byte(insight))
 	return fmt.Sprintf("%s%x", prefix, hash[:8])
@@ -125,7 +125,7 @@ func GenerateID(insight string, typ MemoryItemType) string {
 
 // EnsureArrayFields initializes nil slice fields to empty slices so that
 // JSON serialization produces [] instead of null (matching the TypeScript schema).
-func EnsureArrayFields(item *MemoryItem) {
+func EnsureArrayFields(item *Item) {
 	if item.Tags == nil {
 		item.Tags = []string{}
 	}
@@ -137,9 +137,24 @@ func EnsureArrayFields(item *MemoryItem) {
 	}
 }
 
-// ValidateMemoryItem checks required fields and enum constraints.
+// ValidateItem checks required fields and enum constraints.
 // Rejects nil array fields that the shared schema requires to be arrays.
-func ValidateMemoryItem(item *MemoryItem) error {
+func ValidateItem(item *Item) error {
+	if err := validateRequiredFields(item); err != nil {
+		return err
+	}
+	if item.Severity != nil && !validSeverities[*item.Severity] {
+		return fmt.Errorf("invalid severity: %q", *item.Severity)
+	}
+	if item.Type == TypePattern && item.Pattern == nil {
+		return fmt.Errorf("pattern type requires pattern field")
+	}
+	return nil
+}
+
+// validateRequiredFields checks that all required scalar and array fields are present
+// and that enum-typed fields hold valid values.
+func validateRequiredFields(item *Item) error {
 	if item.ID == "" {
 		return fmt.Errorf("id is required")
 	}
@@ -166,12 +181,6 @@ func ValidateMemoryItem(item *MemoryItem) error {
 	}
 	if item.Related == nil {
 		return fmt.Errorf("related must be an array, not null")
-	}
-	if item.Severity != nil && !validSeverities[*item.Severity] {
-		return fmt.Errorf("invalid severity: %q", *item.Severity)
-	}
-	if item.Type == TypePattern && item.Pattern == nil {
-		return fmt.Errorf("pattern type requires pattern field")
 	}
 	return nil
 }

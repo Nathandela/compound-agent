@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"fmt"
 	"os/exec"
 	"runtime"
 
@@ -79,16 +78,6 @@ func registerInfoCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(aboutCmd())
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(feedbackCmd())
-}
-
-// formatVersion returns the version string for use in other commands.
-func formatVersion() string {
-	return fmt.Sprintf("compound-agent v%s (go)", build.Version)
-}
-
-// versionString is used by other packages that need the bare version.
-func versionString() string {
-	return build.Version
 }
 
 // FormatRepoURL returns the repo URL for use by other commands.

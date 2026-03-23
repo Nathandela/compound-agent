@@ -9,10 +9,10 @@ import (
 )
 
 const (
-	sameTargetThreshold  = 2
+	sameTargetThreshold   = 2
 	totalFailureThreshold = 3
 	failureStateFileName  = ".ca-failure-state.json"
-	stateMaxAge          = time.Hour
+	stateMaxAge           = time.Hour
 )
 
 const failureTip = "Tip: Multiple failures detected. `npx ca search` may have solutions for similar issues."
@@ -26,7 +26,7 @@ type failureState struct {
 
 // ToolFailureResult is the output of the post-tool-failure hook.
 type ToolFailureResult struct {
-	HookSpecificOutput *HookSpecificOutput `json:"hookSpecificOutput,omitempty"`
+	SpecificOutput *SpecificOutput `json:"hookSpecificOutput,omitempty"`
 }
 
 func readFailureState(stateDir string) failureState {
@@ -93,7 +93,7 @@ func ProcessToolFailure(toolName string, toolInput map[string]interface{}, state
 	if state.SameTargetCount >= sameTargetThreshold || state.Count >= totalFailureThreshold {
 		deleteFailureState(stateDir)
 		return ToolFailureResult{
-			HookSpecificOutput: &HookSpecificOutput{
+			SpecificOutput: &SpecificOutput{
 				HookEventName:     "PostToolUseFailure",
 				AdditionalContext: failureTip,
 			},

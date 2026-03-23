@@ -26,7 +26,7 @@ type RankedItem struct {
 
 // SeverityBoost returns a multiplier based on item severity.
 // high -> 1.5, medium -> 1.0, low -> 0.8, nil/unknown -> 1.0.
-func SeverityBoost(item memory.MemoryItem) float64 {
+func SeverityBoost(item memory.Item) float64 {
 	if item.Severity == nil {
 		return MediumSeverityBoost
 	}
@@ -44,7 +44,7 @@ func SeverityBoost(item memory.MemoryItem) float64 {
 
 // RecencyBoostFn returns 1.2 for items created within the last 30 days, 1.0 otherwise.
 // Returns 1.0 if the created timestamp cannot be parsed.
-func RecencyBoostFn(item memory.MemoryItem) float64 {
+func RecencyBoostFn(item memory.Item) float64 {
 	created, err := time.Parse(time.RFC3339, item.Created)
 	if err != nil {
 		return 1.0
@@ -57,7 +57,7 @@ func RecencyBoostFn(item memory.MemoryItem) float64 {
 }
 
 // ConfirmationBoostFn returns 1.3 for confirmed items, 1.0 otherwise.
-func ConfirmationBoostFn(item memory.MemoryItem) float64 {
+func ConfirmationBoostFn(item memory.Item) float64 {
 	if item.Confirmed {
 		return ConfirmationBoost
 	}
@@ -67,7 +67,7 @@ func ConfirmationBoostFn(item memory.MemoryItem) float64 {
 // CalculateScore computes a boosted score from vector similarity and item metadata.
 // boost = min(severity * recency * confirmation, MaxCombinedBoost)
 // result = vectorSimilarity * boost
-func CalculateScore(item memory.MemoryItem, vectorSimilarity float64) float64 {
+func CalculateScore(item memory.Item, vectorSimilarity float64) float64 {
 	boost := math.Min(
 		SeverityBoost(item)*RecencyBoostFn(item)*ConfirmationBoostFn(item),
 		MaxCombinedBoost,

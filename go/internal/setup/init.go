@@ -40,12 +40,8 @@ type InitResult struct {
 	PluginUpdated       bool
 }
 
-// InitRepo initializes compound-agent in a repository.
-// Creates .claude/ structure, lessons index, and optionally installs hooks.
-func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
-	result := &InitResult{Success: true}
-
-	// Create directory structure
+// initDirectories creates the .claude/ directory structure and index.jsonl.
+func initDirectories(repoRoot string, result *InitResult) error {
 	dirs := []string{
 		filepath.Join(repoRoot, ".claude"),
 		filepath.Join(repoRoot, ".claude", "lessons"),
@@ -58,120 +54,129 @@ func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
 	for _, dir := range dirs {
 		_, statErr := os.Stat(dir)
 		if err := os.MkdirAll(dir, 0755); err != nil {
-			return nil, fmt.Errorf("create directory %s: %w", dir, err)
+			return fmt.Errorf("create directory %s: %w", dir, err)
 		}
 		if os.IsNotExist(statErr) {
 			result.DirsCreated = append(result.DirsCreated, dir)
 		}
 	}
 
-	// Create empty index.jsonl if it doesn't exist
 	indexPath := filepath.Join(repoRoot, ".claude", "lessons", "index.jsonl")
 	if _, err := os.Stat(indexPath); os.IsNotExist(err) {
 		if err := os.WriteFile(indexPath, []byte{}, 0644); err != nil {
-			return nil, fmt.Errorf("create index.jsonl: %w", err)
+			return fmt.Errorf("create index.jsonl: %w", err)
 		}
 		result.FilesCreated = append(result.FilesCreated, indexPath)
 	}
 
-	// Ensure .gitignore
-	if err := EnsureGitignore(repoRoot); err != nil {
-		return nil, fmt.Errorf("ensure .gitignore: %w", err)
+	return EnsureGitignore(repoRoot)
+}
+
+// initHooks installs or upgrades Claude Code hooks in settings.json.
+func initHooks(repoRoot string, binaryPath string, result *InitResult) error {
+	settingsPath := filepath.Join(repoRoot, ".claude", "settings.json")
+	settings, err := ReadClaudeSettings(settingsPath)
+	if err != nil {
+		return fmt.Errorf("read settings: %w", err)
 	}
 
-	// Install hooks unless skipped
+	needsInstall := !HasAllHooks(settings)
+	needsUpgrade := HooksNeedUpgrade(settings, binaryPath)
+
+	if needsInstall || needsUpgrade {
+		AddAllHooks(settings, binaryPath)
+		if err := WriteClaudeSettings(settingsPath, settings); err != nil {
+			return fmt.Errorf("write settings: %w", err)
+		}
+		result.HooksUpgraded = needsUpgrade && !needsInstall
+	}
+	result.HooksInstalled = true
+	return nil
+}
+
+// installTemplates installs all template assets (agents, commands, skills, docs).
+func installTemplates(repoRoot string, result *InitResult) error {
+	version := build.Version
+
+	updated, err := UpdateAgentsMd(repoRoot)
+	if err != nil {
+		return fmt.Errorf("update AGENTS.md: %w", err)
+	}
+	result.AgentsMdUpdated = updated
+
+	updated, err = EnsureClaudeMdReference(repoRoot)
+	if err != nil {
+		return fmt.Errorf("ensure CLAUDE.md reference: %w", err)
+	}
+	result.ClaudeMdUpdated = updated
+
+	created, pluginUpdated, err := CreatePluginManifest(repoRoot, version)
+	if err != nil {
+		return fmt.Errorf("create plugin.json: %w", err)
+	}
+	result.PluginCreated = created
+	result.PluginUpdated = pluginUpdated
+
+	return installTemplateGroups(repoRoot, version, result)
+}
+
+// installTemplateGroups installs agent, command, skill, role skill, and doc templates.
+func installTemplateGroups(repoRoot string, version string, result *InitResult) error {
+	type installFunc struct {
+		fn   func() (int, int, error)
+		setN func(int)
+		setU func(int)
+		name string
+	}
+	groups := []installFunc{
+		{func() (int, int, error) { return InstallAgentTemplates(repoRoot) },
+			func(n int) { result.AgentsInstalled = n }, func(u int) { result.AgentsUpdated = u }, "agent templates"},
+		{func() (int, int, error) { return InstallWorkflowCommands(repoRoot) },
+			func(n int) { result.CommandsInstalled = n }, func(u int) { result.CommandsUpdated = u }, "workflow commands"},
+		{func() (int, int, error) { return InstallPhaseSkills(repoRoot) },
+			func(n int) { result.SkillsInstalled = n }, func(u int) { result.SkillsUpdated = u }, "phase skills"},
+		{func() (int, int, error) { return InstallAgentRoleSkills(repoRoot) },
+			func(n int) { result.RoleSkillsInstalled = n }, func(u int) { result.RoleSkillsUpdated = u }, "agent role skills"},
+		{func() (int, int, error) { return InstallDocTemplates(repoRoot, version) },
+			func(n int) { result.DocsInstalled = n }, func(u int) { result.DocsUpdated = u }, "doc templates"},
+	}
+
+	for _, g := range groups {
+		n, u, err := g.fn()
+		if err != nil {
+			return fmt.Errorf("install %s: %w", g.name, err)
+		}
+		g.setN(n)
+		g.setU(u)
+	}
+
+	pruned, err := PruneStaleTemplates(repoRoot)
+	if err != nil {
+		return fmt.Errorf("prune stale templates: %w", err)
+	}
+	result.TemplatesPruned = pruned
+	return nil
+}
+
+// InitRepo initializes compound-agent in a repository.
+// Creates .claude/ structure, lessons index, and optionally installs hooks.
+func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
+	result := &InitResult{Success: true}
+
+	if err := initDirectories(repoRoot, result); err != nil {
+		return nil, err
+	}
+
 	if !opts.SkipHooks {
-		settingsPath := filepath.Join(repoRoot, ".claude", "settings.json")
-		settings, err := ReadClaudeSettings(settingsPath)
-		if err != nil {
-			return nil, fmt.Errorf("read settings: %w", err)
+		if err := initHooks(repoRoot, opts.BinaryPath, result); err != nil {
+			return nil, err
 		}
-
-		needsInstall := !HasAllHooks(settings)
-		needsUpgrade := HooksNeedUpgrade(settings, opts.BinaryPath)
-
-		if needsInstall || needsUpgrade {
-			AddAllHooks(settings, opts.BinaryPath)
-			if err := WriteClaudeSettings(settingsPath, settings); err != nil {
-				return nil, fmt.Errorf("write settings: %w", err)
-			}
-			result.HooksUpgraded = needsUpgrade && !needsInstall
-		}
-		result.HooksInstalled = true
 	}
 
-	// Install templates unless skipped
 	if !opts.SkipTemplates {
-		version := build.Version
-
-		// AGENTS.md
-		updated, err := UpdateAgentsMd(repoRoot)
-		if err != nil {
-			return nil, fmt.Errorf("update AGENTS.md: %w", err)
+		if err := installTemplates(repoRoot, result); err != nil {
+			return nil, err
 		}
-		result.AgentsMdUpdated = updated
-
-		// .claude/CLAUDE.md reference
-		updated, err = EnsureClaudeMdReference(repoRoot)
-		if err != nil {
-			return nil, fmt.Errorf("ensure CLAUDE.md reference: %w", err)
-		}
-		result.ClaudeMdUpdated = updated
-
-		// plugin.json
-		created, pluginUpdated, err := CreatePluginManifest(repoRoot, version)
-		if err != nil {
-			return nil, fmt.Errorf("create plugin.json: %w", err)
-		}
-		result.PluginCreated = created
-		result.PluginUpdated = pluginUpdated
-
-		// Agent templates
-		n, u, err := InstallAgentTemplates(repoRoot)
-		if err != nil {
-			return nil, fmt.Errorf("install agent templates: %w", err)
-		}
-		result.AgentsInstalled = n
-		result.AgentsUpdated = u
-
-		// Workflow commands
-		n, u, err = InstallWorkflowCommands(repoRoot)
-		if err != nil {
-			return nil, fmt.Errorf("install workflow commands: %w", err)
-		}
-		result.CommandsInstalled = n
-		result.CommandsUpdated = u
-
-		// Phase skills
-		n, u, err = InstallPhaseSkills(repoRoot)
-		if err != nil {
-			return nil, fmt.Errorf("install phase skills: %w", err)
-		}
-		result.SkillsInstalled = n
-		result.SkillsUpdated = u
-
-		// Agent role skills
-		n, u, err = InstallAgentRoleSkills(repoRoot)
-		if err != nil {
-			return nil, fmt.Errorf("install agent role skills: %w", err)
-		}
-		result.RoleSkillsInstalled = n
-		result.RoleSkillsUpdated = u
-
-		// Documentation templates
-		n, u, err = InstallDocTemplates(repoRoot, version)
-		if err != nil {
-			return nil, fmt.Errorf("install doc templates: %w", err)
-		}
-		result.DocsInstalled = n
-		result.DocsUpdated = u
-
-		// Prune retired templates from managed directories
-		pruned, err := PruneStaleTemplates(repoRoot)
-		if err != nil {
-			return nil, fmt.Errorf("prune stale templates: %w", err)
-		}
-		result.TemplatesPruned = pruned
 	}
 
 	return result, nil

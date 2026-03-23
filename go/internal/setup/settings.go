@@ -325,6 +325,43 @@ func HooksNeedUpgrade(settings map[string]any, binaryPath string) bool {
 	return false
 }
 
+// isCompoundHookEntry returns true if the hook entry contains any compound-agent marker.
+func isCompoundHookEntry(entry any) bool {
+	entryMap, ok := entry.(map[string]any)
+	if !ok {
+		return false
+	}
+	hooksList, ok := entryMap["hooks"].([]any)
+	if !ok {
+		return false
+	}
+	for _, h := range hooksList {
+		hMap, ok := h.(map[string]any)
+		if !ok {
+			continue
+		}
+		cmd, _ := hMap["command"].(string)
+		for _, marker := range HookMarkers {
+			if strings.Contains(cmd, marker) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// removeHookEntries filters out compound-agent entries from a hook type array.
+// Returns the filtered array and whether any entries were removed.
+func removeHookEntries(arr []any) ([]any, bool) {
+	filtered := make([]any, 0, len(arr))
+	for _, entry := range arr {
+		if !isCompoundHookEntry(entry) {
+			filtered = append(filtered, entry)
+		}
+	}
+	return filtered, len(filtered) < len(arr)
+}
+
 // RemoveAllHooks removes all compound-agent hooks from settings.
 func RemoveAllHooks(settings map[string]any) bool {
 	hooks, ok := settings["hooks"].(map[string]any)
@@ -338,44 +375,8 @@ func RemoveAllHooks(settings map[string]any) bool {
 		if !ok {
 			continue
 		}
-
-		filtered := make([]any, 0, len(arr))
-		for _, entry := range arr {
-			entryMap, ok := entry.(map[string]any)
-			if !ok {
-				filtered = append(filtered, entry)
-				continue
-			}
-			hooksList, ok := entryMap["hooks"].([]any)
-			if !ok {
-				filtered = append(filtered, entry)
-				continue
-			}
-
-			isCompound := false
-			for _, h := range hooksList {
-				hMap, ok := h.(map[string]any)
-				if !ok {
-					continue
-				}
-				cmd, _ := hMap["command"].(string)
-				for _, marker := range HookMarkers {
-					if strings.Contains(cmd, marker) {
-						isCompound = true
-						break
-					}
-				}
-				if isCompound {
-					break
-				}
-			}
-
-			if !isCompound {
-				filtered = append(filtered, entry)
-			}
-		}
-
-		if len(filtered) < len(arr) {
+		filtered, removed := removeHookEntries(arr)
+		if removed {
 			anyRemoved = true
 		}
 		hooks[hookType] = filtered

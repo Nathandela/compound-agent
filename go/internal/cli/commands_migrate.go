@@ -153,27 +153,39 @@ func countNpxHooks(settingsPath string) int {
 			continue
 		}
 		for _, entry := range arr {
-			entryMap, ok := entry.(map[string]any)
-			if !ok {
-				continue
-			}
-			hooksList, ok := entryMap["hooks"].([]any)
-			if !ok {
-				continue
-			}
-			for _, h := range hooksList {
-				hMap, ok := h.(map[string]any)
-				if !ok {
-					continue
-				}
-				cmd, _ := hMap["command"].(string)
-				if strings.Contains(cmd, "npx ca ") || strings.Contains(cmd, "npx compound-agent") {
-					count++
-				}
-			}
+			count += countNpxInEntry(entry)
 		}
 	}
 	return count
+}
+
+// countNpxInEntry counts npx-based hook commands within a single hook entry.
+func countNpxInEntry(entry any) int {
+	entryMap, ok := entry.(map[string]any)
+	if !ok {
+		return 0
+	}
+	hooksList, ok := entryMap["hooks"].([]any)
+	if !ok {
+		return 0
+	}
+	count := 0
+	for _, h := range hooksList {
+		if isNpxHook(h) {
+			count++
+		}
+	}
+	return count
+}
+
+// isNpxHook reports whether a hook map entry references an npx-based command.
+func isNpxHook(h any) bool {
+	hMap, ok := h.(map[string]any)
+	if !ok {
+		return false
+	}
+	cmd, _ := hMap["command"].(string)
+	return strings.Contains(cmd, "npx ca ") || strings.Contains(cmd, "npx compound-agent")
 }
 
 // migrateHooks reads settings.json, replaces npx-based commands with Go binary, and writes back.

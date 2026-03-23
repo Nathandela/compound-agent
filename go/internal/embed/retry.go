@@ -15,10 +15,7 @@ func isConnectionError(err error) bool {
 		return true
 	}
 	var netErr *net.OpError
-	if errors.As(err, &netErr) {
-		return true
-	}
-	return false
+	return errors.As(err, &netErr)
 }
 
 // RetryClient wraps a Client with automatic retry on connection failure (H2).

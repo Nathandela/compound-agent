@@ -44,17 +44,17 @@ func embedBatched(embedder Embedder, texts []string) ([][]float64, error) {
 	return result, nil
 }
 
-// cctToMemoryItem converts a CCT pattern to a MemoryItem for unified scoring.
+// cctToItem converts a CCT pattern to a Item for unified scoring.
 // Uses SourceManual because no "synthesized" source exists; Context.Intent
 // disambiguates these from genuinely manual entries.
-func cctToMemoryItem(p compound.CctPattern) memory.MemoryItem {
-	return memory.MemoryItem{
+func cctToItem(p compound.CctPattern) memory.Item {
+	return memory.Item{
 		ID:         p.ID,
 		Type:       memory.TypeLesson,
 		Trigger:    p.Name,
 		Insight:    p.Description,
 		Tags:       []string{},
-		Source:      memory.SourceManual,
+		Source:     memory.SourceManual,
 		Context:    memory.Context{Tool: "compound", Intent: "synthesis"},
 		Created:    p.Created,
 		Confirmed:  true,
@@ -63,40 +63,11 @@ func cctToMemoryItem(p compound.CctPattern) memory.MemoryItem {
 	}
 }
 
-// SearchVector performs vector similarity search over all items in the database
-// and CCT patterns from cct-patterns.jsonl.
-//
-// Algorithm:
-//  1. Read all non-invalidated items + CCT patterns.
-//  2. Embed the query text.
-//  3. For each item, use cached embedding if hash matches, otherwise embed and cache.
-//  4. Compute cosine similarity, sort descending, return top `limit`.
-func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRoot string) ([]ScoredItem, error) {
-	sdb := storage.NewSearchDB(db)
-	items, err := sdb.ReadAll()
-	if err != nil {
-		return nil, err
-	}
-
-	// Read CCT patterns if available
-	var cctPatterns []compound.CctPattern
-	if repoRoot != "" {
-		cctPatterns, _ = compound.ReadCctPatterns(repoRoot)
-	}
-
-	if len(items) == 0 && len(cctPatterns) == 0 {
-		return nil, nil
-	}
-
-	queryVecs, err := embedder.Embed([]string{query})
-	if err != nil {
-		return nil, err
-	}
-	queryVec := queryVecs[0]
-
+// resolveItemEmbeddings returns embedding vectors for all items, using the cache
+// where possible and batch-embedding uncached items.
+func resolveItemEmbeddings(db *sql.DB, embedder Embedder, items []memory.Item) ([][]float64, error) {
 	cache := storage.GetCachedEmbeddingsBulk(db)
 
-	// Separate cached from uncached items for batched embedding
 	type uncachedEntry struct {
 		idx  int
 		text string
@@ -114,7 +85,6 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRo
 		}
 	}
 
-	// Batch embed all uncached items (chunked to respect daemon limits)
 	if len(uncached) > 0 {
 		texts := make([]string, len(uncached))
 		for i, u := range uncached {
@@ -126,10 +96,15 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRo
 		}
 		for i, u := range uncached {
 			itemVecs[u.idx] = vecs[i]
-			_ = storage.SetCachedEmbedding(db, items[u.idx].ID, vecs[i], u.hash) // cache write failure is non-fatal; search proceeds with in-memory result
+			_ = storage.SetCachedEmbedding(db, items[u.idx].ID, vecs[i], u.hash) // cache write failure is non-fatal
 		}
 	}
 
+	return itemVecs, nil
+}
+
+// scoreItems computes cosine similarity between queryVec and each item's embedding.
+func scoreItems(queryVec []float64, items []memory.Item, itemVecs [][]float64) []ScoredItem {
 	var results []ScoredItem
 	for i, item := range items {
 		score, err := util.CosineSimilarity(queryVec, itemVecs[i])
@@ -138,24 +113,70 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRo
 		}
 		results = append(results, ScoredItem{Item: item, Score: score})
 	}
+	return results
+}
 
-	// Score CCT patterns — batched with chunking for daemon limits
-	if len(cctPatterns) > 0 {
-		cctTexts := make([]string, len(cctPatterns))
-		for i, p := range cctPatterns {
-			cctTexts[i] = p.Name + " " + p.Description
-		}
-		cctVecs, cctErr := embedBatched(embedder, cctTexts)
-		if cctErr == nil && len(cctVecs) == len(cctPatterns) {
-			for i, pattern := range cctPatterns {
-				score, err := util.CosineSimilarity(queryVec, cctVecs[i])
-				if err != nil {
-					continue
-				}
-				results = append(results, ScoredItem{Item: cctToMemoryItem(pattern), Score: score})
-			}
-		}
+// scoreCctPatterns embeds and scores CCT patterns against the query vector.
+func scoreCctPatterns(embedder Embedder, queryVec []float64, cctPatterns []compound.CctPattern) []ScoredItem {
+	if len(cctPatterns) == 0 {
+		return nil
 	}
+	cctTexts := make([]string, len(cctPatterns))
+	for i, p := range cctPatterns {
+		cctTexts[i] = p.Name + " " + p.Description
+	}
+	cctVecs, err := embedBatched(embedder, cctTexts)
+	if err != nil || len(cctVecs) != len(cctPatterns) {
+		return nil
+	}
+	var results []ScoredItem
+	for i, pattern := range cctPatterns {
+		score, err := util.CosineSimilarity(queryVec, cctVecs[i])
+		if err != nil {
+			continue
+		}
+		results = append(results, ScoredItem{Item: cctToItem(pattern), Score: score})
+	}
+	return results
+}
+
+// Vector performs vector similarity search over all items in the database
+// and CCT patterns from cct-patterns.jsonl.
+//
+// Algorithm:
+//  1. Read all non-invalidated items + CCT patterns.
+//  2. Embed the query text.
+//  3. For each item, use cached embedding if hash matches, otherwise embed and cache.
+//  4. Compute cosine similarity, sort descending, return top `limit`.
+func Vector(db *sql.DB, embedder Embedder, query string, limit int, repoRoot string) ([]ScoredItem, error) {
+	sdb := storage.NewSearchDB(db)
+	items, err := sdb.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+
+	var cctPatterns []compound.CctPattern
+	if repoRoot != "" {
+		cctPatterns, _ = compound.ReadCctPatterns(repoRoot)
+	}
+
+	if len(items) == 0 && len(cctPatterns) == 0 {
+		return nil, nil
+	}
+
+	queryVecs, err := embedder.Embed([]string{query})
+	if err != nil {
+		return nil, err
+	}
+	queryVec := queryVecs[0]
+
+	itemVecs, err := resolveItemEmbeddings(db, embedder, items)
+	if err != nil {
+		return nil, err
+	}
+
+	results := scoreItems(queryVec, items, itemVecs)
+	results = append(results, scoreCctPatterns(embedder, queryVec, cctPatterns)...)
 
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
@@ -168,11 +189,23 @@ func SearchVector(db *sql.DB, embedder Embedder, query string, limit int, repoRo
 	return results, nil
 }
 
+// insightCandidate pairs an item with its precomputed content hash.
+type insightCandidate struct {
+	item memory.Item
+	hash string
+}
+
+// uncachedInsightEntry tracks an item index that needs embedding.
+type uncachedInsightEntry struct {
+	idx  int
+	hash string
+}
+
 // FindSimilarLessons finds items whose insight text is similar to the given text.
 // Only items with similarity >= threshold are returned. The item with excludeID
 // is skipped (useful to avoid matching an item against itself).
 //
-// Uses insight-only embeddings (not trigger+insight like SearchVector).
+// Uses insight-only embeddings (not trigger+insight like Vector).
 func FindSimilarLessons(db *sql.DB, embedder Embedder, text string, threshold float64, excludeID string) ([]ScoredItem, error) {
 	sdb := storage.NewSearchDB(db)
 	items, err := sdb.ReadAll()
@@ -187,55 +220,68 @@ func FindSimilarLessons(db *sql.DB, embedder Embedder, text string, threshold fl
 	if err != nil {
 		return nil, err
 	}
-	queryVec := queryVecs[0]
 
-	cache := storage.GetCachedInsightEmbeddingsBulk(db)
+	candidates := filterInsightCandidates(items, excludeID)
+	itemVecs, err := resolveInsightEmbeddings(db, embedder, candidates)
+	if err != nil {
+		return nil, err
+	}
 
-	// Separate cached from uncached items for batched embedding
-	type uncachedEntry struct {
-		idx  int
-		hash string
-	}
-	// Filter out excluded item and collect cache status
-	type candidate struct {
-		item memory.MemoryItem
-		hash string
-	}
-	var candidates []candidate
+	return scoreInsightCandidates(queryVecs[0], candidates, itemVecs, threshold), nil
+}
+
+// filterInsightCandidates builds candidates from items, excluding excludeID.
+func filterInsightCandidates(items []memory.Item, excludeID string) []insightCandidate {
+	var candidates []insightCandidate
 	for _, item := range items {
 		if item.ID == excludeID {
 			continue
 		}
-		candidates = append(candidates, candidate{item: item, hash: storage.ContentHash(item.Insight, "")})
+		candidates = append(candidates, insightCandidate{
+			item: item,
+			hash: storage.ContentHash(item.Insight, ""),
+		})
 	}
+	return candidates
+}
 
+// resolveInsightEmbeddings returns a vector for each candidate, using cached
+// embeddings where available and batch-embedding the rest.
+func resolveInsightEmbeddings(db *sql.DB, embedder Embedder, candidates []insightCandidate) ([][]float64, error) {
+	cache := storage.GetCachedInsightEmbeddingsBulk(db)
 	itemVecs := make([][]float64, len(candidates))
-	var uncached []uncachedEntry
+	var uncached []uncachedInsightEntry
 
 	for i, c := range candidates {
 		if cached, ok := cache[c.item.ID]; ok && cached.Hash == c.hash {
 			itemVecs[i] = cached.Vector
 		} else {
-			uncached = append(uncached, uncachedEntry{idx: i, hash: c.hash})
+			uncached = append(uncached, uncachedInsightEntry{idx: i, hash: c.hash})
 		}
 	}
 
-	// Batch embed all uncached items (chunked to respect daemon limits)
-	if len(uncached) > 0 {
-		texts := make([]string, len(uncached))
-		for i, u := range uncached {
-			texts[i] = candidates[u.idx].item.Insight
-		}
-		vecs, err := embedBatched(embedder, texts)
-		if err != nil {
-			return nil, err
-		}
-		for i, u := range uncached {
-			itemVecs[u.idx] = vecs[i]
-			_ = storage.SetCachedInsightEmbedding(db, candidates[u.idx].item.ID, vecs[i], u.hash) // cache write failure is non-fatal; search proceeds with in-memory result
-		}
+	if len(uncached) == 0 {
+		return itemVecs, nil
 	}
 
+	texts := make([]string, len(uncached))
+	for i, u := range uncached {
+		texts[i] = candidates[u.idx].item.Insight
+	}
+	vecs, err := embedBatched(embedder, texts)
+	if err != nil {
+		return nil, err
+	}
+	for i, u := range uncached {
+		itemVecs[u.idx] = vecs[i]
+		// cache write failure is non-fatal; search proceeds with in-memory result
+		_ = storage.SetCachedInsightEmbedding(db, candidates[u.idx].item.ID, vecs[i], u.hash)
+	}
+	return itemVecs, nil
+}
+
+// scoreInsightCandidates computes similarity and filters by threshold.
+func scoreInsightCandidates(queryVec []float64, candidates []insightCandidate, itemVecs [][]float64, threshold float64) []ScoredItem {
 	var results []ScoredItem
 	for i, c := range candidates {
 		score, err := util.CosineSimilarity(queryVec, itemVecs[i])
@@ -250,6 +296,5 @@ func FindSimilarLessons(db *sql.DB, embedder Embedder, text string, threshold fl
 	sort.Slice(results, func(i, j int) bool {
 		return results[i].Score > results[j].Score
 	})
-
-	return results, nil
+	return results
 }

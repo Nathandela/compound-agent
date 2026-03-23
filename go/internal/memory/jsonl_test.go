@@ -16,8 +16,8 @@ func setupTestDir(t *testing.T) string {
 	return dir
 }
 
-func makeTestItem(id string, typ MemoryItemType) MemoryItem {
-	return MemoryItem{
+func makeTestItem(id string, typ ItemType) Item {
+	return Item{
 		ID: id, Type: typ,
 		Trigger: "test trigger", Insight: "test insight",
 		Tags: []string{"tag1"}, Source: SourceManual,
@@ -29,12 +29,12 @@ func makeTestItem(id string, typ MemoryItemType) MemoryItem {
 	}
 }
 
-func TestAppendMemoryItem_CreatesDir(t *testing.T) {
+func TestAppendItem_CreatesDir(t *testing.T) {
 	dir := t.TempDir() // No .claude/lessons/ yet
 	item := makeTestItem("L001", TypeLesson)
 
-	if err := AppendMemoryItem(dir, item); err != nil {
-		t.Fatalf("AppendMemoryItem: %v", err)
+	if err := AppendItem(dir, item); err != nil {
+		t.Fatalf("AppendItem: %v", err)
 	}
 
 	// File should exist
@@ -48,11 +48,11 @@ func TestAppendAndReadRoundTrip(t *testing.T) {
 	dir := setupTestDir(t)
 	item := makeTestItem("L001", TypeLesson)
 
-	if err := AppendMemoryItem(dir, item); err != nil {
+	if err := AppendItem(dir, item); err != nil {
 		t.Fatal(err)
 	}
 
-	result, err := ReadMemoryItems(dir)
+	result, err := ReadItems(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,10 +68,10 @@ func TestAppendAndReadRoundTrip(t *testing.T) {
 	}
 }
 
-func TestReadMemoryItems_EmptyFile(t *testing.T) {
+func TestReadItems_EmptyFile(t *testing.T) {
 	dir := setupTestDir(t)
 
-	result, err := ReadMemoryItems(dir)
+	result, err := ReadItems(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,10 +80,10 @@ func TestReadMemoryItems_EmptyFile(t *testing.T) {
 	}
 }
 
-func TestReadMemoryItems_FileNotExists(t *testing.T) {
+func TestReadItems_FileNotExists(t *testing.T) {
 	dir := t.TempDir()
 
-	result, err := ReadMemoryItems(dir)
+	result, err := ReadItems(dir)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -92,7 +92,7 @@ func TestReadMemoryItems_FileNotExists(t *testing.T) {
 	}
 }
 
-func TestReadMemoryItems_LastWriteWins(t *testing.T) {
+func TestReadItems_LastWriteWins(t *testing.T) {
 	dir := setupTestDir(t)
 	item1 := makeTestItem("L001", TypeLesson)
 	item1.Insight = "first version"
@@ -100,10 +100,10 @@ func TestReadMemoryItems_LastWriteWins(t *testing.T) {
 	item2 := makeTestItem("L001", TypeLesson)
 	item2.Insight = "second version"
 
-	AppendMemoryItem(dir, item1)
-	AppendMemoryItem(dir, item2)
+	AppendItem(dir, item1)
+	AppendItem(dir, item2)
 
-	result, _ := ReadMemoryItems(dir)
+	result, _ := ReadItems(dir)
 	if len(result.Items) != 1 {
 		t.Fatalf("got %d items, want 1 (dedup)", len(result.Items))
 	}
@@ -112,12 +112,12 @@ func TestReadMemoryItems_LastWriteWins(t *testing.T) {
 	}
 }
 
-func TestReadMemoryItems_Tombstone(t *testing.T) {
+func TestReadItems_Tombstone(t *testing.T) {
 	dir := setupTestDir(t)
 	path := filepath.Join(dir, LessonsPath)
 
 	item := makeTestItem("L001", TypeLesson)
-	AppendMemoryItem(dir, item)
+	AppendItem(dir, item)
 
 	// Append a tombstone (canonical format: {id, deleted, deletedAt})
 	tombstone := `{"id":"L001","deleted":true,"deletedAt":"2026-03-21T00:00:00Z"}` + "\n"
@@ -125,7 +125,7 @@ func TestReadMemoryItems_Tombstone(t *testing.T) {
 	f.WriteString(tombstone)
 	f.Close()
 
-	result, _ := ReadMemoryItems(dir)
+	result, _ := ReadItems(dir)
 	if len(result.Items) != 0 {
 		t.Fatalf("got %d items, want 0 (deleted)", len(result.Items))
 	}
@@ -134,7 +134,7 @@ func TestReadMemoryItems_Tombstone(t *testing.T) {
 	}
 }
 
-func TestReadMemoryItems_LegacyTypeConversion(t *testing.T) {
+func TestReadItems_LegacyTypeConversion(t *testing.T) {
 	dir := setupTestDir(t)
 	path := filepath.Join(dir, LessonsPath)
 
@@ -142,7 +142,7 @@ func TestReadMemoryItems_LegacyTypeConversion(t *testing.T) {
 	legacy := `{"id":"Lold","type":"quick","trigger":"t","insight":"i","tags":["a"],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[]}` + "\n"
 	os.WriteFile(path, []byte(legacy), 0o644)
 
-	result, _ := ReadMemoryItems(dir)
+	result, _ := ReadItems(dir)
 	if len(result.Items) != 1 {
 		t.Fatalf("got %d items, want 1", len(result.Items))
 	}
@@ -151,14 +151,14 @@ func TestReadMemoryItems_LegacyTypeConversion(t *testing.T) {
 	}
 }
 
-func TestReadMemoryItems_SkipsInvalidJSON(t *testing.T) {
+func TestReadItems_SkipsInvalidJSON(t *testing.T) {
 	dir := setupTestDir(t)
 	path := filepath.Join(dir, LessonsPath)
 
 	content := "not json\n" + `{"id":"L001","type":"lesson","trigger":"t","insight":"i","tags":[],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[]}` + "\n"
 	os.WriteFile(path, []byte(content), 0o644)
 
-	result, _ := ReadMemoryItems(dir)
+	result, _ := ReadItems(dir)
 	if len(result.Items) != 1 {
 		t.Fatalf("got %d items, want 1", len(result.Items))
 	}
@@ -167,10 +167,10 @@ func TestReadMemoryItems_SkipsInvalidJSON(t *testing.T) {
 	}
 }
 
-func TestReadMemoryItems_MultipleTypes(t *testing.T) {
+func TestReadItems_MultipleTypes(t *testing.T) {
 	dir := setupTestDir(t)
 
-	items := []MemoryItem{
+	items := []Item{
 		makeTestItem("L001", TypeLesson),
 		makeTestItem("S001", TypeSolution),
 		makeTestItem("R001", TypePreference),
@@ -181,21 +181,21 @@ func TestReadMemoryItems_MultipleTypes(t *testing.T) {
 	items = append(items, pItem)
 
 	for _, item := range items {
-		AppendMemoryItem(dir, item)
+		AppendItem(dir, item)
 	}
 
-	result, _ := ReadMemoryItems(dir)
+	result, _ := ReadItems(dir)
 	if len(result.Items) != 4 {
 		t.Fatalf("got %d items, want 4", len(result.Items))
 	}
 }
 
-func TestReadMemoryItems_DeleteThenReAdd(t *testing.T) {
+func TestReadItems_DeleteThenReAdd(t *testing.T) {
 	dir := setupTestDir(t)
 	path := filepath.Join(dir, LessonsPath)
 
 	item := makeTestItem("L001", TypeLesson)
-	AppendMemoryItem(dir, item)
+	AppendItem(dir, item)
 
 	// Delete it
 	tombstone := `{"id":"L001","deleted":true,"deletedAt":"2026-03-21T00:00:00Z"}` + "\n"
@@ -205,9 +205,9 @@ func TestReadMemoryItems_DeleteThenReAdd(t *testing.T) {
 
 	// Re-add it
 	item.Insight = "re-added"
-	AppendMemoryItem(dir, item)
+	AppendItem(dir, item)
 
-	result, _ := ReadMemoryItems(dir)
+	result, _ := ReadItems(dir)
 	if len(result.Items) != 1 {
 		t.Fatalf("got %d items, want 1", len(result.Items))
 	}
@@ -216,12 +216,12 @@ func TestReadMemoryItems_DeleteThenReAdd(t *testing.T) {
 	}
 }
 
-func TestReadMemoryItems_LegacyTombstone_FullRecordWithDeleted(t *testing.T) {
+func TestReadItems_LegacyTombstone_FullRecordWithDeleted(t *testing.T) {
 	dir := setupTestDir(t)
 	path := filepath.Join(dir, LessonsPath)
 
 	item := makeTestItem("L001", TypeLesson)
-	AppendMemoryItem(dir, item)
+	AppendItem(dir, item)
 
 	// Legacy full record with deleted:true
 	deleted := `{"id":"L001","type":"lesson","trigger":"t","insight":"i","tags":[],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[],"deleted":true,"deletedAt":"2026-03-21T00:00:00Z"}` + "\n"
@@ -229,13 +229,13 @@ func TestReadMemoryItems_LegacyTombstone_FullRecordWithDeleted(t *testing.T) {
 	f.WriteString(deleted)
 	f.Close()
 
-	result, _ := ReadMemoryItems(dir)
+	result, _ := ReadItems(dir)
 	if len(result.Items) != 0 {
 		t.Fatalf("got %d items, want 0 (deleted via full record)", len(result.Items))
 	}
 }
 
-func TestReadMemoryItems_FullType(t *testing.T) {
+func TestReadItems_FullType(t *testing.T) {
 	dir := setupTestDir(t)
 	path := filepath.Join(dir, LessonsPath)
 
@@ -243,7 +243,7 @@ func TestReadMemoryItems_FullType(t *testing.T) {
 	legacy := `{"id":"Lold","type":"full","trigger":"t","insight":"i","tags":[],"source":"manual","context":{"tool":"t","intent":"i"},"created":"2026-01-01T00:00:00Z","confirmed":false,"supersedes":[],"related":[]}` + "\n"
 	os.WriteFile(path, []byte(legacy), 0o644)
 
-	result, _ := ReadMemoryItems(dir)
+	result, _ := ReadItems(dir)
 	if len(result.Items) != 1 {
 		t.Fatalf("got %d items, want 1", len(result.Items))
 	}
@@ -302,23 +302,23 @@ func TestParseLine_AcceptsEmptyTags(t *testing.T) {
 }
 
 // R4: Sort with equal timestamps must use ID as tiebreaker
-func TestReadMemoryItems_DeterministicSort_EqualTimestamps(t *testing.T) {
+func TestReadItems_DeterministicSort_EqualTimestamps(t *testing.T) {
 	dir := setupTestDir(t)
 	sameTime := "2026-01-01T00:00:00Z"
 
 	// Create items with same timestamp but different IDs
-	items := []MemoryItem{
+	items := []Item{
 		{ID: "L003", Type: TypeLesson, Trigger: "t", Insight: "c", Tags: []string{}, Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: sameTime, Supersedes: []string{}, Related: []string{}},
 		{ID: "L001", Type: TypeLesson, Trigger: "t", Insight: "a", Tags: []string{}, Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: sameTime, Supersedes: []string{}, Related: []string{}},
 		{ID: "L002", Type: TypeLesson, Trigger: "t", Insight: "b", Tags: []string{}, Source: SourceManual, Context: Context{Tool: "t", Intent: "i"}, Created: sameTime, Supersedes: []string{}, Related: []string{}},
 	}
 	for _, item := range items {
-		AppendMemoryItem(dir, item)
+		AppendItem(dir, item)
 	}
 
 	// Run multiple times to detect non-determinism
 	for i := 0; i < 10; i++ {
-		result, err := ReadMemoryItems(dir)
+		result, err := ReadItems(dir)
 		if err != nil {
 			t.Fatal(err)
 		}

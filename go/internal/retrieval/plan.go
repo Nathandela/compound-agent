@@ -15,41 +15,11 @@ type PlanRetrievalResult struct {
 	Message string
 }
 
-// RetrieveForPlan retrieves relevant lessons for a plan using hybrid search.
-// Falls back to keyword-only when embedder is nil or vector search fails.
-func RetrieveForPlan(db *sql.DB, repoRoot string, embedder search.Embedder, planText string, limit int) (PlanRetrievalResult, error) {
-	if limit < 1 {
-		limit = 5
-	}
-	candidateLimit := limit * search.CandidateMultiplier
-
-	// Keyword search
-	sdb := storage.NewSearchDB(db)
-	kwResults, err := sdb.SearchKeywordScored(planText, candidateLimit, "")
-	if err != nil {
-		return PlanRetrievalResult{}, fmt.Errorf("keyword search: %w", err)
-	}
-
-	kwItems := make([]search.ScoredItem, len(kwResults))
-	for i, r := range kwResults {
-		kwItems[i] = search.ScoredItem{Item: r.MemoryItem, Score: r.Score}
-	}
-
-	// Vector search (optional)
-	var vecItems []search.ScoredItem
-	vectorFailed := false
-
-	if embedder != nil {
-		vecItems, err = search.SearchVector(db, embedder, planText, candidateLimit, repoRoot)
-		if err != nil {
-			vectorFailed = true
-		}
-	}
-
-	// Merge
+// mergeAndRank combines keyword and vector results via hybrid merge, ranks them,
+// and returns the top items up to limit.
+func mergeAndRank(kwItems, vecItems []search.ScoredItem, vectorAvailable bool, limit int) []search.RankedItem {
 	var merged []search.ScoredItem
-	if embedder == nil || vectorFailed {
-		// Keyword-only fallback: no minScore threshold
+	if !vectorAvailable {
 		zero := 0.0
 		txtW := 0.3
 		merged = search.MergeHybridScores(nil, kwItems, &search.HybridMergeOptions{
@@ -62,15 +32,41 @@ func RetrieveForPlan(db *sql.DB, repoRoot string, embedder search.Embedder, plan
 		})
 	}
 
-	// Rank
 	ranked := search.RankItems(merged)
-
-	// Limit
 	if len(ranked) > limit {
 		ranked = ranked[:limit]
 	}
+	return ranked
+}
 
-	// Extract ScoredItems for formatting
+// RetrieveForPlan retrieves relevant lessons for a plan using hybrid search.
+// Falls back to keyword-only when embedder is nil or vector search fails.
+func RetrieveForPlan(db *sql.DB, repoRoot string, embedder search.Embedder, planText string, limit int) (PlanRetrievalResult, error) {
+	if limit < 1 {
+		limit = 5
+	}
+	candidateLimit := limit * search.CandidateMultiplier
+
+	sdb := storage.NewSearchDB(db)
+	kwResults, err := sdb.SearchKeywordScored(planText, candidateLimit, "")
+	if err != nil {
+		return PlanRetrievalResult{}, fmt.Errorf("keyword search: %w", err)
+	}
+
+	kwItems := make([]search.ScoredItem, len(kwResults))
+	for i, r := range kwResults {
+		kwItems[i] = search.ScoredItem{Item: r.Item, Score: r.Score}
+	}
+
+	var vecItems []search.ScoredItem
+	vectorAvailable := false
+	if embedder != nil {
+		vecItems, err = search.Vector(db, embedder, planText, candidateLimit, repoRoot)
+		vectorAvailable = err == nil
+	}
+
+	ranked := mergeAndRank(kwItems, vecItems, vectorAvailable, limit)
+
 	topScored := make([]search.ScoredItem, len(ranked))
 	for i, r := range ranked {
 		topScored[i] = r.ScoredItem

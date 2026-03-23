@@ -37,8 +37,8 @@ type CctPattern struct {
 
 // ClusterResult holds the output of clustering.
 type ClusterResult struct {
-	Clusters [][]memory.MemoryItem
-	Noise    []memory.MemoryItem
+	Clusters [][]memory.Item
+	Noise    []memory.Item
 }
 
 // GenerateCctID generates a deterministic ID from input.
@@ -69,50 +69,10 @@ func BuildSimilarityMatrix(embeddings [][]float64) [][]float64 {
 	return matrix
 }
 
-// ClusterBySimilarity clusters items using single-linkage agglomerative clustering with union-find.
-func ClusterBySimilarity(items []memory.MemoryItem, embeddings [][]float64, threshold float64) ClusterResult {
-	n := len(items)
-	if n == 0 {
-		return ClusterResult{}
-	}
-
-	matrix := BuildSimilarityMatrix(embeddings)
-
-	// Union-Find
-	parent := make([]int, n)
-	for i := range parent {
-		parent[i] = i
-	}
-
-	var find func(int) int
-	find = func(x int) int {
-		for parent[x] != x {
-			parent[x] = parent[parent[x]] // path compression
-			x = parent[x]
-		}
-		return x
-	}
-
-	union := func(a, b int) {
-		rootA := find(a)
-		rootB := find(b)
-		if rootA != rootB {
-			parent[rootA] = rootB
-		}
-	}
-
-	// Merge pairs above threshold
-	for i := 0; i < n; i++ {
-		for j := i + 1; j < n; j++ {
-			if matrix[i][j] >= threshold {
-				union(i, j)
-			}
-		}
-	}
-
-	// Group by root
-	groups := make(map[int][]memory.MemoryItem)
-	for i := 0; i < n; i++ {
+// buildClusters groups items by their union-find root and separates single-item groups as noise.
+func buildClusters(items []memory.Item, parent []int, find func(int) int) ClusterResult {
+	groups := make(map[int][]memory.Item)
+	for i := 0; i < len(items); i++ {
 		root := find(i)
 		groups[root] = append(groups[root], items[i])
 	}
@@ -128,15 +88,51 @@ func ClusterBySimilarity(items []memory.MemoryItem, embeddings [][]float64, thre
 	return result
 }
 
-// SynthesizePattern creates a CctPattern from a cluster of lessons.
-func SynthesizePattern(cluster []memory.MemoryItem, clusterID string) CctPattern {
-	id := GenerateCctID(clusterID)
-	sourceIDs := make([]string, len(cluster))
-	for i, item := range cluster {
-		sourceIDs[i] = item.ID
+// ClusterBySimilarity clusters items using single-linkage agglomerative clustering with union-find.
+func ClusterBySimilarity(items []memory.Item, embeddings [][]float64, threshold float64) ClusterResult {
+	n := len(items)
+	if n == 0 {
+		return ClusterResult{}
 	}
 
-	// Aggregate tags by frequency
+	matrix := BuildSimilarityMatrix(embeddings)
+
+	// Union-Find
+	parent := make([]int, n)
+	for i := range parent {
+		parent[i] = i
+	}
+
+	var find func(int) int //nolint:staticcheck // recursive closure requires separate declaration
+	find = func(x int) int {
+		for parent[x] != x {
+			parent[x] = parent[parent[x]]
+			x = parent[x]
+		}
+		return x
+	}
+
+	union := func(a, b int) {
+		rootA := find(a)
+		rootB := find(b)
+		if rootA != rootB {
+			parent[rootA] = rootB
+		}
+	}
+
+	for i := 0; i < n; i++ {
+		for j := i + 1; j < n; j++ {
+			if matrix[i][j] >= threshold {
+				union(i, j)
+			}
+		}
+	}
+
+	return buildClusters(items, parent, find)
+}
+
+// aggregateTags returns the top tags from a cluster sorted by frequency descending.
+func aggregateTags(cluster []memory.Item) []string {
 	tagCounts := make(map[string]int)
 	for _, item := range cluster {
 		for _, tag := range item.Tags {
@@ -144,57 +140,77 @@ func SynthesizePattern(cluster []memory.MemoryItem, clusterID string) CctPattern
 		}
 	}
 
-	// Sort tags by frequency descending
 	type tagFreq struct {
 		tag   string
 		count int
 	}
-	var sortedTags []tagFreq
+	sorted := make([]tagFreq, 0, len(tagCounts))
 	for tag, count := range tagCounts {
-		sortedTags = append(sortedTags, tagFreq{tag, count})
+		sorted = append(sorted, tagFreq{tag, count})
 	}
-	sort.Slice(sortedTags, func(i, j int) bool {
-		return sortedTags[i].count > sortedTags[j].count
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].count > sorted[j].count
 	})
 
-	// Name from top tags or fallback to truncated insight
-	var name string
-	if len(sortedTags) > 0 {
-		top := sortedTags
-		if len(top) > MaxNameTags {
-			top = top[:MaxNameTags]
-		}
-		names := make([]string, len(top))
-		for i, tf := range top {
-			names[i] = tf.tag
-		}
-		name = strings.Join(names, ", ")
-	} else if len(cluster) > 0 {
-		name = cluster[0].Insight
+	top := sorted
+	if len(top) > MaxNameTags {
+		top = top[:MaxNameTags]
+	}
+	names := make([]string, len(top))
+	for i, tf := range top {
+		names[i] = tf.tag
+	}
+	return names
+}
+
+// buildPatternName derives a pattern name from tags or the first insight.
+func buildPatternName(cluster []memory.Item) string {
+	tags := aggregateTags(cluster)
+	if len(tags) > 0 {
+		return strings.Join(tags, ", ")
+	}
+	if len(cluster) > 0 {
+		name := cluster[0].Insight
 		if len(name) > MaxNameLength {
 			name = name[:MaxNameLength]
 		}
+		return name
 	}
+	return ""
+}
 
-	// Description from all insights
+// buildInsightSummary concatenates all insights from a cluster into a semicolon-separated string.
+func buildInsightSummary(cluster []memory.Item) string {
 	insights := make([]string, len(cluster))
 	for i, item := range cluster {
 		insights[i] = item.Insight
 	}
-	description := strings.Join(insights, "; ")
+	return strings.Join(insights, "; ")
+}
 
-	// Testability
-	testable := false
+// isClusterTestable returns true if any item in the cluster is high-severity or has evidence.
+func isClusterTestable(cluster []memory.Item) bool {
 	for _, item := range cluster {
 		if item.Severity != nil && *item.Severity == memory.SeverityHigh {
-			testable = true
-			break
+			return true
 		}
 		if item.Evidence != nil && *item.Evidence != "" {
-			testable = true
-			break
+			return true
 		}
 	}
+	return false
+}
+
+// SynthesizePattern creates a CctPattern from a cluster of lessons.
+func SynthesizePattern(cluster []memory.Item, clusterID string) CctPattern {
+	id := GenerateCctID(clusterID)
+	sourceIDs := make([]string, len(cluster))
+	for i, item := range cluster {
+		sourceIDs[i] = item.ID
+	}
+
+	name := buildPatternName(cluster)
+	testable := isClusterTestable(cluster)
 
 	var testApproach *string
 	if testable {
@@ -205,7 +221,7 @@ func SynthesizePattern(cluster []memory.MemoryItem, clusterID string) CctPattern
 	return CctPattern{
 		ID:           id,
 		Name:         name,
-		Description:  description,
+		Description:  buildInsightSummary(cluster),
 		Frequency:    len(cluster),
 		Testable:     testable,
 		TestApproach: testApproach,
@@ -214,29 +230,16 @@ func SynthesizePattern(cluster []memory.MemoryItem, clusterID string) CctPattern
 	}
 }
 
-// WriteCctPatterns writes patterns to cct-patterns.jsonl, deduplicating by ID.
-// Existing patterns with the same ID are replaced by new ones.
-func WriteCctPatterns(repoRoot string, patterns []CctPattern) error {
-	filePath := filepath.Join(repoRoot, ".claude", "lessons", "cct-patterns.jsonl")
-	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-		return fmt.Errorf("create dir: %w", err)
-	}
-
-	// Read existing patterns
-	existing, err := ReadCctPatterns(repoRoot)
-	if err != nil {
-		return fmt.Errorf("read existing: %w", err)
-	}
-
-	// Merge: preserve existing order, replace by ID, append new
+// mergePatterns deduplicates patterns by ID, preserving existing order and replacing
+// matching IDs with new versions.
+func mergePatterns(existing, newPatterns []CctPattern) []CctPattern {
 	byID := make(map[string]CctPattern)
-	for _, p := range patterns {
+	for _, p := range newPatterns {
 		byID[p.ID] = p
 	}
 
 	var merged []CctPattern
 	seen := make(map[string]bool)
-	// Existing patterns keep their order; replaced if ID matches
 	for _, p := range existing {
 		if replacement, ok := byID[p.ID]; ok {
 			merged = append(merged, replacement)
@@ -245,22 +248,24 @@ func WriteCctPatterns(repoRoot string, patterns []CctPattern) error {
 		}
 		seen[p.ID] = true
 	}
-	// Append truly new patterns in input order
-	for _, p := range patterns {
+	for _, p := range newPatterns {
 		if !seen[p.ID] {
 			merged = append(merged, p)
 			seen[p.ID] = true
 		}
 	}
+	return merged
+}
 
-	// Atomic write: temp file then rename
+// writePatternFile atomically writes patterns to a JSONL file via temp+rename.
+func writePatternFile(filePath string, patterns []CctPattern) error {
 	tmpPath := filePath + ".tmp"
 	f, err := os.OpenFile(tmpPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0644)
 	if err != nil {
 		return fmt.Errorf("open temp file: %w", err)
 	}
 
-	for _, p := range merged {
+	for _, p := range patterns {
 		data, err := json.Marshal(p)
 		if err != nil {
 			f.Close()
@@ -289,6 +294,23 @@ func WriteCctPatterns(repoRoot string, patterns []CctPattern) error {
 		return fmt.Errorf("rename temp file: %w", err)
 	}
 	return nil
+}
+
+// WriteCctPatterns writes patterns to cct-patterns.jsonl, deduplicating by ID.
+// Existing patterns with the same ID are replaced by new ones.
+func WriteCctPatterns(repoRoot string, patterns []CctPattern) error {
+	filePath := filepath.Join(repoRoot, ".claude", "lessons", "cct-patterns.jsonl")
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+		return fmt.Errorf("create dir: %w", err)
+	}
+
+	existing, err := ReadCctPatterns(repoRoot)
+	if err != nil {
+		return fmt.Errorf("read existing: %w", err)
+	}
+
+	merged := mergePatterns(existing, patterns)
+	return writePatternFile(filePath, merged)
 }
 
 // ReadCctPatterns reads patterns from cct-patterns.jsonl.

@@ -60,18 +60,23 @@ func InstallWorkflowCommands(repoRoot string) (int, int, error) {
 	return installMapToDir(dir, templates.CommandTemplates())
 }
 
+// writeSkillFile creates or updates a file at the given path, ensuring its parent
+// directory exists. Returns (created, updated, error).
+func writeSkillFile(filePath string, content string) (bool, bool, error) {
+	if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+		return false, false, fmt.Errorf("mkdir %s: %w", filepath.Dir(filePath), err)
+	}
+	return reconcileFile(filePath, content)
+}
+
 // InstallPhaseSkills writes phase SKILL.md files to .claude/skills/compound/<phase>/SKILL.md.
 // Also writes reference files alongside skills. Creates missing and updates stale files.
 // Returns (created, updated, error).
 func InstallPhaseSkills(repoRoot string) (int, int, error) {
 	created, updated := 0, 0
 	for phase, content := range templates.PhaseSkills() {
-		skillDir := filepath.Join(repoRoot, ".claude", "skills", "compound", phase)
-		if err := os.MkdirAll(skillDir, 0755); err != nil {
-			return created, updated, fmt.Errorf("mkdir %s: %w", skillDir, err)
-		}
-		filePath := filepath.Join(skillDir, "SKILL.md")
-		c, u, err := reconcileFile(filePath, content)
+		filePath := filepath.Join(repoRoot, ".claude", "skills", "compound", phase, "SKILL.md")
+		c, u, err := writeSkillFile(filePath, content)
 		if err != nil {
 			return created, updated, err
 		}
@@ -83,13 +88,9 @@ func InstallPhaseSkills(repoRoot string) (int, int, error) {
 		}
 	}
 
-	// Install reference files
 	for relPath, content := range templates.PhaseSkillReferences() {
 		filePath := filepath.Join(repoRoot, ".claude", "skills", "compound", relPath)
-		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-			return created, updated, fmt.Errorf("mkdir %s: %w", filepath.Dir(filePath), err)
-		}
-		c, u, err := reconcileFile(filePath, content)
+		c, u, err := writeSkillFile(filePath, content)
 		if err != nil {
 			return created, updated, err
 		}
@@ -352,6 +353,22 @@ func pruneStaleFiles(dir string, expected map[string]string) (int, error) {
 	return pruned, nil
 }
 
+// shouldSkipEntry returns true if the entry should be preserved without pruning.
+func shouldSkipEntry(entry os.DirEntry, relDir string, relPath string, skipTopLevel map[string]bool) bool {
+	return entry.IsDir() && relDir == "" && skipTopLevel[entry.Name()]
+}
+
+// pruneDir handles pruning of a directory entry. Returns (pruned count, error).
+func pruneDir(root, relPath string, expectedDirs map[string]bool, expectedFiles map[string]bool, skipTopLevel map[string]bool) (int, error) {
+	if !expectedDirs[relPath] {
+		if err := os.RemoveAll(filepath.Join(root, filepath.FromSlash(relPath))); err != nil {
+			return 0, fmt.Errorf("remove %s: %w", relPath, err)
+		}
+		return 1, nil
+	}
+	return pruneManagedSubtree(root, relPath, expectedFiles, expectedDirs, skipTopLevel)
+}
+
 // pruneManagedSubtree removes files and directories below root that are not in
 // the expected sets. Relative paths in expectedFiles/expectedDirs use slash
 // separators. skipTopLevel names are preserved only at the root level.
@@ -377,40 +394,43 @@ func pruneManagedSubtree(
 
 	pruned := 0
 	for _, entry := range entries {
-		relPath := entry.Name()
-		if relDir != "" {
-			relPath = path.Join(relDir, entry.Name())
+		n, entryErr := pruneEntry(root, relDir, entry, expectedFiles, expectedDirs, skipTopLevel)
+		if entryErr != nil {
+			return pruned, entryErr
 		}
-
-		if entry.IsDir() {
-			if relDir == "" && skipTopLevel[entry.Name()] {
-				continue
-			}
-			if !expectedDirs[relPath] {
-				if rErr := os.RemoveAll(filepath.Join(root, filepath.FromSlash(relPath))); rErr != nil {
-					return pruned, fmt.Errorf("remove %s: %w", relPath, rErr)
-				}
-				pruned++
-				continue
-			}
-
-			n, recurseErr := pruneManagedSubtree(root, relPath, expectedFiles, expectedDirs, skipTopLevel)
-			if recurseErr != nil {
-				return pruned, recurseErr
-			}
-			pruned += n
-			continue
-		}
-
-		if !expectedFiles[relPath] {
-			if rErr := os.Remove(filepath.Join(root, filepath.FromSlash(relPath))); rErr != nil {
-				return pruned, fmt.Errorf("remove %s: %w", relPath, rErr)
-			}
-			pruned++
-		}
+		pruned += n
 	}
 
 	return pruned, nil
+}
+
+// pruneEntry processes a single directory entry for pruning.
+func pruneEntry(
+	root, relDir string,
+	entry os.DirEntry,
+	expectedFiles, expectedDirs map[string]bool,
+	skipTopLevel map[string]bool,
+) (int, error) {
+	relPath := entry.Name()
+	if relDir != "" {
+		relPath = path.Join(relDir, entry.Name())
+	}
+
+	if shouldSkipEntry(entry, relDir, relPath, skipTopLevel) {
+		return 0, nil
+	}
+
+	if entry.IsDir() {
+		return pruneDir(root, relPath, expectedDirs, expectedFiles, skipTopLevel)
+	}
+
+	if !expectedFiles[relPath] {
+		if err := os.Remove(filepath.Join(root, filepath.FromSlash(relPath))); err != nil {
+			return 0, fmt.Errorf("remove %s: %w", relPath, err)
+		}
+		return 1, nil
+	}
+	return 0, nil
 }
 
 // pruneStaleSubdirs removes subdirectories from dir that are not in the expected map (by key).

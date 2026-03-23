@@ -180,7 +180,7 @@ func (k *KnowledgeDB) UpsertChunks(chunks []KnowledgeChunk) error {
 		(id, file_path, start_line, end_line, content_hash, text, embedding, model, updated_at)
 		VALUES (?, ?, ?, ?, ?, ?, NULL, ?, ?)`)
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return fmt.Errorf("prepare: %w", err)
 	}
 	defer stmt.Close()
@@ -188,7 +188,7 @@ func (k *KnowledgeDB) UpsertChunks(chunks []KnowledgeChunk) error {
 	for _, c := range chunks {
 		model := sql.NullString{String: c.Model, Valid: c.Model != ""}
 		if _, err := stmt.Exec(c.ID, c.FilePath, c.StartLine, c.EndLine, c.ContentHash, c.Text, model, c.UpdatedAt); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return fmt.Errorf("exec: %w", err)
 		}
 	}
@@ -209,14 +209,14 @@ func (k *KnowledgeDB) DeleteChunksByFilePath(filePaths []string) error {
 
 	stmt, err := tx.Prepare("DELETE FROM chunks WHERE file_path = ?")
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return fmt.Errorf("prepare: %w", err)
 	}
 	defer stmt.Close()
 
 	for _, path := range filePaths {
 		if _, err := stmt.Exec(path); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return fmt.Errorf("exec delete %s: %w", path, err)
 		}
 	}
@@ -226,14 +226,14 @@ func (k *KnowledgeDB) DeleteChunksByFilePath(filePaths []string) error {
 // GetChunkCount returns the total number of chunks.
 func (k *KnowledgeDB) GetChunkCount() int {
 	var count int
-	k.db.QueryRow("SELECT COUNT(*) FROM chunks").Scan(&count)
+	_ = k.db.QueryRow("SELECT COUNT(*) FROM chunks").Scan(&count)
 	return count
 }
 
 // GetChunkCountByFilePath returns the chunk count for a specific file.
 func (k *KnowledgeDB) GetChunkCountByFilePath(filePath string) int {
 	var count int
-	k.db.QueryRow("SELECT COUNT(*) FROM chunks WHERE file_path = ?", filePath).Scan(&count)
+	_ = k.db.QueryRow("SELECT COUNT(*) FROM chunks WHERE file_path = ?", filePath).Scan(&count)
 	return count
 }
 
@@ -394,7 +394,7 @@ func (k *KnowledgeDB) SetChunkEmbeddingBatch(batch []ChunkEmbedding) error {
 
 	stmt, err := tx.Prepare("UPDATE chunks SET embedding = ?, content_hash = ? WHERE id = ?")
 	if err != nil {
-		tx.Rollback()
+		_ = tx.Rollback()
 		return fmt.Errorf("prepare: %w", err)
 	}
 	defer stmt.Close()
@@ -402,7 +402,7 @@ func (k *KnowledgeDB) SetChunkEmbeddingBatch(batch []ChunkEmbedding) error {
 	for _, item := range batch {
 		blob := float64ToBlob(item.Vector)
 		if _, err := stmt.Exec(blob, item.ContentHash, item.ID); err != nil {
-			tx.Rollback()
+			_ = tx.Rollback()
 			return fmt.Errorf("exec: %w", err)
 		}
 	}

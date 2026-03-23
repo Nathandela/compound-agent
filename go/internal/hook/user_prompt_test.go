@@ -82,27 +82,27 @@ func TestProcessUserPrompt_PlanningLowConfidence(t *testing.T) {
 func TestProcessUserPrompt_CorrectionPriority(t *testing.T) {
 	// When both correction and planning match, correction wins
 	result := ProcessUserPrompt("actually, decide on the approach")
-	if result.HookSpecificOutput == nil {
+	if result.SpecificOutput == nil {
 		t.Fatal("expected output")
 	}
-	if result.HookSpecificOutput.AdditionalContext != CorrectionReminder {
+	if result.SpecificOutput.AdditionalContext != CorrectionReminder {
 		t.Error("correction should take priority over planning")
 	}
 }
 
 func TestProcessUserPrompt_EmptyPrompt(t *testing.T) {
 	result := ProcessUserPrompt("")
-	if result.HookSpecificOutput != nil {
+	if result.SpecificOutput != nil {
 		t.Error("empty prompt should produce no output")
 	}
 }
 
 func TestProcessUserPrompt_OutputFormat(t *testing.T) {
 	result := ProcessUserPrompt("actually fix this")
-	if result.HookSpecificOutput == nil {
+	if result.SpecificOutput == nil {
 		t.Fatal("expected hook output")
 	}
-	if result.HookSpecificOutput.HookEventName != "UserPromptSubmit" {
-		t.Errorf("got event name %q, want UserPromptSubmit", result.HookSpecificOutput.HookEventName)
+	if result.SpecificOutput.HookEventName != "UserPromptSubmit" {
+		t.Errorf("got event name %q, want UserPromptSubmit", result.SpecificOutput.HookEventName)
 	}
 }

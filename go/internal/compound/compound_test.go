@@ -61,7 +61,7 @@ func TestBuildSimilarityMatrix(t *testing.T) {
 }
 
 func TestClusterBySimilarity(t *testing.T) {
-	items := []memory.MemoryItem{
+	items := []memory.Item{
 		{ID: "L1", Insight: "A", Tags: []string{"a"}},
 		{ID: "L2", Insight: "B", Tags: []string{"a"}},
 		{ID: "L3", Insight: "C", Tags: []string{"b"}},
@@ -96,7 +96,7 @@ func TestClusterBySimilarity_Empty(t *testing.T) {
 }
 
 func TestSynthesizePattern(t *testing.T) {
-	cluster := []memory.MemoryItem{
+	cluster := []memory.Item{
 		{ID: "L1", Insight: "Insight one", Trigger: "trigger1", Tags: []string{"tag1", "tag2"}, Severity: sevPtr(memory.SeverityHigh)},
 		{ID: "L2", Insight: "Insight two", Trigger: "trigger2", Tags: []string{"tag1", "tag3"}},
 	}
@@ -121,7 +121,7 @@ func TestSynthesizePattern(t *testing.T) {
 }
 
 func TestSynthesizePattern_NoTags(t *testing.T) {
-	cluster := []memory.MemoryItem{
+	cluster := []memory.Item{
 		{ID: "L1", Insight: "Some long insight text here for naming", Trigger: "t1"},
 		{ID: "L2", Insight: "Another insight", Trigger: "t2"},
 	}
