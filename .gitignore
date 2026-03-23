@@ -3,9 +3,10 @@ node_modules/
 
 # Build output
 go/dist/
+dist/
 
-# Cache
-.claude/.cache/
+# Cache (any nesting depth)
+**/.claude/.cache/
 .claude/.ca-*.json
 
 # Setup-generated (ca setup dogfooding on source repo)
@@ -36,6 +37,16 @@ go/dist/
 
 # Go build artifacts
 go/ca
+
+# Binary build output (keep bin/ca wrapper script)
+bin/ca-binary
+bin/ca-embed
+bin/ca-test
+bin/checksums.txt
+
+# Nested .claude dirs from test runs / dogfooding
+go/.claude/
+go/internal/**/.claude/
 
 # Rust build artifacts
 rust/embed-daemon/target/
