@@ -1,0 +1,13 @@
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /go
+    schedule:
+      interval: weekly
+    target-branch: main
+
+  - package-ecosystem: cargo
+    directory: /rust/embed-daemon
+    schedule:
+      interval: weekly
+    target-branch: main

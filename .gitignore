@@ -58,3 +58,6 @@ agent_logs/
 release-bins/
 npm-tmp-*/
 rust-artifacts/
+
+# Beads / Dolt files (added by bd init)
+.beads-credential-key

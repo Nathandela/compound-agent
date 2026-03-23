@@ -9,43 +9,71 @@ For detailed project rules and TDD workflow, see `.claude/CLAUDE.md`.
 ## Project Overview
 
 **Name**: Compound Agent
-**Purpose**: Semantically-intelligent workflow plugin that helps Claude Code avoid repeating mistakes across sessions
-**Type**: TypeScript library, deployable as dev dependency
-**Package Manager**: pnpm
+**Purpose**: Learning system that helps Claude Code avoid repeating mistakes across sessions
+**Stack**: Go (primary) + Rust (embedding daemon) + Node/pnpm (npm wrapper distribution)
+**CLI**: `ca` (alias: `compound-agent`), built with Cobra
+**Module**: `github.com/nathandelacretaz/compound-agent`
 
 ### What It Does
 
 1. Captures lessons from user corrections, self-corrections, and test failures
 2. Stores lessons in JSONL (git-tracked) with SQLite index (cache)
-3. Retrieves relevant lessons via local embeddings (EmbeddingGemma-300M)
-4. Injects lessons at session-start and plan-time
+3. Retrieves relevant lessons via local embeddings (ONNX Runtime, Rust daemon)
+4. Injects lessons at session-start and plan-time via hooks
 
 ### Key Components
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| Types/Schemas | `src/memory/types.ts` | Zod schemas for Lesson and LessonRecord |
-| Storage | `src/memory/storage/` | JSONL append-only + SQLite FTS5 index |
-| Embeddings | `src/memory/embeddings/` | @huggingface/transformers with nomic-embed-text-v1.5 (Q8 ONNX) |
-| Search | `src/memory/search/` | Vector similarity + ranking with boosts |
-| Capture | `src/memory/capture/` | Trigger detection + quality filters |
-| Retrieval | `src/memory/retrieval/` | Session-start and plan-time retrieval |
-| Setup | `src/setup/` | Init, hooks, templates, Claude integration |
-| Commands | `src/commands/` | CLI command registrations |
-| CLI | `src/cli.ts` | Commander.js entry point |
-| Public API | `src/index.ts` | All exports for library consumers |
+| CLI entrypoint | `go/cmd/ca/` | Cobra root command, hook dispatch |
+| Commands | `go/internal/cli/` | All CLI subcommand definitions |
+| Storage | `go/internal/storage/` | SQLite + FTS5 (search, cache, sync, knowledge DB) |
+| Search | `go/internal/search/` | Hybrid search (keyword + vector ranking) |
+| Capture | `go/internal/capture/` | Trigger detection + quality filters |
+| Retrieval | `go/internal/retrieval/` | Session-start and plan-time retrieval |
+| Compound | `go/internal/compound/` | Compound synthesis (clustering, patterns) |
+| Knowledge | `go/internal/knowledge/` | Knowledge indexing and embedding |
+| Embed | `go/internal/embed/` | Embedding daemon IPC (client, lifecycle) |
+| Hook | `go/internal/hook/` | Hook runner, phase state, failure tracking |
+| Memory | `go/internal/memory/` | Memory types and JSONL operations |
+| Setup | `go/internal/setup/` | Template installation (embedded templates) |
+| Util | `go/internal/util/` | Shared utilities (stdin, shell escape, cosine) |
+| Build | `go/internal/build/` | Build version injection |
+| npm dist | `go/internal/npmdist/` | npm distribution wrapper |
+| Embed daemon | `rust/embed-daemon/` | Rust ONNX Runtime embedding daemon |
 
 ### Architecture
 
 ```
-.claude/                        (per-repository)
-  lessons/
-    index.jsonl                 <- Source of truth (git-tracked)
-    archive/                    <- Compacted old lessons
-  .cache/
-    lessons.sqlite              <- Rebuildable index (.gitignore)
-
-{transformers_package}/.cache/  <- Embedding model cache (Transformers.js local storage)
+go/
+├── cmd/ca/                     <- CLI entrypoint (Cobra root command)
+├── internal/                   <- All packages (unexported)
+│   ├── cli/                    <- Cobra command definitions
+│   ├── storage/                <- SQLite + FTS5
+│   ├── search/                 <- Hybrid search (keyword + vector)
+│   ├── capture/                <- Lesson capture
+│   ├── retrieval/              <- Session retrieval
+│   ├── compound/               <- Compound synthesis
+│   ├── knowledge/              <- Knowledge indexing
+│   ├── embed/                  <- Embedding daemon IPC
+│   ├── hook/                   <- Hook management
+│   ├── memory/                 <- Memory types / JSONL
+│   ├── setup/                  <- Template installation
+│   ├── util/                   <- Shared utilities
+│   ├── build/                  <- Version injection
+│   └── npmdist/                <- npm wrapper
+rust/
+└── embed-daemon/               <- Rust embedding daemon (ONNX Runtime)
+.claude/
+├── CLAUDE.md                   <- Always-loaded project rules
+├── compound-agent.json         <- Config
+├── agents/                     <- Subagent definitions (TDD pipeline)
+├── commands/                   <- Slash commands
+├── skills/compound/            <- Skill definitions (cook-it, spec-dev, plan, work, review, compound, etc.)
+└── lessons/
+    └── index.jsonl             <- Source of truth (git-tracked)
+.claude/.cache/
+    └── lessons.sqlite          <- Rebuildable index (.gitignore)
 ```
 
 ---
@@ -53,82 +81,113 @@ For detailed project rules and TDD workflow, see `.claude/CLAUDE.md`.
 ## Build, Test, Run Commands
 
 ```bash
-# Install dependencies
-pnpm install
+# Build CLI binary (CGO required for SQLite)
+cd go && go build -tags sqlite_fts5 ./cmd/ca
 
-# Build TypeScript to dist/
-pnpm build
+# Run full test suite
+cd go && go test -tags sqlite_fts5 ./...
 
-# Run all tests (requires model download first)
-pnpm test:all
+# Static analysis
+cd go && go vet -tags sqlite_fts5 ./...
 
-# Run tests (without embedding tests if model missing)
-pnpm test
+# Lint (golangci-lint v2)
+cd go && golangci-lint run ./...
 
-# Watch mode
-pnpm test:watch
+# Build via Makefile
+make -C go build
 
-# Type checking (lint)
-pnpm lint
-
-# Download embedding model (~278MB)
-pnpm download-model
-
-# Development build with watch
-pnpm dev
+# Test via Makefile
+make -C go test
 ```
+
+### Build Requirements
+
+- Go 1.26+
+- CGO enabled (for `mattn/go-sqlite3`)
+- Build tag: `sqlite_fts5`
+
+### Dependencies (minimal)
+
+| Dependency | Purpose |
+|------------|---------|
+| `github.com/mattn/go-sqlite3` | SQLite driver with FTS5 support (CGO) |
+| `github.com/spf13/cobra` | CLI framework |
 
 ### CLI Usage
 
 ```bash
-# After build, run CLI directly
-node ./dist/cli.js <command>
+# Core commands
+ca search <query>              # Search lessons (hybrid: keyword + vector)
+ca list                        # List all lessons
+ca learn                       # Capture a new lesson
+ca load-session                # Load high-severity lessons for session context
+ca check-plan --plan "..."     # Check a plan against learned lessons
 
-# Commands
-node ./dist/cli.js download-model   # Download EmbeddingGemma-300M model
+# Knowledge
+ca knowledge                   # Knowledge indexing commands
+
+# Maintenance
+ca stats                       # Database health
+ca compact                     # Reduce lesson database size
+
+# Setup
+ca init                        # Setup hooks, templates, config
+
+# Verification
+ca verify-gates <epic-id>      # Verify review + compound tasks closed
+ca phase-check                 # Cook-it phase state management
+
+# Hooks
+ca hooks run <hook-name>       # Run a hook handler
+
+# Advanced
+ca capture                     # Structured capture from JSON input
+ca detect                      # Detect triggers from JSON input
 ```
 
 ---
 
 ## Code Style and Conventions
 
-### TypeScript Configuration
-
-- **Target**: ES2022
-- **Module**: ESNext with bundler resolution
-- **Strict mode**: Enabled (all strict flags on)
-- **Additional checks**: noUnusedLocals, noUnusedParameters, noImplicitReturns, noUncheckedIndexedAccess
-
 ### File Organization
 
-- Source files: `src/**/*.ts`
-- Test files: `src/**/*.test.ts` (colocated with implementation)
-- Public API: Export through `src/index.ts` only
-- Internal modules: Do NOT export through index.ts
+- Source: `go/internal/<package>/*.go`
+- Tests: `go/internal/<package>/*_test.go` (colocated with source)
+- CLI commands: `go/internal/cli/commands_*.go` (one file per command group)
+- All internal packages are unexported (`internal/`)
 
 ### Naming Conventions
 
-- **Files**: kebab-case (e.g., `vector.ts`, `quality.ts`)
-- **Functions**: camelCase, verb-first (e.g., `appendLesson`, `detectUserCorrection`)
-- **Types**: PascalCase (e.g., `Lesson`, `ScoredLesson`)
-- **Schemas**: PascalCase with Schema suffix (e.g., `LessonSchema`)
-- **Constants**: SCREAMING_SNAKE_CASE (e.g., `LESSONS_PATH`, `DB_PATH`)
+- **Files**: snake_case (e.g., `phase_state.go`, `knowledge_db.go`)
+- **Exported functions**: PascalCase, verb-first (e.g., `RegisterCommands`, `OpenRepoDB`)
+- **Unexported functions**: camelCase, verb-first (e.g., `runSearch`, `formatSearchResults`)
+- **Types/Structs**: PascalCase (e.g., `Item`, `ScoredItem`, `RankedItem`)
+- **Constants**: PascalCase for exported, camelCase for unexported (Go convention)
 
 ### Documentation
 
-- JSDoc on all public functions
-- Type annotations on all public APIs
+- Doc comments on all exported functions (enforced by linter)
 - No emojis in code or comments
+- Package-level doc comments in each package
 
 ### Module Boundaries
 
-Each module exports through its `index.ts`:
-- `src/memory/storage/index.ts` - Storage operations
-- `src/memory/embeddings/index.ts` - Embedding operations
-- `src/memory/search/index.ts` - Search operations
-- `src/memory/capture/index.ts` - Capture operations
-- `src/memory/retrieval/index.ts` - Retrieval operations
-- `src/setup/index.ts` - Setup command registrations
+Each package in `go/internal/` has a clear responsibility:
+- `storage` owns SQLite operations (open, sync, search, cache)
+- `search` owns ranking and scoring logic
+- `capture` owns trigger detection and quality gates
+- `retrieval` owns session loading and plan checking
+- `memory` owns JSONL read/write and type definitions
+- `embed` owns daemon lifecycle and IPC protocol
+- `cli` owns Cobra command wiring and output formatting
+
+### Error Handling
+
+- Errors wrapped with `fmt.Errorf("context: %w", err)`
+- Embedding failures: Hard fail (no silent fallback to empty results)
+- File read errors: Return wrapped errors
+- Invalid lesson data: Validate and reject malformed entries
+- Structured logging via `log/slog` (debug/warn/error levels)
 
 ---
 
@@ -144,137 +203,19 @@ Each module exports through its `index.ts`:
 
 All SQLite queries use parameterized statements:
 
-```typescript
+```go
 // CORRECT - parameterized
-db.prepare('SELECT * FROM lessons WHERE id = ?').get(id);
+db.QueryRow("SELECT * FROM lessons WHERE id = ?", id)
 
 // WRONG - string interpolation
-db.prepare(`SELECT * FROM lessons WHERE id = '${id}'`);
+db.QueryRow(fmt.Sprintf("SELECT * FROM lessons WHERE id = '%s'", id))
 ```
 
 ### File Paths
 
-- Use `path.join()` for constructing file paths
-- Always resolve to absolute paths before file operations
+- Use `filepath.Join()` for constructing file paths
+- Resolve to absolute paths before file operations
 - Validate that paths are within expected directories
-
-### Error Handling
-
-- Embedding failures: Hard fail (no silent fallback)
-- File read errors: Throw with descriptive message
-- Invalid lesson data: Validate with Zod, reject malformed
-
----
-
-## API Contracts
-
-### Zod Schemas (src/memory/types.ts)
-
-```typescript
-// Memory item schemas (current format)
-MemoryItemSchema        // Base memory item (all fields, optional except core)
-MemoryItemRecordSchema  // Union: MemoryItemSchema | legacy formats (for reading JSONL)
-MemoryItemTypeSchema    // "lesson" | "solution" | "pattern" | "preference"
-
-// Specialized item schemas
-LessonItemSchema        // type: "lesson" - mistakes and corrections
-SolutionItemSchema      // type: "solution" - working approaches
-PatternItemSchema       // type: "pattern" - recurring code patterns
-PreferenceItemSchema    // type: "preference" - user preferences
-
-// Legacy schemas (backward compatibility)
-LessonSchema            // Original lesson format
-LessonRecordSchema      // Union: LessonSchema | LegacyTombstoneSchema
-LessonTypeSchema        // "mistake" | "preference" | "procedure"
-LegacyLessonSchema      // Pre-v1 lesson format
-LegacyTombstoneSchema   // Minimal tombstone record for deletions
-```
-
-### Public Exports (src/index.ts)
-
-All public API is exported from `src/index.ts`:
-
-```typescript
-// Storage
-appendLesson, appendMemoryItem, readLessons, readMemoryItems
-rebuildIndex, searchKeyword, closeDb, DB_PATH, LESSONS_PATH
-
-// Embeddings
-embedText, embedTexts, getEmbedding, unloadEmbedding
-isModelAvailable, isModelUsable, resolveModel
-MODEL_FILENAME, MODEL_URI
-
-// Search
-searchVector, cosineSimilarity, calculateScore
-rankLessons, rankMemoryItems
-severityBoost, recencyBoost, confirmationBoost
-
-// Capture
-shouldPropose, isNovel, isSpecific, isActionable
-detectUserCorrection, detectSelfCorrection, detectTestFailure
-
-// Retrieval
-loadSessionLessons, loadSessionMemory
-retrieveForPlan, formatLessonsCheck, formatMemoryCheck
-
-// Context Recovery
-getPrimeContext
-
-// Types & Schemas
-generateId
-LessonSchema, LessonRecordSchema, LessonTypeSchema
-MemoryItemSchema, MemoryItemRecordSchema, MemoryItemTypeSchema
-LessonItemSchema, SolutionItemSchema, PatternItemSchema, PreferenceItemSchema
-LegacyLessonSchema, LegacyTombstoneSchema
-
-// Constants
-VERSION
-
-// Audit API
-runAudit, AuditFindingSchema, AuditReportSchema
-type AuditFinding, AuditReport, AuditOptions
-
-// Compound API (clustering, synthesis, pattern I/O)
-buildSimilarityMatrix, CCT_PATTERNS_PATH, CctPatternSchema
-clusterBySimilarity, readCctPatterns, synthesizePattern, writeCctPatterns
-type CctPattern, ClusterResult
-```
-
-### Function Signatures
-
-Key functions follow consistent patterns:
-
-```typescript
-// Storage: (repoRoot, data) -> Promise<void>
-appendLesson(repoRoot: string, lesson: Lesson): Promise<void>
-appendMemoryItem(repoRoot: string, item: MemoryItem): Promise<void>
-
-// Search: (repoRoot, query, options) -> Promise<Result[]>
-searchVector(repoRoot: string, query: string, options?: SearchVectorOptions): Promise<ScoredMemoryItem[]>
-
-// Ranking: (items) -> RankedResult[]
-rankMemoryItems(items: ScoredMemoryItem[]): RankedMemoryItem[]
-
-// Detection: (input) -> DetectedResult | null
-detectUserCorrection(message: string): DetectedCorrection | null
-
-// Retrieval: (repoRoot, ...) -> Promise<string>
-loadSessionMemory(repoRoot: string): Promise<string>
-retrieveForPlan(repoRoot: string, planText: string): Promise<PlanRetrievalResult>
-getPrimeContext(repoRoot: string): Promise<string>
-
-// Audit: (repoRoot, options?) -> Promise<AuditReport>
-runAudit(repoRoot: string, options?: AuditOptions): Promise<AuditReport>
-
-// Compound: clustering and synthesis
-buildSimilarityMatrix(embeddings: number[][]): number[][]
-clusterBySimilarity(items: MemoryItem[], embeddings: number[][], threshold?: number): ClusterResult
-synthesizePattern(cluster: MemoryItem[], clusterId: string): CctPattern
-
-// Compound I/O: (repoRoot) -> Promise<CctPattern[]>
-readCctPatterns(repoRoot: string): Promise<CctPattern[]>
-writeCctPatterns(repoRoot: string, patterns: CctPattern[]): Promise<void>
-```
 
 ---
 
@@ -290,62 +231,38 @@ writeCctPatterns(repoRoot: string, patterns: CctPattern[]): Promise<void>
    - Follow TDD: write tests FIRST, then implement
    - Use verification subagents (see `.claude/CLAUDE.md`)
 
-3. **DO NOT skip embedding model download**
-   - Run `pnpm download-model` before running full test suite
-   - Tests that need embeddings will fail without the model
-
-4. **DO NOT modify tests to make them pass**
+3. **DO NOT modify tests to make them pass**
    - If tests seem wrong, discuss with user first
    - Tests define expected behavior
 
-5. **DO NOT use string interpolation in SQL**
+4. **DO NOT use string interpolation in SQL**
    - Always use parameterized queries
    - SQLite injection is a real risk
 
-6. **DO NOT export internal modules through index.ts**
-   - Only export the public API surface
-   - Internal utilities stay internal
-
-7. **DO NOT use global mutable state**
+5. **DO NOT use global mutable state**
    - Pass dependencies explicitly
    - Use function parameters, not globals
 
-8. **DO NOT commit without running tests**
-   - `pnpm test` must pass before commit
-   - `pnpm lint` must pass before commit
+6. **DO NOT commit without running tests**
+   - `go test -tags sqlite_fts5 ./...` must pass before commit
+   - `golangci-lint run ./...` must pass before commit
 
-9. **DO NOT use pandas (or equivalent heavy libraries)**
-   - This is a lightweight library
-   - Keep dependencies minimal
+7. **DO NOT add heavyweight dependencies**
+   - This project has only two direct dependencies (sqlite3, cobra)
+   - Keep it minimal
 
-10. **DO NOT log sensitive lesson content in production**
-    - Lessons may contain code patterns
-    - Debug logging only in development
+8. **DO NOT log sensitive lesson content in production**
+   - Lessons may contain code patterns
+   - Debug logging only in development
 
 ### Testing Requirements
 
-- Tests colocated with source files (`*.test.ts`)
-- Use Vitest for all tests
-- Property-based tests with fast-check where appropriate
+- Tests colocated with source files (`*_test.go`)
+- Table-driven tests with subtests (`t.Run`)
+- Build tag `sqlite_fts5` required for all test commands
 - 100% pass rate required
-- Unconditional test skips not allowed for business logic
-- Conditional skips (`skipIf`) allowed for environment-native tests (embeddings)
-
-### Embedding Tests
-
-Embedding tests require the model to be downloaded:
-
-```bash
-# Download model first
-pnpm download-model
-
-# Then run tests
-pnpm test:all
-```
-
-Tests check `SKIP_EMBEDDING_TESTS` environment variable:
-- Set `SKIP_EMBEDDING_TESTS=1` to skip embedding tests
-- CI should run `pnpm test:all` for full coverage
+- No mocking of business logic
+- Property-based tests where appropriate
 
 ---
 
@@ -368,9 +285,9 @@ This section explains HOW and WHEN Claude should interact with the compound-agen
 
 | Command | Purpose |
 |---------|---------|
-| `ca prime` | Load session context (high-severity lessons) |
+| `ca load-session` | Load session context (high-severity lessons) |
 | `ca search <query>` | Search lessons |
-| `ca learn --trigger "..." --insight "..."` | Capture a lesson |
+| `ca learn` | Capture a lesson |
 | `ca list` | List all lessons |
 | `ca stats` | Database health |
 | `ca verify-gates <epic-id>` | Verify review + compound tasks exist and are closed |
@@ -389,7 +306,7 @@ This section explains HOW and WHEN Claude should interact with the compound-agen
 
 #### Session Start (Automatic via hooks)
 
-`ca prime` runs automatically via `.claude/settings.json` hooks at SessionStart and PreCompact.
+`ca load-session` runs automatically via `.claude/settings.json` hooks at SessionStart and PreCompact.
 
 #### Before Architectural Decisions
 
@@ -464,6 +381,7 @@ Run `ca init` in a project root to configure:
 - `AGENTS.md` - Agent instructions
 - `.claude/CLAUDE.md` - Project reference
 - `.claude/commands/` - Slash commands (/learn, /show, /wrong, /stats)
+- `.claude/skills/compound/` - Workflow skills (cook-it, spec-dev, plan, work, review, compound)
 - Pre-commit hook - Capture reminder
 
 ---
@@ -588,13 +506,13 @@ bd automatically syncs via Dolt:
 
 ### Important Rules
 
-- ✅ Use bd for ALL task tracking
-- ✅ Always use `--json` flag for programmatic use
-- ✅ Link discovered work with `discovered-from` dependencies
-- ✅ Check `bd ready` before asking "what should I work on?"
-- ❌ Do NOT create markdown TODO lists
-- ❌ Do NOT use external issue trackers
-- ❌ Do NOT duplicate tracking systems
+- Use bd for ALL task tracking
+- Always use `--json` flag for programmatic use
+- Link discovered work with `discovered-from` dependencies
+- Check `bd ready` before asking "what should I work on?"
+- Do NOT create markdown TODO lists
+- Do NOT use external issue trackers
+- Do NOT duplicate tracking systems
 
 For more details, see README.md and docs/QUICKSTART.md.
 
