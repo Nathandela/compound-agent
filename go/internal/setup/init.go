@@ -24,10 +24,15 @@ type InitResult struct {
 	DirsCreated         []string
 	FilesCreated        []string
 	AgentsInstalled     int
+	AgentsUpdated       int
 	CommandsInstalled   int
+	CommandsUpdated     int
 	SkillsInstalled     int
+	SkillsUpdated       int
 	RoleSkillsInstalled int
+	RoleSkillsUpdated   int
 	DocsInstalled       int
+	DocsUpdated         int
 	AgentsMdUpdated     bool
 	ClaudeMdUpdated     bool
 	PluginCreated       bool
@@ -121,39 +126,44 @@ func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
 		result.PluginUpdated = pluginUpdated
 
 		// Agent templates
-		n, err := InstallAgentTemplates(repoRoot)
+		n, u, err := InstallAgentTemplates(repoRoot)
 		if err != nil {
 			return nil, fmt.Errorf("install agent templates: %w", err)
 		}
 		result.AgentsInstalled = n
+		result.AgentsUpdated = u
 
 		// Workflow commands
-		n, err = InstallWorkflowCommands(repoRoot)
+		n, u, err = InstallWorkflowCommands(repoRoot)
 		if err != nil {
 			return nil, fmt.Errorf("install workflow commands: %w", err)
 		}
 		result.CommandsInstalled = n
+		result.CommandsUpdated = u
 
 		// Phase skills
-		n, err = InstallPhaseSkills(repoRoot)
+		n, u, err = InstallPhaseSkills(repoRoot)
 		if err != nil {
 			return nil, fmt.Errorf("install phase skills: %w", err)
 		}
 		result.SkillsInstalled = n
+		result.SkillsUpdated = u
 
 		// Agent role skills
-		n, err = InstallAgentRoleSkills(repoRoot)
+		n, u, err = InstallAgentRoleSkills(repoRoot)
 		if err != nil {
 			return nil, fmt.Errorf("install agent role skills: %w", err)
 		}
 		result.RoleSkillsInstalled = n
+		result.RoleSkillsUpdated = u
 
 		// Documentation templates
-		n, err = InstallDocTemplates(repoRoot, version)
+		n, u, err = InstallDocTemplates(repoRoot, version)
 		if err != nil {
 			return nil, fmt.Errorf("install doc templates: %w", err)
 		}
 		result.DocsInstalled = n
+		result.DocsUpdated = u
 	}
 
 	return result, nil

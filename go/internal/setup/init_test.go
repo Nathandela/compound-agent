@@ -148,6 +148,11 @@ func TestInitRepo_InstallsTemplates(t *testing.T) {
 	if totalTemplates != 0 {
 		t.Errorf("idempotent init installed %d templates, want 0", totalTemplates)
 	}
+	totalUpdated := result2.AgentsUpdated + result2.CommandsUpdated +
+		result2.SkillsUpdated + result2.RoleSkillsUpdated + result2.DocsUpdated
+	if totalUpdated != 0 {
+		t.Errorf("idempotent init updated %d templates, want 0", totalUpdated)
+	}
 	if result2.AgentsMdUpdated {
 		t.Error("expected AGENTS.md not to be updated on second call")
 	}
@@ -321,6 +326,51 @@ func TestInitRepo_UpdatesStalePlugin(t *testing.T) {
 	}
 	if !result.PluginUpdated {
 		t.Error("expected PluginUpdated=true")
+	}
+}
+
+func TestInitRepo_UpdatesStaleTemplates(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+
+	// First install
+	result, err := InitRepo(dir, InitOptions{SkipHooks: true})
+	if err != nil {
+		t.Fatalf("first InitRepo: %v", err)
+	}
+	if result.AgentsInstalled == 0 {
+		t.Fatal("expected agent templates installed")
+	}
+
+	// Modify an agent template to simulate staleness
+	agentsDir := filepath.Join(dir, ".claude", "agents", "compound")
+	entries, err := os.ReadDir(agentsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	stalePath := filepath.Join(agentsDir, entries[0].Name())
+	if err := os.WriteFile(stalePath, []byte("# stale\n"), 0644); err != nil {
+		t.Fatalf("write stale: %v", err)
+	}
+
+	// Re-init should detect and update stale templates
+	result2, err := InitRepo(dir, InitOptions{SkipHooks: true})
+	if err != nil {
+		t.Fatalf("second InitRepo: %v", err)
+	}
+	if result2.AgentsUpdated == 0 {
+		t.Error("expected AgentsUpdated > 0")
+	}
+
+	// Verify content was restored
+	content, err := os.ReadFile(stalePath)
+	if err != nil {
+		t.Fatalf("read restored: %v", err)
+	}
+	if string(content) == "# stale\n" {
+		t.Error("stale content not overwritten")
 	}
 }
 

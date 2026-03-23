@@ -5,18 +5,22 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestInstallAgentTemplates(t *testing.T) {
 	dir := t.TempDir()
 
 	// First install creates files
-	n, err := InstallAgentTemplates(dir)
+	n, u, err := InstallAgentTemplates(dir)
 	if err != nil {
 		t.Fatalf("InstallAgentTemplates: %v", err)
 	}
 	if n == 0 {
 		t.Fatal("expected files to be created")
+	}
+	if u != 0 {
+		t.Errorf("expected 0 updated on first install, got %d", u)
 	}
 
 	// Verify files exist
@@ -29,25 +33,31 @@ func TestInstallAgentTemplates(t *testing.T) {
 		t.Fatal("no agent files created")
 	}
 
-	// Verify idempotency: second install creates nothing
-	n2, err := InstallAgentTemplates(dir)
+	// Verify idempotency: second install creates/updates nothing
+	n2, u2, err := InstallAgentTemplates(dir)
 	if err != nil {
 		t.Fatalf("InstallAgentTemplates (2nd): %v", err)
 	}
 	if n2 != 0 {
 		t.Errorf("idempotent install created %d files, want 0", n2)
 	}
+	if u2 != 0 {
+		t.Errorf("idempotent install updated %d files, want 0", u2)
+	}
 }
 
 func TestInstallWorkflowCommands(t *testing.T) {
 	dir := t.TempDir()
 
-	n, err := InstallWorkflowCommands(dir)
+	n, u, err := InstallWorkflowCommands(dir)
 	if err != nil {
 		t.Fatalf("InstallWorkflowCommands: %v", err)
 	}
 	if n == 0 {
 		t.Fatal("expected files to be created")
+	}
+	if u != 0 {
+		t.Errorf("expected 0 updated on first install, got %d", u)
 	}
 
 	// Verify files exist
@@ -58,21 +68,27 @@ func TestInstallWorkflowCommands(t *testing.T) {
 	}
 
 	// Verify idempotency
-	n2, _ := InstallWorkflowCommands(dir)
+	n2, u2, _ := InstallWorkflowCommands(dir)
 	if n2 != 0 {
 		t.Errorf("idempotent install created %d files, want 0", n2)
+	}
+	if u2 != 0 {
+		t.Errorf("idempotent install updated %d files, want 0", u2)
 	}
 }
 
 func TestInstallPhaseSkills(t *testing.T) {
 	dir := t.TempDir()
 
-	n, err := InstallPhaseSkills(dir)
+	n, u, err := InstallPhaseSkills(dir)
 	if err != nil {
 		t.Fatalf("InstallPhaseSkills: %v", err)
 	}
 	if n == 0 {
 		t.Fatal("expected files to be created")
+	}
+	if u != 0 {
+		t.Errorf("expected 0 updated on first install, got %d", u)
 	}
 
 	// Verify SKILL.md files exist
@@ -88,21 +104,27 @@ func TestInstallPhaseSkills(t *testing.T) {
 	}
 
 	// Verify idempotency
-	n2, _ := InstallPhaseSkills(dir)
+	n2, u2, _ := InstallPhaseSkills(dir)
 	if n2 != 0 {
 		t.Errorf("idempotent install created %d files, want 0", n2)
+	}
+	if u2 != 0 {
+		t.Errorf("idempotent install updated %d files, want 0", u2)
 	}
 }
 
 func TestInstallAgentRoleSkills(t *testing.T) {
 	dir := t.TempDir()
 
-	n, err := InstallAgentRoleSkills(dir)
+	n, u, err := InstallAgentRoleSkills(dir)
 	if err != nil {
 		t.Fatalf("InstallAgentRoleSkills: %v", err)
 	}
 	if n == 0 {
 		t.Fatal("expected files to be created")
+	}
+	if u != 0 {
+		t.Errorf("expected 0 updated on first install, got %d", u)
 	}
 
 	// Verify a known role exists
@@ -112,21 +134,27 @@ func TestInstallAgentRoleSkills(t *testing.T) {
 	}
 
 	// Verify idempotency
-	n2, _ := InstallAgentRoleSkills(dir)
+	n2, u2, _ := InstallAgentRoleSkills(dir)
 	if n2 != 0 {
 		t.Errorf("idempotent install created %d files, want 0", n2)
+	}
+	if u2 != 0 {
+		t.Errorf("idempotent install updated %d files, want 0", u2)
 	}
 }
 
 func TestInstallDocTemplates(t *testing.T) {
 	dir := t.TempDir()
 
-	n, err := InstallDocTemplates(dir, "1.0.0")
+	n, u, err := InstallDocTemplates(dir, "1.0.0")
 	if err != nil {
 		t.Fatalf("InstallDocTemplates: %v", err)
 	}
 	if n == 0 {
 		t.Fatal("expected files to be created")
+	}
+	if u != 0 {
+		t.Errorf("expected 0 updated on first install, got %d", u)
 	}
 
 	// Verify README.md was written with version substituted
@@ -143,9 +171,12 @@ func TestInstallDocTemplates(t *testing.T) {
 	}
 
 	// Verify idempotency
-	n2, _ := InstallDocTemplates(dir, "1.0.0")
+	n2, u2, _ := InstallDocTemplates(dir, "1.0.0")
 	if n2 != 0 {
 		t.Errorf("idempotent install created %d files, want 0", n2)
+	}
+	if u2 != 0 {
+		t.Errorf("idempotent install updated %d files, want 0", u2)
 	}
 }
 
@@ -286,6 +317,244 @@ func TestCreatePluginManifest(t *testing.T) {
 	}
 	if updated2 {
 		t.Error("expected updated=false on same-version call")
+	}
+}
+
+func TestInstallAgentTemplates_UpdatesStaleContent(t *testing.T) {
+	dir := t.TempDir()
+
+	// First install
+	created, updated, err := InstallAgentTemplates(dir)
+	if err != nil {
+		t.Fatalf("InstallAgentTemplates: %v", err)
+	}
+	if created == 0 {
+		t.Fatal("expected files to be created")
+	}
+	if updated != 0 {
+		t.Errorf("expected 0 updated on first install, got %d", updated)
+	}
+
+	// Modify one file to simulate stale content
+	agentsDir := filepath.Join(dir, ".claude", "agents", "compound")
+	entries, err := os.ReadDir(agentsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	stalePath := filepath.Join(agentsDir, entries[0].Name())
+	if err := os.WriteFile(stalePath, []byte("# stale content\n"), 0644); err != nil {
+		t.Fatalf("write stale file: %v", err)
+	}
+
+	// Re-install should detect stale content and update
+	created2, updated2, err := InstallAgentTemplates(dir)
+	if err != nil {
+		t.Fatalf("InstallAgentTemplates (update): %v", err)
+	}
+	if created2 != 0 {
+		t.Errorf("expected 0 created on re-install, got %d", created2)
+	}
+	if updated2 == 0 {
+		t.Error("expected at least 1 updated file")
+	}
+
+	// Verify content was restored
+	content, err := os.ReadFile(stalePath)
+	if err != nil {
+		t.Fatalf("read restored file: %v", err)
+	}
+	if string(content) == "# stale content\n" {
+		t.Error("stale content was not overwritten")
+	}
+}
+
+func TestInstallWorkflowCommands_UpdatesStaleContent(t *testing.T) {
+	dir := t.TempDir()
+
+	created, _, err := InstallWorkflowCommands(dir)
+	if err != nil {
+		t.Fatalf("InstallWorkflowCommands: %v", err)
+	}
+	if created == 0 {
+		t.Fatal("expected files to be created")
+	}
+
+	// Modify one file
+	cmdsDir := filepath.Join(dir, ".claude", "commands", "compound")
+	entries, err := os.ReadDir(cmdsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	stalePath := filepath.Join(cmdsDir, entries[0].Name())
+	if err := os.WriteFile(stalePath, []byte("# stale\n"), 0644); err != nil {
+		t.Fatalf("write stale: %v", err)
+	}
+
+	_, updated, err := InstallWorkflowCommands(dir)
+	if err != nil {
+		t.Fatalf("InstallWorkflowCommands (update): %v", err)
+	}
+	if updated == 0 {
+		t.Error("expected at least 1 updated file")
+	}
+}
+
+func TestInstallPhaseSkills_UpdatesStaleContent(t *testing.T) {
+	dir := t.TempDir()
+
+	created, _, err := InstallPhaseSkills(dir)
+	if err != nil {
+		t.Fatalf("InstallPhaseSkills: %v", err)
+	}
+	if created == 0 {
+		t.Fatal("expected files to be created")
+	}
+
+	// Modify a SKILL.md file
+	specDevSkill := filepath.Join(dir, ".claude", "skills", "compound", "spec-dev", "SKILL.md")
+	if err := os.WriteFile(specDevSkill, []byte("# stale skill\n"), 0644); err != nil {
+		t.Fatalf("write stale: %v", err)
+	}
+
+	_, updated, err := InstallPhaseSkills(dir)
+	if err != nil {
+		t.Fatalf("InstallPhaseSkills (update): %v", err)
+	}
+	if updated == 0 {
+		t.Error("expected at least 1 updated skill")
+	}
+
+	content, err := os.ReadFile(specDevSkill)
+	if err != nil {
+		t.Fatalf("read restored: %v", err)
+	}
+	if string(content) == "# stale skill\n" {
+		t.Error("stale skill was not overwritten")
+	}
+}
+
+func TestInstallAgentRoleSkills_UpdatesStaleContent(t *testing.T) {
+	dir := t.TempDir()
+
+	created, _, err := InstallAgentRoleSkills(dir)
+	if err != nil {
+		t.Fatalf("InstallAgentRoleSkills: %v", err)
+	}
+	if created == 0 {
+		t.Fatal("expected files to be created")
+	}
+
+	// Modify a role skill
+	repoAnalyst := filepath.Join(dir, ".claude", "skills", "compound", "agents", "repo-analyst", "SKILL.md")
+	if err := os.WriteFile(repoAnalyst, []byte("# stale role\n"), 0644); err != nil {
+		t.Fatalf("write stale: %v", err)
+	}
+
+	_, updated, err := InstallAgentRoleSkills(dir)
+	if err != nil {
+		t.Fatalf("InstallAgentRoleSkills (update): %v", err)
+	}
+	if updated == 0 {
+		t.Error("expected at least 1 updated role skill")
+	}
+}
+
+func TestInstallDocTemplates_UpdatesStaleContent(t *testing.T) {
+	dir := t.TempDir()
+
+	created, _, err := InstallDocTemplates(dir, "1.0.0")
+	if err != nil {
+		t.Fatalf("InstallDocTemplates: %v", err)
+	}
+	if created == 0 {
+		t.Fatal("expected files to be created")
+	}
+
+	// Modify a doc file (change content, not just date)
+	docsDir := filepath.Join(dir, "docs", "compound")
+	entries, err := os.ReadDir(docsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	stalePath := filepath.Join(docsDir, entries[0].Name())
+	if err := os.WriteFile(stalePath, []byte("# stale docs\n"), 0644); err != nil {
+		t.Fatalf("write stale: %v", err)
+	}
+
+	_, updated, err := InstallDocTemplates(dir, "1.0.0")
+	if err != nil {
+		t.Fatalf("InstallDocTemplates (update): %v", err)
+	}
+	if updated == 0 {
+		t.Error("expected at least 1 updated doc")
+	}
+}
+
+func TestInstallDocTemplates_DateChangeNotStale(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install
+	_, _, err := InstallDocTemplates(dir, "1.0.0")
+	if err != nil {
+		t.Fatalf("InstallDocTemplates: %v", err)
+	}
+
+	// Change only the date in a file (simulates install on a different day)
+	docsDir := filepath.Join(dir, "docs", "compound")
+	entries, err := os.ReadDir(docsDir)
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+	filePath := filepath.Join(docsDir, entries[0].Name())
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		t.Fatalf("read doc: %v", err)
+	}
+	today := time.Now().Format("2006-01-02")
+	modified := strings.Replace(string(content), today, "2025-01-01", 1)
+	if err := os.WriteFile(filePath, []byte(modified), 0644); err != nil {
+		t.Fatalf("write modified: %v", err)
+	}
+
+	// Re-install should NOT trigger update (only date changed)
+	_, updated, err := InstallDocTemplates(dir, "1.0.0")
+	if err != nil {
+		t.Fatalf("InstallDocTemplates (date check): %v", err)
+	}
+	if updated != 0 {
+		t.Errorf("expected 0 updated when only date changed, got %d", updated)
+	}
+}
+
+func TestInstallDocTemplates_VersionChangeUpdates(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install with version 1.0.0
+	_, _, err := InstallDocTemplates(dir, "1.0.0")
+	if err != nil {
+		t.Fatalf("InstallDocTemplates: %v", err)
+	}
+
+	// Re-install with new version should update
+	_, updated, err := InstallDocTemplates(dir, "2.0.0")
+	if err != nil {
+		t.Fatalf("InstallDocTemplates (version change): %v", err)
+	}
+	if updated == 0 {
+		t.Error("expected docs to be updated when version changed")
+	}
+
+	// Verify new version is in content
+	readmePath := filepath.Join(dir, "docs", "compound", "README.md")
+	content, err := os.ReadFile(readmePath)
+	if err != nil {
+		t.Fatalf("read README: %v", err)
+	}
+	if !strings.Contains(string(content), "2.0.0") {
+		t.Error("README should contain new version 2.0.0")
+	}
+	if strings.Contains(string(content), "1.0.0") {
+		t.Error("README should not contain old version 1.0.0")
 	}
 }
 

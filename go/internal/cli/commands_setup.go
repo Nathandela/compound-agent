@@ -43,10 +43,15 @@ func initCmd() *cobra.Command {
 					"dirsCreated":         len(result.DirsCreated),
 					"filesCreated":        len(result.FilesCreated),
 					"agentsInstalled":     result.AgentsInstalled,
+					"agentsUpdated":       result.AgentsUpdated,
 					"commandsInstalled":   result.CommandsInstalled,
+					"commandsUpdated":     result.CommandsUpdated,
 					"skillsInstalled":     result.SkillsInstalled,
+					"skillsUpdated":       result.SkillsUpdated,
 					"roleSkillsInstalled": result.RoleSkillsInstalled,
+					"roleSkillsUpdated":   result.RoleSkillsUpdated,
 					"docsInstalled":       result.DocsInstalled,
+					"docsUpdated":         result.DocsUpdated,
 				})
 				cmd.Println(string(data))
 			} else {
@@ -60,13 +65,7 @@ func initCmd() *cobra.Command {
 					cmd.Println("  Plugin: version updated")
 				}
 				cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
-				totalTemplates := result.AgentsInstalled + result.CommandsInstalled +
-					result.SkillsInstalled + result.RoleSkillsInstalled + result.DocsInstalled
-				if totalTemplates > 0 {
-					cmd.Printf("  Templates: %d installed (agents:%d commands:%d skills:%d roles:%d docs:%d)\n",
-						totalTemplates, result.AgentsInstalled, result.CommandsInstalled,
-						result.SkillsInstalled, result.RoleSkillsInstalled, result.DocsInstalled)
-				}
+				printTemplatesSummary(cmd, result)
 				if result.AgentsMdUpdated {
 					cmd.Println("  AGENTS.md: updated")
 				}
@@ -120,10 +119,15 @@ func setupCmd() *cobra.Command {
 				"hooksUpgraded":       result.HooksUpgraded,
 				"pluginUpdated":       result.PluginUpdated,
 				"agentsInstalled":     result.AgentsInstalled,
+				"agentsUpdated":       result.AgentsUpdated,
 				"commandsInstalled":   result.CommandsInstalled,
+				"commandsUpdated":     result.CommandsUpdated,
 				"skillsInstalled":     result.SkillsInstalled,
+				"skillsUpdated":       result.SkillsUpdated,
 				"roleSkillsInstalled": result.RoleSkillsInstalled,
+				"roleSkillsUpdated":   result.RoleSkillsUpdated,
 				"docsInstalled":       result.DocsInstalled,
+				"docsUpdated":         result.DocsUpdated,
 			})
 			cmd.Println(string(data))
 		} else {
@@ -137,13 +141,7 @@ func setupCmd() *cobra.Command {
 				cmd.Println("  Plugin: version updated in .claude/plugin.json")
 			}
 			cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
-			totalTemplates := result.AgentsInstalled + result.CommandsInstalled +
-				result.SkillsInstalled + result.RoleSkillsInstalled + result.DocsInstalled
-			if totalTemplates > 0 {
-				cmd.Printf("  Templates: %d installed (agents:%d commands:%d skills:%d roles:%d docs:%d)\n",
-					totalTemplates, result.AgentsInstalled, result.CommandsInstalled,
-					result.SkillsInstalled, result.RoleSkillsInstalled, result.DocsInstalled)
-			}
+			printTemplatesSummary(cmd, result)
 			if result.AgentsMdUpdated {
 				cmd.Println("  AGENTS.md: updated")
 			}
@@ -325,6 +323,25 @@ func statusLabel(installed bool, stale bool) string {
 		return "connected"
 	}
 	return "disconnected"
+}
+
+// printTemplatesSummary prints installed/updated template counts.
+func printTemplatesSummary(cmd *cobra.Command, result *setup.InitResult) {
+	totalInstalled := result.AgentsInstalled + result.CommandsInstalled +
+		result.SkillsInstalled + result.RoleSkillsInstalled + result.DocsInstalled
+	totalUpdated := result.AgentsUpdated + result.CommandsUpdated +
+		result.SkillsUpdated + result.RoleSkillsUpdated + result.DocsUpdated
+
+	if totalInstalled > 0 {
+		cmd.Printf("  Templates: %d installed (agents:%d commands:%d skills:%d roles:%d docs:%d)\n",
+			totalInstalled, result.AgentsInstalled, result.CommandsInstalled,
+			result.SkillsInstalled, result.RoleSkillsInstalled, result.DocsInstalled)
+	}
+	if totalUpdated > 0 {
+		cmd.Printf("  Templates: %d updated (agents:%d commands:%d skills:%d roles:%d docs:%d)\n",
+			totalUpdated, result.AgentsUpdated, result.CommandsUpdated,
+			result.SkillsUpdated, result.RoleSkillsUpdated, result.DocsUpdated)
+	}
 }
 
 // resolveBinaryPath finds the current Go binary path for hook commands.

@@ -7,41 +7,78 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/nathandelacretaz/compound-agent/internal/setup/templates"
 )
 
+// docDatePattern matches last-updated frontmatter dates for normalization.
+var docDatePattern = regexp.MustCompile(`last-updated: "\d{4}-\d{2}-\d{2}"`)
+
+// normalizeDocDate replaces last-updated date values with a fixed string
+// so that date-only differences don't trigger spurious template updates.
+func normalizeDocDate(content string) string {
+	return docDatePattern.ReplaceAllString(content, `last-updated: "NORMALIZED"`)
+}
+
+// reconcileFile creates or updates a file at filePath with content.
+// Returns (created, updated) booleans. Updates only when content differs.
+func reconcileFile(filePath string, content string) (bool, bool, error) {
+	existing, err := os.ReadFile(filePath)
+	if errors.Is(err, os.ErrNotExist) {
+		if wErr := os.WriteFile(filePath, []byte(content), 0644); wErr != nil {
+			return false, false, fmt.Errorf("write %s: %w", filePath, wErr)
+		}
+		return true, false, nil
+	}
+	if err != nil {
+		return false, false, fmt.Errorf("read %s: %w", filePath, err)
+	}
+	if string(existing) != content {
+		if wErr := os.WriteFile(filePath, []byte(content), 0644); wErr != nil {
+			return false, false, fmt.Errorf("write %s: %w", filePath, wErr)
+		}
+		return false, true, nil
+	}
+	return false, false, nil
+}
+
 // InstallAgentTemplates writes agent .md files to .claude/agents/compound/.
-// Idempotent: does not overwrite existing files. Returns count of files created.
-func InstallAgentTemplates(repoRoot string) (int, error) {
+// Creates missing files and updates stale files. Returns (created, updated, error).
+func InstallAgentTemplates(repoRoot string) (int, int, error) {
 	dir := filepath.Join(repoRoot, ".claude", "agents", "compound")
 	return installMapToDir(dir, templates.AgentTemplates())
 }
 
 // InstallWorkflowCommands writes command .md files to .claude/commands/compound/.
-// Idempotent: does not overwrite existing files. Returns count of files created.
-func InstallWorkflowCommands(repoRoot string) (int, error) {
+// Creates missing files and updates stale files. Returns (created, updated, error).
+func InstallWorkflowCommands(repoRoot string) (int, int, error) {
 	dir := filepath.Join(repoRoot, ".claude", "commands", "compound")
 	return installMapToDir(dir, templates.CommandTemplates())
 }
 
 // InstallPhaseSkills writes phase SKILL.md files to .claude/skills/compound/<phase>/SKILL.md.
-// Also writes reference files alongside skills. Idempotent. Returns count of files created.
-func InstallPhaseSkills(repoRoot string) (int, error) {
-	created := 0
+// Also writes reference files alongside skills. Creates missing and updates stale files.
+// Returns (created, updated, error).
+func InstallPhaseSkills(repoRoot string) (int, int, error) {
+	created, updated := 0, 0
 	for phase, content := range templates.PhaseSkills() {
 		skillDir := filepath.Join(repoRoot, ".claude", "skills", "compound", phase)
 		if err := os.MkdirAll(skillDir, 0755); err != nil {
-			return created, fmt.Errorf("mkdir %s: %w", skillDir, err)
+			return created, updated, fmt.Errorf("mkdir %s: %w", skillDir, err)
 		}
 		filePath := filepath.Join(skillDir, "SKILL.md")
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-				return created, fmt.Errorf("write %s: %w", filePath, err)
-			}
+		c, u, err := reconcileFile(filePath, content)
+		if err != nil {
+			return created, updated, err
+		}
+		if c {
 			created++
+		}
+		if u {
+			updated++
 		}
 	}
 
@@ -49,62 +86,84 @@ func InstallPhaseSkills(repoRoot string) (int, error) {
 	for relPath, content := range templates.PhaseSkillReferences() {
 		filePath := filepath.Join(repoRoot, ".claude", "skills", "compound", relPath)
 		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-			return created, fmt.Errorf("mkdir %s: %w", filepath.Dir(filePath), err)
+			return created, updated, fmt.Errorf("mkdir %s: %w", filepath.Dir(filePath), err)
 		}
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-				return created, fmt.Errorf("write %s: %w", filePath, err)
-			}
+		c, u, err := reconcileFile(filePath, content)
+		if err != nil {
+			return created, updated, err
+		}
+		if c {
 			created++
+		}
+		if u {
+			updated++
 		}
 	}
 
-	return created, nil
+	return created, updated, nil
 }
 
 // InstallAgentRoleSkills writes agent role SKILL.md files to
 // .claude/skills/compound/agents/<role>/SKILL.md.
-// Idempotent: does not overwrite existing files. Returns count of files created.
-func InstallAgentRoleSkills(repoRoot string) (int, error) {
-	created := 0
+// Creates missing and updates stale files. Returns (created, updated, error).
+func InstallAgentRoleSkills(repoRoot string) (int, int, error) {
+	created, updated := 0, 0
 	for role, content := range templates.AgentRoleSkills() {
 		skillDir := filepath.Join(repoRoot, ".claude", "skills", "compound", "agents", role)
 		if err := os.MkdirAll(skillDir, 0755); err != nil {
-			return created, fmt.Errorf("mkdir %s: %w", skillDir, err)
+			return created, updated, fmt.Errorf("mkdir %s: %w", skillDir, err)
 		}
 		filePath := filepath.Join(skillDir, "SKILL.md")
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-				return created, fmt.Errorf("write %s: %w", filePath, err)
-			}
+		c, u, err := reconcileFile(filePath, content)
+		if err != nil {
+			return created, updated, err
+		}
+		if c {
 			created++
 		}
+		if u {
+			updated++
+		}
 	}
-	return created, nil
+	return created, updated, nil
 }
 
 // InstallDocTemplates writes documentation .md files to docs/compound/.
-// Substitutes {{VERSION}} and {{DATE}} placeholders. Idempotent. Returns count of files created.
-func InstallDocTemplates(repoRoot string, version string) (int, error) {
+// Substitutes {{VERSION}} and {{DATE}} placeholders. Creates missing and updates
+// stale files (date-only changes are ignored). Returns (created, updated, error).
+func InstallDocTemplates(repoRoot string, version string) (int, int, error) {
 	dir := filepath.Join(repoRoot, "docs", "compound")
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return 0, fmt.Errorf("mkdir %s: %w", dir, err)
+		return 0, 0, fmt.Errorf("mkdir %s: %w", dir, err)
 	}
 
-	created := 0
+	created, updated := 0, 0
 	date := time.Now().Format("2006-01-02")
 	for filename, tmpl := range templates.DocTemplates() {
 		filePath := filepath.Join(dir, filename)
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			content := strings.ReplaceAll(tmpl, "{{VERSION}}", version)
-			content = strings.ReplaceAll(content, "{{DATE}}", date)
-			if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-				return created, fmt.Errorf("write %s: %w", filePath, err)
+		content := strings.ReplaceAll(tmpl, "{{VERSION}}", version)
+		content = strings.ReplaceAll(content, "{{DATE}}", date)
+
+		existing, err := os.ReadFile(filePath)
+		if errors.Is(err, os.ErrNotExist) {
+			if wErr := os.WriteFile(filePath, []byte(content), 0644); wErr != nil {
+				return created, updated, fmt.Errorf("write %s: %w", filePath, wErr)
 			}
 			created++
+			continue
+		}
+		if err != nil {
+			return created, updated, fmt.Errorf("read %s: %w", filePath, err)
+		}
+		// Compare with date normalization to avoid spurious updates
+		if normalizeDocDate(string(existing)) != normalizeDocDate(content) {
+			if wErr := os.WriteFile(filePath, []byte(content), 0644); wErr != nil {
+				return created, updated, fmt.Errorf("write %s: %w", filePath, wErr)
+			}
+			updated++
 		}
 	}
-	return created, nil
+	return created, updated, nil
 }
 
 // UpdateAgentsMd creates or appends the Compound Agent section to AGENTS.md.
@@ -198,21 +257,26 @@ func CreatePluginManifest(repoRoot string, version string) (bool, bool, error) {
 }
 
 // installMapToDir writes files from a map to a directory.
-// Idempotent: skips existing files. Returns count of files created.
-func installMapToDir(dir string, files map[string]string) (int, error) {
+// Creates missing files and updates existing files whose content has changed.
+// Returns (created count, updated count, error).
+func installMapToDir(dir string, files map[string]string) (int, int, error) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return 0, fmt.Errorf("mkdir %s: %w", dir, err)
+		return 0, 0, fmt.Errorf("mkdir %s: %w", dir, err)
 	}
 
-	created := 0
+	created, updated := 0, 0
 	for filename, content := range files {
 		filePath := filepath.Join(dir, filename)
-		if _, err := os.Stat(filePath); os.IsNotExist(err) {
-			if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-				return created, fmt.Errorf("write %s: %w", filePath, err)
-			}
+		c, u, err := reconcileFile(filePath, content)
+		if err != nil {
+			return created, updated, err
+		}
+		if c {
 			created++
 		}
+		if u {
+			updated++
+		}
 	}
-	return created, nil
+	return created, updated, nil
 }
