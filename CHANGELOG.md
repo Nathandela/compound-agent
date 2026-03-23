@@ -7,6 +7,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.2] - 2026-03-23
+
+### Fixed
+
+- **Compound-agent prime output was invisible in Claude hooks**: `ca prime` now writes normal command output to stdout instead of stderr, so `SessionStart` and `PreCompact` hook output is visible to Claude Code rather than being dropped by stderr redirection or ignored by hook rendering.
+- **Duplicate Claude hook reconciliation**: `ca setup claude` now detects and repairs duplicated compound-agent hook entries in `.claude/settings.json` instead of treating them as healthy installs. Hook detection and removal now correctly recognize shell-escaped binary commands like `'/path/to/ca' prime`.
+
 ## [2.1.1] - 2026-03-23
 
 ### Fixed
