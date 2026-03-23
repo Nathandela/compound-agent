@@ -532,7 +532,7 @@ func TestPrimeCmd_Output(t *testing.T) {
 	if !strings.Contains(stdout, "Compound Agent Active") {
 		t.Error("expected trust language header")
 	}
-	if !strings.Contains(stdout, "npx ca search") {
+	if !strings.Contains(stdout, "ca search") {
 		t.Error("expected CLI commands table")
 	}
 	// Should contain critical lessons header
