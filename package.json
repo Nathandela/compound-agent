@@ -50,10 +50,10 @@
     "knowledge-management"
   ],
   "optionalDependencies": {
-    "@syottos/darwin-arm64": "2.0.3",
-    "@syottos/darwin-x64": "2.0.3",
-    "@syottos/linux-arm64": "2.0.3",
-    "@syottos/linux-x64": "2.0.3"
+    "@syottos/darwin-arm64": "2.1.0",
+    "@syottos/darwin-x64": "2.1.0",
+    "@syottos/linux-arm64": "2.1.0",
+    "@syottos/linux-x64": "2.1.0"
   },
   "author": "Nathan Delacrétaz",
   "license": "MIT",
