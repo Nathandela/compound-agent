@@ -82,8 +82,9 @@ func initHooks(repoRoot string, binaryPath string, result *InitResult) error {
 
 	needsInstall := !HasAllHooks(settings)
 	needsUpgrade := HooksNeedUpgrade(settings, binaryPath)
+	needsDedupe := HooksNeedDedupe(settings)
 
-	if needsInstall || needsUpgrade {
+	if needsInstall || needsUpgrade || needsDedupe {
 		AddAllHooks(settings, binaryPath)
 		if err := WriteClaudeSettings(settingsPath, settings); err != nil {
 			return fmt.Errorf("write settings: %w", err)

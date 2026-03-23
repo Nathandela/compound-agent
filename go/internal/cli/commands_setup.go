@@ -203,14 +203,15 @@ func registerSetupClaudeCmd(parent *cobra.Command) {
 			alreadyInstalled := setup.HasAllHooks(settings)
 			binaryPath := resolveBinaryPath()
 			needsUpgrade := setup.HooksNeedUpgrade(settings, binaryPath)
+			needsDedupe := setup.HooksNeedDedupe(settings)
 
 			if status {
-				return handleClaudeStatus(cmd, alreadyInstalled, needsUpgrade, displayPath, settingsPath, jsonOut)
+				return handleClaudeStatus(cmd, alreadyInstalled, needsUpgrade, needsDedupe, displayPath, settingsPath, jsonOut)
 			}
 			if uninstall {
 				return handleClaudeUninstall(cmd, settings, settingsPath, alreadyInstalled, displayPath, jsonOut)
 			}
-			return handleClaudeInstall(cmd, settings, settingsPath, alreadyInstalled, needsUpgrade, binaryPath, displayPath, jsonOut)
+			return handleClaudeInstall(cmd, settings, settingsPath, alreadyInstalled, needsUpgrade, needsDedupe, binaryPath, displayPath, jsonOut)
 		},
 	}
 
@@ -223,13 +224,14 @@ func registerSetupClaudeCmd(parent *cobra.Command) {
 	parent.AddCommand(cmd)
 }
 
-func handleClaudeStatus(cmd *cobra.Command, installed bool, stale bool, displayPath, settingsPath string, jsonOut bool) error {
+func handleClaudeStatus(cmd *cobra.Command, installed bool, stale bool, duplicated bool, displayPath, settingsPath string, jsonOut bool) error {
 	if jsonOut {
 		data, _ := json.Marshal(map[string]any{
-			"settingsFile":  displayPath,
-			"hookInstalled": installed,
-			"hookStale":     stale,
-			"status":        statusLabel(installed, stale),
+			"settingsFile":   displayPath,
+			"hookInstalled":  installed,
+			"hookStale":      stale,
+			"hookDuplicated": duplicated,
+			"status":         statusLabel(installed, stale, duplicated),
 		})
 		cmd.Println(string(data))
 		return nil
@@ -243,10 +245,13 @@ func handleClaudeStatus(cmd *cobra.Command, installed bool, stale bool, displayP
 	} else {
 		cmd.Println("  [missing] File not found")
 	}
-	if installed && !stale {
+	if installed && !stale && !duplicated {
 		cmd.Println("  [ok] Compound Agent hooks installed")
 	} else if installed && stale {
 		cmd.Println("  [warn] Compound Agent hooks installed but stale (using npx instead of binary)")
+		cmd.Println("         Fix: ca setup claude")
+	} else if installed && duplicated {
+		cmd.Println("  [warn] Compound Agent hooks installed but duplicated")
 		cmd.Println("         Fix: ca setup claude")
 	} else {
 		cmd.Println("  [warn] Compound Agent hooks not installed")
@@ -254,8 +259,8 @@ func handleClaudeStatus(cmd *cobra.Command, installed bool, stale bool, displayP
 	return nil
 }
 
-func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPath string, installed bool, needsUpgrade bool, binaryPath string, displayPath string, jsonOut bool) error {
-	if installed && !needsUpgrade {
+func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPath string, installed bool, needsUpgrade bool, needsDedupe bool, binaryPath string, displayPath string, jsonOut bool) error {
+	if installed && !needsUpgrade && !needsDedupe {
 		if jsonOut {
 			data, _ := json.Marshal(map[string]any{
 				"installed": true,
@@ -275,8 +280,12 @@ func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPa
 	}
 
 	action := "installed"
-	if needsUpgrade {
+	if needsUpgrade && needsDedupe {
+		action = "reconciled"
+	} else if needsUpgrade {
 		action = "upgraded"
+	} else if needsDedupe {
+		action = "reconciled"
 	}
 
 	if jsonOut {
@@ -287,8 +296,12 @@ func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPa
 		})
 		cmd.Println(string(data))
 	} else {
-		if needsUpgrade {
+		if needsUpgrade && needsDedupe {
+			cmd.Printf("[ok] Claude Code hooks reconciled in %s (upgraded + deduplicated)\n", displayPath)
+		} else if needsUpgrade {
 			cmd.Printf("[ok] Claude Code hooks upgraded in %s (npx → binary)\n", displayPath)
+		} else if needsDedupe {
+			cmd.Printf("[ok] Claude Code hooks reconciled in %s (deduplicated)\n", displayPath)
 		} else {
 			cmd.Printf("[ok] Claude Code hooks installed to %s\n", displayPath)
 		}
@@ -326,9 +339,12 @@ func handleClaudeUninstall(cmd *cobra.Command, settings map[string]any, settings
 	return nil
 }
 
-func statusLabel(installed bool, stale bool) string {
+func statusLabel(installed bool, stale bool, duplicated bool) string {
 	if installed && stale {
 		return "stale"
+	}
+	if installed && duplicated {
+		return "duplicated"
 	}
 	if installed {
 		return "connected"
@@ -451,6 +467,8 @@ func runDoctorChecks(repoRoot string) []doctorCheck {
 		binaryPath := resolveBinaryPath()
 		if setup.HooksNeedUpgrade(settings, binaryPath) {
 			checks = append(checks, doctorCheck{Name: "Claude Code hooks installed", Status: "warn", Fix: "Hooks are stale (npx). Run: ca setup claude"})
+		} else if setup.HooksNeedDedupe(settings) {
+			checks = append(checks, doctorCheck{Name: "Claude Code hooks installed", Status: "warn", Fix: "Hooks are duplicated. Run: ca setup claude"})
 		} else {
 			checks = append(checks, doctorCheck{Name: "Claude Code hooks installed", Status: "pass"})
 		}

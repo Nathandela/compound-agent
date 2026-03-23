@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/nathandelacretaz/compound-agent/internal/setup"
 	"github.com/spf13/cobra"
 )
 
@@ -118,6 +119,63 @@ func TestSetupClaudeCommand_Uninstall(t *testing.T) {
 	out, err := executeCommand(root2, "setup", "claude", "--uninstall", "--repo-root", dir)
 	if err != nil {
 		t.Fatalf("setup claude --uninstall failed: %v\nOutput: %s", err, out)
+	}
+}
+
+func TestSetupClaudeCommand_ReconcilesDuplicateHooks(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0755); err != nil {
+		t.Fatalf("mkdir .claude: %v", err)
+	}
+
+	settings := map[string]any{}
+	setup.AddAllHooks(settings, "/usr/local/bin/ca")
+	hooks := settings["hooks"].(map[string]any)
+	hooks["SessionStart"] = append(hooks["SessionStart"].([]any), setupHookEntryForTest("", "/usr/local/bin/ca prime 2>/dev/null || true"))
+
+	if err := setup.WriteClaudeSettings(filepath.Join(dir, ".claude", "settings.json"), settings); err != nil {
+		t.Fatalf("write settings: %v", err)
+	}
+
+	root := &cobra.Command{Use: "ca"}
+	setupCmd := &cobra.Command{Use: "setup", Short: "Setup commands"}
+	root.AddCommand(setupCmd)
+	registerSetupClaudeCmd(setupCmd)
+
+	out, err := executeCommand(root, "setup", "claude", "--repo-root", dir, "--json")
+	if err != nil {
+		t.Fatalf("setup claude --json failed: %v\nOutput: %s", err, out)
+	}
+
+	var result map[string]any
+	if err := json.Unmarshal([]byte(strings.TrimSpace(out)), &result); err != nil {
+		t.Fatalf("expected valid JSON output, got: %s", out)
+	}
+	if result["action"] != "reconciled" {
+		t.Fatalf("expected action=reconciled, got %v", result["action"])
+	}
+
+	updated, err := setup.ReadClaudeSettings(filepath.Join(dir, ".claude", "settings.json"))
+	if err != nil {
+		t.Fatalf("read updated settings: %v", err)
+	}
+	if setup.HooksNeedDedupe(updated) {
+		t.Error("expected duplicate hooks to be removed")
+	}
+	if got := len(updated["hooks"].(map[string]any)["SessionStart"].([]any)); got != 1 {
+		t.Errorf("expected 1 SessionStart entry after reconcile, got %d", got)
+	}
+}
+
+func setupHookEntryForTest(matcher, command string) map[string]any {
+	return map[string]any{
+		"matcher": matcher,
+		"hooks": []any{
+			map[string]any{
+				"type":    "command",
+				"command": command,
+			},
+		},
 	}
 }
 

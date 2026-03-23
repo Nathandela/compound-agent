@@ -102,6 +102,52 @@ func TestAddAllHooks_Idempotent(t *testing.T) {
 	}
 }
 
+func TestAddAllHooks_DedupesExistingCompoundHooks(t *testing.T) {
+	settings := map[string]any{}
+	AddAllHooks(settings, "")
+
+	hooks := settings["hooks"].(map[string]any)
+	hooks["SessionStart"] = append(hooks["SessionStart"].([]any), hookEntry("", makePrimeCommand("")))
+	hooks["PreCompact"] = append(hooks["PreCompact"].([]any), hookEntry("", makePrimeCommand("")))
+
+	if !HooksNeedDedupe(settings) {
+		t.Fatal("expected duplicates to be detected before reconciliation")
+	}
+
+	AddAllHooks(settings, "")
+
+	if HooksNeedDedupe(settings) {
+		t.Error("expected duplicates to be removed after reconciliation")
+	}
+	if got := len(hooks["SessionStart"].([]any)); got != 1 {
+		t.Errorf("expected 1 SessionStart entry after dedupe, got %d", got)
+	}
+	if got := len(hooks["PreCompact"].([]any)); got != 1 {
+		t.Errorf("expected 1 PreCompact entry after dedupe, got %d", got)
+	}
+}
+
+func TestAddAllHooks_DedupePreservesUnrelatedHooks(t *testing.T) {
+	settings := map[string]any{}
+	AddAllHooks(settings, "")
+
+	hooks := settings["hooks"].(map[string]any)
+	unrelated := hookEntry("", "echo unrelated")
+	hooks["SessionStart"] = append([]any{unrelated}, hooks["SessionStart"].([]any)...)
+	hooks["SessionStart"] = append(hooks["SessionStart"].([]any), hookEntry("", makePrimeCommand("")))
+
+	AddAllHooks(settings, "")
+
+	sessionStart := hooks["SessionStart"].([]any)
+	if len(sessionStart) != 2 {
+		t.Fatalf("expected unrelated hook plus one compound hook, got %d entries", len(sessionStart))
+	}
+	first := sessionStart[0].(map[string]any)["hooks"].([]any)[0].(map[string]any)["command"].(string)
+	if first != "echo unrelated" {
+		t.Errorf("expected unrelated hook to be preserved, got %q", first)
+	}
+}
+
 func TestAddAllHooks_WithBinaryPath(t *testing.T) {
 	settings := map[string]any{}
 	AddAllHooks(settings, "/usr/local/bin/ca")
@@ -263,6 +309,27 @@ func TestHooksNeedUpgrade_NoHooks(t *testing.T) {
 	}
 }
 
+func TestHooksNeedDedupe_NoDuplicates(t *testing.T) {
+	settings := map[string]any{}
+	AddAllHooks(settings, "")
+
+	if HooksNeedDedupe(settings) {
+		t.Error("expected false: canonical hooks should not need dedupe")
+	}
+}
+
+func TestHooksNeedDedupe_WithDuplicates(t *testing.T) {
+	settings := map[string]any{}
+	AddAllHooks(settings, "")
+
+	hooks := settings["hooks"].(map[string]any)
+	hooks["SessionStart"] = append(hooks["SessionStart"].([]any), hookEntry("", makePrimeCommand("")))
+
+	if !HooksNeedDedupe(settings) {
+		t.Error("expected true: duplicate SessionStart hooks should need dedupe")
+	}
+}
+
 func TestHooksNeedUpgrade_MixedHooks(t *testing.T) {
 	// Some hooks are npx, some are binary (shouldn't happen but test boundary)
 	settings := map[string]any{}
@@ -279,5 +346,24 @@ func TestHooksNeedUpgrade_MixedHooks(t *testing.T) {
 	// Other hooks still use npx → needs upgrade
 	if !HooksNeedUpgrade(settings, "/usr/local/bin/ca") {
 		t.Error("expected true: some hooks still use npx")
+	}
+}
+
+func TestAddAllHooks_DedupePreservesExistingBinaryCommandWithoutBinaryPath(t *testing.T) {
+	settings := map[string]any{}
+	AddAllHooks(settings, "/usr/local/bin/ca")
+
+	hooks := settings["hooks"].(map[string]any)
+	hooks["SessionStart"] = append(hooks["SessionStart"].([]any), hookEntry("", "/opt/alt/ca prime 2>/dev/null || true"))
+
+	AddAllHooks(settings, "")
+
+	sessionStart := hooks["SessionStart"].([]any)
+	if len(sessionStart) != 1 {
+		t.Fatalf("expected 1 SessionStart entry after dedupe, got %d", len(sessionStart))
+	}
+	cmd := sessionStart[0].(map[string]any)["hooks"].([]any)[0].(map[string]any)["command"].(string)
+	if strings.Contains(cmd, "npx ca") {
+		t.Errorf("expected existing binary command to be preserved, got %q", cmd)
 	}
 }
