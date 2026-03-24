@@ -91,6 +91,26 @@ Our lesson system is genuinely novel relative to the blog. They have no equivale
 - Inject the matching lesson directly into the hook output, not just a generic "try ca search" tip
 - Close the loop between failure detection and lesson retrieval automatically
 
+### 7. Deep Research in the Architect Phase (get-a-phd)
+
+**Effort**: Low (already exists) | **Impact**: Massive leverage
+
+**Insight**: The blog's Planner agent expands 1-4 sentences into a product spec but stays deliberately shallow -- high-level product context, no deep domain knowledge. This is a missed opportunity. The architect phase is the highest-leverage moment in the entire pipeline: decisions made here cascade through every downstream phase.
+
+**Our advantage**: We already have `/compound:get-a-phd` and `/compound:architect`. The get-a-phd command spawns deep research agents that build PhD-level domain knowledge *before* system decomposition happens. This means the architect doesn't just decompose tasks -- it decomposes them with genuine understanding of the problem domain, trade-off landscape, and prior art.
+
+**Why this is massive leverage**:
+- A well-researched architect decision saves dozens of rework cycles downstream
+- Domain knowledge acquired during research feeds directly into spec quality, which feeds into plan quality, which feeds into implementation quality -- compounding returns at every phase
+- The blog's Planner explicitly avoids implementation details to prevent "cascading errors from over-specification." But under-specification at the architecture level causes equally expensive errors (wrong abstractions, missed constraints, reinvented wheels). Deep research solves this by grounding architecture in real domain knowledge rather than guessing
+- For novel or complex domains (ML pipelines, distributed systems, protocol design), the difference between an architect who researched and one who didn't is the difference between a system that works and one that needs to be rewritten
+
+**Action -- reinforce and expand**:
+- Make get-a-phd the default entry point for any non-trivial architect session, not an optional step
+- Feed research outputs into the lesson system so domain knowledge persists across sessions and projects
+- Structure research artifacts as reusable references (not just conversation context) so they survive compaction and context resets
+- Add a "research sufficiency" gate: the architect phase should not proceed to decomposition until the agent has demonstrated adequate domain understanding
+
 ---
 
 ## What NOT to Change
