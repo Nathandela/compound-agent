@@ -53,7 +53,14 @@ func RunHook(hookName string, stdin io.Reader, stdout io.Writer) int {
 		return 1
 	}
 
-	// All hooks catch errors and output {} on failure
+	// pre-commit is a git hook (not a Claude Code hook) — output plain text.
+	// Returns before the defer below; safe because fmt.Fprintln cannot panic.
+	if hookName == "pre-commit" {
+		fmt.Fprintln(stdout, preCommitMessage)
+		return 0
+	}
+
+	// All Claude Code hooks catch errors and output {} on failure.
 	defer func() {
 		if r := recover(); r != nil {
 			slog.Error("hook panic", "hook", hookName, "error", r)
@@ -71,11 +78,6 @@ func RunHook(hookName string, stdin io.Reader, stdout io.Writer) int {
 // dispatchHook routes to the correct hook handler and returns the result to serialize.
 func dispatchHook(hookName string, stdin io.Reader) (interface{}, int) {
 	switch hookName {
-	case "pre-commit":
-		return map[string]interface{}{
-			"hook":    "pre-commit",
-			"message": preCommitMessage,
-		}, 0
 	case "user-prompt":
 		return dispatchUserPrompt(stdin, hookName)
 	case "post-tool-failure":
@@ -89,7 +91,7 @@ func dispatchHook(hookName string, stdin io.Reader) (interface{}, int) {
 	default:
 		return map[string]interface{}{
 			"error": fmt.Sprintf(
-				"Unknown hook: %s. Valid hooks: pre-commit, user-prompt, post-tool-failure, post-tool-success, post-read (or read-tracker), phase-guard, phase-audit (or stop-audit)",
+				"Unknown hook: %s. Valid hooks: user-prompt, post-tool-failure, post-tool-success, post-read (or read-tracker), phase-guard, phase-audit (or stop-audit), pre-commit (git only)",
 				hookName,
 			),
 		}, 1

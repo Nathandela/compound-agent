@@ -38,13 +38,15 @@ func TestRunHook_PreCommit(t *testing.T) {
 	if exitCode != 0 {
 		t.Errorf("got exit code %d, want 0", exitCode)
 	}
-	var m map[string]interface{}
-	json.Unmarshal(out.Bytes(), &m)
-	if m["hook"] != "pre-commit" {
-		t.Error("expected pre-commit hook output")
+	// pre-commit is a git hook — must output plain text, not JSON.
+	output := out.String()
+	if !strings.Contains(output, "LESSON CAPTURE CHECKPOINT") {
+		t.Error("expected plain text checkpoint message")
 	}
-	if m["message"] == nil {
-		t.Error("expected message in pre-commit output")
+	// Verify it's NOT JSON (git hooks display stdout as-is to the terminal).
+	var m map[string]interface{}
+	if err := json.Unmarshal(out.Bytes(), &m); err == nil {
+		t.Error("pre-commit output must be plain text, not JSON")
 	}
 }
 
