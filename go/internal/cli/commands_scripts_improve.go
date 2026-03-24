@@ -177,8 +177,7 @@ if [ -n "${TOPICS:-}" ]; then
 
       PROMPT=$(build_improve_prompt "$TOPIC")
       claude --dangerously-skip-permissions --model "$MODEL" --output-format stream-json --verbose \
-        -p "$PROMPT" > "$TRACEFILE" 2>/dev/null || true
-      extract_text "$TRACEFILE" "$LOGFILE"
+        -p "$PROMPT" 2>/dev/null | tee "$TRACEFILE" | extract_text > "$LOGFILE" || true
       MARKER=$(detect_improve_marker "$LOGFILE" "$TRACEFILE")
 `, opts.maxIters, opts.timeBudget)
 }

@@ -159,6 +159,112 @@ ca loop --epics E1 E2 E3 E4 \
   --force
 ```
 
+### Real-world: 6 epics with full review fleet (compound-agent project)
+
+This configuration was used to implement a multi-epic feature in the compound-agent project itself (Go CLI migration, 6 dependent epics):
+
+```bash
+ca loop \
+  --epics learning_agent-j5l learning_agent-w37q learning_agent-ko94 \
+         learning_agent-xhbr learning_agent-w0tg learning_agent-2zzc \
+  --model "claude-opus-4-6[1m]" \
+  --max-retries 2 \
+  --reviewers claude-sonnet claude-opus gemini codex \
+  --review-every 1 \
+  --max-review-cycles 3 \
+  --review-model "claude-opus-4-6[1m]" \
+  --force
+```
+
+**Configuration rationale:**
+- `--max-retries 2`: Allows two retry attempts per epic before marking as failed
+- `--review-every 1`: Reviews after every completed epic (aggressive; use `--review-every 2` for faster throughput)
+- `--model claude-opus-4-6[1m]`: The 1M context variant handles large epics without truncation
+- `--reviewers claude-sonnet claude-opus gemini codex`: Full fleet for comprehensive coverage (gemini/codex may be unavailable -- the loop auto-detects and skips them)
+
+**What actually happened:**
+- Epics E1-E4 completed successfully; E2 triggered 3 review cycles before approval
+- Gemini and Codex failed health checks (CLI not installed) -- logged as warnings, review continued with Claude models only
+- Memory watchdog triggered once during E2 (killed session at 12% free memory), retry succeeded
+- Total runtime: ~3 hours for 4 completed epics
+
+---
+
+## Troubleshooting
+
+Field-tested failure modes observed in production loop runs, with symptoms, root causes, and fixes.
+
+### Uncommitted changes after loop exit
+
+**Symptom**: `git status` shows modified/untracked files after loop finishes. Work appears done but isn't committed.
+
+**Root cause**: The agent session completed its work and output `EPIC_COMPLETE`, but the commit/push step inside the session failed silently (e.g., hook rejection, merge conflict).
+
+**Fix**: The loop now auto-checks `git diff --quiet` after each epic completion and runs `git add -A && git commit` if dirty. Additionally, the loop pushes to remote at exit. If you still see uncommitted changes, run:
+```bash
+git status --short
+git add -A && git commit -m "chore: post-loop cleanup"
+git push
+```
+
+### Reviews skipped for some epics
+
+**Symptom**: With `--review-every 1`, some epics get reviewed but others don't. Logs show "No commits in range ... skipping review phase."
+
+**Root cause**: The review phase checks `git log --oneline "$REVIEW_DIFF_RANGE"` and skips if zero commits exist in the range. This happens when the reviewed code was already committed before the diff range started (e.g., the implementer committed during a prior review fix cycle, advancing HEAD past the range).
+
+**Fix**: This is usually benign -- the code was already reviewed in a previous cycle. Check the review logs in `agent_logs/reviews/` to verify. If you need every epic reviewed independently, consider `--review-every 1` with `--review-blocking`.
+
+### Reviewer fleet underutilized
+
+**Symptom**: Configured 4 reviewers but logs show only Claude models were used.
+
+**Root cause**: Gemini/Codex CLIs not installed or not authenticated. The `detect_reviewers()` function logs per-reviewer warnings and a summary of configured vs available reviewers.
+
+**Diagnosis**:
+```bash
+grep "configured but unavailable" agent_logs/loop_*.log
+grep "Configured reviewers:" agent_logs/loop_*.log
+grep "Available reviewers:" agent_logs/loop_*.log
+```
+
+**Fix**: Install and authenticate the missing CLIs, or remove them from `--reviewers` to avoid noise.
+
+### extract_text produces empty logs
+
+**Symptom**: `agent_logs/loop_*.log` files are empty but `agent_logs/trace_*.jsonl` files have content. Warning in loop output: "Macro log is empty but trace has content."
+
+**Root cause**: The `extract_text` jq parser failed (jq not installed, or Claude's stream-json format changed). The loop falls back to trace-file marker detection (unanchored grep), which is less reliable.
+
+**Diagnosis**: Check if jq is available: `command -v jq`. If not, install it or ensure python3 is available (used as fallback).
+
+**Fix**: The loop now has both jq and python3 extraction paths. If both fail, markers are still detected via the fallback grep in the raw trace file.
+
+### Memory watchdog kills sessions
+
+**Symptom**: Logs show "WATCHDOG: memory X% < 15%, killing PID". Session marked as failed.
+
+**Root cause**: The Claude session (or spawned test processes) consumed too much memory. The watchdog killed the session to prevent system freeze.
+
+**Fix**: Tune the thresholds via environment variables:
+```bash
+WATCHDOG_THRESHOLD=10 WATCHDOG_INTERVAL=60 ./infinity-loop.sh  # More lenient
+```
+Or kill memory-hungry background processes before running:
+```bash
+pkill -f vitest; pkill -f "node.*test"
+```
+
+### No git push at loop end
+
+**Symptom**: Loop completed but changes aren't on remote.
+
+**Root cause**: In older versions of the generated script, `git push` was not included. The loop now pushes at exit, but SSH/auth failures are non-fatal (logged as warnings).
+
+**Diagnosis**: `grep "git push" agent_logs/loop_*.log`
+
+**Fix**: Push manually: `git push`. If SSH fails, check authentication: `ssh -T git@github.com`.
+
 ---
 
 ## Implementation Deep Dive
@@ -566,7 +672,12 @@ while true; do
   done
 
   case "$SUCCESS" in
-    true)  COMPLETED=$((COMPLETED + 1))
+    true)  # Verify working tree is clean after epic completion
+           if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+             log "WARN: Working tree dirty after epic completion, auto-committing"
+             git add -A && git commit -m "chore: auto-commit uncommitted changes from $EPIC_ID"
+           fi
+           COMPLETED=$((COMPLETED + 1))
            COMPLETED_SINCE_REVIEW=$((COMPLETED_SINCE_REVIEW + 1))
            # Trigger periodic review if cadence reached
            if [ "$COMPLETED_SINCE_REVIEW" -ge "$REVIEW_EVERY" ]; then
@@ -584,6 +695,12 @@ done
 
 # Final review for any unreviewed completed epics
 [ "$COMPLETED_SINCE_REVIEW" -gt 0 ] && run_review_phase "final"
+
+# Push to remote if available
+if git remote get-url origin >/dev/null 2>&1; then
+  log "Pushing to remote..."
+  git push 2>&1 || log "WARN: git push failed (check SSH/auth)"
+fi
 ```
 
 ### 10. Observability Output

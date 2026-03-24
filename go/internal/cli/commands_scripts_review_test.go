@@ -553,27 +553,32 @@ func TestLoopCommand_ImproveUsesFailedCount(t *testing.T) {
 	}
 }
 
-func TestLoopCommand_ImproveUsesExtractTextWithArgs(t *testing.T) {
+func TestLoopCommand_UsesTwoScopeLogging(t *testing.T) {
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
 	dir := t.TempDir()
 	outPath := filepath.Join(dir, "loop.sh")
 
-	_, err := executeCommand(root, "loop", "-o", outPath, "--improve")
+	_, err := executeCommand(root, "loop", "-o", outPath)
 	if err != nil {
-		t.Fatalf("loop --improve failed: %v", err)
+		t.Fatalf("loop failed: %v", err)
 	}
 
 	data, _ := os.ReadFile(outPath)
 	script := string(data)
 
-	// extract_text must be called with file args, not as a pipeline filter
-	if strings.Contains(script, "| extract_text >") {
-		t.Error("improve phase pipes into extract_text but it expects file args")
+	// Main loop uses pipe-based two-scope logging: claude | tee $TRACE | extract_text > $LOG
+	if !strings.Contains(script, "| tee") {
+		t.Error("expected tee-based two-scope logging in main loop")
 	}
-	if !strings.Contains(script, `extract_text "$TRACEFILE" "$LOGFILE"`) {
-		t.Error("expected extract_text called with file arguments")
+	if !strings.Contains(script, "| extract_text >") {
+		t.Error("expected piped extract_text in main loop")
+	}
+	// extract_text reads from stdin (no file args in function definition)
+	if strings.Contains(script, `extract_text() {
+  local file="$1"`) {
+		t.Error("extract_text should read from stdin, not take file args")
 	}
 }
 
@@ -664,5 +669,425 @@ func TestLoopScriptReviewConfig_NonBlocking(t *testing.T) {
 
 	if !strings.Contains(config, "REVIEW_BLOCKING=false") {
 		t.Error("expected REVIEW_BLOCKING=false")
+	}
+}
+
+// --- Parity tests: verify Go generator matches production infinity-loop.sh ---
+
+func TestLoopCommand_CrashHandler(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	checks := map[string]string{
+		"_loop_cleanup":           "crash handler function",
+		"trap _loop_cleanup EXIT": "EXIT trap",
+		"stop_memory_watchdog":    "watchdog cleanup in crash handler",
+		`\"status\":\"crashed\"`:  "crash status JSON",
+		"BASH_LINENO":             "crash line number reporting",
+	}
+	for needle, desc := range checks {
+		if !strings.Contains(script, needle) {
+			t.Errorf("missing %s: expected %q", desc, needle)
+		}
+	}
+}
+
+func TestLoopCommand_MemoryWatchdog(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	checks := map[string]string{
+		"WATCHDOG_THRESHOLD":    "watchdog threshold config",
+		"WATCHDOG_INTERVAL":     "watchdog interval config",
+		"get_memory_pct":        "extracted memory function",
+		"start_memory_watchdog": "watchdog start function",
+		"stop_memory_watchdog":  "watchdog stop function",
+		"WATCHDOG_PID":          "watchdog PID tracking",
+		"CLAUDE_PGID":           "background subshell PID",
+	}
+	for needle, desc := range checks {
+		if !strings.Contains(script, needle) {
+			t.Errorf("missing %s: expected %q", desc, needle)
+		}
+	}
+}
+
+func TestLoopCommand_RepoScopedOrphanCleanup(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Orphan cleanup must be scoped to repo directory
+	if !strings.Contains(script, "repo_dir") {
+		t.Error("orphan cleanup not scoped to repo directory")
+	}
+	if !strings.Contains(script, "lsof") {
+		t.Error("missing macOS process cwd detection (lsof)")
+	}
+	if !strings.Contains(script, "readlink") {
+		t.Error("missing Linux process cwd detection (readlink)")
+	}
+}
+
+func TestLoopCommand_DependencyChecking(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	checks := map[string]string{
+		"check_deps_closed": "dependency checking function",
+		"parse_json":        "JSON parsing function",
+		"depends_on":        "depends_on field access",
+		"blocking_dep":      "blocking dependency detection",
+	}
+	for needle, desc := range checks {
+		if !strings.Contains(script, needle) {
+			t.Errorf("missing %s: expected %q", desc, needle)
+		}
+	}
+}
+
+func TestLoopCommand_DualFileMarkerDetection(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// detect_marker takes two args: logfile and tracefile
+	if !strings.Contains(script, `detect_marker() {
+  local logfile="$1" tracefile="$2"`) {
+		t.Error("detect_marker should take two file arguments (logfile + tracefile)")
+	}
+	// Uses anchored grep for primary detection
+	if !strings.Contains(script, `"^EPIC_COMPLETE$"`) {
+		t.Error("missing anchored EPIC_COMPLETE grep")
+	}
+	// Extracts HUMAN_REQUIRED reason
+	if !strings.Contains(script, `"^HUMAN_REQUIRED:"`) {
+		t.Error("missing HUMAN_REQUIRED reason extraction")
+	}
+	// Call site passes both files
+	if !strings.Contains(script, `detect_marker "$LOGFILE" "$TRACEFILE"`) {
+		t.Error("detect_marker call site should pass both LOGFILE and TRACEFILE")
+	}
+}
+
+func TestLoopCommand_GitStatusCheckAfterEpic(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	if !strings.Contains(script, "git diff --quiet") {
+		t.Error("missing git status check after epic completion")
+	}
+	if !strings.Contains(script, "auto-committing") {
+		t.Error("missing auto-commit for dirty working tree")
+	}
+}
+
+func TestLoopCommand_GitPushAtEnd(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	if !strings.Contains(script, "git push") {
+		t.Error("missing git push at loop end")
+	}
+	if !strings.Contains(script, "git remote get-url origin") {
+		t.Error("missing remote availability check before push")
+	}
+}
+
+func TestLoopCommand_CLIPrerequisites(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	if !strings.Contains(script, `command -v claude >/dev/null || die`) {
+		t.Error("missing claude CLI prerequisite check")
+	}
+	if !strings.Contains(script, `command -v bd >/dev/null || die`) {
+		t.Error("missing bd CLI prerequisite check")
+	}
+	if !strings.Contains(script, "die()") {
+		t.Error("missing die() helper function")
+	}
+}
+
+func TestLoopCommand_ReviewerAvailabilitySummary(t *testing.T) {
+	detection := loopScriptReviewerDetection()
+
+	if !strings.Contains(detection, "Configured reviewers:") {
+		t.Error("missing configured reviewers log line")
+	}
+	if !strings.Contains(detection, "configured but unavailable") {
+		t.Error("missing unavailable reviewer diagnostics")
+	}
+}
+
+func TestLoopCommand_ExtractTextPython3Fallback(t *testing.T) {
+	helpers := loopScriptHelpers()
+
+	if !strings.Contains(helpers, "python3 -c") {
+		t.Error("extract_text missing python3 fallback")
+	}
+	if !strings.Contains(helpers, "json.loads") {
+		t.Error("extract_text python3 fallback should parse JSON line by line")
+	}
+}
+
+func TestLoopCommand_StderrCapture(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	if !strings.Contains(script, ".stderr") {
+		t.Error("missing stderr capture")
+	}
+	if !strings.Contains(script, "extract_text may have failed") {
+		t.Error("missing extract_text health check warning")
+	}
+}
+
+// --- Structural ordering tests: verify injection points are correct ---
+
+func TestLoopCommand_ReviewTriggersBeforeExit(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath,
+		"--reviewers", "claude-sonnet", "--review-every", "2")
+	if err != nil {
+		t.Fatalf("loop --reviewers failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	periodicIdx := strings.Index(script, `run_review_phase "periodic"`)
+	finalIdx := strings.Index(script, `run_review_phase "final"`)
+	exitIdx := strings.LastIndex(script, "exit 0 || exit 1")
+
+	if periodicIdx < 0 {
+		t.Fatal("periodic review trigger not found")
+	}
+	if finalIdx < 0 {
+		t.Fatal("final review trigger not found")
+	}
+	if exitIdx < 0 {
+		t.Fatal("exit line not found")
+	}
+
+	if periodicIdx > exitIdx {
+		t.Errorf("periodic review trigger (pos %d) appears AFTER exit (pos %d) -- dead code", periodicIdx, exitIdx)
+	}
+	if finalIdx > exitIdx {
+		t.Errorf("final review trigger (pos %d) appears AFTER exit (pos %d) -- dead code", finalIdx, exitIdx)
+	}
+}
+
+func TestLoopCommand_ImprovePhaseBeforeExit(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath, "--improve")
+	if err != nil {
+		t.Fatalf("loop --improve failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	improveIdx := strings.Index(script, "Improvement phase")
+	exitIdx := strings.LastIndex(script, "exit 0")
+
+	if improveIdx < 0 {
+		t.Fatal("improve phase not found")
+	}
+	if exitIdx < 0 {
+		t.Fatal("exit line not found")
+	}
+	if improveIdx > exitIdx {
+		t.Errorf("improve phase (pos %d) appears AFTER exit (pos %d) -- dead code", improveIdx, exitIdx)
+	}
+}
+
+func TestLoopCommand_ReviewInitBeforeWhile(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath,
+		"--reviewers", "claude-sonnet", "--review-every", "1")
+	if err != nil {
+		t.Fatalf("loop --reviewers failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	initIdx := strings.Index(script, "REVIEW_BASE_SHA=$(git rev-parse HEAD)")
+	whileIdx := strings.Index(script, "while true; do")
+
+	if initIdx < 0 {
+		t.Fatal("REVIEW_BASE_SHA init not found")
+	}
+	if whileIdx < 0 {
+		t.Fatal("while loop not found")
+	}
+	if initIdx > whileIdx {
+		t.Errorf("REVIEW_BASE_SHA init (pos %d) appears INSIDE the while loop (pos %d) -- resets every iteration", initIdx, whileIdx)
+	}
+}
+
+func TestLoopCommand_PeriodicTriggerInsideSuccessBranch(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath,
+		"--reviewers", "claude-sonnet", "--review-every", "1")
+	if err != nil {
+		t.Fatalf("loop --reviewers failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Periodic trigger should be BETWEEN COMPLETED++ and the elif/else branches
+	completedIdx := strings.Index(script, `COMPLETED=$((COMPLETED + 1))`)
+	periodicIdx := strings.Index(script, `run_review_phase "periodic"`)
+	elifIdx := strings.Index(script, `"$SUCCESS" = skip`)
+
+	if completedIdx < 0 || periodicIdx < 0 || elifIdx < 0 {
+		t.Fatal("expected COMPLETED++, periodic trigger, and elif to exist")
+	}
+	if periodicIdx < completedIdx {
+		t.Error("periodic trigger should be AFTER COMPLETED++")
+	}
+	if periodicIdx > elifIdx {
+		t.Error("periodic trigger should be BEFORE the elif branch (inside success branch)")
+	}
+}
+
+func TestLoopCommand_ImproveUsesPipeExtractText(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath, "--improve")
+	if err != nil {
+		t.Fatalf("loop --improve failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Improve phase must NOT call extract_text with file arguments
+	if strings.Contains(script, `extract_text "$TRACEFILE" "$LOGFILE"`) {
+		t.Error("improve phase calls extract_text with file args but function reads from stdin")
 	}
 }

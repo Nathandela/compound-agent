@@ -61,14 +61,12 @@ func loopScriptReviewTriggers(reviewEvery int) (init, periodic, final string) {
 
 	if usePeriodic {
 		periodic = fmt.Sprintf(`
-    if [ "$RESULT" = "complete" ]; then
-      COMPLETED_SINCE_REVIEW=$((COMPLETED_SINCE_REVIEW + 1))
-      if [ "$COMPLETED_SINCE_REVIEW" -ge %d ]; then
-        REVIEW_DIFF_RANGE="$REVIEW_BASE_SHA..HEAD"
-        run_review_phase "periodic" || log "WARN: review phase (periodic) failed, continuing"
-        COMPLETED_SINCE_REVIEW=0
-        REVIEW_BASE_SHA=$(git rev-parse HEAD)
-      fi
+    COMPLETED_SINCE_REVIEW=$((COMPLETED_SINCE_REVIEW + 1))
+    if [ "$COMPLETED_SINCE_REVIEW" -ge %d ]; then
+      REVIEW_DIFF_RANGE="$REVIEW_BASE_SHA..HEAD"
+      run_review_phase "periodic" || log "WARN: review phase (periodic) failed, continuing"
+      COMPLETED_SINCE_REVIEW=0
+      REVIEW_BASE_SHA=$(git rev-parse HEAD)
     fi
 `, reviewEvery)
 	}
@@ -134,7 +132,7 @@ portable_timeout() {
 }
 
 // loopScriptReviewerDetection returns the reviewer CLI detection function.
-func loopScriptReviewerDetection() string {
+func loopScriptReviewerDetection() string { //nolint:funlen // bash template string
 	return `
 detect_reviewers() {
   AVAILABLE_REVIEWERS=""
@@ -170,11 +168,19 @@ detect_reviewers() {
     esac
   done
   AVAILABLE_REVIEWERS="${AVAILABLE_REVIEWERS# }"
+  log "Configured reviewers: $REVIEW_REVIEWERS"
   if [ -z "$AVAILABLE_REVIEWERS" ]; then
     log "WARN: No reviewer CLIs available, skipping review phase"
     return 1
   fi
   log "Available reviewers: $AVAILABLE_REVIEWERS"
+  # Log unavailable reviewers for diagnostics
+  for r in $REVIEW_REVIEWERS; do
+    case " $AVAILABLE_REVIEWERS " in
+      (*" $r "*) ;;
+      (*) log "WARN: $r configured but unavailable" ;;
+    esac
+  done
   return 0
 }
 `
