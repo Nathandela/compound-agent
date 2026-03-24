@@ -284,63 +284,133 @@ echo "[improve] Summary: $COMPLETED improvements, $FAILED_COUNT failures"
 
 // ========================== loop ==========================
 
+// loopCmdOptions captures all flag values for the loop command.
+type loopCmdOptions struct {
+	output, model, epics, reviewers, reviewModel string
+	maxRetries, reviewEvery, maxReviewCycles     int
+	improveMaxIters, improveTimeBudget           int
+	force, reviewBlocking, improve               bool
+}
+
 func loopCmd() *cobra.Command {
-	var (
-		output     string
-		maxRetries int
-		model      string
-		force      bool
-		epics      string
-	)
+	var o loopCmdOptions
 
 	cmd := &cobra.Command{
 		Use:   "loop",
 		Short: "Generate infinity loop script for epic processing",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if output == "" {
-				output = "infinity-loop.sh"
-			}
-			if !force {
-				if _, err := os.Stat(output); err == nil {
-					return fmt.Errorf("file %s already exists (use --force to overwrite)", output)
-				}
-			}
-
-			script := generateLoopScript(maxRetries, model, epics)
-
-			if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
-				return fmt.Errorf("create directory: %w", err)
-			}
-			if err := os.WriteFile(output, []byte(script), 0755); err != nil {
-				return fmt.Errorf("write script: %w", err)
-			}
-
-			cmd.Printf("[ok] Generated infinity loop script: %s\n", output)
-			cmd.Println("Run it with: bash " + output)
-			return nil
+			return runLoop(cmd, &o)
 		},
 	}
 
-	cmd.Flags().StringVarP(&output, "output", "o", "infinity-loop.sh", "Output script path")
-	cmd.Flags().IntVar(&maxRetries, "max-retries", 1, "Max retries per epic on failure")
-	cmd.Flags().StringVar(&model, "model", "claude-sonnet-4-6", "Claude model to use")
-	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing script")
-	cmd.Flags().StringVar(&epics, "epics", "", "Comma-separated epic IDs to process")
+	cmd.Flags().StringVarP(&o.output, "output", "o", "infinity-loop.sh", "Output script path")
+	cmd.Flags().IntVar(&o.maxRetries, "max-retries", 1, "Max retries per epic on failure")
+	cmd.Flags().StringVar(&o.model, "model", "claude-sonnet-4-6", "Claude model to use")
+	cmd.Flags().BoolVar(&o.force, "force", false, "Overwrite existing script")
+	cmd.Flags().StringVar(&o.epics, "epics", "", "Comma-separated epic IDs to process")
+	cmd.Flags().StringVar(&o.reviewers, "reviewers", "", "Comma-separated reviewers (claude-sonnet,claude-opus,gemini,codex)")
+	cmd.Flags().IntVar(&o.reviewEvery, "review-every", 0, "Review every N completed epics (0=end-only)")
+	cmd.Flags().IntVar(&o.maxReviewCycles, "max-review-cycles", 3, "Max review/fix iterations")
+	cmd.Flags().BoolVar(&o.reviewBlocking, "review-blocking", false, "Fail loop if review not approved after max cycles")
+	cmd.Flags().StringVar(&o.reviewModel, "review-model", "claude-opus-4-6", "Model for implementer fix sessions")
+	cmd.Flags().BoolVar(&o.improve, "improve", false, "Run improvement phase after all epics complete")
+	cmd.Flags().IntVar(&o.improveMaxIters, "improve-max-iters", 5, "Max improvement iterations per topic")
+	cmd.Flags().IntVar(&o.improveTimeBudget, "improve-time-budget", 0, "Total improvement time budget in seconds (0=unlimited)")
 	return cmd
 }
 
-func generateLoopScript(maxRetries int, model, epicIDs string) string {
-	escapedModel := util.ShellEscape(model)
-	escapedEpicIDs := util.ShellEscape(epicIDs)
+func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
+	output := o.output
+	if output == "" {
+		output = "infinity-loop.sh"
+	}
+	if !o.force {
+		if _, err := os.Stat(output); err == nil {
+			return fmt.Errorf("file %s already exists (use --force to overwrite)", output)
+		}
+	}
+
+	opts := loopGenerateOptions{maxRetries: o.maxRetries, model: o.model, epics: o.epics}
+
+	if o.reviewers != "" {
+		reviewerList := strings.Split(o.reviewers, ",")
+		if err := validateReviewers(reviewerList); err != nil {
+			return err
+		}
+		opts.review = &loopReviewOptions{
+			reviewers: reviewerList, maxReviewCycles: o.maxReviewCycles,
+			reviewBlocking: o.reviewBlocking, reviewModel: o.reviewModel, reviewEvery: o.reviewEvery,
+		}
+	}
+	if o.improve {
+		opts.improve = &loopImproveOptions{maxIters: o.improveMaxIters, timeBudget: o.improveTimeBudget}
+	}
+
+	script := generateLoopScript(opts)
+
+	if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+		return fmt.Errorf("create directory: %w", err)
+	}
+	if err := os.WriteFile(output, []byte(script), 0755); err != nil {
+		return fmt.Errorf("write script: %w", err)
+	}
+	cmd.Printf("[ok] Generated infinity loop script: %s\n", output)
+	cmd.Println("Run it with: bash " + output)
+	return nil
+}
+
+// loopGenerateOptions holds all options for generating the loop script.
+type loopGenerateOptions struct {
+	maxRetries int
+	model      string
+	epics      string
+	review     *loopReviewOptions
+	improve    *loopImproveOptions
+}
+
+func generateLoopScript(opts loopGenerateOptions) string {
+	escapedModel := util.ShellEscape(opts.model)
+	escapedEpicIDs := util.ShellEscape(opts.epics)
 	bt := "`" // backtick for use in templates
 
-	config := loopScriptConfig(maxRetries, escapedModel, escapedEpicIDs)
+	config := loopScriptConfig(opts.maxRetries, escapedModel, escapedEpicIDs)
 	memorySafety := loopScriptMemorySafety()
 	epicSelector := loopScriptEpicSelector()
 	promptBuilder := loopScriptPromptBuilder(bt)
-	markerAndLoop := loopScriptMarkerAndLoop()
 
-	return config + memorySafety + epicSelector + promptBuilder + markerAndLoop
+	var reviewSection string
+	if opts.review != nil {
+		reviewSection = loopScriptReviewConfig(*opts.review) +
+			loopScriptReviewerDetection() +
+			loopScriptSessionIDManagement() +
+			loopScriptReviewPrompt() +
+			loopScriptSpawnReviewers() +
+			loopScriptImplementerPhase() +
+			loopScriptReviewLoop()
+	}
+
+	helpers := loopScriptHelpers()
+	loopInit := loopScriptLoopInit()
+	epicProcessing := loopScriptEpicProcessing()
+	loopSummary := loopScriptLoopSummary()
+
+	// Inject review triggers into the main loop when reviewers are configured.
+	if opts.review != nil {
+		triggerInit, triggerPeriodic, triggerFinal := loopScriptReviewTriggers(opts.review.reviewEvery)
+		loopInit += triggerInit
+		loopSummary += triggerPeriodic
+		loopSummary += triggerFinal
+	}
+
+	mainLoop := helpers + loopInit + epicProcessing + loopSummary
+
+	script := config + memorySafety + epicSelector + promptBuilder + reviewSection + mainLoop
+
+	if opts.improve != nil {
+		script += loopScriptImprovePhase(*opts.improve)
+	}
+
+	return script
 }
 
 // loopScriptConfig returns the header, config vars, and mkdir section.
@@ -355,6 +425,10 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string) strin
 	fmt.Fprintf(&b, "#\n# Usage:\n#   ./infinity-loop.sh\n#   LOOP_DRY_RUN=1 ./infinity-loop.sh\n\n")
 	fmt.Fprintf(&b, "set -euo pipefail\n\n")
 	fmt.Fprintf(&b, "# Config\nMAX_RETRIES=%d\nMODEL=%s\nEPIC_IDS=%s\nLOG_DIR=\"agent_logs\"\nMIN_FREE_MEMORY_PCT=${MIN_FREE_MEMORY_PCT:-20}\n\n", maxRetries, escapedModel, escapedEpicIDs)
+	// Helpers used by review and improve phases
+	fmt.Fprintf(&b, "# Helpers\ntimestamp() { date '+%%Y-%%m-%%d_%%H-%%M-%%S'; }\nlog() { echo \"[$(timestamp)] $*\"; }\n\n")
+	// JSON parser detection
+	fmt.Fprintf(&b, "HAS_JQ=false\ncommand -v jq >/dev/null 2>&1 && HAS_JQ=true\n\n")
 	fmt.Fprintf(&b, "mkdir -p \"$LOG_DIR\"\n\n")
 	return b.String()
 }
@@ -441,11 +515,6 @@ func loopScriptPromptBuilder(bt string) string {
 	return b.String()
 }
 
-// loopScriptMarkerAndLoop returns the marker detection, observability, and main loop sections.
-func loopScriptMarkerAndLoop() string {
-	return loopScriptHelpers() + loopScriptMainLoopBody()
-}
-
 func loopScriptHelpers() string {
 	return `# --- Marker Detection ---
 detect_marker() {
@@ -474,10 +543,6 @@ log_result() {
 }
 
 `
-}
-
-func loopScriptMainLoopBody() string {
-	return loopScriptLoopInit() + loopScriptEpicProcessing() + loopScriptLoopSummary()
 }
 
 func loopScriptLoopInit() string {
