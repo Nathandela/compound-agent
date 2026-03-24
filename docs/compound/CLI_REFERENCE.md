@@ -1,6 +1,6 @@
 ---
-version: "2.2.0"
-last-updated: "2026-03-23"
+version: "2.2.1"
+last-updated: "2026-03-24"
 summary: "Complete CLI command reference for compound-agent"
 ---
 

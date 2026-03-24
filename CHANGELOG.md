@@ -7,6 +7,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.1] - 2026-03-24
+
+### Added
+
+- **Loop generator production parity**: Brought the Go `ca loop` script generator to full parity with the hardened production `infinity-loop.sh`. Ported crash handler (EXIT trap with status file logging), 3-layer memory safety (repo-scoped orphan cleanup, memory gate, background watchdog with PID tracking), `parse_json()` with jq/python3 fallback, dependency-aware epic ordering (`check_deps_closed()`), dual-file anchored marker detection, and CLI prerequisite checks.
+- **Loop review and improve phases**: Implemented 8 missing flags from the former TS CLI: `--reviewers`, `--review-every`, `--max-review-cycles`, `--review-blocking`, `--review-model`, `--improve`, `--improve-max-iters`, `--improve-time-budget`. Review phase supports multi-model spawning, session management, and review cycles with implementer fix loop. Improve phase supports topic discovery, iteration with rollback, and time budget.
+- **Field-tested enhancements**: Git status check after epic completion (auto-commits if dirty), git push at loop end (with remote availability check), reviewer availability summary logging.
+- **Infinity-loop reference docs**: Added troubleshooting section and real-world example from compound-agent's own 6-epic loop run.
+
+### Fixed
+
+- **Review triggers were dead code**: Review phase triggers were placed after an exit statement and never executed.
+- **Undefined variable in periodic trigger**: `$RESULT` replaced with `$SUCCESS` in periodic review trigger.
+- **Review base SHA reset in loop**: `REVIEW_BASE_SHA` was incorrectly reset inside the while loop on every iteration.
+- **Improve phase stdin piping**: `extract_text` was using file args instead of stdin pipe.
+- **Conditional exit**: Exit line now omitted when improve phase follows review phase.
+
 ## [2.2.0] - 2026-03-23
 
 ### Added
