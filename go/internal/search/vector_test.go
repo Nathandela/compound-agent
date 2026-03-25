@@ -239,7 +239,7 @@ func TestFindSimilarLessons_FiltersByThreshold(t *testing.T) {
 		"completely different": {0.0, 1.0, 0.0, 0.0}, // score = 0.0 (below threshold)
 	}}
 
-	result, err := FindSimilarLessons(db, embedder, "find similar text", 0.80, "")
+	result, err := FindSimilarLessons(db, embedder, "find similar text", 0.80, "", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -266,7 +266,7 @@ func TestFindSimilarLessons_ExcludesSpecifiedID(t *testing.T) {
 		"insight B":   sameVec,
 	}}
 
-	result, err := FindSimilarLessons(db, embedder, "search text", 0.80, "L001")
+	result, err := FindSimilarLessons(db, embedder, "search text", 0.80, "L001", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -354,11 +354,51 @@ func TestFindSimilarLessons_EmptyDB(t *testing.T) {
 	defer db.Close()
 
 	embedder := &mockEmbedder{vectors: map[string][]float64{}}
-	result, err := FindSimilarLessons(db, embedder, "test", 0.80, "")
+	result, err := FindSimilarLessons(db, embedder, "test", 0.80, "", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if result != nil {
 		t.Errorf("expected nil for empty db, got %v", result)
+	}
+}
+
+func TestFindSimilarLessons_UsesPreloadedItems(t *testing.T) {
+	// DB has no items, but preloaded items are provided — should use them
+	db := setupTestDB(t, nil)
+	defer db.Close()
+
+	preloaded := []memory.Item{
+		{ID: "L001", Type: memory.TypeLesson, Trigger: "t1", Insight: "shared insight", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
+	}
+
+	sameVec := []float64{1.0, 0.0, 0.0, 0.0}
+	embedder := &mockEmbedder{vectors: map[string][]float64{
+		"search text":    sameVec,
+		"shared insight": sameVec,
+	}}
+
+	// Must insert the lesson row so cache writes succeed (UPDATE-only)
+	for _, item := range preloaded {
+		_, _ = db.Exec(`INSERT INTO lessons (
+			id, type, trigger, insight, evidence, severity,
+			tags, source, context, supersedes, related,
+			created, confirmed, deleted, retrieval_count, last_retrieved,
+			invalidated_at, invalidation_reason,
+			citation_file, citation_line, citation_commit,
+			compaction_level, compacted_at, pattern_bad, pattern_good
+		) VALUES (?, ?, ?, ?, NULL, NULL, '', 'manual', '{}', '[]', '[]', ?, 1, 0, 0, NULL, NULL, NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL)`,
+			item.ID, string(item.Type), item.Trigger, item.Insight, item.Created)
+	}
+
+	result, err := FindSimilarLessons(db, embedder, "search text", 0.80, "", preloaded)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("expected 1 result from preloaded items, got %d", len(result))
+	}
+	if result[0].Item.ID != "L001" {
+		t.Errorf("expected L001, got %s", result[0].Item.ID)
 	}
 }

@@ -5,6 +5,7 @@ package capture
 import (
 	"database/sql"
 	"errors"
+	"math"
 	"strings"
 	"testing"
 
@@ -345,6 +346,96 @@ func TestIsNovel_DuplicateAboveThreshold(t *testing.T) {
 	}
 	if result.ExistingID != "L001" {
 		t.Errorf("expected existingID='L001', got %q", result.ExistingID)
+	}
+}
+
+func TestIsNovel_ExactlyAtThreshold(t *testing.T) {
+	// Similarity == 0.98 should be flagged as a duplicate (>= threshold).
+	// Construct two unit vectors with cosine similarity = 0.98:
+	// v1 = (1, 0, 0, 0), v2 = (cos(theta), sin(theta), 0, 0) where cos(theta) = 0.98
+	theta := math.Acos(0.98)
+	items := []memory.Item{
+		{ID: "L001", Type: memory.TypeLesson, Trigger: "trigger", Insight: "existing insight", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
+	}
+	db := setupTestDB(t, items)
+	defer db.Close()
+
+	embedder := &mockEmbedder{vectors: map[string][]float64{
+		"new insight":      {1.0, 0.0, 0.0, 0.0},
+		"existing insight": {math.Cos(theta), math.Sin(theta), 0.0, 0.0},
+	}}
+
+	result := isNovelWithDB(db, "new insight", embedder, DuplicateThreshold)
+	if result.Novel {
+		t.Error("expected novel=false when similarity is exactly at threshold (0.98)")
+	}
+}
+
+func TestIsNovel_JustBelowThreshold(t *testing.T) {
+	// Similarity = 0.979 should NOT be flagged as a duplicate (< 0.98).
+	theta := math.Acos(0.979)
+	items := []memory.Item{
+		{ID: "L001", Type: memory.TypeLesson, Trigger: "trigger", Insight: "existing insight", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
+	}
+	db := setupTestDB(t, items)
+	defer db.Close()
+
+	embedder := &mockEmbedder{vectors: map[string][]float64{
+		"new insight":      {1.0, 0.0, 0.0, 0.0},
+		"existing insight": {math.Cos(theta), math.Sin(theta), 0.0, 0.0},
+	}}
+
+	result := isNovelWithDB(db, "new insight", embedder, DuplicateThreshold)
+	if !result.Novel {
+		t.Errorf("expected novel=true when similarity (0.979) is below threshold, got reason=%q", result.Reason)
+	}
+}
+
+func TestIsNovel_EllipsisOnlyWhenTruncated(t *testing.T) {
+	// Short insight text should NOT have trailing ellipsis
+	items := []memory.Item{
+		{ID: "L001", Type: memory.TypeLesson, Trigger: "trigger", Insight: "short", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
+	}
+	db := setupTestDB(t, items)
+	defer db.Close()
+
+	sameVec := []float64{1.0, 0.0, 0.0, 0.0}
+	embedder := &mockEmbedder{vectors: map[string][]float64{
+		"short": sameVec,
+	}}
+
+	result := isNovelWithDB(db, "short", embedder, DuplicateThreshold)
+	if result.Novel {
+		t.Fatal("expected novel=false for identical content")
+	}
+	if strings.HasSuffix(result.Reason, `..."`) {
+		t.Errorf("short insight should not have ellipsis, got: %s", result.Reason)
+	}
+	if !strings.Contains(result.Reason, `"short"`) {
+		t.Errorf("expected reason to contain the full short insight, got: %s", result.Reason)
+	}
+}
+
+func TestIsNovel_EllipsisWhenTruncated(t *testing.T) {
+	// Long insight text SHOULD have trailing ellipsis
+	longInsight := "This is a very long insight text that definitely exceeds fifty characters in length"
+	items := []memory.Item{
+		{ID: "L001", Type: memory.TypeLesson, Trigger: "trigger", Insight: longInsight, Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
+	}
+	db := setupTestDB(t, items)
+	defer db.Close()
+
+	sameVec := []float64{1.0, 0.0, 0.0, 0.0}
+	embedder := &mockEmbedder{vectors: map[string][]float64{
+		longInsight: sameVec,
+	}}
+
+	result := isNovelWithDB(db, longInsight, embedder, DuplicateThreshold)
+	if result.Novel {
+		t.Fatal("expected novel=false for identical content")
+	}
+	if !strings.HasSuffix(result.Reason, `..."`) {
+		t.Errorf("long insight should have ellipsis, got: %s", result.Reason)
 	}
 }
 
