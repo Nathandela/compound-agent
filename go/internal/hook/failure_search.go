@@ -60,8 +60,9 @@ func BuildSearchTokens(toolName, target, toolOutput string) []string {
 	// Extract distinctive keywords from error output
 	if toolOutput != "" {
 		trimmed := strings.TrimSpace(toolOutput)
-		if len(trimmed) > maxQueryLen {
-			trimmed = trimmed[:maxQueryLen]
+		// Truncate on rune boundary to avoid splitting multi-byte UTF-8 characters
+		if runes := []rune(trimmed); len(runes) > maxQueryLen {
+			trimmed = string(runes[:maxQueryLen])
 		}
 		for _, word := range strings.Fields(trimmed) {
 			// Strip punctuation from word boundaries
@@ -94,7 +95,7 @@ func FormatLessonResults(matches []LessonMatch) string {
 	var sb strings.Builder
 	sb.WriteString("Relevant lessons from past sessions:\n")
 	for i, m := range matches {
-		sb.WriteString(fmt.Sprintf("\n%d. **%s**\n   %s", i+1, m.Trigger, m.Insight))
+		fmt.Fprintf(&sb, "\n%d. **%s**\n   %s", i+1, m.Trigger, m.Insight)
 	}
 	return sb.String()
 }
