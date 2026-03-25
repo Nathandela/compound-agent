@@ -28,10 +28,17 @@ func TestRetryClient_HealthRetryOnDisconnect(t *testing.T) {
 				return
 			}
 			var req Request
-			json.Unmarshal(buf[:n-1], &req)
+			if err := json.Unmarshal(buf[:n-1], &req); err != nil {
+				return
+			}
 			resp := Response{ID: req.ID, Status: "ok", Model: "nomic-embed-text-v1.5"}
-			data, _ := json.Marshal(resp)
-			conn.Write(append(data, '\n'))
+			data, merr := json.Marshal(resp)
+			if merr != nil {
+				return
+			}
+			if _, werr := conn.Write(append(data, '\n')); werr != nil {
+				return
+			}
 		}
 	}
 
@@ -73,14 +80,21 @@ func TestRetryClient_EmbedRetryOnDisconnect(t *testing.T) {
 				return // Simulate crash
 			}
 			var req Request
-			json.Unmarshal(buf[:n-1], &req)
+			if err := json.Unmarshal(buf[:n-1], &req); err != nil {
+				return
+			}
 			vecs := make([][]float64, len(req.Texts))
 			for i := range req.Texts {
 				vecs[i] = []float64{0.1, 0.2}
 			}
 			resp := Response{ID: req.ID, Vectors: vecs}
-			data, _ := json.Marshal(resp)
-			conn.Write(append(data, '\n'))
+			data, merr := json.Marshal(resp)
+			if merr != nil {
+				return
+			}
+			if _, werr := conn.Write(append(data, '\n')); werr != nil {
+				return
+			}
 		}
 	}
 

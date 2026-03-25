@@ -2,6 +2,7 @@ package hook
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -45,13 +46,21 @@ func readFailureState(stateDir string) failureState {
 	return state
 }
 
-func writeFailureState(stateDir string, state failureState) {
-	data, _ := json.Marshal(state)
-	_ = os.WriteFile(filepath.Join(stateDir, failureStateFileName), data, 0o644)
+func writeFailureState(stateDir string, state failureState) error {
+	data, err := json.Marshal(state)
+	if err != nil {
+		return fmt.Errorf("marshal failure state: %w", err)
+	}
+	if err := os.WriteFile(filepath.Join(stateDir, failureStateFileName), data, 0o644); err != nil {
+		return fmt.Errorf("write failure state: %w", err)
+	}
+	return nil
 }
 
 func deleteFailureState(stateDir string) {
-	_ = os.Remove(filepath.Join(stateDir, failureStateFileName))
+	// Best-effort: if the file doesn't exist or can't be removed, the state
+	// will be treated as stale on next read (timestamp check).
+	os.Remove(filepath.Join(stateDir, failureStateFileName))
 }
 
 func getFailureTarget(toolName string, toolInput map[string]interface{}) string {
@@ -111,7 +120,9 @@ func ProcessToolFailureWithSearch(toolName string, toolInput map[string]interfac
 	}
 
 	state.Timestamp = time.Now().UnixMilli()
-	writeFailureState(stateDir, state)
+	// Write error is non-fatal: worst case, the counter resets and
+	// the user sees the tip one failure later than expected.
+	_ = writeFailureState(stateDir, state)
 	return ToolFailureResult{}
 }
 

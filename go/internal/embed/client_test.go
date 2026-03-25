@@ -48,8 +48,13 @@ func echoHandler(conn net.Conn) {
 		line := scanner.Bytes()
 		var req Request
 		if err := json.Unmarshal(line, &req); err != nil {
-			resp, _ := json.Marshal(Response{ID: "unknown", Error: "parse error"})
-			conn.Write(append(resp, '\n'))
+			resp, merr := json.Marshal(Response{ID: "unknown", Error: "parse error"})
+			if merr != nil {
+				return
+			}
+			if _, werr := conn.Write(append(resp, '\n')); werr != nil {
+				return
+			}
 			continue
 		}
 		var resp interface{}
@@ -67,8 +72,13 @@ func echoHandler(conn net.Conn) {
 		default:
 			resp = Response{ID: req.ID, Error: fmt.Sprintf("unknown method: %s", req.Method)}
 		}
-		data, _ := json.Marshal(resp)
-		conn.Write(append(data, '\n'))
+		data, merr := json.Marshal(resp)
+		if merr != nil {
+			return
+		}
+		if _, werr := conn.Write(append(data, '\n')); werr != nil {
+			return
+		}
 	}
 }
 
