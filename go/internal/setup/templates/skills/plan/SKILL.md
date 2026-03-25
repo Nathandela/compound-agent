@@ -21,9 +21,24 @@ Create a concrete implementation plan by decomposing work into small, testable t
 7. Decompose into tasks small enough to verify individually
 8. Define acceptance criteria for each task
 9. Ensure each task traces back to a spec requirement for traceability
-10. Map dependencies between tasks
-11. Create beads issues: `bd create --title="..." --type=task`
-12. Create review and compound blocking tasks (`bd create` + `bd dep add`) that depend on work tasks — these survive compaction and surface via `bd ready` after work completes
+10. **Generate Acceptance Criteria table**: Extract testable criteria from EARS requirements and append to the epic description. Use this format:
+
+    ```markdown
+    ## Acceptance Criteria
+    | ID | Source Req | Criterion | Verification Method |
+    |----|-----------|-----------|---------------------|
+    | AC-1 | EARS-N | When X, system shall Y within Z | unit test / manual / integration |
+    ```
+
+    Rules:
+    - Each EARS requirement MUST map to at least one AC row
+    - Criteria MUST be testable (no vague adjectives like "fast" or "good")
+    - Verification method MUST be specified
+    - Write the AC table to the epic via `bd update <epic-id> --description="<existing desc + AC section>"`
+    - The AC section is **append-only** after plan phase; review annotates pass/fail
+11. Map dependencies between tasks
+12. Create beads issues: `bd create --title="..." --type=task`
+13. Create review and compound blocking tasks (`bd create` + `bd dep add`) that depend on work tasks — these survive compaction and surface via `bd ready` after work completes
 
 ## Memory Integration
 - Run `ca search` and `ca knowledge "relevant topic"` for patterns related to the feature area
@@ -43,6 +58,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Not reviewing existing ADRs and docs for constraints
 - Making architectural decisions without research backing (use the researcher skill for complex domains)
 - Planning implementation details too early (stay at task level)
+- Not generating Acceptance Criteria table from EARS requirements
 
 ## Quality Criteria
 - Each task has clear acceptance criteria
@@ -53,8 +69,10 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Ambiguities resolved via `AskUserQuestion` before decomposing
 - Complexity estimates are realistic (no "should be quick")
 - Each task traces back to a spec requirement
+- **Acceptance Criteria table generated and appended to epic description**
 
 ## POST-PLAN VERIFICATION -- MANDATORY
 After creating all tasks, verify review and compound tasks exist:
 - Run `bd list --status=open` and check for a "Review:" task and a "Compound:" task
 - If either is missing, CREATE THEM NOW. The plan is NOT complete without these gates.
+- **Verify AC table**: Run `bd show <epic-id>` and confirm the `## Acceptance Criteria` section exists in the description. If missing, the plan is NOT complete.

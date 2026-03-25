@@ -12,19 +12,20 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 1. Pick tasks from `bd ready` or `$ARGUMENTS`
 2. Mark tasks in progress: `bd update <id> --status=in_progress`
 3. Read the epic description (`bd show <epic>`) for spec context -- EARS requirements guide what "done" looks like
-4. Run `ca search` per agent/subtask for targeted context. Display results.
-5. Assess parallelization: identify independent tasks that can be worked simultaneously
-6. Deploy an **AgentTeam** (TeamCreate + Task with `team_name`) with MULTIPLE test-writers and implementers:
+4. **Read Acceptance Criteria**: Locate the `## Acceptance Criteria` table in the parent epic description. Each AC row defines a testable criterion that the implementation must satisfy. If no AC section exists, flag as a process gap and proceed using EARS requirements directly.
+5. Run `ca search` per agent/subtask for targeted context. Display results.
+6. Assess parallelization: identify independent tasks that can be worked simultaneously
+7. Deploy an **AgentTeam** (TeamCreate + Task with `team_name`) with MULTIPLE test-writers and implementers:
    - Role skills: `.claude/skills/compound/agents/{test-writer,implementer}/SKILL.md`
    - Scale teammate count to independent tasks; pairs coordinate via SendMessage on shared interfaces
-7. Agents communicate via SendMessage when working on overlapping areas.
-8. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
-9. If implementation diverges from spec requirements, stop and discuss with user via AskUserQuestion before proceeding.
-10. If blocked, use AskUserQuestion to get user direction.
-11. Shut down the team when done: send shutdown_request to all teammates.
-12. Commit incrementally as tests pass.
-13. Run full test suite for regressions.
-14. Close tasks: `bd close <id>`
+8. Agents communicate via SendMessage when working on overlapping areas.
+9. Lead coordinates: review agent outputs, resolve conflicts, verify tests pass. Do not write code directly.
+10. If implementation diverges from spec requirements or acceptance criteria, stop and discuss with user via AskUserQuestion before proceeding.
+11. If blocked, use AskUserQuestion to get user direction.
+12. Shut down the team when done: send shutdown_request to all teammates.
+13. Commit incrementally as tests pass.
+14. Run full test suite for regressions.
+15. Close tasks: `bd close <id>`
 
 ## Memory Integration
 - Run `ca search` per delegated subtask with the subtask's specific description
@@ -62,6 +63,7 @@ for complex changes. For all changes, `/implementation-reviewer` is the minimum 
 - Not injecting memory context into agent prompts
 - Modifying tests to make them pass instead of fixing implementation
 - Not running the full test suite after agent work completes
+- Ignoring acceptance criteria from the parent epic
 
 ## Quality Criteria
 - Tests existed before implementation code
@@ -71,6 +73,7 @@ for complex changes. For all changes, `/implementation-reviewer` is the minimum 
 - All tests pass after refactoring
 - Task lifecycle tracked via beads (`bd`)
 - Implementation aligns with spec requirements from epic
+- **Implementation satisfies acceptance criteria from parent epic**
 
 ## PHASE GATE 3 -- MANDATORY
 Before starting Review, verify ALL work tasks are closed:

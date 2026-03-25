@@ -47,6 +47,7 @@ For each phase:
 
 ## Phase Gates (MANDATORY)
 - **After Plan**: Run `bd list --status=open` and verify Review + Compound tasks exist, then run `ca phase-check gate post-plan`
+- **After Plan (AC Gate)**: Run `bd show <epic-id>` and verify the `## Acceptance Criteria` section exists in the epic description. If missing, the plan phase MUST be re-entered to generate the AC table before proceeding to Work. This gate ensures the contract between plan and work is fulfilled.
 - **After Work (GATE 3)**: `bd list --status=in_progress` must be empty. Then run `ca phase-check gate gate-3`
 - **After Review (GATE 4)**: /implementation-reviewer must have returned APPROVED. Then run `ca phase-check gate gate-4`
 - **After Compound (FINAL GATE)**: Run `ca verify-gates <epic-id>` (must PASS), `{{QUALITY_GATE_TEST}}`, and `{{QUALITY_GATE_LINT}}`, then run `ca phase-check gate final` (auto-cleans phase state)
@@ -71,11 +72,13 @@ If a gate fails, DO NOT proceed. Fix the issue first.
 - Proceeding after a failed gate
 - Not updating epic notes with phase state (loses resume ability)
 - Batching all commits to the end instead of committing incrementally
+- Not verifying AC table exists after plan phase before starting work
 
 ## Quality Criteria
 - All 5 phases were executed (3/5 is NOT success)
 - Each phase skill was Read before execution
 - Phase gates verified between each transition
+- **AC table verified present after plan phase**
 - Epic notes updated after each phase
 - Memory searched at the start of each phase
 - `ca verify-gates` passed at the end

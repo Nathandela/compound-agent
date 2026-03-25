@@ -67,8 +67,9 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 ### Phase 4: Hand off
 1. Create beads epic if needed (`bd create --title="..." --type=epic --priority=<N>`)
 2. Store spec in the epic description (`bd update <epic-id> --description="..."`) -- single source of truth, including both EARS requirements and scenario table
-3. Flag open questions for plan phase
-4. Capture lessons: `ca learn`
+3. **Note on Acceptance Criteria**: The EARS requirements you write here are the source material for the Acceptance Criteria table. The plan phase will extract testable AC rows from these EARS requirements and append the AC table to the epic description. Write EARS requirements with testability in mind — each should map cleanly to at least one verifiable criterion.
+4. Flag open questions for plan phase
+5. Capture lessons: `ca learn`
 
 ## Memory Integration
 - `ca search` before generating approaches
@@ -88,6 +89,7 @@ Read `.claude/skills/compound/spec-dev/references/spec-guide.md` on demand for E
 - Not creating the beads epic
 - Specifying implementation instead of requirements
 - Skipping scenario table generation after EARS requirements
+- Writing EARS requirements that cannot be mapped to testable acceptance criteria
 
 ## Quality Criteria
 - [ ] Requirements use EARS notation
@@ -99,3 +101,4 @@ Read `.claude/skills/compound/spec-dev/references/spec-guide.md` on demand for E
 - [ ] Scenario table generated from EARS requirements and diagrams
 - [ ] Spec and scenario table stored in beads epic description
 - [ ] ADRs created for significant decisions
+- [ ] **EARS requirements are testable and can map to acceptance criteria**
