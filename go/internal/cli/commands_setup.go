@@ -353,7 +353,7 @@ func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPa
 func printClaudeResult(cmd *cobra.Command, displayPath string, action string, jsonOut bool) {
 	if jsonOut {
 		data, _ := json.Marshal(map[string]any{
-			"installed": action != "unchanged",
+			"installed": true,
 			"location":  displayPath,
 			"action":    action,
 		})
