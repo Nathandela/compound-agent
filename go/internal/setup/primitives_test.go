@@ -830,6 +830,56 @@ func TestPruneStaleTemplates_RemovesStaleRoleDirs(t *testing.T) {
 	}
 }
 
+func TestPruneStaleTemplates_RemovesStaleAgentRoleReferenceEntries(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install agent role skills and references.
+	if _, _, err := InstallAgentRoleSkills(dir); err != nil {
+		t.Fatalf("InstallAgentRoleSkills: %v", err)
+	}
+
+	// Add retired entries inside a still-valid role directory.
+	roleDir := filepath.Join(dir, ".claude", "skills", "compound", "agents", "runtime-verifier")
+	staleRef := filepath.Join(roleDir, "references", "retired.md")
+	if err := os.WriteFile(staleRef, []byte("# old ref\n"), 0644); err != nil {
+		t.Fatalf("write retired ref: %v", err)
+	}
+	staleDir := filepath.Join(roleDir, "retired-dir")
+	if err := os.MkdirAll(staleDir, 0755); err != nil {
+		t.Fatalf("mkdir retired-dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(staleDir, "note.md"), []byte("# old dir\n"), 0644); err != nil {
+		t.Fatalf("write retired dir note: %v", err)
+	}
+
+	pruned, err := PruneStaleTemplates(dir)
+	if err != nil {
+		t.Fatalf("PruneStaleTemplates: %v", err)
+	}
+	if pruned < 2 {
+		t.Errorf("expected at least 2 pruned entries, got %d", pruned)
+	}
+
+	if _, err := os.Stat(staleRef); !os.IsNotExist(err) {
+		t.Error("retired reference file should be removed")
+	}
+	if _, err := os.Stat(staleDir); !os.IsNotExist(err) {
+		t.Error("retired nested directory should be removed")
+	}
+
+	// Current reference file must remain.
+	currentRef := filepath.Join(roleDir, "references", "playwright-patterns.md")
+	if _, err := os.Stat(currentRef); err != nil {
+		t.Errorf("current reference file should be preserved: %v", err)
+	}
+
+	// Current SKILL.md must remain.
+	skillFile := filepath.Join(roleDir, "SKILL.md")
+	if _, err := os.Stat(skillFile); err != nil {
+		t.Errorf("SKILL.md should be preserved: %v", err)
+	}
+}
+
 func TestPruneStaleTemplates_NonExistentDirs(t *testing.T) {
 	dir := t.TempDir()
 

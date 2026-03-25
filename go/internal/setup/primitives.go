@@ -335,6 +335,14 @@ func PruneStaleTemplates(repoRoot string) (int, error) {
 	}
 	pruned += n
 
+	// Agent role skill internals: prune retired nested files/dirs (for example
+	// old references under a still-valid role directory).
+	n, err = pruneAgentRoleSkillInternals(rolesDir)
+	if err != nil {
+		return pruned, err
+	}
+	pruned += n
+
 	return pruned, nil
 }
 
@@ -356,6 +364,26 @@ func prunePhaseSkillInternals(skillsDir string) (int, error) {
 	}
 
 	return pruneManagedSubtree(skillsDir, "", expectedFiles, expectedDirs, map[string]bool{"agents": true})
+}
+
+// pruneAgentRoleSkillInternals removes retired files and directories inside current
+// agent role skill directories while preserving the current SKILL.md and reference files.
+func pruneAgentRoleSkillInternals(rolesDir string) (int, error) {
+	expectedFiles := make(map[string]bool)
+	expectedDirs := make(map[string]bool)
+
+	for role := range templates.AgentRoleSkills() {
+		expectedDirs[role] = true
+		expectedFiles[path.Join(role, "SKILL.md")] = true
+	}
+	for relPath := range templates.AgentRoleSkillReferences() {
+		expectedFiles[relPath] = true
+		for dir := path.Dir(relPath); dir != "." && dir != ""; dir = path.Dir(dir) {
+			expectedDirs[dir] = true
+		}
+	}
+
+	return pruneManagedSubtree(rolesDir, "", expectedFiles, expectedDirs, nil)
 }
 
 // pruneStaleFiles removes files from dir that are not in the expected map (by filename key).
