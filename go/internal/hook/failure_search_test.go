@@ -56,6 +56,31 @@ func TestBuildSearchTokens_TruncatesLongOutput(t *testing.T) {
 	}
 }
 
+func TestBuildSearchTokens_TruncatesOnRuneBoundary(t *testing.T) {
+	// Build a string of multi-byte runes that would be split mid-rune
+	// if truncated by byte offset instead of rune offset.
+	// U+00E9 (é) is 2 bytes in UTF-8; 201 of them = 402 bytes.
+	runes := make([]rune, maxQueryLen+1)
+	for i := range runes {
+		runes[i] = 'é' // 2-byte UTF-8
+	}
+	multiByteOutput := string(runes)
+
+	got := BuildSearchTokens("Bash", "", multiByteOutput)
+	// The truncated string should be valid UTF-8 (no broken runes).
+	// It should produce a single long token (no spaces), so: [the-token].
+	if len(got) == 0 {
+		t.Fatal("expected at least one token from multi-byte input")
+	}
+	for _, tok := range got {
+		for _, r := range tok {
+			if r == '\uFFFD' {
+				t.Errorf("token contains replacement character, truncation likely split a multi-byte rune: %q", tok)
+			}
+		}
+	}
+}
+
 func TestBuildSearchTokens_EmptyInputs(t *testing.T) {
 	got := BuildSearchTokens("", "", "")
 	if len(got) != 0 {
