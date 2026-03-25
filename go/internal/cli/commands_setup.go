@@ -275,24 +275,41 @@ func handleClaudeStatus(cmd *cobra.Command, installed bool, stale bool, duplicat
 	return nil
 }
 
-func handleClaudeDryRun(cmd *cobra.Command, installed bool, needsUpgrade bool, needsDedupe bool, displayPath string, jsonOut bool) error {
-	action := "install"
+// hookAction classifies the action to take based on hook state.
+// Returns a present-tense verb ("install", "upgrade", "reconcile", "unchanged").
+func hookAction(installed, needsUpgrade, needsDedupe bool) string {
 	if installed && !needsUpgrade && !needsDedupe {
-		action = "unchanged"
-	} else if needsUpgrade && needsDedupe {
-		action = "reconcile"
-	} else if needsUpgrade {
-		action = "upgrade"
-	} else if needsDedupe {
-		action = "reconcile"
+		return "unchanged"
 	}
+	if needsUpgrade && needsDedupe {
+		return "reconcile"
+	}
+	if needsUpgrade {
+		return "upgrade"
+	}
+	if needsDedupe {
+		return "reconcile"
+	}
+	return "install"
+}
+
+// hookActionPastTense maps present-tense actions to past-tense for output messages.
+var hookActionPastTense = map[string]string{
+	"install":   "installed",
+	"upgrade":   "upgraded",
+	"reconcile": "reconciled",
+	"unchanged": "unchanged",
+}
+
+func handleClaudeDryRun(cmd *cobra.Command, installed bool, needsUpgrade bool, needsDedupe bool, displayPath string, jsonOut bool) error {
+	action := hookAction(installed, needsUpgrade, needsDedupe)
 
 	if jsonOut {
 		data, _ := json.Marshal(map[string]any{
-			"dryRun":   true,
-			"location": displayPath,
-			"action":   action,
-			"installed": installed,
+			"dryRun":       true,
+			"location":     displayPath,
+			"action":       action,
+			"installed":    installed,
 			"needsUpgrade": needsUpgrade,
 			"needsDedupe":  needsDedupe,
 		})
@@ -319,16 +336,7 @@ func handleClaudeDryRun(cmd *cobra.Command, installed bool, needsUpgrade bool, n
 
 func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPath string, installed bool, needsUpgrade bool, needsDedupe bool, binaryPath string, displayPath string, jsonOut bool) error {
 	if installed && !needsUpgrade && !needsDedupe {
-		if jsonOut {
-			data, _ := json.Marshal(map[string]any{
-				"installed": true,
-				"location":  displayPath,
-				"action":    "unchanged",
-			})
-			cmd.Println(string(data))
-		} else {
-			cmd.Printf("[info] Compound agent hooks already installed at %s\n", displayPath)
-		}
+		printClaudeResult(cmd, displayPath, "unchanged", jsonOut)
 		return nil
 	}
 
@@ -337,35 +345,36 @@ func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPa
 		return fmt.Errorf("write settings: %w", err)
 	}
 
-	action := "installed"
-	if needsUpgrade && needsDedupe {
-		action = "reconciled"
-	} else if needsUpgrade {
-		action = "upgraded"
-	} else if needsDedupe {
-		action = "reconciled"
-	}
+	action := hookActionPastTense[hookAction(installed, needsUpgrade, needsDedupe)]
+	printClaudeResult(cmd, displayPath, action, jsonOut)
+	return nil
+}
 
+func printClaudeResult(cmd *cobra.Command, displayPath string, action string, jsonOut bool) {
 	if jsonOut {
 		data, _ := json.Marshal(map[string]any{
-			"installed": true,
+			"installed": action != "unchanged",
 			"location":  displayPath,
 			"action":    action,
 		})
 		cmd.Println(string(data))
+		return
+	}
+
+	messages := map[string]string{
+		"unchanged":  fmt.Sprintf("[info] Compound agent hooks already installed at %s", displayPath),
+		"installed":  fmt.Sprintf("[ok] Claude Code hooks installed to %s", displayPath),
+		"upgraded":   fmt.Sprintf("[ok] Claude Code hooks upgraded in %s (npx → binary)", displayPath),
+		"reconciled": fmt.Sprintf("[ok] Claude Code hooks reconciled in %s (upgraded + deduplicated)", displayPath),
+	}
+	if msg, ok := messages[action]; ok {
+		cmd.Println(msg)
 	} else {
-		if needsUpgrade && needsDedupe {
-			cmd.Printf("[ok] Claude Code hooks reconciled in %s (upgraded + deduplicated)\n", displayPath)
-		} else if needsUpgrade {
-			cmd.Printf("[ok] Claude Code hooks upgraded in %s (npx → binary)\n", displayPath)
-		} else if needsDedupe {
-			cmd.Printf("[ok] Claude Code hooks reconciled in %s (deduplicated)\n", displayPath)
-		} else {
-			cmd.Printf("[ok] Claude Code hooks installed to %s\n", displayPath)
-		}
+		cmd.Printf("[ok] Claude Code hooks %s in %s\n", action, displayPath)
+	}
+	if action != "unchanged" {
 		cmd.Println("  Hooks: SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse, PreToolUse, Stop")
 	}
-	return nil
 }
 
 func handleClaudeUninstall(cmd *cobra.Command, settings map[string]any, settingsPath string, installed bool, displayPath string, jsonOut bool) error {

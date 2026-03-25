@@ -184,4 +184,3 @@ func TestDetectStack_DirectoryNotFile(t *testing.T) {
 		t.Errorf("TestCmd = %q, want fallback (directory named go.mod should be ignored)", info.TestCmd)
 	}
 }
-
