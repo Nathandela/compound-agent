@@ -19,12 +19,24 @@ Take a large system specification and decompose it into naturally-scoped epic be
 **Goal**: Understand the system domain before decomposing.
 1. Search memory: \`ca search\` for past features, constraints, decisions
 2. Search knowledge: \`ca knowledge "relevant terms"\`
-3. Ask "why" before "how" -- understand the real need
-4. Build a **domain glossary** (ubiquitous language) from the dialogue
-5. Produce a **discovery mindmap** (Mermaid \`mindmap\`) to expose assumptions
-6. **Reversibility analysis**: classify decisions as irreversible (schema, public API, service boundary), moderate (framework), or reversible (library, config). Spend effort proportional to irreversibility.
-7. **Change volatility**: rate each boundary stable/moderate/high. High-volatility justifies modularity investment.
-8. Use \`AskUserQuestion\` to clarify scope and preferences
+3. **Research sufficiency gate** (see below)
+4. Ask "why" before "how" -- understand the real need
+5. Build a **domain glossary** (ubiquitous language) from the dialogue
+6. Produce a **discovery mindmap** (Mermaid \`mindmap\`) to expose assumptions
+7. **Reversibility analysis**: classify decisions as irreversible (schema, public API, service boundary), moderate (framework), or reversible (library, config). Spend effort proportional to irreversibility.
+8. **Change volatility**: rate each boundary stable/moderate/high. High-volatility justifies modularity investment.
+9. Use \`AskUserQuestion\` to clarify scope and preferences
+
+### Research Sufficiency Gate
+After steps 1-2, evaluate whether the domain is well-enough understood to decompose:
+
+1. **Collect results**: Gather all hits from \`ca search\` and \`ca knowledge\` plus any existing documents in \`docs/research/\` relevant to the domain.
+2. **Evaluate relevance, not just count**: Score each result for semantic relevance to the decomposition task (STPA H2.1). A result is "relevant" only if it directly informs bounded context identification, interface design, or domain modeling for this specific system.
+3. **Apply threshold**: If **fewer than 3 results score above the relevance threshold (0.7+ similarity or clear topical match)**, the domain is insufficiently understood.
+   - **Insufficient**: Recommend triggering \`/compound:get-a-phd\` with the domain topic before continuing decomposition. Use \`AskUserQuestion\` to confirm with the user.
+   - **Sufficient**: Note the evidence ("N relevant sources found: [list]") and proceed. Skip get-a-phd.
+4. **Time budget** (STPA H2.5): Research (including any get-a-phd execution) is capped at **15 minutes or 3 research rounds**, whichever comes first. If the budget expires, proceed with available knowledge and document gaps as assumptions.
+5. **Artifact storage**: When get-a-phd produces output, verify artifacts land in \`docs/research/<topic>/\` and that \`docs/research/index.md\` is updated before continuing to decomposition.
 
 **Gate 1**: Use \`AskUserQuestion\` to confirm the understanding is complete before proceeding to Spec.
 
@@ -71,7 +83,28 @@ Spawn **6 parallel subagents** (via Task tool):
 3. Define **fitness functions** per epic to monitor assumptions. Document re-decomposition trigger.
 4. Wire dependencies via \`bd dep add\` for all relationships
 5. Store processing order as notes on the meta-epic
-6. Capture lessons via \`ca learn\`
+6. **Create Integration Verification epic** (see below)
+7. Capture lessons via \`ca learn\`
+
+### Integration Verification Epic
+After creating all domain epics, create a final **Integration Verification (IV) epic** that validates cross-epic interfaces:
+
+1. **Create the IV epic**: \`bd create --title="Integration Verification: <system name>" --type=epic --priority=<N>\`
+2. **Wire dependencies**: The IV epic depends on ALL other materialized epics (\`bd dep add <iv-id> <epic-id>\` for each). It runs last.
+3. **Scope proportionally** (IV-2) using the contract classification tree:
+   | Contract Type | Examples | IV Scope |
+   |--------------|----------|----------|
+   | Data-only | Shared structs, config, file formats | **LIGHT** — schema validation, round-trip tests |
+   | Behavioral | API calls, event handlers, callbacks | **MEDIUM** — contract tests, integration scenarios |
+   | Composition | Shared state, orchestration, lifecycle | **FULL** — end-to-end flows, failure injection |
+   Classify each interface contract from Phase 3 and pick the highest scope level across all contracts.
+4. **IV epic description must include** (STPA H3.3):
+   - Scope level (LIGHT / MEDIUM / FULL) with justification
+   - **Contracts under test table**: list every cross-epic interface contract with source epic, target epic, contract type, and test approach
+   - Dependencies (all materialized epics)
+   - Instruction that the IV epic goes through the full cook-it pipeline (IV-3)
+   - Instruction that the plan phase produces tasks testing cross-epic interfaces from the architect's contracts (IV-4)
+   - Instruction that if integration tests find cross-boundary failures, create bug beads with deps to the originating epics (IV-5)
 
 ## Phase 5: Launch (Opt-in)
 **Goal**: Configure and launch the infinity loop on the materialized epics.
@@ -147,11 +180,18 @@ See \`architect/references/infinity-loop.md\` for full parameter reference and m
 - Treating complex decisions as complicated (Cynefin): service boundaries need experiments, not just analysis
 - Ignoring implicit contracts (threading, timing, backpressure) -- Garlan's architectural mismatch
 - Not capturing assumptions that would invalidate the decomposition if wrong
+- **Counting search results without evaluating relevance** -- 10 low-relevance hits do not equal domain familiarity (STPA H2.1)
+- **Unbounded research spirals** -- always enforce the 15-minute / 3-round budget (STPA H2.5)
+- **Skipping the research gate when the domain is novel** -- unfamiliar domains lead to wrong bounded contexts
+- **Omitting the Integration Verification epic** -- cross-epic interface failures are only caught at the end; without IV, integration bugs surface too late
+- **Under-scoping integration verification** -- using LIGHT scope when behavioral or composition contracts exist; match scope to contract complexity
+- **IV epic without enough structure** -- spec-dev cannot produce a meaningful plan if the IV description lacks the contracts-under-test table (STPA H3.3)
 - Launching loop without verifying all epics are status=open (pre-flight check)
 - Skipping dry-run (catches configuration errors before live execution)
 
 ## Quality Criteria
 - [ ] Socratic phase completed with domain glossary and mindmap
+- [ ] **Research sufficiency gate evaluated** with documented evidence (sources listed or get-a-phd triggered)
 - [ ] System-level EARS requirements cover all capabilities
 - [ ] Architecture diagrams produced (C4, sequence, state)
 - [ ] Spec written to docs/specs/ and meta-epic created
@@ -159,6 +199,7 @@ See \`architect/references/infinity-loop.md\` for full parameter reference and m
 - [ ] Each epic has scope boundaries, EARS subset, interface contracts (explicit + implicit), and assumptions
 - [ ] Dependencies wired via bd dep add
 - [ ] Processing order stored on meta-epic
+- [ ] **Integration Verification epic created** with correct scope level, contracts-under-test table, and dependencies on all domain epics
 - [ ] 3 human gates passed via AskUserQuestion (4 if launch phase activated)
 - [ ] Memory searched at each phase
 - [ ] Phase 5 opt-in question asked (or intent detected in starting prompt)
