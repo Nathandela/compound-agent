@@ -7,6 +7,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Research docs shipping**: `ca init` now installs `docs/compound/research/` (42 files across 9 topic directories) to consumer repos via `go:embed`. Restores research delivery that was lost during the Go migration -- ~25 template files (agent-role-skills, phase skills, commands) reference these docs for domain knowledge (security, TDD, property testing, code review, etc.).
+- **Research drift tests**: `TestTemplateDrift_ResearchSourceMatchesEmbed` verifies source and embedded research trees stay in sync. `TestTemplateDrift_ResearchReferencesResolve` validates all `docs/compound/research/` path references in templates point to files that actually exist.
+
+### Fixed
+
+- **Phantom runtime-verification references**: 4 template files referenced `docs/research/q-and-a/runtime-verification.md` which never existed. Redirected to `docs/compound/research/scenario-testing/`.
+- **Research index.md accuracy**: Fixed source path (was `docs/research/`, now `docs/compound/research/`). Added managed-directory warning so users know `docs/compound/research/` is fully managed by `ca init` and user research belongs in `docs/research/`.
+
 ## [2.3.0] - 2026-03-25
 
 ### Added
