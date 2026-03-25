@@ -370,7 +370,8 @@ type loopGenerateOptions struct {
 
 func generateLoopScript(opts loopGenerateOptions) string {
 	escapedModel := util.ShellEscape(opts.model)
-	escapedEpicIDs := util.ShellEscape(opts.epics)
+	// Replace commas with spaces so bash `for` loop iterates correctly.
+	escapedEpicIDs := util.ShellEscape(strings.ReplaceAll(opts.epics, ",", " "))
 	bt := "`" // backtick for use in templates
 
 	config := loopScriptConfig(opts.maxRetries, escapedModel, escapedEpicIDs)
