@@ -20,7 +20,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    b. Filter results by category match and recency (prefer lessons < 30 days old)
    c. Cap at **3-5 lessons per reviewer** -- more dilutes focus
    d. Inject matched lessons into each reviewer's prompt as calibration context
-   e. Consult `docs/research/` for methodology references relevant to the review domain (e.g., `docs/research/q-and-a/runtime-verification.md` for testing reviews)
+   e. Consult `docs/compound/research/` for methodology references relevant to the review domain (e.g., `docs/compound/research/scenario-testing/` for testing reviews)
    f. **Contradiction detection**: If a reviewer finding contradicts a high-severity lesson (severity >= P1), flag the contradiction for human review via `AskUserQuestion` with both the finding and the lesson content. Do not auto-resolve contradictions.
    > See `review/references/lesson-calibration.md` for detailed calibration guidance
 5. Search memory with `ca search` for known patterns and recurring issues (broader search beyond per-reviewer calibration)
@@ -103,7 +103,7 @@ When the runtime-verifier is triggered (web/API projects only):
 - Flags undocumented public APIs and ADR violations
 
 ## Literature
-- Consult `docs/research/q-and-a/runtime-verification.md` for runtime verification methodology and Playwright best practices
+- Consult `docs/compound/research/scenario-testing/` for runtime verification methodology and testing best practices
 - Consult `docs/compound/research/code-review/` for systematic review methodology, severity taxonomies, and evidence-based review practices
 - Run `ca knowledge "code review methodology"` for indexed knowledge on review techniques
 - Run `ca search "review"` for lessons from past review cycles

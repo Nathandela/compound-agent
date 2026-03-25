@@ -43,7 +43,7 @@ If your findings contradict any of these lessons, flag the contradiction explici
 
 ### 4. Research Supplements
 Beyond lessons, reviewers may receive research excerpts:
-- `docs/research/q-and-a/runtime-verification.md` — for test-coverage and runtime verification reviews
+- `docs/compound/research/scenario-testing/` — for test-coverage and runtime verification reviews
 - `docs/compound/research/code-review/` — for systematic review methodology
 - `docs/compound/research/tdd/` — for TDD and testing pattern reviews
 - `docs/compound/research/property-testing/` — for property-based test reviews

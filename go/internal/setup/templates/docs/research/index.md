@@ -1,6 +1,7 @@
 # Research Index
 
-> Shipped by compound-agent. Source: `docs/research/` in the compound-agent package.
+> Shipped by compound-agent. Source: `docs/compound/research/` in the compound-agent repo.
+> **This directory is fully managed by `ca init`.** Do not add files here -- they will be pruned on the next run. Place user-authored research in `docs/research/` instead.
 
 Research documents that inform project design decisions, agent methodology, and domain knowledge.
 
