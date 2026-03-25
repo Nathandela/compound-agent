@@ -7,6 +7,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.3.0] - 2026-03-25
+
+### Added
+
+- **Smarter failure escalation** (Epic 1): When Claude Code tools fail repeatedly (≥3 same-target or ≥3 total), the post-tool-failure hook now searches the lesson database for relevant past solutions instead of showing a static tip. Includes injectable `LessonSearchFunc`, rune-safe token extraction from error output, BM25-scored FTS5 search with 500ms timeout, 4-level fallback chain, and confidence annotations for low-scoring matches.
+- **Architect intelligence** (Epic 2): Architect skill gains a research sufficiency gate (search `ca search` + `docs/research/` before spec writing) and automatic integration verification epic creation during decomposition.
+- **Acceptance criteria protocol** (Epic 3): AC table generation from EARS requirements in the plan phase, AC reading in the work phase, and an AC gate between plan and work in the cook-it pipeline.
+- **Lesson-calibrated reviews** (Epic 4): Review skill now searches past lessons per-reviewer (3-5 cap, recency bias) and conditionally triggers runtime verification via the new `runtime-verifier` agent role skill for ephemeral Playwright testing.
+- **Integration verification** (Epic 5): Template drift detection test that verifies reviewer names in skill templates have matching agent role skill directories.
+- **Context-aware FTS5 search**: New `SearchKeywordScoredORContext()` method threads `context.Context` through to `QueryContext`, enforcing the 500ms timeout contract at the database layer.
+
+### Fixed
+
+- **Failure threshold off-by-one**: `sameTargetThreshold` changed from 2 to 3 to match EARS spec FE-1 (≥3 failures before escalation).
+- **Phantom reviewer names**: Fixed `cct-reviewer` → `cct-subagent` and `docs-reviewer` → `doc-gardener` in review and compound skill templates.
+- **Cyclop complexity violation**: Extracted `installAgentRoleSkillReferences()` helper from `InstallAgentRoleSkills()` in `primitives.go` to stay within the cyclomatic complexity limit.
+- **Comma-separated epic IDs in loop generator**: `ca loop` now converts comma-separated epic IDs to space-separated for bash `for` loop compatibility.
+
 ## [2.2.1] - 2026-03-24
 
 ### Added
