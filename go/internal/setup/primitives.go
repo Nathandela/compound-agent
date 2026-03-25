@@ -121,13 +121,13 @@ func InstallPhaseSkills(repoRoot string, stack StackInfo) (int, int, error) {
 // Creates missing and updates stale files. Returns (created, updated, error).
 func InstallAgentRoleSkills(repoRoot string) (int, int, error) {
 	created, updated := 0, 0
+	agentsDir := filepath.Join(repoRoot, ".claude", "skills", "compound", "agents")
 	for role, content := range templates.AgentRoleSkills() {
-		skillDir := filepath.Join(repoRoot, ".claude", "skills", "compound", "agents", role)
+		skillDir := filepath.Join(agentsDir, role)
 		if err := os.MkdirAll(skillDir, 0755); err != nil {
 			return created, updated, fmt.Errorf("mkdir %s: %w", skillDir, err)
 		}
-		filePath := filepath.Join(skillDir, "SKILL.md")
-		c, u, err := reconcileFile(filePath, content)
+		c, u, err := reconcileFile(filepath.Join(skillDir, "SKILL.md"), content)
 		if err != nil {
 			return created, updated, err
 		}
@@ -138,9 +138,17 @@ func InstallAgentRoleSkills(repoRoot string) (int, int, error) {
 			updated++
 		}
 	}
-	// Install reference files for agent role skills.
+	c, u, err := installAgentRoleSkillReferences(agentsDir)
+	created += c
+	updated += u
+	return created, updated, err
+}
+
+// installAgentRoleSkillReferences writes reference files for agent role skills.
+func installAgentRoleSkillReferences(agentsDir string) (int, int, error) {
+	created, updated := 0, 0
 	for relPath, content := range templates.AgentRoleSkillReferences() {
-		filePath := filepath.Join(repoRoot, ".claude", "skills", "compound", "agents", relPath)
+		filePath := filepath.Join(agentsDir, relPath)
 		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 			return created, updated, fmt.Errorf("mkdir %s: %w", filepath.Dir(filePath), err)
 		}

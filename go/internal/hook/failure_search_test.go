@@ -181,6 +181,46 @@ func TestSearchLessonsWithTimeout_HandlesError(t *testing.T) {
 	}
 }
 
+func TestFormatLessonResults_ConfidenceAnnotation(t *testing.T) {
+	matches := []LessonMatch{
+		{Trigger: "high confidence match", Insight: "do this", Score: 0.8},
+		{Trigger: "low confidence match", Insight: "maybe this", Score: 0.3},
+		{Trigger: "borderline match", Insight: "at threshold", Score: 0.5},
+	}
+	got := FormatLessonResults(matches)
+
+	// High confidence (>= 0.5) should NOT have "(possible match)" prefix
+	if strings.Contains(got, "(possible match) high confidence match") {
+		t.Error("high confidence match should not have (possible match) prefix")
+	}
+	if !strings.Contains(got, "**high confidence match**") {
+		t.Error("high confidence match should appear with trigger text")
+	}
+
+	// Low confidence (< 0.5) should have "(possible match)" prefix
+	if !strings.Contains(got, "(possible match) **low confidence match**") {
+		t.Errorf("low confidence match should have (possible match) prefix, got:\n%s", got)
+	}
+
+	// Borderline (== 0.5) should NOT have prefix (>= 0.5 is high confidence)
+	if strings.Contains(got, "(possible match) **borderline match**") {
+		t.Error("score == 0.5 should be high confidence, no prefix")
+	}
+	if !strings.Contains(got, "**borderline match**") {
+		t.Error("borderline match should appear")
+	}
+}
+
+func TestFormatLessonResults_AllLowConfidence(t *testing.T) {
+	matches := []LessonMatch{
+		{Trigger: "weak match", Insight: "try this", Score: 0.1},
+	}
+	got := FormatLessonResults(matches)
+	if !strings.Contains(got, "(possible match) **weak match**") {
+		t.Errorf("low score match should have prefix, got:\n%s", got)
+	}
+}
+
 func TestSearchLessonsWithTimeout_RespectsContext(t *testing.T) {
 	searchFn := func(ctx context.Context, _ []string, _ int) ([]LessonMatch, error) {
 		if _, ok := ctx.Deadline(); !ok {

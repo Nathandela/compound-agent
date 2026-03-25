@@ -146,7 +146,7 @@ func dispatchToolFailure(stdin io.Reader, hookName string) (interface{}, int) {
 // makeLessonSearchFunc creates a LessonSearchFunc backed by FTS5 keyword search.
 // Uses OR between tokens for broad matching.
 func makeLessonSearchFunc(repoRoot string) LessonSearchFunc {
-	return func(_ context.Context, tokens []string, limit int) ([]LessonMatch, error) {
+	return func(ctx context.Context, tokens []string, limit int) ([]LessonMatch, error) {
 		db, err := storage.OpenRepoDB(repoRoot)
 		if err != nil {
 			return nil, err
@@ -154,7 +154,7 @@ func makeLessonSearchFunc(repoRoot string) LessonSearchFunc {
 		defer db.Close()
 
 		sdb := storage.NewSearchDB(db)
-		scored, err := sdb.SearchKeywordScoredOR(tokens, limit, memory.TypeLesson)
+		scored, err := sdb.SearchKeywordScoredORContext(ctx, tokens, limit, memory.TypeLesson)
 		if err != nil {
 			return nil, err
 		}

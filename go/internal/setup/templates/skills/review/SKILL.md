@@ -25,7 +25,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    > See `review/references/lesson-calibration.md` for detailed calibration guidance
 5. Search memory with `ca search` for known patterns and recurring issues (broader search beyond per-reviewer calibration)
 6. Select reviewer tier based on diff size:
-   - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
+   - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-subagent
    - **Medium** (100-500): add architecture, performance, scenario-coverage, pattern-matcher (8 total)
    - **Large** (500+): all reviewers including doc-gardener, drift-detector, runtime-verifier
 7. **Runtime Verification (conditional)**: Detect project type and conditionally spawn runtime-verifier:
@@ -87,7 +87,7 @@ When a reviewer produces a finding that directly contradicts a calibration lesso
 - Run `ca search` before review for known recurring issues
 - **LCR**: Per-reviewer calibration queries (see Lesson-Calibrated Review Protocol above)
 - **pattern-matcher** auto-reinforces: recurring findings get severity increased via `ca learn`
-- **cct-reviewer** reads CCT patterns for known Claude failure patterns
+- **cct-subagent** reads CCT patterns for known Claude failure patterns
 - Capture the review report via `ca learn` with `type=solution`
 
 ## Runtime Verification Integration
@@ -99,7 +99,7 @@ When the runtime-verifier is triggered (web/API projects only):
 - Verifier uses Playwright/Puppeteer **library APIs** (code generation), NOT browser MCP tools
 
 ## Docs Integration
-- **docs-reviewer** checks code/docs alignment and ADR compliance
+- **doc-gardener** checks code/docs alignment and ADR compliance
 - Flags undocumented public APIs and ADR violations
 
 ## Literature
@@ -129,8 +129,8 @@ When the runtime-verifier is triggered (web/API projects only):
 - **Research references were consulted for applicable review domains**
 - **Lesson contradictions were flagged for human review (LCR-3)**
 - pattern-matcher checked memory and reinforced recurring issues
-- cct-reviewer checked against known Claude failure patterns
-- docs-reviewer confirmed docs/ADR alignment
+- cct-subagent checked against known Claude failure patterns
+- doc-gardener confirmed docs/ADR alignment
 - security-reviewer P0 findings: none (blocks merge)
 - security-reviewer P1 findings: all acknowledged or resolved
 - **Runtime verifier ran for web/API projects or reported SKIPPED for CLI (RV)**

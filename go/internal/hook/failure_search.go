@@ -86,7 +86,13 @@ func BuildSearchTokens(toolName, target, toolOutput string) []string {
 	return tokens
 }
 
+// confidenceThreshold is the minimum score for a match to be considered high confidence.
+// Matches below this threshold are prefixed with "(possible match)".
+const confidenceThreshold = 0.5
+
 // FormatLessonResults formats matched lessons for injection into hook output.
+// Lessons with scores below the confidence threshold are prefixed with
+// "(possible match)" to signal lower relevance.
 func FormatLessonResults(matches []LessonMatch) string {
 	if len(matches) == 0 {
 		return ""
@@ -95,7 +101,11 @@ func FormatLessonResults(matches []LessonMatch) string {
 	var sb strings.Builder
 	sb.WriteString("Relevant lessons from past sessions:\n")
 	for i, m := range matches {
-		fmt.Fprintf(&sb, "\n%d. **%s**\n   %s", i+1, m.Trigger, m.Insight)
+		prefix := ""
+		if m.Score < confidenceThreshold {
+			prefix = "(possible match) "
+		}
+		fmt.Fprintf(&sb, "\n%d. %s**%s**\n   %s", i+1, prefix, m.Trigger, m.Insight)
 	}
 	return sb.String()
 }

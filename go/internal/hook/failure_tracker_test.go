@@ -23,10 +23,16 @@ func TestProcessToolFailure_SameTargetThreshold(t *testing.T) {
 	// First failure on same target
 	ProcessToolFailure("Bash", map[string]interface{}{"command": "npm install"}, dir)
 
-	// Second failure on same target should trigger
+	// Second failure on same target should NOT trigger (threshold is 3)
 	result := ProcessToolFailure("Bash", map[string]interface{}{"command": "npm test"}, dir)
+	if result.SpecificOutput != nil {
+		t.Fatal("second failure on same target should not trigger tip")
+	}
+
+	// Third failure on same target should trigger
+	result = ProcessToolFailure("Bash", map[string]interface{}{"command": "npm run build"}, dir)
 	if result.SpecificOutput == nil {
-		t.Fatal("second failure on same target should trigger tip")
+		t.Fatal("third failure on same target should trigger tip")
 	}
 	if result.SpecificOutput.HookEventName != "PostToolUseFailure" {
 		t.Errorf("got event name %q, want PostToolUseFailure", result.SpecificOutput.HookEventName)
@@ -49,7 +55,8 @@ func TestProcessToolFailure_TotalThreshold(t *testing.T) {
 func TestProcessToolFailure_ResetAfterTip(t *testing.T) {
 	dir := t.TempDir()
 
-	// Trigger tip
+	// Trigger tip (3 same-target failures)
+	ProcessToolFailure("Bash", map[string]interface{}{"command": "npm test"}, dir)
 	ProcessToolFailure("Bash", map[string]interface{}{"command": "npm test"}, dir)
 	ProcessToolFailure("Bash", map[string]interface{}{"command": "npm test"}, dir)
 
@@ -121,9 +128,10 @@ func TestWithSearch_InjectsLessonsOnThreshold(t *testing.T) {
 		}, nil
 	}
 
-	// Two same-target failures to trigger threshold
+	// Three same-target failures to trigger threshold
 	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm install"}, "ENOENT", dir, searchFn)
-	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "ENOENT", dir, searchFn)
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "ENOENT", dir, searchFn)
+	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm run build"}, "ENOENT", dir, searchFn)
 
 	if result.SpecificOutput == nil {
 		t.Fatal("expected tip on threshold")
@@ -143,6 +151,7 @@ func TestWithSearch_FallsBackOnNoResults(t *testing.T) {
 	}
 
 	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, searchFn)
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, searchFn)
 	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, searchFn)
 
 	if result.SpecificOutput == nil {
@@ -160,6 +169,7 @@ func TestWithSearch_FallsBackOnError(t *testing.T) {
 	}
 
 	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, searchFn)
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, searchFn)
 	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, searchFn)
 
 	if result.SpecificOutput == nil {
@@ -173,6 +183,7 @@ func TestWithSearch_FallsBackOnError(t *testing.T) {
 func TestWithSearch_NilSearchFnFallsBackToStaticTip(t *testing.T) {
 	dir := t.TempDir()
 
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, nil)
 	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, nil)
 	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, nil)
 
@@ -194,6 +205,7 @@ func TestWithSearch_PassesCorrectTokensToSearch(t *testing.T) {
 
 	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm install"}, "ENOENT: no such file", dir, searchFn)
 	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "ENOENT: no such file", dir, searchFn)
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm run build"}, "ENOENT: no such file", dir, searchFn)
 
 	if !sliceContains(capturedTokens, "npm") {
 		t.Error("tokens should contain target")

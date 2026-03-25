@@ -31,7 +31,7 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 12. Update outdated docs and deprecate superseded ADRs (set status to `deprecated`)
 
 ## Docs Integration
-- docs-reviewer checks if `docs/` content is outdated after the cycle
+- doc-gardener checks if `docs/` content is outdated after the cycle
 - Check `docs/decisions/` for ADRs contradicted by the work done
 - Set ADR status to `deprecated` if a decision was reversed, referencing the new ADR
 

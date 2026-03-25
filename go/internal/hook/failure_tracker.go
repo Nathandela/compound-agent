@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	sameTargetThreshold   = 2
+	sameTargetThreshold   = 3
 	totalFailureThreshold = 3
 	failureStateFileName  = ".ca-failure-state.json"
 	stateMaxAge           = time.Hour

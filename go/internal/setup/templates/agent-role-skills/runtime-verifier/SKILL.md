@@ -12,6 +12,7 @@ Generate and execute ephemeral Playwright tests against a running application in
 - **Web UI projects**: Detected by `package.json` containing React, Vue, Angular, Svelte, or Next.js dependencies; or HTML/CSS files in the changed file set
 - **HTTP API projects**: Detected by Express, Fastify, Hono, Flask, Django, FastAPI, Gin, or similar server framework dependencies; or OpenAPI/Swagger specification files
 - **SKIP for**: CLI tools, libraries, Go packages without HTTP handlers, Rust crates without web servers
+- **Hybrid projects** (e.g., Go with both CLI and HTTP handlers): prefer runtime verification if HTTP endpoints exist. The presence of HTTP route handlers takes precedence over CLI entrypoints.
 
 ## Methodology
 

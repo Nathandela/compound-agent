@@ -23,9 +23,10 @@ func TestIntegration_SearchWithRealDB(t *testing.T) {
 	searchFn := makeTestSearchFunc(db)
 
 	dir := t.TempDir()
-	// Two failures on npm to trigger threshold
+	// Three failures on npm to trigger threshold
 	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm install"}, "ENOENT: no such file", dir, searchFn)
-	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "ENOENT: no such file", dir, searchFn)
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "ENOENT: no such file", dir, searchFn)
+	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm run build"}, "ENOENT: no such file", dir, searchFn)
 
 	if result.SpecificOutput == nil {
 		t.Fatal("expected tip on threshold")
@@ -51,7 +52,8 @@ func TestIntegration_SearchNoMatchFallback(t *testing.T) {
 
 	dir := t.TempDir()
 	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm install"}, "ENOENT", dir, searchFn)
-	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "ENOENT", dir, searchFn)
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "ENOENT", dir, searchFn)
+	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm run build"}, "ENOENT", dir, searchFn)
 
 	if result.SpecificOutput == nil {
 		t.Fatal("expected tip on threshold")

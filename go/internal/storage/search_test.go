@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"testing"
 
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
@@ -271,5 +272,35 @@ func TestRowToItem(t *testing.T) {
 	}
 	if r.Citation == nil || r.Citation.File != "f.go" || r.Citation.Line == nil || *r.Citation.Line != 10 {
 		t.Errorf("citation = %v", r.Citation)
+	}
+}
+
+func TestSearchKeywordScoredORContext_CancelledContext(t *testing.T) {
+	sdb, _ := setupSearchDB(t)
+	defer sdb.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	_, err := sdb.SearchKeywordScoredORContext(ctx, []string{"database"}, 10, memory.TypeLesson)
+	if err == nil {
+		t.Fatal("expected error from cancelled context, got nil")
+	}
+}
+
+func TestSearchKeywordScoredORContext_ValidContext(t *testing.T) {
+	sdb, _ := setupSearchDB(t)
+	defer sdb.Close()
+
+	ctx := context.Background()
+	results, err := sdb.SearchKeywordScoredORContext(ctx, []string{"database"}, 10, memory.TypeLesson)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(results) < 1 {
+		t.Fatalf("expected at least 1 result, got %d", len(results))
+	}
+	if results[0].ID != "L001" {
+		t.Errorf("expected L001, got %s", results[0].ID)
 	}
 }
