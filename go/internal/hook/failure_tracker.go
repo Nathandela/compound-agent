@@ -78,7 +78,16 @@ func getFailureTarget(toolName string, toolInput map[string]interface{}) string 
 }
 
 // ProcessToolFailure processes a tool failure and returns a tip if thresholds are met.
+// This is the backward-compatible version without search integration.
 func ProcessToolFailure(toolName string, toolInput map[string]interface{}, stateDir string) ToolFailureResult {
+	return ProcessToolFailureWithSearch(toolName, toolInput, "", stateDir, nil)
+}
+
+// ProcessToolFailureWithSearch processes a tool failure with optional lesson search.
+// When thresholds are met and searchFn is provided, it searches for relevant lessons
+// and injects them into the hook output. Falls back to a static tip on search errors
+// or when no results are found.
+func ProcessToolFailureWithSearch(toolName string, toolInput map[string]interface{}, toolOutput string, stateDir string, searchFn LessonSearchFunc) ToolFailureResult {
 	state := readFailureState(stateDir)
 	state.Count++
 	target := getFailureTarget(toolName, toolInput)
@@ -92,10 +101,11 @@ func ProcessToolFailure(toolName string, toolInput map[string]interface{}, state
 
 	if state.SameTargetCount >= sameTargetThreshold || state.Count >= totalFailureThreshold {
 		deleteFailureState(stateDir)
+		tip := buildFailureTip(toolName, target, toolOutput, searchFn)
 		return ToolFailureResult{
 			SpecificOutput: &SpecificOutput{
 				HookEventName:     "PostToolUseFailure",
-				AdditionalContext: failureTip,
+				AdditionalContext: tip,
 			},
 		}
 	}
@@ -103,6 +113,25 @@ func ProcessToolFailure(toolName string, toolInput map[string]interface{}, state
 	state.Timestamp = time.Now().UnixMilli()
 	writeFailureState(stateDir, state)
 	return ToolFailureResult{}
+}
+
+// buildFailureTip attempts to search for relevant lessons and falls back to a static tip.
+func buildFailureTip(toolName, target, toolOutput string, searchFn LessonSearchFunc) string {
+	if searchFn == nil {
+		return failureTip
+	}
+
+	tokens := BuildSearchTokens(toolName, target, toolOutput)
+	if len(tokens) == 0 {
+		return failureTip
+	}
+
+	matches, err := searchLessonsWithTimeout(searchFn, tokens)
+	if err != nil || len(matches) == 0 {
+		return failureTip
+	}
+
+	return FormatLessonResults(matches)
 }
 
 // ProcessToolSuccess clears the failure state.

@@ -94,6 +94,25 @@ func (s *SearchDB) SearchKeywordScored(query string, limit int, typeFilter memor
 	return s.executeFts(sanitized, limit, typeFilter, true)
 }
 
+// SearchKeywordScoredOR searches using FTS5 with OR between tokens.
+// Each token is sanitized individually. This provides broader matching than
+// the default implicit-AND behavior, returning results that match any term.
+func (s *SearchDB) SearchKeywordScoredOR(tokens []string, limit int, typeFilter memory.ItemType) ([]ScoredResult, error) {
+	var sanitized []string
+	for _, t := range tokens {
+		clean := SanitizeFtsQuery(t)
+		if clean != "" {
+			sanitized = append(sanitized, clean)
+		}
+	}
+	if len(sanitized) == 0 {
+		return nil, nil
+	}
+
+	query := strings.Join(sanitized, " OR ")
+	return s.executeFts(query, limit, typeFilter, true)
+}
+
 // ReadAll reads all non-invalidated memory items from SQLite.
 func (s *SearchDB) ReadAll() ([]memory.Item, error) {
 	rows, err := s.db.Query(`SELECT ` + lessonSelectCols + `

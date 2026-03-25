@@ -1,6 +1,7 @@
 package hook
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/nathandelacretaz/compound-agent/internal/memory"
+	"github.com/nathandelacretaz/compound-agent/internal/storage"
 	"github.com/nathandelacretaz/compound-agent/internal/util"
 )
 
@@ -121,8 +124,9 @@ func dispatchToolFailure(stdin io.Reader, hookName string) (interface{}, int) {
 		return handleErrorResult(hookName, err), 0
 	}
 	var data struct {
-		ToolName  string                 `json:"tool_name"`
-		ToolInput map[string]interface{} `json:"tool_input"`
+		ToolName   string                 `json:"tool_name"`
+		ToolInput  map[string]interface{} `json:"tool_input"`
+		ToolOutput string                 `json:"tool_output"`
 	}
 	if err = json.Unmarshal([]byte(input.raw), &data); err != nil {
 		return handleErrorResult(hookName, err), 0
@@ -133,8 +137,38 @@ func dispatchToolFailure(stdin io.Reader, hookName string) (interface{}, int) {
 	if data.ToolInput == nil {
 		data.ToolInput = map[string]interface{}{}
 	}
-	stateDir := filepath.Join(util.GetRepoRoot(), ".claude")
-	return ProcessToolFailure(data.ToolName, data.ToolInput, stateDir), 0
+	repoRoot := util.GetRepoRoot()
+	stateDir := filepath.Join(repoRoot, ".claude")
+	searchFn := makeLessonSearchFunc(repoRoot)
+	return ProcessToolFailureWithSearch(data.ToolName, data.ToolInput, data.ToolOutput, stateDir, searchFn), 0
+}
+
+// makeLessonSearchFunc creates a LessonSearchFunc backed by FTS5 keyword search.
+// Uses OR between tokens for broad matching.
+func makeLessonSearchFunc(repoRoot string) LessonSearchFunc {
+	return func(_ context.Context, tokens []string, limit int) ([]LessonMatch, error) {
+		db, err := storage.OpenRepoDB(repoRoot)
+		if err != nil {
+			return nil, err
+		}
+		defer db.Close()
+
+		sdb := storage.NewSearchDB(db)
+		scored, err := sdb.SearchKeywordScoredOR(tokens, limit, memory.TypeLesson)
+		if err != nil {
+			return nil, err
+		}
+
+		var matches []LessonMatch
+		for _, s := range scored {
+			matches = append(matches, LessonMatch{
+				Trigger: s.Trigger,
+				Insight: s.Insight,
+				Score:   s.Score,
+			})
+		}
+		return matches, nil
+	}
 }
 
 func dispatchToolSuccess(stdin io.Reader) (interface{}, int) {

@@ -1,8 +1,11 @@
 package hook
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -105,5 +108,116 @@ func TestProcessToolFailure_StaleState(t *testing.T) {
 	result := ProcessToolFailure("Bash", map[string]interface{}{"command": "npm test"}, dir)
 	if result.SpecificOutput != nil {
 		t.Error("stale state should be discarded, first failure should not trigger tip")
+	}
+}
+
+// --- Tests for ProcessToolFailureWithSearch ---
+
+func TestWithSearch_InjectsLessonsOnThreshold(t *testing.T) {
+	dir := t.TempDir()
+	searchFn := func(_ context.Context, _ []string, _ int) ([]LessonMatch, error) {
+		return []LessonMatch{
+			{Trigger: "npm ENOENT", Insight: "Clear node_modules", Score: 0.8},
+		}, nil
+	}
+
+	// Two same-target failures to trigger threshold
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm install"}, "ENOENT", dir, searchFn)
+	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "ENOENT", dir, searchFn)
+
+	if result.SpecificOutput == nil {
+		t.Fatal("expected tip on threshold")
+	}
+	if !strings.Contains(result.SpecificOutput.AdditionalContext, "npm ENOENT") {
+		t.Error("tip should contain lesson trigger")
+	}
+	if !strings.Contains(result.SpecificOutput.AdditionalContext, "Clear node_modules") {
+		t.Error("tip should contain lesson insight")
+	}
+}
+
+func TestWithSearch_FallsBackOnNoResults(t *testing.T) {
+	dir := t.TempDir()
+	searchFn := func(_ context.Context, _ []string, _ int) ([]LessonMatch, error) {
+		return nil, nil
+	}
+
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, searchFn)
+	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, searchFn)
+
+	if result.SpecificOutput == nil {
+		t.Fatal("expected tip on threshold")
+	}
+	if result.SpecificOutput.AdditionalContext != failureTip {
+		t.Errorf("expected static tip fallback, got %q", result.SpecificOutput.AdditionalContext)
+	}
+}
+
+func TestWithSearch_FallsBackOnError(t *testing.T) {
+	dir := t.TempDir()
+	searchFn := func(_ context.Context, _ []string, _ int) ([]LessonMatch, error) {
+		return nil, errors.New("db not initialized")
+	}
+
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, searchFn)
+	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, searchFn)
+
+	if result.SpecificOutput == nil {
+		t.Fatal("expected tip on threshold")
+	}
+	if result.SpecificOutput.AdditionalContext != failureTip {
+		t.Errorf("expected static tip fallback, got %q", result.SpecificOutput.AdditionalContext)
+	}
+}
+
+func TestWithSearch_NilSearchFnFallsBackToStaticTip(t *testing.T) {
+	dir := t.TempDir()
+
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, nil)
+	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "error", dir, nil)
+
+	if result.SpecificOutput == nil {
+		t.Fatal("expected tip on threshold")
+	}
+	if result.SpecificOutput.AdditionalContext != failureTip {
+		t.Errorf("expected static tip, got %q", result.SpecificOutput.AdditionalContext)
+	}
+}
+
+func TestWithSearch_PassesCorrectTokensToSearch(t *testing.T) {
+	dir := t.TempDir()
+	var capturedTokens []string
+	searchFn := func(_ context.Context, tokens []string, _ int) ([]LessonMatch, error) {
+		capturedTokens = tokens
+		return nil, nil
+	}
+
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm install"}, "ENOENT: no such file", dir, searchFn)
+	ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm test"}, "ENOENT: no such file", dir, searchFn)
+
+	if !sliceContains(capturedTokens, "npm") {
+		t.Error("tokens should contain target")
+	}
+	if !sliceContains(capturedTokens, "ENOENT") {
+		t.Error("tokens should contain error keyword")
+	}
+}
+
+func TestWithSearch_SubThresholdNoSearch(t *testing.T) {
+	dir := t.TempDir()
+	called := false
+	searchFn := func(_ context.Context, _ []string, _ int) ([]LessonMatch, error) {
+		called = true
+		return nil, nil
+	}
+
+	// Only one failure — below threshold
+	result := ProcessToolFailureWithSearch("Bash", map[string]interface{}{"command": "npm install"}, "error", dir, searchFn)
+
+	if result.SpecificOutput != nil {
+		t.Error("sub-threshold should not trigger tip")
+	}
+	if called {
+		t.Error("search should not be called below threshold")
 	}
 }
