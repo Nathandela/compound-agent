@@ -206,6 +206,32 @@ func InstallDocTemplates(repoRoot string, version string, stack StackInfo) (int,
 	return created, updated, nil
 }
 
+// InstallResearchDocs writes research documentation files to docs/compound/research/.
+// Walks the embedded research tree and creates intermediate directories as needed.
+// Creates missing and updates stale files. Returns (created, updated, error).
+func InstallResearchDocs(repoRoot string) (int, int, error) {
+	researchDir := filepath.Join(repoRoot, "docs", "compound", "research")
+	if err := os.MkdirAll(researchDir, 0755); err != nil {
+		return 0, 0, fmt.Errorf("mkdir %s: %w", researchDir, err)
+	}
+
+	created, updated := 0, 0
+	for relPath, content := range templates.ResearchDocs() {
+		filePath := filepath.Join(researchDir, filepath.FromSlash(relPath))
+		c, u, err := writeSkillFile(filePath, content)
+		if err != nil {
+			return created, updated, err
+		}
+		if c {
+			created++
+		}
+		if u {
+			updated++
+		}
+	}
+	return created, updated, nil
+}
+
 // UpdateAgentsMd creates or appends the Compound Agent section to AGENTS.md.
 // Idempotent: returns false if section already exists.
 func UpdateAgentsMd(repoRoot string) (bool, error) {
@@ -319,9 +345,17 @@ func PruneStaleTemplates(repoRoot string) (int, error) {
 		pruned += n
 	}
 
+	// Research docs: prune stale files and directories
+	researchDir := filepath.Join(repoRoot, "docs", "compound", "research")
+	n, err := pruneResearchInternals(researchDir)
+	if err != nil {
+		return pruned, err
+	}
+	pruned += n
+
 	// Phase skills: prune stale phase directories (skip "agents/" subdir)
 	skillsDir := filepath.Join(repoRoot, ".claude", "skills", "compound")
-	n, err := pruneStaleSubdirs(skillsDir, templates.PhaseSkills(), []string{"agents"})
+	n, err = pruneStaleSubdirs(skillsDir, templates.PhaseSkills(), []string{"agents"})
 	if err != nil {
 		return pruned, err
 	}
@@ -352,6 +386,22 @@ func PruneStaleTemplates(repoRoot string) (int, error) {
 	pruned += n
 
 	return pruned, nil
+}
+
+// pruneResearchInternals removes files and directories from the research tree
+// that no longer exist in the embedded template set.
+func pruneResearchInternals(researchDir string) (int, error) {
+	expectedFiles := make(map[string]bool)
+	expectedDirs := make(map[string]bool)
+
+	for relPath := range templates.ResearchDocs() {
+		expectedFiles[relPath] = true
+		for dir := path.Dir(relPath); dir != "." && dir != ""; dir = path.Dir(dir) {
+			expectedDirs[dir] = true
+		}
+	}
+
+	return pruneManagedSubtree(researchDir, "", expectedFiles, expectedDirs, nil)
 }
 
 // prunePhaseSkillInternals removes retired files and directories inside current

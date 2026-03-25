@@ -134,6 +134,8 @@ func printInitResultJSON(cmd *cobra.Command, result *setup.InitResult) {
 		"roleSkillsUpdated":   result.RoleSkillsUpdated,
 		"docsInstalled":       result.DocsInstalled,
 		"docsUpdated":         result.DocsUpdated,
+		"researchInstalled":   result.ResearchInstalled,
+		"researchUpdated":     result.ResearchUpdated,
 		"templatesPruned":     result.TemplatesPruned,
 	})
 	cmd.Println(string(data))
@@ -422,19 +424,23 @@ func statusLabel(installed bool, stale bool, duplicated bool) string {
 // printTemplatesSummary prints installed/updated template counts.
 func printTemplatesSummary(cmd *cobra.Command, result *setup.InitResult) {
 	totalInstalled := result.AgentsInstalled + result.CommandsInstalled +
-		result.SkillsInstalled + result.RoleSkillsInstalled + result.DocsInstalled
+		result.SkillsInstalled + result.RoleSkillsInstalled + result.DocsInstalled +
+		result.ResearchInstalled
 	totalUpdated := result.AgentsUpdated + result.CommandsUpdated +
-		result.SkillsUpdated + result.RoleSkillsUpdated + result.DocsUpdated
+		result.SkillsUpdated + result.RoleSkillsUpdated + result.DocsUpdated +
+		result.ResearchUpdated
 
 	if totalInstalled > 0 {
-		cmd.Printf("  Templates: %d installed (agents:%d commands:%d skills:%d roles:%d docs:%d)\n",
+		cmd.Printf("  Templates: %d installed (agents:%d commands:%d skills:%d roles:%d docs:%d research:%d)\n",
 			totalInstalled, result.AgentsInstalled, result.CommandsInstalled,
-			result.SkillsInstalled, result.RoleSkillsInstalled, result.DocsInstalled)
+			result.SkillsInstalled, result.RoleSkillsInstalled, result.DocsInstalled,
+			result.ResearchInstalled)
 	}
 	if totalUpdated > 0 {
-		cmd.Printf("  Templates: %d updated (agents:%d commands:%d skills:%d roles:%d docs:%d)\n",
+		cmd.Printf("  Templates: %d updated (agents:%d commands:%d skills:%d roles:%d docs:%d research:%d)\n",
 			totalUpdated, result.AgentsUpdated, result.CommandsUpdated,
-			result.SkillsUpdated, result.RoleSkillsUpdated, result.DocsUpdated)
+			result.SkillsUpdated, result.RoleSkillsUpdated, result.DocsUpdated,
+			result.ResearchUpdated)
 	}
 	if result.TemplatesPruned > 0 {
 		cmd.Printf("  Templates: %d retired files removed\n", result.TemplatesPruned)

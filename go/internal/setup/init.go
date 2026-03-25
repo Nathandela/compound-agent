@@ -33,6 +33,8 @@ type InitResult struct {
 	RoleSkillsUpdated   int
 	DocsInstalled       int
 	DocsUpdated         int
+	ResearchInstalled   int
+	ResearchUpdated     int
 	TemplatesPruned     int
 	AgentsMdUpdated     bool
 	ClaudeMdUpdated     bool
@@ -143,6 +145,8 @@ func installTemplateGroups(repoRoot string, version string, stack StackInfo, res
 			func(n int) { result.RoleSkillsInstalled = n }, func(u int) { result.RoleSkillsUpdated = u }, "agent role skills"},
 		{func() (int, int, error) { return InstallDocTemplates(repoRoot, version, stack) },
 			func(n int) { result.DocsInstalled = n }, func(u int) { result.DocsUpdated = u }, "doc templates"},
+		{func() (int, int, error) { return InstallResearchDocs(repoRoot) },
+			func(n int) { result.ResearchInstalled = n }, func(u int) { result.ResearchUpdated = u }, "research docs"},
 	}
 
 	for _, g := range groups {

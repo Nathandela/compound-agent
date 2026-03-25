@@ -125,6 +125,9 @@ func TestInitRepo_InstallsTemplates(t *testing.T) {
 	if result.DocsInstalled == 0 {
 		t.Error("expected doc templates to be installed")
 	}
+	if result.ResearchInstalled == 0 {
+		t.Error("expected research docs to be installed")
+	}
 	if !result.AgentsMdUpdated {
 		t.Error("expected AGENTS.md to be updated")
 	}
@@ -144,12 +147,14 @@ func TestInitRepo_InstallsTemplates(t *testing.T) {
 		t.Fatalf("second InitRepo failed: %v", err)
 	}
 	totalTemplates := result2.AgentsInstalled + result2.CommandsInstalled +
-		result2.SkillsInstalled + result2.RoleSkillsInstalled + result2.DocsInstalled
+		result2.SkillsInstalled + result2.RoleSkillsInstalled + result2.DocsInstalled +
+		result2.ResearchInstalled
 	if totalTemplates != 0 {
 		t.Errorf("idempotent init installed %d templates, want 0", totalTemplates)
 	}
 	totalUpdated := result2.AgentsUpdated + result2.CommandsUpdated +
-		result2.SkillsUpdated + result2.RoleSkillsUpdated + result2.DocsUpdated
+		result2.SkillsUpdated + result2.RoleSkillsUpdated + result2.DocsUpdated +
+		result2.ResearchUpdated
 	if totalUpdated != 0 {
 		t.Errorf("idempotent init updated %d templates, want 0", totalUpdated)
 	}

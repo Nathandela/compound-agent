@@ -24,6 +24,9 @@ var agentRoleSkillsFS embed.FS
 //go:embed docs/*.md
 var docsFS embed.FS
 
+//go:embed docs/research
+var researchFS embed.FS
+
 //go:embed agents-md.md
 var agentsMdTemplate string
 
@@ -169,6 +172,26 @@ func AgentRoleSkillReferences() map[string]string {
 // Content includes {{VERSION}} and {{DATE}} placeholders for substitution.
 func DocTemplates() map[string]string {
 	return readEmbedDir(docsFS, "docs")
+}
+
+// ResearchDocs returns a map of relative-path -> content for research documentation.
+// Paths are relative to the research root (e.g., "security/overview.md", "index.md").
+func ResearchDocs() map[string]string {
+	const root = "docs/research"
+	result := make(map[string]string)
+	_ = fs.WalkDir(researchFS, root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		// Strip "docs/research/" prefix to get relative path
+		rel := strings.TrimPrefix(p, root+"/")
+		data, readErr := fs.ReadFile(researchFS, p)
+		if readErr == nil {
+			result[rel] = string(data)
+		}
+		return nil
+	})
+	return result
 }
 
 // readEmbedDir reads all files from an embedded FS directory into a map.

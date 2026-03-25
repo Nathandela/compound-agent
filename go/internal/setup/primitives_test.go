@@ -180,6 +180,74 @@ func TestInstallDocTemplates(t *testing.T) {
 	}
 }
 
+func TestInstallResearchDocs(t *testing.T) {
+	dir := t.TempDir()
+
+	n, u, err := InstallResearchDocs(dir)
+	if err != nil {
+		t.Fatalf("InstallResearchDocs: %v", err)
+	}
+	if n == 0 {
+		t.Fatal("expected files to be created")
+	}
+	if u != 0 {
+		t.Errorf("expected 0 updated on first install, got %d", u)
+	}
+
+	// Verify nested research file exists
+	overviewPath := filepath.Join(dir, "docs", "compound", "research", "security", "overview.md")
+	if _, err := os.Stat(overviewPath); err != nil {
+		t.Errorf("missing security/overview.md: %v", err)
+	}
+
+	// Verify index.md at root
+	indexPath := filepath.Join(dir, "docs", "compound", "research", "index.md")
+	content, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatalf("ReadFile index.md: %v", err)
+	}
+	if len(content) == 0 {
+		t.Error("index.md is empty")
+	}
+
+	// Verify idempotency: second install creates/updates nothing
+	n2, u2, err := InstallResearchDocs(dir)
+	if err != nil {
+		t.Fatalf("InstallResearchDocs (2nd): %v", err)
+	}
+	if n2 != 0 {
+		t.Errorf("idempotent install created %d files, want 0", n2)
+	}
+	if u2 != 0 {
+		t.Errorf("idempotent install updated %d files, want 0", u2)
+	}
+}
+
+func TestInstallResearchDocs_UpdatesStaleContent(t *testing.T) {
+	dir := t.TempDir()
+
+	// First install
+	_, _, err := InstallResearchDocs(dir)
+	if err != nil {
+		t.Fatalf("InstallResearchDocs: %v", err)
+	}
+
+	// Corrupt a file to simulate stale content
+	overviewPath := filepath.Join(dir, "docs", "compound", "research", "security", "overview.md")
+	if err := os.WriteFile(overviewPath, []byte("stale content"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// Re-install should update
+	_, u, err := InstallResearchDocs(dir)
+	if err != nil {
+		t.Fatalf("InstallResearchDocs (2nd): %v", err)
+	}
+	if u == 0 {
+		t.Error("expected stale file to be updated")
+	}
+}
+
 func TestUpdateAgentsMd(t *testing.T) {
 	dir := t.TempDir()
 
@@ -877,6 +945,51 @@ func TestPruneStaleTemplates_RemovesStaleAgentRoleReferenceEntries(t *testing.T)
 	skillFile := filepath.Join(roleDir, "SKILL.md")
 	if _, err := os.Stat(skillFile); err != nil {
 		t.Errorf("SKILL.md should be preserved: %v", err)
+	}
+}
+
+func TestPruneStaleTemplates_RemovesStaleResearchFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install research docs first
+	if _, _, err := InstallResearchDocs(dir); err != nil {
+		t.Fatalf("InstallResearchDocs: %v", err)
+	}
+
+	// Add a stale research file
+	staleFile := filepath.Join(dir, "docs", "compound", "research", "retired-topic.md")
+	if err := os.WriteFile(staleFile, []byte("# old research\n"), 0644); err != nil {
+		t.Fatalf("write stale file: %v", err)
+	}
+
+	// Add a stale research directory
+	staleDir := filepath.Join(dir, "docs", "compound", "research", "retired-topic")
+	if err := os.MkdirAll(staleDir, 0755); err != nil {
+		t.Fatalf("mkdir stale dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(staleDir, "old.md"), []byte("# old\n"), 0644); err != nil {
+		t.Fatalf("write stale dir file: %v", err)
+	}
+
+	pruned, err := PruneStaleTemplates(dir)
+	if err != nil {
+		t.Fatalf("PruneStaleTemplates: %v", err)
+	}
+	if pruned < 2 {
+		t.Errorf("expected at least 2 pruned (stale file + dir), got %d", pruned)
+	}
+
+	if _, err := os.Stat(staleFile); !os.IsNotExist(err) {
+		t.Error("stale research file should be removed")
+	}
+	if _, err := os.Stat(staleDir); !os.IsNotExist(err) {
+		t.Error("stale research directory should be removed")
+	}
+
+	// Current research files must remain
+	indexPath := filepath.Join(dir, "docs", "compound", "research", "index.md")
+	if _, err := os.Stat(indexPath); err != nil {
+		t.Errorf("index.md should be preserved: %v", err)
 	}
 }
 

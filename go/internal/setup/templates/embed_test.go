@@ -241,6 +241,48 @@ func TestPluginJSON(t *testing.T) {
 	}
 }
 
+func TestResearchDocs(t *testing.T) {
+	docs := ResearchDocs()
+	if len(docs) == 0 {
+		t.Fatal("expected research docs, got none")
+	}
+
+	// Verify expected research files exist (spot check key paths)
+	expected := []string{
+		"index.md",
+		"security/overview.md",
+		"security/injection-patterns.md",
+		"tdd/test-driven-development-methodology.md",
+		"code-review/systematic-review-methodology.md",
+		"learning-systems/knowledge-compounding-for-agents.md",
+		"property-testing/property-based-testing-and-invariants.md",
+	}
+	for _, relPath := range expected {
+		content, ok := docs[relPath]
+		if !ok {
+			t.Errorf("missing research doc: %s", relPath)
+			continue
+		}
+		if len(content) == 0 {
+			t.Errorf("research doc %s is empty", relPath)
+		}
+	}
+
+	// Verify nested directories are included
+	hasNested := false
+	for key := range docs {
+		if strings.Contains(key, "/") {
+			hasNested = true
+			break
+		}
+	}
+	if !hasNested {
+		t.Error("research docs should include nested paths (e.g., security/overview.md)")
+	}
+
+	t.Logf("research docs: %d", len(docs))
+}
+
 func TestConstants(t *testing.T) {
 	if CompoundAgentSectionHeader == "" {
 		t.Error("CompoundAgentSectionHeader is empty")
