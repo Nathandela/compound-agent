@@ -1091,3 +1091,23 @@ func TestLoopCommand_ImproveUsesPipeExtractText(t *testing.T) {
 		t.Error("improve phase calls extract_text with file args but function reads from stdin")
 	}
 }
+
+func TestLoopCommand_RejectsExtraPositionalArgs(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	// Space-separated epics look like extra positional args to cobra.
+	// This must error rather than silently dropping epics.
+	_, err := executeCommand(root, "loop", "-o", outPath,
+		"--epics", "epic-1", "epic-2", "epic-3",
+	)
+	if err == nil {
+		t.Fatal("expected error when extra positional args are passed (space-separated epics)")
+	}
+	if !strings.Contains(err.Error(), "unknown command") {
+		t.Errorf("expected cobra 'unknown command' error, got: %v", err)
+	}
+}

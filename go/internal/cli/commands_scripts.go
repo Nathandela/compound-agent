@@ -298,6 +298,7 @@ func loopCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "loop",
 		Short: "Generate infinity loop script for epic processing",
+		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runLoop(cmd, &o)
 		},
