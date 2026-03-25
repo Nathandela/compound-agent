@@ -26,8 +26,8 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 5. Search memory with `ca search` for known patterns and recurring issues (broader search beyond per-reviewer calibration)
 6. Select reviewer tier based on diff size:
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-reviewer
-   - **Medium** (100-500): add architecture, performance, edge-case, scenario-coverage (8 total)
-   - **Large** (500+): all 12 reviewers including docs, consistency, error-handling, pattern-matcher
+   - **Medium** (100-500): add architecture, performance, scenario-coverage, pattern-matcher (8 total)
+   - **Large** (500+): all reviewers including doc-gardener, drift-detector, runtime-verifier
 7. **Runtime Verification (conditional)**: Detect project type and conditionally spawn runtime-verifier:
    - **Web UI project** (has `package.json` with React/Vue/Angular/Svelte, or HTML files in changed set): spawn `runtime-verifier` agent
    - **HTTP API project** (has Express/Fastify/Flask/Django/Gin routes, or OpenAPI spec): spawn `runtime-verifier` agent

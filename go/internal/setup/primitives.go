@@ -138,6 +138,23 @@ func InstallAgentRoleSkills(repoRoot string) (int, int, error) {
 			updated++
 		}
 	}
+	// Install reference files for agent role skills.
+	for relPath, content := range templates.AgentRoleSkillReferences() {
+		filePath := filepath.Join(repoRoot, ".claude", "skills", "compound", "agents", relPath)
+		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+			return created, updated, fmt.Errorf("mkdir %s: %w", filepath.Dir(filePath), err)
+		}
+		c, u, err := reconcileFile(filePath, content)
+		if err != nil {
+			return created, updated, err
+		}
+		if c {
+			created++
+		}
+		if u {
+			updated++
+		}
+	}
 	return created, updated, nil
 }
 
