@@ -15,10 +15,10 @@ var agentsFS embed.FS
 //go:embed commands/*.md
 var commandsFS embed.FS
 
-//go:embed skills/*/SKILL.md skills/*/references/*.md
+//go:embed skills
 var skillsFS embed.FS
 
-//go:embed agent-role-skills/*/SKILL.md agent-role-skills/*/references/*.md
+//go:embed agent-role-skills
 var agentRoleSkillsFS embed.FS
 
 //go:embed docs/*.md

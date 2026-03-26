@@ -308,10 +308,12 @@ spawn_reviewers() {
         sid=$(read_session_id "$reviewer" "$REVIEW_DIR/sessions.json")
         if [ "$cycle" -eq 1 ]; then
           (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
+            --dangerously-skip-permissions \
             --output-format text --session-id "$sid" \
             -p "$(cat "$prompt_file")" > "$report" 2>&1 || true) &
         else
           (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
+            --dangerously-skip-permissions \
             --output-format text --resume "$sid" \
             -p "$follow_up" > "$report" 2>&1 || true) &
         fi
@@ -330,10 +332,10 @@ spawn_reviewers() {
       (codex)
         if [ "$cycle" -eq 1 ]; then
           (portable_timeout "$REVIEW_TIMEOUT" codex exec --full-auto \
-            - < "$prompt_file" > "$report" 2>&1 || true) &
+            -o "$report" -- - < "$prompt_file" 2>/dev/null || true) &
         else
-          (portable_timeout "$REVIEW_TIMEOUT" codex exec resume --last \
-            "$follow_up" > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" codex exec resume --last --full-auto \
+            -o "$report" "$follow_up" 2>/dev/null || true) &
         fi
         pids="$pids $!"
         ;;

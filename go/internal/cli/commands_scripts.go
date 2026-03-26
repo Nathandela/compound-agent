@@ -450,7 +450,8 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string) strin
 	// Helpers
 	fmt.Fprintf(&b, "# Helpers\n")
 	fmt.Fprintf(&b, "timestamp() { date '+%%Y-%%m-%%d_%%H-%%M-%%S'; }\n")
-	fmt.Fprintf(&b, "log() { echo \"[$(timestamp)] $*\"; }\n")
+	fmt.Fprintf(&b, "# log() writes to stderr so it never corrupts command-substitution captures\n")
+	fmt.Fprintf(&b, "log() { echo \"[$(timestamp)] $*\" >&2; }\n")
 	fmt.Fprintf(&b, "die() { log \"FATAL: $*\"; exit 1; }\n\n")
 
 	// CLI prerequisites
@@ -991,6 +992,7 @@ func loopScriptEpicResult(periodicTrigger string) string { //nolint:funlen // ba
 	return `  EPIC_DURATION=$(( $(date +%s) - EPIC_START ))
 
   if [ "$SUCCESS" = true ]; then
+    if [ -z "${LOOP_DRY_RUN:-}" ]; then
     # Verify working tree is clean after epic completion
     if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
       log "WARN: Working tree dirty after epic completion, auto-committing"
@@ -1000,6 +1002,7 @@ func loopScriptEpicResult(periodicTrigger string) string { //nolint:funlen // ba
     log_result "$EPIC_ID" "complete" "$ATTEMPT" "$EPIC_DURATION"
     log "Epic $EPIC_ID done. Completed so far: $COMPLETED"
 ` + periodicTrigger + `
+    fi
   elif [ "$SUCCESS" = skip ]; then
     SKIPPED=$((SKIPPED + 1))
     log_result "$EPIC_ID" "skipped" "$ATTEMPT" "$EPIC_DURATION"
@@ -1028,6 +1031,8 @@ func loopScriptPostLoop(finalTrigger string, hasImprove bool) string {
 
 	return finalTrigger + `
 TOTAL_DURATION=$(( $(date +%s) - LOOP_START ))
+
+if [ -z "${LOOP_DRY_RUN:-}" ]; then
 echo "{\"type\":\"summary\",\"completed\":$COMPLETED,\"failed\":$FAILED_COUNT,\"skipped\":$SKIPPED,\"total_duration_s\":$TOTAL_DURATION}" >> "$EXEC_LOG"
 write_status "idle"
 
@@ -1035,6 +1040,7 @@ write_status "idle"
 if git remote get-url origin >/dev/null 2>&1; then
   log "Pushing to remote..."
   git push 2>&1 || log "WARN: git push failed (check SSH/auth)"
+fi
 fi
 
 log "=========================================="

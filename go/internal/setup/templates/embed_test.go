@@ -115,9 +115,20 @@ func TestPhaseSkillReferences(t *testing.T) {
 		t.Error("missing spec-dev/references/spec-guide.md")
 	}
 
-	// Verify architect reference
-	if _, ok := refs["architect/references/infinity-loop.md"]; !ok {
-		t.Error("missing architect/references/infinity-loop.md")
+	// Verify architect infinity-loop reference directory (nested)
+	expectedInfinityLoop := []string{
+		"architect/references/infinity-loop/README.md",
+		"architect/references/infinity-loop/pre-flight.md",
+		"architect/references/infinity-loop/memory-safety.md",
+		"architect/references/infinity-loop/epic-ordering.md",
+		"architect/references/infinity-loop/logging.md",
+		"architect/references/infinity-loop/review-fleet.md",
+		"architect/references/infinity-loop/troubleshooting.md",
+	}
+	for _, refPath := range expectedInfinityLoop {
+		if _, ok := refs[refPath]; !ok {
+			t.Errorf("missing %s", refPath)
+		}
 	}
 	t.Logf("phase skill references: %d", len(refs))
 }

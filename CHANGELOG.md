@@ -13,11 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Research docs shipping**: `ca init` now installs `docs/compound/research/` (42 files across 9 topic directories) to consumer repos via `go:embed`. Restores research delivery that was lost during the Go migration -- ~25 template files (agent-role-skills, phase skills, commands) reference these docs for domain knowledge (security, TDD, property testing, code review, etc.).
 - **Research drift tests**: `TestTemplateDrift_ResearchSourceMatchesEmbed` verifies source and embedded research trees stay in sync. `TestTemplateDrift_ResearchReferencesResolve` validates all `docs/compound/research/` path references in templates point to files that actually exist.
+- **Nested reference directories**: `//go:embed` patterns changed from explicit file globs to directory-level embedding (`skills`, `agent-role-skills`), enabling skills to ship structured reference subdirectories. The install/prune pipeline already supported nesting — only the embed pattern was blocking.
+- **Architect infinity-loop reference restructure**: Replaced the 734-line monolith `infinity-loop.md` with 7 concern-based files in `references/infinity-loop/`: README.md (symptom→file router), pre-flight.md, memory-safety.md, epic-ordering.md, logging.md, review-fleet.md, troubleshooting.md. Includes 4 new failure modes from overnight run post-mortem analysis.
 
 ### Fixed
 
 - **Phantom runtime-verification references**: 4 template files referenced `docs/research/q-and-a/runtime-verification.md` which never existed. Redirected to `docs/compound/research/scenario-testing/`.
 - **Research index.md accuracy**: Fixed source path (was `docs/research/`, now `docs/compound/research/`). Added managed-directory warning so users know `docs/compound/research/` is fully managed by `ca init` and user research belongs in `docs/research/`.
+- **Loop generator: `log()` stdout corruption** (P0): `log()` now writes to stderr (`>&2`). Previously, `log()` wrote to stdout, causing skip messages from `check_deps_closed()` to corrupt epic IDs when captured via `EPIC_ID=$(get_next_epic)`. This single bug caused 5 cascading failures in a 6-hour overnight run.
+- **Loop generator: Claude reviewers silent** (P1): Added `--dangerously-skip-permissions` to Claude reviewer invocations (both `--session-id` cycle 1 and `--resume` cycle 2+). Without it, reviewers couldn't use tools in non-interactive mode, producing 1-byte output files.
+- **Loop generator: Codex reviewer broken** (P1): Fixed Codex invocation — `-p` is `--profile` (not prompt), prompt is a positional arg. Changed to `codex exec --full-auto -o "$report" -- - < "$prompt_file"` for stdin input and clean output capture. Stdout redirect (`>`) captured UI chrome; `-o` captures only the assistant's response.
+- **Loop generator: dry-run contamination** (P2): Guarded `COMPLETED` increment, `log_result`, periodic review trigger, git dirty check, summary JSONL write, `write_status`, and `git push` with `LOOP_DRY_RUN` checks. Previously, dry-run wrote ghost entries to the execution log.
 
 ## [2.3.0] - 2026-03-25
 

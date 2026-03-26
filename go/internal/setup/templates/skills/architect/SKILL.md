@@ -131,7 +131,11 @@ This phase is OPT-IN. After Phase 4:
    - Max retries on failure (default: 1)
    - Include improvement phase? (default: no)
    - Dry-run first? (default: yes)
-   See \`architect/references/infinity-loop.md\` for advanced parameters.
+   See \`architect/references/infinity-loop/README.md\` for the full parameter reference.
+   Read specific files as needed:
+   - Pre-flight and launch: \`infinity-loop/pre-flight.md\`
+   - Memory tuning: \`infinity-loop/memory-safety.md\`
+   - Review fleet config: \`infinity-loop/review-fleet.md\`
 
 3. **Generate script** (produces \`./infinity-loop.sh\`):
    \`\`\`bash
@@ -162,7 +166,7 @@ This phase is OPT-IN. After Phase 4:
    - Execution log: \`cat agent_logs/loop-execution.jsonl\`
    - For ongoing health monitoring, see the 30-minute probe protocol in the reference guide.
 
-See \`architect/references/infinity-loop.md\` for full parameter reference and monitoring guide.
+See \`architect/references/infinity-loop/README.md\` for full reference. For troubleshooting, read \`infinity-loop/troubleshooting.md\`.
 
 ## Memory Integration
 - \`ca search\` before starting each phase
