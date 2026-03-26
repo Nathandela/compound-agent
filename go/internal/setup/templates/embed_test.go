@@ -66,6 +66,7 @@ func TestPhaseSkills(t *testing.T) {
 	expected := []string{
 		"spec-dev", "plan", "work", "review", "compound",
 		"cook-it", "researcher", "test-cleaner", "agentic", "architect",
+		"qa-engineer",
 	}
 	for _, phase := range expected {
 		content, ok := skills[phase]
@@ -118,6 +119,18 @@ func TestPhaseSkillReferences(t *testing.T) {
 	// Verify architect advisory-fleet reference
 	if _, ok := refs["architect/references/advisory-fleet.md"]; !ok {
 		t.Error("missing architect/references/advisory-fleet.md")
+	}
+
+	// Verify qa-engineer references
+	expectedQAEngineer := []string{
+		"qa-engineer/references/exploratory-testing.md",
+		"qa-engineer/references/browser-automation.md",
+		"qa-engineer/references/constitution-schema.md",
+	}
+	for _, refPath := range expectedQAEngineer {
+		if _, ok := refs[refPath]; !ok {
+			t.Errorf("missing %s", refPath)
+		}
 	}
 
 	// Verify architect infinity-loop reference directory (nested)

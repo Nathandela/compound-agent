@@ -35,20 +35,26 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    - Role skill: `.claude/skills/compound/agents/runtime-verifier/SKILL.md`
    - Timeout: 5min total suite, 2min per individual test
    > See RV-1 through RV-5 in epic for full requirements
-8. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with `team_name`):
+8. **QA Engineer (optional, not a sequential blocker)**: Consider invoking the QA Engineer skill when the review involves visual changes, UI behavior, form interactions, or accessibility -- or when a reviewer flags a finding that needs hands-on verification. This step does NOT block steps 9-18; it runs independently and its findings merge at step 11.
+   - Skill: `.claude/skills/compound/qa-engineer/SKILL.md`
+   - Triggers: visual changes (CSS, HTML, component files), new pages/routes, form modifications, accessibility-related changes
+   - The QA Engineer complements runtime-verifier (step 7): runtime-verifier covers automated contract tests, QA Engineer covers exploratory/visual/boundary testing
+   - This is **not automatic** -- use it when the change scope warrants hands-on browser testing, or when a reviewer specifically requests it
+   - Can also run between review cycles in the infinity loop (see `review-fleet.md`)
+9. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with `team_name`):
    - Role skills: `.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer,scenario-coverage-reviewer}/SKILL.md`
    - Security specialist skills (on-demand, spawned by security-reviewer): `.claude/skills/compound/agents/{security-injection,security-secrets,security-auth,security-data,security-deps}/SKILL.md`
    - Runtime verifier (conditional, see step 7): `.claude/skills/compound/agents/runtime-verifier/SKILL.md`
    - For large diffs (500+), deploy MULTIPLE instances; split files across instances, coordinate via SendMessage
-9. Reviewers communicate findings to each other via `SendMessage`
-10. Collect, consolidate, and deduplicate all findings
-11. Classify by severity: P0 (blocks merge), P1 (critical/blocking), P2 (important), P3 (minor)
-12. Use `AskUserQuestion` when severity is ambiguous or fix has multiple valid options
-13. Create beads issues for P1 findings: `bd create --title="P1: ..."`
-14. Verify spec alignment: flag unmet EARS requirements as P1, flag requirements met but missing from acceptance criteria as gaps
-15. Fix all P1 findings before proceeding
-16. Run `/implementation-reviewer` as mandatory gate
-17. Capture novel findings with `ca learn`; pattern-matcher auto-reinforces recurring issues
+10. Reviewers communicate findings to each other via `SendMessage`
+11. Collect, consolidate, and deduplicate all findings (including QA Engineer findings if step 8 was used)
+12. Classify by severity: P0 (blocks merge), P1 (critical/blocking), P2 (important), P3 (minor)
+13. Use `AskUserQuestion` when severity is ambiguous or fix has multiple valid options
+14. Create beads issues for P1 findings: `bd create --title="P1: ..."`
+15. Verify spec alignment: flag unmet EARS requirements as P1, flag requirements met but missing from acceptance criteria as gaps
+16. Fix all P1 findings before proceeding
+17. Run `/implementation-reviewer` as mandatory gate
+18. Capture novel findings with `ca learn`; pattern-matcher auto-reinforces recurring issues
 
 ## Acceptance Criteria Review Protocol
 When checking AC, produce a summary table in the review report:
@@ -120,6 +126,7 @@ When the runtime-verifier is triggered (web/API projects only):
 - Not calibrating reviewers with past lessons (LCR skip)
 - Running runtime-verifier on CLI projects (wastes time, always SKIPs)
 - Silently skipping runtime-verifier when build fails (must report P1/INFRA)
+- Not considering QA Engineer for visual/UI changes (catches layout, accessibility, and interaction bugs that code review misses)
 
 ## Quality Criteria
 - All quality gates pass (`{{QUALITY_GATE_TEST}}`, `{{QUALITY_GATE_LINT}}`)
@@ -134,6 +141,7 @@ When the runtime-verifier is triggered (web/API projects only):
 - security-reviewer P0 findings: none (blocks merge)
 - security-reviewer P1 findings: all acknowledged or resolved
 - **Runtime verifier ran for web/API projects or reported SKIPPED for CLI (RV)**
+- **QA Engineer invoked for visual/UI changes when warranted (optional but recommended)**
 - All P1 findings fixed before `/implementation-reviewer` approval
 - All spec requirements verified against implementation
 - **All acceptance criteria checked and verified (PASS/FAIL)**
