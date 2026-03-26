@@ -151,6 +151,24 @@ cd go && golangci-lint run ./...            # Zero violations
 
 ---
 
+## Release Checklist (Inviolable)
+
+Every release MUST follow these steps. Skipping any step ships broken binaries to users.
+
+```bash
+[ ] 1. cd go && go test -tags sqlite_fts5 ./...   # Quality gates pass
+[ ] 2. cd go && golangci-lint run ./...            # Zero lint violations
+[ ] 3. Bump "version" in package.json              # e.g. "2.5.0"
+[ ] 4. Bump ALL 4 "@syottos/*" in optionalDependencies to SAME version
+[ ] 5. Move [Unreleased] CHANGELOG entries under new version header
+[ ] 6. git add package.json CHANGELOG.md && git commit
+[ ] 7. git tag v2.5.0 && git push && git push --tags
+```
+
+**Step 4 is critical.** The `@syottos/*` platform packages contain the actual Go binary. If optionalDependencies point to an older version, `npm install` resolves the old binary and users silently get stale templates (missing skills, outdated references). `TestPlatformVersionSync` catches this in CI.
+
+---
+
 ## Technology Stack
 
 | Component | Technology |

@@ -239,18 +239,39 @@ cd go && go build -tags sqlite_fts5 ./cmd/ca # Binary builds
 
 ```bash
 # 1. Update version in package.json
-#    (should already be bumped in the commit)
+#    - "version" field
+#    - ALL 4 entries in "optionalDependencies" (@syottos/*)
+#    Both MUST match. See "Critical: Version Sync" below.
 
 # 2. Move [Unreleased] entries in CHANGELOG.md under a new version header
 #    ## [x.x.x] - YYYY-MM-DD
 
-# 3. Commit the changelog update
-git add CHANGELOG.md && git commit -m "docs(changelog): release vx.x.x"
+# 3. Commit the version bump + changelog
+git add package.json CHANGELOG.md && git commit -m "chore(release): bump version to vx.x.x"
 
 # 4. Create and push the version tag
 git tag vx.x.x
 git push && git push --tags
 ```
+
+### Critical: Version Sync
+
+The `optionalDependencies` in `package.json` MUST match the `version` field. The release workflow publishes `@syottos/*` platform packages at the same version, then publishes the main `compound-agent` package. If optionalDependencies point to an older version, users get stale Go binaries with outdated templates -- new skills, updated references, and bug fixes silently missing.
+
+```jsonc
+// package.json -- both versions MUST be identical
+{
+  "version": "2.4.1",              // <-- this
+  "optionalDependencies": {
+    "@syottos/darwin-arm64": "2.4.1",  // <-- must match
+    "@syottos/darwin-x64": "2.4.1",
+    "@syottos/linux-arm64": "2.4.1",
+    "@syottos/linux-x64": "2.4.1"
+  }
+}
+```
+
+A CI test (`TestPlatformVersionSync`) enforces this at build time.
 
 ### What Happens Automatically
 

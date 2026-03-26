@@ -10,6 +10,67 @@ import (
 	"testing"
 )
 
+// TestPlatformVersionSync verifies that the optionalDependencies in
+// package.json all point to the same version as the top-level "version" field.
+// If they drift, npm/pnpm installs the wrong platform binary and users get
+// stale Go templates (missing skills, outdated references).
+func TestPlatformVersionSync(t *testing.T) {
+	repoRoot := findRepoRoot(t)
+
+	data, err := os.ReadFile(filepath.Join(repoRoot, "package.json"))
+	if err != nil {
+		t.Fatalf("read package.json: %v", err)
+	}
+
+	content := string(data)
+
+	// Extract top-level version
+	versionRe := regexp.MustCompile(`"version":\s*"([^"]+)"`)
+	versionMatch := versionRe.FindStringSubmatch(content)
+	if len(versionMatch) < 2 {
+		t.Fatal("could not find version in package.json")
+	}
+	version := versionMatch[1]
+
+	// Extract all @syottos/* versions
+	syottosRe := regexp.MustCompile(`"@syottos/[\w-]+":\s*"([^"]+)"`)
+	matches := syottosRe.FindAllStringSubmatch(content, -1)
+	if len(matches) == 0 {
+		t.Fatal("no @syottos/* dependencies found in package.json")
+	}
+	if len(matches) != 4 {
+		t.Errorf("expected 4 @syottos/* dependencies, got %d", len(matches))
+	}
+
+	for _, m := range matches {
+		if m[1] != version {
+			t.Errorf("@syottos/* version %q does not match package version %q -- bump optionalDependencies before tagging", m[1], version)
+		}
+	}
+}
+
+// findRepoRoot walks up from the test directory to find the repository root.
+// It looks for go.mod (inside go/) then goes one level up.
+func findRepoRoot(t *testing.T) string {
+	t.Helper()
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd: %v", err)
+	}
+	dir := wd
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+			return filepath.Dir(dir) // go.mod is inside go/, repo root is one up
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			t.Skip("could not find repo root (go.mod)")
+			return ""
+		}
+		dir = parent
+	}
+}
+
 // TestTemplateDrift_ReviewerNamesMatchAgentRoleSkills verifies that every
 // reviewer name mentioned in the review SKILL.md role-skill paths and bold
 // references has a corresponding agent-role-skill directory in the embedded
@@ -110,25 +171,7 @@ func TestTemplateDrift_ReviewerNamesMatchAgentRoleSkills(t *testing.T) {
 // set of files. Catches drift when a file is added to the source but not
 // copied into the embedded templates (or vice versa).
 func TestTemplateDrift_ResearchSourceMatchesEmbed(t *testing.T) {
-	// Walk up from the test file to find the repo root (contains go.mod).
-	wd, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("Getwd: %v", err)
-	}
-	repoRoot := wd
-	for {
-		if _, err := os.Stat(filepath.Join(repoRoot, "go.mod")); err == nil {
-			break
-		}
-		parent := filepath.Dir(repoRoot)
-		if parent == repoRoot {
-			t.Skip("could not find repo root (go.mod)")
-			return
-		}
-		repoRoot = parent
-	}
-	// Go up one more level since go.mod is inside go/
-	repoRoot = filepath.Dir(repoRoot)
+	repoRoot := findRepoRoot(t)
 
 	sourceDir := filepath.Join(repoRoot, "docs", "compound", "research")
 	if _, err := os.Stat(sourceDir); os.IsNotExist(err) {
@@ -138,7 +181,7 @@ func TestTemplateDrift_ResearchSourceMatchesEmbed(t *testing.T) {
 
 	// Collect source files
 	sourceFiles := make(map[string]bool)
-	err = filepath.Walk(sourceDir, func(p string, info os.FileInfo, err error) error {
+	walkErr := filepath.Walk(sourceDir, func(p string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return err
 		}
@@ -146,8 +189,8 @@ func TestTemplateDrift_ResearchSourceMatchesEmbed(t *testing.T) {
 		sourceFiles[filepath.ToSlash(rel)] = true
 		return nil
 	})
-	if err != nil {
-		t.Fatalf("walk source: %v", err)
+	if walkErr != nil {
+		t.Fatalf("walk source: %v", walkErr)
 	}
 
 	// Collect embedded files

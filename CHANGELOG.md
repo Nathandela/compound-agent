@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.1] - 2026-03-26
+
+### Fixed
+
+- **Platform binary version mismatch**: `package.json` optionalDependencies pointed `@syottos/*` packages at `2.3.0` while the main package was `2.4.0`. Users installing `compound-agent@2.4.0` got v2.3.0 Go binaries, silently missing `build-great-things` and `qa-engineer` skills, updated `architect` references (advisory fleet, improve loop), and updated `review` skill (QA engineer integration). Added `TestPlatformVersionSync` CI test and documented the version sync requirement in CONTRIBUTING.md and CLAUDE.md to prevent recurrence.
+
 ## [2.4.0] - 2026-03-26
 
 ### Added
