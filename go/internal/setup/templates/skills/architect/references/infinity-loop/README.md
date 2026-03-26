@@ -22,6 +22,8 @@ The infinity loop (`ca loop`) generates a standalone bash script that autonomous
 | Improve iters | `--improve-max-iters <n>` | 5 | Max iterations per topic |
 | Improve budget | `--improve-time-budget <s>` | 0 (unlimited) | Total improvement time budget |
 
+> For improve program authoring and examples, see `../improve-loop/program-authoring.md` and `../improve-loop/example-programs.md`.
+
 ## Where to Look
 
 Use this decision tree to find the right reference file:
@@ -34,6 +36,7 @@ Use this decision tree to find the right reference file:
 | Empty logs, missing markers, silent sessions | `logging.md` |
 | Reviewer fleet issues, 1-byte output, broken reviews | `review-fleet.md` |
 | Any failure you can't diagnose | `troubleshooting.md` |
+| Improve phase: topics not running, markers not detected | `../improve-loop/troubleshooting.md` |
 
 ## Examples
 

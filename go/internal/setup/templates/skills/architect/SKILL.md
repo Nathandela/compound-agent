@@ -1,12 +1,12 @@
 ---
 name: Architect
-description: Decompose a large system specification into cook-it-ready epic beads via DDD bounded contexts
+description: Decompose a large system specification into cook-it-ready epic beads via DDD bounded contexts, with optional post-epic improvement loop configuration
 ---
 
 # Architect Skill
 
 ## Overview
-Take a large system specification and decompose it into naturally-scoped epic beads that the infinity loop can process via cook-it. Each output epic is sized for one cook-it cycle.
+Take a large system specification and decompose it into naturally-scoped epic beads that the infinity loop can process via cook-it. Each output epic is sized for one cook-it cycle. Phase 5 optionally configures post-epic improvement programs for iterative codebase refinement.
 
 5 phases with 4 human gates (Phase 5 is opt-in). Runs BEFORE spec-dev -- each decomposed epic then goes through full cook-it (including spec-dev to refine its EARS subset).
 
@@ -123,7 +123,7 @@ After creating all domain epics, create a final **Integration Verification (IV) 
    - Instruction that if integration tests find cross-boundary failures, create bug beads with deps to the originating epics (IV-5)
 
 ## Phase 5: Launch (Opt-in)
-**Goal**: Configure and launch the infinity loop on the materialized epics.
+**Goal**: Configure and launch the infinity loop on the materialized epics, with optional post-epic improvement programs.
 
 This phase is OPT-IN. After Phase 4:
 - If the user's starting prompt mentioned loop/launch intent: proceed directly to step 1.
@@ -146,43 +146,60 @@ This phase is OPT-IN. After Phase 4:
    - Max review cycles (default: 3)
    - Max retries on failure (default: 1)
    - Include improvement phase? (default: no)
+     - If yes: max iterations per topic? (default: 5)
+     - If yes: time budget in seconds? (default: 0, unlimited)
    - Dry-run first? (default: yes)
    See \`architect/references/infinity-loop/README.md\` for the full parameter reference.
    Read specific files as needed:
    - Pre-flight and launch: \`infinity-loop/pre-flight.md\`
    - Memory tuning: \`infinity-loop/memory-safety.md\`
    - Review fleet config: \`infinity-loop/review-fleet.md\`
+   - Improve phase overview: \`improve-loop/README.md\`
 
-3. **Generate script** (produces \`./infinity-loop.sh\`):
+3. **Author improvement programs** (skip if improvement phase was declined in step 2):
+   This follows the same materialize pattern as Phase 4 (epics into beads), but for improvement topics. Read \`architect/references/improve-loop/program-authoring.md\` for program structure and markers before authoring.
+   a. **Identify topics** from Phases 1-3 findings:
+      - Quality risks flagged during Socratic dialogue
+      - STPA hazards from the decomposition convoy
+      - Gaps or weak spots noted in the system spec
+      - Read \`architect/references/improve-loop/example-programs.md\` for reference templates. Aim for 2-4 programs -- fewer is wasted overhead, more risks exhausting the time budget.
+   b. **Author programs**: Create \`improve/<topic>.md\` for each identified topic. Each program MUST have a Goal section (with marker instructions) and a Validation section (mechanically checkable).
+   c. **Present for approval**: Use \`AskUserQuestion\` to show the proposed improvement programs. Include the topic name, goal summary, and validation criteria for each.
+   d. **Write approved programs** to disk at the project root: \`mkdir -p improve\` then Write tool for each file (e.g., \`improve/error-handling.md\`).
+
+4. **Generate script** (produces \`./infinity-loop.sh\`):
    \`\`\`bash
    ca loop --epics <id1> <id2> ... \\
      --model <model> \\
      --reviewers <reviewer1> <reviewer2> ... \\
      --review-every <N> --max-review-cycles <N> \\
-     --max-retries <N> [--improve] --force
+     --max-retries <N> \\
+     [--improve --improve-max-iters <N> --improve-time-budget <S>] \\
+     --force
    \`\`\`
 
-4. **Dry-run** (unless user declined in step 2):
+5. **Dry-run** (unless user declined in step 2):
    \`\`\`bash
    LOOP_DRY_RUN=1 ./infinity-loop.sh
    \`\`\`
    Review output, then use \`AskUserQuestion\`: "Dry-run complete. Proceed with live launch?"
 
-5. **Launch in background**:
+6. **Launch in background**:
    Verify screen is available: \`command -v screen\`. If not, use \`nohup ./infinity-loop.sh > loop-output.log 2>&1 &\` as fallback.
    \`\`\`bash
    screen -dmS compound-loop ./infinity-loop.sh
    \`\`\`
    Verify: \`screen -ls | grep compound-loop\`
 
-6. **Report monitoring commands** to the user:
+7. **Report monitoring commands** to the user:
    - Live watch: \`ca watch\`
+   - Improve phase watch: \`ca watch --improve\` (if improvement phase enabled)
    - Status: \`cat agent_logs/.loop-status.json\`
    - Attach: \`screen -r compound-loop\`
    - Execution log: \`cat agent_logs/loop-execution.jsonl\`
    - For ongoing health monitoring, see the 30-minute probe protocol in the reference guide.
 
-See \`architect/references/infinity-loop/README.md\` for full reference. For troubleshooting, read \`infinity-loop/troubleshooting.md\`.
+See \`architect/references/infinity-loop/README.md\` for full reference. For troubleshooting, read \`infinity-loop/troubleshooting.md\` and \`improve-loop/troubleshooting.md\`.
 
 ## Memory Integration
 - \`ca search\` before starting each phase
@@ -210,6 +227,9 @@ See \`architect/references/infinity-loop/README.md\` for full reference. For tro
 - **Treating advisory feedback as blocking** -- advisors inform the human, they don't have veto power
 - Launching loop without verifying all epics are status=open (pre-flight check)
 - Skipping dry-run (catches configuration errors before live execution)
+- Authoring improvement programs without reading \`improve-loop/program-authoring.md\` first
+- Programs with overlapping scope that conflict during iteration (e.g., "add comments" vs "simplify code")
+- Programs without mechanical validation criteria (agent cannot self-assess "readability")
 
 ## Quality Criteria
 - [ ] Socratic phase completed with domain glossary and mindmap
@@ -230,3 +250,5 @@ See \`architect/references/infinity-loop/README.md\` for full reference. For tro
 - [ ] Dry-run offered and reviewed (if launch activated)
 - [ ] Loop launched in screen session (if user approved)
 - [ ] Monitoring commands reported to user
+- [ ] Improvement programs authored and approved (if improve phase enabled)
+- [ ] Each program has Goal (with markers) and Validation (mechanically checkable) sections
