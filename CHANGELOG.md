@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-03-26
+
 ### Added
 
 - **Build Great Things skill**: New `skills/build-great-things/` ships a comprehensive design and development playbook via `ca init`. Covers both software design philosophy (Ousterhout's complexity management, deep modules, information hiding) and the full build sequence for user-facing products across 6 phases (Foundation → Structure → Craft → Motion → Performance → Launch) with separate website and webapp tracks. Includes mandatory quality checklist, 12 anti-patterns for common AI laziness, and routing table for task-specific guidance. 12 reference files provide phase-specific design principles and research pointers.
