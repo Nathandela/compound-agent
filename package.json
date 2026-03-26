@@ -1,6 +1,6 @@
 {
   "name": "compound-agent",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "type": "module",
   "description": "Learning system for Claude Code — avoids repeating mistakes across sessions",
   "bin": {

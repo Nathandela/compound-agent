@@ -22,10 +22,11 @@ Take a large system specification and decompose it into naturally-scoped epic be
 3. **Research sufficiency gate** (see below)
 4. Ask "why" before "how" -- understand the real need
 5. Build a **domain glossary** (ubiquitous language) from the dialogue
-6. Produce a **discovery mindmap** (Mermaid \`mindmap\`) to expose assumptions
-7. **Reversibility analysis**: classify decisions as irreversible (schema, public API, service boundary), moderate (framework), or reversible (library, config). Spend effort proportional to irreversibility.
-8. **Change volatility**: rate each boundary stable/moderate/high. High-volatility justifies modularity investment.
-9. Use \`AskUserQuestion\` to clarify scope and preferences
+6. **Design skill detection**: If the system involves building something users will see or interact with -- websites, web apps, dashboards, landing pages, APIs with client-facing surfaces, or any product where design quality matters -- flag it for the \`/compound:build-great-things\` skill. This covers both visual design (typography, color, motion, states) and software design philosophy (deep modules, complexity management, information architecture, state architecture). This informs the Phase 2 spec note.
+7. Produce a **discovery mindmap** (Mermaid \`mindmap\`) to expose assumptions
+8. **Reversibility analysis**: classify decisions as irreversible (schema, public API, service boundary), moderate (framework), or reversible (library, config). Spend effort proportional to irreversibility.
+9. **Change volatility**: rate each boundary stable/moderate/high. High-volatility justifies modularity investment.
+10. Use \`AskUserQuestion\` to clarify scope and preferences
 
 ### Research Sufficiency Gate
 After steps 1-2, evaluate whether the domain is well-enough understood to decompose:
@@ -46,6 +47,7 @@ After steps 1-2, evaluate whether the domain is well-enough understood to decomp
 2. Produce **architecture diagrams**: C4Context, sequenceDiagram, stateDiagram-v2
 3. Generate a **scenario table** from the EARS requirements
 4. Write the spec to \`docs/specs/<name>.md\` and create a **meta-epic bead**
+5. **Design skill note**: If design-relevant work was detected in Phase 1 (step 6), add a note to the spec recommending that applicable epics invoke \`/compound:build-great-things\` during their work phase. The skill covers both software design philosophy (Ousterhout's complexity management, deep modules, information hiding) and the full build sequence for user-facing products (IA, typography, color, motion, states, accessibility, conversion). Read \`build-great-things/SKILL.md\` for the full playbook.
 
 ### Advisory Fleet (Post-Spec)
 Before presenting the spec to the human, solicit external architectural perspectives. Read \`architect/references/advisory-fleet.md\` for the full protocol. In brief:
