@@ -47,7 +47,23 @@ After steps 1-2, evaluate whether the domain is well-enough understood to decomp
 3. Generate a **scenario table** from the EARS requirements
 4. Write the spec to \`docs/specs/<name>.md\` and create a **meta-epic bead**
 
-**Gate 2**: Use \`AskUserQuestion\` to get human approval of the system-level spec.
+### Advisory Fleet (Post-Spec)
+Before presenting the spec to the human, solicit external architectural perspectives. Read \`architect/references/advisory-fleet.md\` for the full protocol. In brief:
+1. **Detect** available advisor CLIs (\`claude\`, \`gemini\`, \`codex\`) with a health-check Bash call
+2. **Write** prompt files to \`/tmp/advisory/\` (one per lens, parallel Write calls)
+3. **Spawn** each advisor as a background Bash call (\`run_in_background: true\`, all in one message)
+4. **Collect** reports as each advisor finishes (Read tool), then **synthesize** into a structured brief
+5. **Persist** the brief to \`docs/specs/<name>-advisory-brief.md\`
+
+The 4 advisor lenses (assigned to available CLIs per the fallback table in the reference doc):
+   - **Security & Reliability** -- attack surfaces, failure modes, trust boundaries
+   - **Scalability & Performance** -- bottlenecks, growth patterns, resource contention
+   - **Organizational & Delivery** -- team boundaries, coordination cost, cognitive load
+   - **Simplicity & Alternatives** (devil's advocate) -- over-engineering, simpler approaches
+
+If no advisor CLIs are available, skip this step and proceed directly to Gate 2. The advisory fleet is non-blocking -- it informs the human's decision but cannot veto it.
+
+**Gate 2**: Use \`AskUserQuestion\` to get human approval of the system-level spec. The Gate 2 question MUST include the advisory fleet brief (if produced) so the human sees both the spec and external perspectives in the same view. If no brief was produced, note why (no CLIs, all timed out, etc.).
 
 ## Phase 3: Decompose
 **Goal**: Break the system into naturally-scoped epics using DDD bounded contexts.
@@ -190,6 +206,8 @@ See \`architect/references/infinity-loop/README.md\` for full reference. For tro
 - **Omitting the Integration Verification epic** -- cross-epic interface failures are only caught at the end; without IV, integration bugs surface too late
 - **Under-scoping integration verification** -- using LIGHT scope when behavioral or composition contracts exist; match scope to contract complexity
 - **IV epic without enough structure** -- spec-dev cannot produce a meaningful plan if the IV description lacks the contracts-under-test table (STPA H3.3)
+- **Skipping the advisory fleet** when external CLIs are available -- the 5-minute investment catches blind spots before committing to an architecture
+- **Treating advisory feedback as blocking** -- advisors inform the human, they don't have veto power
 - Launching loop without verifying all epics are status=open (pre-flight check)
 - Skipping dry-run (catches configuration errors before live execution)
 
@@ -204,6 +222,7 @@ See \`architect/references/infinity-loop/README.md\` for full reference. For tro
 - [ ] Dependencies wired via bd dep add
 - [ ] Processing order stored on meta-epic
 - [ ] **Integration Verification epic created** with correct scope level, contracts-under-test table, and dependencies on all domain epics
+- [ ] Advisory fleet consulted before Gate 2 (or skipped with documented reason)
 - [ ] 3 human gates passed via AskUserQuestion (4 if launch phase activated)
 - [ ] Memory searched at each phase
 - [ ] Phase 5 opt-in question asked (or intent detected in starting prompt)

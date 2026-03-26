@@ -115,6 +115,11 @@ func TestPhaseSkillReferences(t *testing.T) {
 		t.Error("missing spec-dev/references/spec-guide.md")
 	}
 
+	// Verify architect advisory-fleet reference
+	if _, ok := refs["architect/references/advisory-fleet.md"]; !ok {
+		t.Error("missing architect/references/advisory-fleet.md")
+	}
+
 	// Verify architect infinity-loop reference directory (nested)
 	expectedInfinityLoop := []string{
 		"architect/references/infinity-loop/README.md",
