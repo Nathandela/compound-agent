@@ -327,10 +327,8 @@ func CreatePluginManifest(repoRoot string, version string) (bool, bool, error) {
 // PruneStaleTemplates removes managed files and directories that no longer
 // exist in the current template set. Only touches compound/ namespaces.
 // Returns count of items removed.
-func PruneStaleTemplates(repoRoot string) (int, error) {
+func pruneFlatDirs(repoRoot string) (int, error) {
 	pruned := 0
-
-	// Flat directories: prune files not in current template set
 	flatDirs := []struct {
 		dir      string
 		expected map[string]string
@@ -345,6 +343,17 @@ func PruneStaleTemplates(repoRoot string) (int, error) {
 			return pruned, err
 		}
 		pruned += n
+	}
+	return pruned, nil
+}
+
+// PruneStaleTemplates removes installed templates that no longer
+// exist in the current template set. Only touches compound/ namespaces.
+// Returns count of items removed.
+func PruneStaleTemplates(repoRoot string) (int, error) {
+	pruned, err := pruneFlatDirs(repoRoot)
+	if err != nil {
+		return pruned, err
 	}
 
 	// Research docs: prune stale files and directories
