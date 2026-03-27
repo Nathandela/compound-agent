@@ -1499,6 +1499,7 @@ func buildAuditReport(findings []auditFinding) auditReport {
 func registerScriptCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(improveCmd())
 	rootCmd.AddCommand(loopCmd())
+	rootCmd.AddCommand(polishCmd())
 	rootCmd.AddCommand(watchCmd())
 	rootCmd.AddCommand(auditCmd())
 }

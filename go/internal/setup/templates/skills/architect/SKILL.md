@@ -206,6 +206,46 @@ This phase is OPT-IN. After Phase 4:
 
 See \`architect/references/infinity-loop/README.md\` for full reference. For troubleshooting, read \`infinity-loop/troubleshooting.md\` and \`improve-loop/troubleshooting.md\`.
 
+### Phase 6: Polish (Opt-in, post-loop)
+
+After the infinity loop completes, ask the user via \`AskUserQuestion\`: "The implementation loop is complete. Would you like to run the polish loop for iterative quality refinement?" If declined, stop here.
+
+**Gate 5**: User confirms polish loop activation and cycle count N.
+
+1. **Gather parameters**:
+   - Number of cycles (\`--cycles N\`) -- user must specify upfront, no default
+   - Reviewer fleet (\`--reviewers\`) -- which model CLIs to use for audit
+   - Model for mini-architect sessions (\`--model\`, default: \`claude-opus-4-6[1m]\`)
+   - Spec file path (\`--spec\`) for reviewer context
+
+2. **Generate polish script**:
+   \`\`\`bash
+   ca polish --cycles <N> \\
+     --meta-epic <meta-epic-id> \\
+     --spec docs/specs/<name>.md \\
+     --reviewers <reviewer1> <reviewer2> ... \\
+     --model <model> \\
+     --force
+   \`\`\`
+
+3. **Dry-run**: \`POLISH_DRY_RUN=1 ./polish-loop.sh\` -- validates configuration without spawning sessions.
+
+4. **Launch**: \`screen -dmS compound-polish ./polish-loop.sh\`
+
+5. **Report monitoring commands** to the user:
+   - Status: \`cat agent_logs/.polish-status.json\`
+   - Cycle reports: \`ls agent_logs/polish-cycle-*/\`
+   - Attach: \`screen -r compound-polish\`
+
+Each polish cycle executes three steps:
+- **Audit**: All configured reviewers evaluate the full implementation against the \`build-great-things\` pre-ship checklist (45 quality items + 12 laziness anti-patterns). This is a holistic craft review, not a diff review.
+- **Mini-Architect**: A Claude Opus[1M] session reads the synthesized audit report, groups findings into improvement epics, creates beads, and wires dependencies.
+- **Inner Loop**: A fresh \`ca loop\` runs the cook-it pipeline for each improvement epic.
+
+The loop runs exactly N times. No early exit. Read \`build-great-things/SKILL.md\` for the full quality checklist that drives the audit.
+
+See \`architect/references/polish-loop/README.md\` for the full parameter reference.
+
 ## Memory Integration
 - \`ca search\` before starting each phase
 - \`ca knowledge\` for indexed project docs
@@ -235,6 +275,8 @@ See \`architect/references/infinity-loop/README.md\` for full reference. For tro
 - Authoring improvement programs without reading \`improve-loop/program-authoring.md\` first
 - Programs with overlapping scope that conflict during iteration (e.g., "add comments" vs "simplify code")
 - Programs without mechanical validation criteria (agent cannot self-assess "readability")
+- Running polish loop without specifying cycle count upfront (N must be decided before launch)
+- Using polish loop for correctness fixes (it is craft-focused; use review fleet for correctness)
 
 ## Quality Criteria
 - [ ] Socratic phase completed with domain glossary and mindmap
@@ -257,3 +299,7 @@ See \`architect/references/infinity-loop/README.md\` for full reference. For tro
 - [ ] Monitoring commands reported to user
 - [ ] Improvement programs authored and approved (if improve phase enabled)
 - [ ] Each program has Goal (with markers) and Validation (mechanically checkable) sections
+- [ ] Phase 6 opt-in question asked after loop completes (5 if polish activated)
+- [ ] Polish cycle count specified upfront by user
+- [ ] Polish dry-run offered and reviewed (if polish activated)
+- [ ] Polish loop launched in separate screen session (if user approved)
