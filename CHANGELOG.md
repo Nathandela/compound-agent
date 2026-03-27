@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-03-27
+
+### Added
+
+- **Polish Loop (Phase 6)**: New `ca polish` CLI command generates a standalone bash script for iterative quality refinement. Runs N cycles of: multi-model audit fleet evaluating full implementation against the build-great-things pre-ship checklist (34 quality items + 12 laziness anti-patterns), mini-architect decomposing findings into improvement epics, and inner infinity loop implementing them. Supports claude-opus, claude-sonnet, gemini, and codex as reviewers. Includes dry-run mode, crash handler with status JSON, reviewer CLI detection with graceful degradation, and per-cycle observability (individual reports, synthesized reports, architect logs).
+- **Architect Phase 6**: Opt-in phase in architect SKILL.md that activates after the infinity loop completes. Gate 5 for user confirmation. Generates and launches the polish loop script with monitoring commands.
+- **Polish loop reference docs**: `architect/references/polish-loop/README.md` (configuration reference) and `audit-prompt.md` (audit prompt design explaining how it differs from the review fleet).
+
+### Fixed
+
+- **Polish loop: dry-run crash** (P0): `POLISH_EPICS` variable initialized before the loop and at start of each cycle to prevent unbound variable error under `set -u`.
+- **Polish loop: crash handler exit code** (P0): EXIT trap now preserves the original exit code with `exit $exit_code` so callers detect failures.
+- **Polish loop: log() ordering** (P1): `log()` function defined before crash handler in script assembly to prevent `log: command not found` during early failures.
+- **Polish loop: missing ca prerequisite** (P1): Added `command -v ca` check alongside claude and bd.
+- **Polish loop: ARG_MAX risk** (P1): Reviewer prompts piped via stdin (`-p - < file`) instead of command substitution to handle large specs.
+- **Polish loop: architect heredoc expansion** (P1): Mini-architect prompt uses quoted heredoc + file-based injection to prevent shell expansion of report content containing `$` or backticks.
+- **Polish loop: spec file validation** (P1): Script fails fast if spec file doesn't exist at runtime.
+- **Polish loop: git commit before push**: Post-loop commits synthesized reports and status artifacts before pushing.
+
 ## [2.4.1] - 2026-03-26
 
 ### Fixed
