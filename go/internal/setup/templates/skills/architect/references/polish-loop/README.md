@@ -21,7 +21,7 @@ Each of the N cycles runs exactly three steps:
 ### Step 1: Audit
 
 All configured reviewers evaluate the full implementation in parallel. Each reviewer receives:
-- The build-great-things pre-ship checklist (45 quality items + 12 laziness anti-patterns)
+- The build-great-things pre-ship checklist (34 quality items + 12 laziness anti-patterns)
 - The system spec for context
 - The current cycle number
 

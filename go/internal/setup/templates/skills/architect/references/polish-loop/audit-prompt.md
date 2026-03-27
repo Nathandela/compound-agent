@@ -15,13 +15,13 @@ The polish audit prompt differs fundamentally from the infinity loop's review fl
 
 The audit prompt embeds the complete build-great-things pre-ship checklist:
 
-### Quantified Items (45)
+### Quantified Items (34)
 - **States** (5): loading, empty, error, offline, partial data
 - **Interaction** (5): hover/active/focus/disabled, focus visibility, press feedback, validation, transitions
 - **Visual Craft** (9): hierarchy, de-emphasis, geometric spacing, no-border-first, elevation, semantic color, scroll animations, images, icons
 - **Responsiveness** (4): mobile-first, 44x44px touch, fluid typography, no horizontal scroll
 - **Performance** (3): Core Web Vitals (LCP/INP/CLS), font loading, above-fold without JS
-- **Accessibility** (4): semantic HTML, minimal ARIA, contrast (4.5:1), reduced-motion, live regions
+- **Accessibility** (5): semantic HTML, minimal ARIA, contrast (4.5:1), reduced-motion, live regions
 - **Completeness** (3): 404 page, favicon/OG, print styles
 
 ### Anti-Pattern Items (12)

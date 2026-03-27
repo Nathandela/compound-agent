@@ -8,7 +8,7 @@ description: Decompose a large system specification into cook-it-ready epic bead
 ## Overview
 Take a large system specification and decompose it into naturally-scoped epic beads that the infinity loop can process via cook-it. Each output epic is sized for one cook-it cycle. Phase 5 optionally configures post-epic improvement programs for iterative codebase refinement.
 
-5 phases with 4 human gates (Phase 5 is opt-in). Runs BEFORE spec-dev -- each decomposed epic then goes through full cook-it (including spec-dev to refine its EARS subset).
+6 phases with 5 human gates (Phase 5 and Phase 6 are opt-in). Runs BEFORE spec-dev -- each decomposed epic then goes through full cook-it (including spec-dev to refine its EARS subset).
 
 ## Input
 - Beads epic ID: read epic description as input
@@ -223,7 +223,7 @@ After the infinity loop completes, ask the user via \`AskUserQuestion\`: "The im
    ca polish --cycles <N> \\
      --meta-epic <meta-epic-id> \\
      --spec docs/specs/<name>.md \\
-     --reviewers <reviewer1> <reviewer2> ... \\
+     --reviewers <reviewer1>,<reviewer2>,... \\
      --model <model> \\
      --force
    \`\`\`
@@ -238,7 +238,7 @@ After the infinity loop completes, ask the user via \`AskUserQuestion\`: "The im
    - Attach: \`screen -r compound-polish\`
 
 Each polish cycle executes three steps:
-- **Audit**: All configured reviewers evaluate the full implementation against the \`build-great-things\` pre-ship checklist (45 quality items + 12 laziness anti-patterns). This is a holistic craft review, not a diff review.
+- **Audit**: All configured reviewers evaluate the full implementation against the \`build-great-things\` pre-ship checklist (34 quality items + 12 laziness anti-patterns). This is a holistic craft review, not a diff review.
 - **Mini-Architect**: A Claude Opus[1M] session reads the synthesized audit report, groups findings into improvement epics, creates beads, and wires dependencies.
 - **Inner Loop**: A fresh \`ca loop\` runs the cook-it pipeline for each improvement epic.
 
@@ -256,7 +256,7 @@ See \`architect/references/polish-loop/README.md\` for the full parameter refere
 - Micro-slicing epics too small (each epic should be a natural bounded context, not a single task)
 - Missing interface contracts between epics (coupling will bite during implementation)
 - Not searching memory for past decomposition patterns
-- Skipping human gates (the 3 gates are the quality checkpoints)
+- Skipping human gates (Gates 1-3 are mandatory; Gates 4-5 activate with opt-in phases)
 - Creating epics without EARS subset (loses traceability to system spec)
 - Not wiring dependencies (loop will process in wrong order)
 - Treating complex decisions as complicated (Cynefin): service boundaries need experiments, not just analysis
@@ -290,7 +290,7 @@ See \`architect/references/polish-loop/README.md\` for the full parameter refere
 - [ ] Processing order stored on meta-epic
 - [ ] **Integration Verification epic created** with correct scope level, contracts-under-test table, and dependencies on all domain epics
 - [ ] Advisory fleet consulted before Gate 2 (or skipped with documented reason)
-- [ ] 3 human gates passed via AskUserQuestion (4 if launch phase activated)
+- [ ] 3 human gates passed via AskUserQuestion (4 if launch phase activated, 5 if polish phase activated)
 - [ ] Memory searched at each phase
 - [ ] Phase 5 opt-in question asked (or intent detected in starting prompt)
 - [ ] Pre-flight: all epic beads verified status=open before launch

@@ -68,9 +68,6 @@ func runPolish(cmd *cobra.Command, o *polishCmdOptions) error {
 	}
 
 	output := o.output
-	if output == "" {
-		output = "polish-loop.sh"
-	}
 	if !o.force {
 		if _, err := os.Stat(output); err == nil {
 			return fmt.Errorf("file %s already exists (use --force to overwrite)", output)
@@ -112,9 +109,9 @@ func generatePolishScript(opts polishGenerateOptions) string {
 	escapedReviewers := util.ShellEscape(strings.Join(opts.reviewers, " "))
 
 	config := polishScriptConfig(opts.cycles, escapedModel, escapedMetaEpic, escapedSpec, escapedReviewers)
+	logFn := polishScriptLogFunction()
 	crashHandler := polishScriptCrashHandler()
 	prereqs := polishScriptPrerequisites()
-	logFn := polishScriptLogFunction()
 	reviewerDetection := polishScriptReviewerDetection()
 	auditPrompt := polishScriptAuditPrompt()
 	spawnReviewers := polishScriptSpawnReviewers()
@@ -124,7 +121,7 @@ func generatePolishScript(opts polishGenerateOptions) string {
 	mainLoop := polishScriptMainLoop()
 	postLoop := polishScriptPostLoop()
 
-	return config + crashHandler + prereqs + logFn +
+	return config + logFn + crashHandler + prereqs +
 		reviewerDetection + auditPrompt + spawnReviewers +
 		synthesize + miniArchitect + innerLoop + mainLoop + postLoop
 }
@@ -162,6 +159,7 @@ _polish_cleanup() {
   if [ $exit_code -ne 0 ]; then
     log "Polish loop crashed with exit code $exit_code"
     echo "{\"status\":\"crashed\",\"exit_code\":$exit_code,\"cycle\":${cycle:-0},\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$LOG_DIR/.polish-status.json"
+    exit $exit_code
   fi
 }
 trap _polish_cleanup EXIT
@@ -173,6 +171,8 @@ func polishScriptPrerequisites() string {
 	return `# --- Prerequisites ---
 command -v claude >/dev/null 2>&1 || { echo "ERROR: claude CLI not found"; exit 1; }
 command -v bd >/dev/null 2>&1 || { echo "ERROR: bd CLI not found"; exit 1; }
+command -v ca >/dev/null 2>&1 || { echo "ERROR: ca CLI not found (needed for inner loop)"; exit 1; }
+[ -f "$SPEC_FILE" ] || { log "ERROR: spec file not found: $SPEC_FILE"; exit 1; }
 
 `
 }
@@ -369,11 +369,11 @@ run_polish_audit() {
         claude $model_flag \
           --dangerously-skip-permissions \
           --output-format text \
-          -p "$(cat "$prompt_file")" > "$report" 2>"$cycle_dir/$reviewer.stderr" &
+          -p - < "$prompt_file" > "$report" 2>"$cycle_dir/$reviewer.stderr" &
         ;;
       gemini)
         gemini --yolo \
-          -p "$(cat "$prompt_file")" \
+          < "$prompt_file" \
           > "$report" 2>"$cycle_dir/$reviewer.stderr" &
         ;;
       codex)
@@ -447,9 +447,11 @@ run_mini_architect() {
     return 0
   fi
 
-  local architect_prompt
-  architect_prompt=$(cat <<ARCHITECT_EOF
-You are a mini-architect for polish cycle $cycle_num.
+  # Build prompt file (quoted heredoc prevents shell expansion of report content)
+  local prompt_file="$cycle_dir/mini-architect-prompt.md"
+  {
+    cat <<'ARCHITECT_HEADER_EOF'
+You are a mini-architect for a polish cycle.
 
 ## Your Task
 Read the polish report below and create improvement epic beads for the findings.
@@ -457,26 +459,26 @@ Read the polish report below and create improvement epic beads for the findings.
 ## Instructions
 1. Read the polish report carefully
 2. Group related findings into improvement epics (aim for 2-5 epics)
-3. For each epic, run: bd create --title="Polish C${cycle_num}: <summary>" --description="<findings>" --type=epic --priority=2
+3. For each epic, run: bd create --title="Polish: <summary>" --description="<findings>" --type=epic --priority=2
 4. Wire dependencies between epics if needed: bd dep add <dependent> <dependency>
 5. Output the created epic IDs, one per line
 
-## Polish Report
-$(cat "$report_file")
-
-## Meta-Epic
-Parent: $META_EPIC
-
-## Output Format
-After creating all epics, output each ID on its own line:
-POLISH_EPIC: <epic-id>
-ARCHITECT_EOF
-)
+ARCHITECT_HEADER_EOF
+    echo "## Polish Report"
+    cat "$report_file"
+    echo ""
+    echo "## Meta-Epic"
+    echo "Parent: $META_EPIC"
+    echo ""
+    echo "## Output Format"
+    echo "After creating all epics, output each ID on its own line:"
+    echo "POLISH_EPIC: <epic-id>"
+  } > "$prompt_file"
 
   claude --model "$MODEL" \
     --dangerously-skip-permissions \
     --output-format text \
-    -p "$architect_prompt" > "$architect_log" 2>"$cycle_dir/mini-architect.stderr" || true
+    -p - < "$prompt_file" > "$architect_log" 2>"$cycle_dir/mini-architect.stderr" || true
 
   # Extract created epic IDs
   POLISH_EPICS=""
@@ -527,7 +529,7 @@ run_inner_loop() {
   }
 
   log "Cycle $cycle_num: running inner infinity loop"
-  bash "$inner_script" 2>"$cycle_dir/inner-loop.stderr" || {
+  bash "$inner_script" >"$cycle_dir/inner-loop.stdout" 2>"$cycle_dir/inner-loop.stderr" || {
     log "WARN: inner loop exited with non-zero status"
   }
 
@@ -544,8 +546,11 @@ detect_polish_reviewers
 log "Starting polish loop: $CYCLES cycles"
 echo "{\"status\":\"running\",\"cycles\":$CYCLES,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$LOG_DIR/.polish-status.json"
 
+POLISH_EPICS=""
+
 for ((cycle=1; cycle<=CYCLES; cycle++)); do
   log "=== Cycle $cycle/$CYCLES ==="
+  POLISH_EPICS=""
   echo "{\"status\":\"running\",\"cycle\":$cycle,\"cycles\":$CYCLES,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$LOG_DIR/.polish-status.json"
 
   # Step 1: Audit
@@ -571,7 +576,12 @@ func polishScriptPostLoop() string {
 log "Polish loop completed: $CYCLES cycles"
 echo "{\"status\":\"completed\",\"cycles\":$CYCLES,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$LOG_DIR/.polish-status.json"
 
-# Push results
+# Commit and push results
+if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+  log "Committing polish loop artifacts"
+  git add docs/specs/polish-report-cycle-*.md agent_logs/.polish-status.json 2>/dev/null || true
+  git commit -m "chore: polish loop cycle completion" 2>/dev/null || true
+fi
 if git remote get-url origin >/dev/null 2>&1; then
   log "Pushing results"
   git push 2>/dev/null || log "WARN: git push failed (non-fatal)"

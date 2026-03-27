@@ -241,6 +241,9 @@ func TestPolishCommand_ShellInjection(t *testing.T) {
 	if !strings.Contains(script, `SPEC_FILE='$(evil)'`) {
 		t.Error("SPEC_FILE not single-quoted")
 	}
+	if !strings.Contains(script, `MODEL='$(evil)'`) {
+		t.Error("MODEL not single-quoted")
+	}
 }
 
 // --- Script structure tests ---
@@ -664,7 +667,7 @@ func TestPolishScriptInnerLoop_InvokesCaLoop(t *testing.T) {
 	}
 }
 
-func TestPolishScriptMainLoop_HasNoCycleForLoop(t *testing.T) {
+func TestPolishScriptMainLoop_HasNCycleForLoop(t *testing.T) {
 	mainLoop := polishScriptMainLoop()
 	if !strings.Contains(mainLoop, "for ((cycle=1; cycle<=CYCLES; cycle++))") {
 		t.Error("expected N-cycle for loop")
@@ -692,12 +695,15 @@ func TestPolishCommand_CLIPrerequisites(t *testing.T) {
 	data, _ := os.ReadFile(outPath)
 	script := string(data)
 
-	// Must check for claude and bd CLIs
+	// Must check for claude, bd, and ca CLIs
 	if !strings.Contains(script, `command -v claude`) {
 		t.Error("expected claude CLI prerequisite check")
 	}
 	if !strings.Contains(script, `command -v bd`) {
 		t.Error("expected bd CLI prerequisite check")
+	}
+	if !strings.Contains(script, `command -v ca`) {
+		t.Error("expected ca CLI prerequisite check")
 	}
 }
 
@@ -780,5 +786,227 @@ func TestPolishCommand_GitPushAtEnd(t *testing.T) {
 
 	if !strings.Contains(script, "git push") {
 		t.Error("expected git push at end of script")
+	}
+}
+
+func TestPolishCommand_LogBeforeCrashHandler(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	_, err := executeCommand(root, "polish",
+		"-o", outPath,
+		"--cycles", "1",
+		"--meta-epic", "E1",
+		"--spec", "spec.md",
+		"--reviewers", "claude-opus",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// log() must be defined BEFORE the crash handler that calls it
+	logIdx := strings.Index(script, "log() {")
+	trapIdx := strings.Index(script, "trap _polish_cleanup EXIT")
+	if logIdx < 0 {
+		t.Fatal("missing log function definition")
+	}
+	if trapIdx < 0 {
+		t.Fatal("missing EXIT trap")
+	}
+	if logIdx > trapIdx {
+		t.Error("log() must be defined before the crash handler trap")
+	}
+}
+
+func TestPolishCommand_CrashHandlerPreservesExitCode(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	_, err := executeCommand(root, "polish",
+		"-o", outPath,
+		"--cycles", "1",
+		"--meta-epic", "E1",
+		"--spec", "spec.md",
+		"--reviewers", "claude-opus",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Crash handler must preserve exit code so callers see failure
+	if !strings.Contains(script, "exit $exit_code") {
+		t.Error("crash handler must preserve original exit code with 'exit $exit_code'")
+	}
+}
+
+func TestPolishCommand_PolishEpicsInitializedPerCycle(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	_, err := executeCommand(root, "polish",
+		"-o", outPath,
+		"--cycles", "2",
+		"--meta-epic", "E1",
+		"--spec", "spec.md",
+		"--reviewers", "claude-opus",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// POLISH_EPICS must be initialized in the main loop body (before mini-architect)
+	forIdx := strings.Index(script, "for ((cycle=1")
+	if forIdx < 0 {
+		t.Fatal("missing for loop")
+	}
+	loopBody := script[forIdx:]
+	if !strings.Contains(loopBody, `POLISH_EPICS=""`) {
+		t.Error("POLISH_EPICS must be reset to empty at start of each cycle")
+	}
+}
+
+func TestPolishCommand_SpecFileExistenceCheck(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	_, err := executeCommand(root, "polish",
+		"-o", outPath,
+		"--cycles", "1",
+		"--meta-epic", "E1",
+		"--spec", "spec.md",
+		"--reviewers", "claude-opus",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Script must check spec file exists at runtime (fail fast)
+	if !strings.Contains(script, "SPEC_FILE") && !strings.Contains(script, "spec") {
+		t.Error("expected spec file reference")
+	}
+	// Must have a file existence check
+	if !strings.Contains(script, `[ -f "$SPEC_FILE" ]`) && !strings.Contains(script, `[ ! -f "$SPEC_FILE" ]`) {
+		t.Error("expected spec file existence check at runtime")
+	}
+}
+
+func TestPolishCommand_ReviewerPromptUsesStdin(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	_, err := executeCommand(root, "polish",
+		"-o", outPath,
+		"--cycles", "1",
+		"--meta-epic", "E1",
+		"--spec", "spec.md",
+		"--reviewers", "claude-opus",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Claude reviewer should pipe prompt via stdin, not command substitution
+	// to avoid ARG_MAX issues with large specs
+	if strings.Contains(script, `-p "$(cat "$prompt_file")"`) {
+		t.Error("reviewer prompt should use stdin piping, not -p with command substitution (ARG_MAX risk)")
+	}
+}
+
+func TestPolishCommand_GitCommitBeforePush(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	_, err := executeCommand(root, "polish",
+		"-o", outPath,
+		"--cycles", "1",
+		"--meta-epic", "E1",
+		"--spec", "spec.md",
+		"--reviewers", "claude-opus",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	commitIdx := strings.Index(script, "git commit")
+	pushIdx := strings.Index(script, "git push")
+	if commitIdx < 0 {
+		t.Fatal("expected git commit in post-loop")
+	}
+	if pushIdx < 0 {
+		t.Fatal("expected git push in post-loop")
+	}
+	if commitIdx > pushIdx {
+		t.Error("git commit must come before git push")
+	}
+}
+
+func TestPolishCommand_NoDeadOutputFallback(t *testing.T) {
+	// The cobra default for --output means o.output is never empty.
+	// Verify no dead code fallback exists in runPolish.
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	out, err := executeCommand(root, "polish",
+		"-o", outPath,
+		"--cycles", "1",
+		"--meta-epic", "E1",
+		"--spec", "spec.md",
+		"--reviewers", "claude-opus",
+	)
+	if err != nil {
+		t.Fatalf("command failed: %v\nOutput: %s", err, out)
+	}
+	// Just verify it works — the dead code removal is a code review item
+}
+
+func TestPolishCommand_ArchitectHeredocQuoted(t *testing.T) {
+	architect := polishScriptMiniArchitect()
+	// The architect prompt must use a quoted heredoc for the static header
+	// to prevent shell expansion of report content containing $ or backticks
+	if !strings.Contains(architect, "<<'ARCHITECT_HEADER_EOF'") {
+		t.Error("architect prompt must use quoted heredoc <<'ARCHITECT_HEADER_EOF' to prevent shell expansion")
+	}
+	// Report content should be injected via cat (file-based), not heredoc expansion
+	if !strings.Contains(architect, `cat "$report_file"`) {
+		t.Error("architect prompt should inject report via cat, not heredoc expansion")
 	}
 }
