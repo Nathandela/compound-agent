@@ -103,6 +103,35 @@ func TestPhaseSkills_QualityGatePlaceholders(t *testing.T) {
 			t.Errorf("phase skill %s still has hardcoded pnpm commands", phase)
 		}
 	}
+
+	needsBuildPlaceholder := []string{"cook-it", "review", "work", "compound"}
+	for _, phase := range needsBuildPlaceholder {
+		content, ok := skills[phase]
+		if !ok {
+			t.Errorf("missing phase skill: %s", phase)
+			continue
+		}
+		if !strings.Contains(content, "{{QUALITY_GATE_BUILD}}") {
+			t.Errorf("phase skill %s missing {{QUALITY_GATE_BUILD}} placeholder", phase)
+		}
+		if strings.Contains(content, "pnpm build") {
+			t.Errorf("phase skill %s still has hardcoded pnpm build", phase)
+		}
+	}
+}
+
+func TestPhaseSkills_VerificationContractInstructions(t *testing.T) {
+	skills := PhaseSkills()
+	for _, phase := range []string{"plan", "work", "review", "cook-it"} {
+		content, ok := skills[phase]
+		if !ok {
+			t.Errorf("missing phase skill: %s", phase)
+			continue
+		}
+		if !strings.Contains(content, "## Verification Contract") {
+			t.Errorf("phase skill %s missing Verification Contract guidance", phase)
+		}
+	}
 }
 
 func TestPhaseSkillReferences(t *testing.T) {
@@ -223,8 +252,14 @@ func TestDocTemplates_QualityGatePlaceholders(t *testing.T) {
 	if !strings.Contains(content, "{{QUALITY_GATE_LINT}}") {
 		t.Error("WORKFLOW.md missing {{QUALITY_GATE_LINT}} placeholder")
 	}
-	if strings.Contains(content, "pnpm test") || strings.Contains(content, "pnpm lint") {
+	if !strings.Contains(content, "{{QUALITY_GATE_BUILD}}") {
+		t.Error("WORKFLOW.md missing {{QUALITY_GATE_BUILD}} placeholder")
+	}
+	if strings.Contains(content, "pnpm test") || strings.Contains(content, "pnpm lint") || strings.Contains(content, "pnpm build") {
 		t.Error("WORKFLOW.md still has hardcoded pnpm commands")
+	}
+	if !strings.Contains(content, "Verification Contract") {
+		t.Error("WORKFLOW.md missing Verification Contract guidance")
 	}
 }
 

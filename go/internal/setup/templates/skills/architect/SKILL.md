@@ -48,6 +48,7 @@ After steps 1-2, evaluate whether the domain is well-enough understood to decomp
 3. Generate a **scenario table** from the EARS requirements
 4. Write the spec to \`docs/specs/<name>.md\` and create a **meta-epic bead**
 5. **Design skill note**: If design-relevant work was detected in Phase 1 (step 6), add a note to the spec recommending that applicable epics invoke \`/compound:build-great-things\` during their work phase. The skill covers both software design philosophy (Ousterhout's complexity management, deep modules, information hiding) and the full build sequence for user-facing products (IA, typography, color, motion, states, accessibility, conversion). Read \`build-great-things/SKILL.md\` for the full playbook.
+6. **Default profile note (advisory only)**: If the system clearly maps to a dominant delivery shape (`webapp`, `api`, `cli`, `library`, `service`), record that in the spec or meta-epic as advisory context for downstream plan. Do NOT create repo-global config for this, and do NOT treat it as a substitute for the per-epic `## Verification Contract`.
 
 ### Advisory Fleet (Post-Spec)
 Before presenting the spec to the human, solicit external architectural perspectives. Read \`architect/references/advisory-fleet.md\` for the full protocol. In brief:
@@ -85,12 +86,14 @@ Spawn **6 parallel subagents** (via Task tool):
 - Assumptions that must hold for this boundary to remain valid
 - Org alignment: which team type owns this (stream-aligned/platform/enabling/complicated-subsystem)?
 - Pointer to the master spec file
+- Delivery profile hints when they materially affect downstream verification contracts
 
 **Multi-criteria validation** before Gate 3 -- for each epic:
 - [ ] Structural: low change coupling, acyclic dependencies
 - [ ] Semantic: stable bounded context, coherent ubiquitous language
 - [ ] Organizational: single team owner, within cognitive budget
 - [ ] Economic: modularity benefit > coordination overhead
+- [ ] For user-facing systems, at least one early epic is a production-grade slice, not only subsystem scaffolding
 
 **Gate 3**: Use \`AskUserQuestion\` to get human approval of the epic structure, dependency graph, and interface contracts.
 

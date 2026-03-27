@@ -87,19 +87,21 @@ func TestIntegrationVerification_FELessonStoreContract(t *testing.T) {
 }
 
 // TestIntegrationVerification_RVConditionalContract verifies that the runtime
-// verifier is conditionally triggered based on project type.
-// AC-3: Review template has runtime-verifier conditional on project type
-// with explicit CLI skip.
+// verifier is conditionally triggered by the epic-level Verification Contract.
+// AC-3: Review template has runtime-verifier guidance tied to required evidence,
+// while still preserving explicit web/API handling and CLI/library skips when
+// runtime proof is not required.
 func TestIntegrationVerification_RVConditionalContract(t *testing.T) {
 	skills := PhaseSkills()
 	review := requireSkill(t, skills, "review")
 
 	t.Run("conditional_trigger", func(t *testing.T) {
-		assertContains(t, review, "Runtime Verification (conditional)", "missing conditional RV section")
+		assertContains(t, review, "Runtime Verification (contract-driven)", "missing contract-driven RV section")
+		assertContains(t, review, "Verification Contract", "missing Verification Contract reference")
 	})
 
 	t.Run("CLI_skip", func(t *testing.T) {
-		assertContains(t, review, "CLI/library project", "missing CLI/library skip condition")
+		assertContains(t, review, "CLI/library/service without runtime evidence", "missing CLI/library/service skip condition")
 		assertContains(t, review, "SKIP", "missing SKIP instruction for CLI")
 		assertContains(t, review, "P3/INFO", "missing P3/INFO severity for CLI skip")
 	})

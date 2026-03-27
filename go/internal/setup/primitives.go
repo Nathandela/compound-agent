@@ -69,17 +69,19 @@ func writeSkillFile(filePath string, content string) (bool, bool, error) {
 	return reconcileFile(filePath, content)
 }
 
-// substituteQualityGates replaces {{QUALITY_GATE_TEST}} and {{QUALITY_GATE_LINT}}
-// placeholders in content with the detected stack commands.
+// substituteQualityGates replaces quality gate placeholders in content with the
+// detected stack commands.
 func substituteQualityGates(content string, stack StackInfo) string {
+	stack = stack.withFallbacks()
 	content = strings.ReplaceAll(content, "{{QUALITY_GATE_TEST}}", stack.TestCmd)
 	content = strings.ReplaceAll(content, "{{QUALITY_GATE_LINT}}", stack.LintCmd)
+	content = strings.ReplaceAll(content, "{{QUALITY_GATE_BUILD}}", stack.BuildCmd)
 	return content
 }
 
 // InstallPhaseSkills writes phase SKILL.md files to .claude/skills/compound/<phase>/SKILL.md.
-// Also writes reference files alongside skills. Substitutes {{QUALITY_GATE_TEST}} and
-// {{QUALITY_GATE_LINT}} placeholders with detected stack commands.
+// Also writes reference files alongside skills. Substitutes quality gate
+// placeholders with detected stack commands.
 // Creates missing and updates stale files. Returns (created, updated, error).
 func InstallPhaseSkills(repoRoot string, stack StackInfo) (int, int, error) {
 	created, updated := 0, 0
@@ -167,8 +169,8 @@ func installAgentRoleSkillReferences(agentsDir string) (int, int, error) {
 }
 
 // InstallDocTemplates writes documentation .md files to docs/compound/.
-// Substitutes {{VERSION}}, {{DATE}}, {{QUALITY_GATE_TEST}}, and {{QUALITY_GATE_LINT}}
-// placeholders. Creates missing and updates stale files (date-only changes are ignored).
+// Substitutes {{VERSION}}, {{DATE}}, and quality gate placeholders.
+// Creates missing and updates stale files (date-only changes are ignored).
 // Returns (created, updated, error).
 func InstallDocTemplates(repoRoot string, version string, stack StackInfo) (int, int, error) {
 	dir := filepath.Join(repoRoot, "docs", "compound")

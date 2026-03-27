@@ -14,21 +14,22 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
 2. Detect spec drift: compare final implementation against original EARS requirements in the epic description (`bd show <epic>`). Note any divergences -- what changed, why, was it justified. If drift reveals a spec was wrong or incomplete, flag that for lesson extraction.
-3. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with `team_name`):
+3. Detect **verification drift**: compare the work and review evidence against the epic's `## Verification Contract`. If review had to escalate the contract, or if planned evidence was too weak/too strong, capture that as a workflow-quality lesson.
+4. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with `team_name`):
    - Role skills: `.claude/skills/compound/agents/{context-analyzer,lesson-extractor,pattern-matcher,solution-writer,compounding}/SKILL.md`
    - For large diffs, deploy MULTIPLE context-analyzers and lesson-extractors
    - Pipeline: context-analyzers -> lesson-extractors -> pattern-matcher + solution-writer -> compounding
    - Agents coordinate via SendMessage throughout the pipeline
-4. Agents pass results through the pipeline via `SendMessage`. The lead coordinates: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
-5. Apply quality filters: novelty check (>0.98 cosine similarity = skip), specificity check
-6. Classify each item by type: lesson, solution, pattern, or preference
-7. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
-8. Use `AskUserQuestion` to confirm high-severity items with the user before storing; medium/low items are auto-stored
-9. Store via `ca learn` with supersedes/related links where applicable.
+5. Agents pass results through the pipeline via `SendMessage`. The lead coordinates: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
+6. Apply quality filters: novelty check (>0.98 cosine similarity = skip), specificity check
+7. Classify each item by type: lesson, solution, pattern, or preference
+8. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
+9. Use `AskUserQuestion` to confirm high-severity items with the user before storing; medium/low items are auto-stored
+10. Store via `ca learn` with supersedes/related links where applicable.
    At minimum, capture 1 lesson per significant decision made during this cycle
-10. **Lint graduation**: Spawn the `lint-classifier` subagent (`.claude/agents/compound/lint-classifier.md`). Pass it the list of newly captured insights from step 9 via SendMessage (each with id, insight text, and severity). The subagent classifies each as LINTABLE, PARTIAL, or NOT_LINTABLE. For LINTABLE + HIGH confidence items, it detects the project's linter and creates beads tasks under a "Linting Improvement" epic. All insights remain stored as lessons regardless of classification.
-11. Delegate to the `compounding` subagent to run synthesis: cluster accumulated lessons by similarity and write CCT patterns to `.claude/lessons/cct-patterns.jsonl`
-12. Update outdated docs and deprecate superseded ADRs (set status to `deprecated`)
+11. **Lint graduation**: Spawn the `lint-classifier` subagent (`.claude/agents/compound/lint-classifier.md`). Pass it the list of newly captured insights from step 10 via SendMessage (each with id, insight text, and severity). The subagent classifies each as LINTABLE, PARTIAL, or NOT_LINTABLE. For LINTABLE + HIGH confidence items, it detects the project's linter and creates beads tasks under a "Linting Improvement" epic. All insights remain stored as lessons regardless of classification.
+12. Delegate to the `compounding` subagent to run synthesis: cluster accumulated lessons by similarity and write CCT patterns to `.claude/lessons/cct-patterns.jsonl`
+13. Update outdated docs and deprecate superseded ADRs (set status to `deprecated`)
 
 ## Docs Integration
 - doc-gardener checks if `docs/` content is outdated after the cycle
@@ -48,6 +49,7 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 - Requiring user confirmation for every item (only high-severity needs it)
 - Not classifying items by type (lesson/solution/pattern/preference)
 - Capturing vague lessons ("be careful with X") -- be specific and concrete
+- Not capturing when the Verification Contract was too weak or over-specified for the actual work
 
 ## Quality Criteria
 - Analysis team was spawned and agents coordinated via pipeline
@@ -60,10 +62,12 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 - Beads checked for related issues (`bd`)
 - Each item gives clear, concrete guidance for future sessions
 - Spec drift analyzed and captured
+- Verification drift analyzed and captured when the contract needed adjustment
 
 ## FINAL GATE -- EPIC CLOSURE
 Before closing the epic:
 - Run `ca verify-gates <epic-id>` -- must return PASS for both gates
 - Run `{{QUALITY_GATE_TEST}}` and `{{QUALITY_GATE_LINT}}` -- must pass
+- Read the epic's `## Verification Contract` and run every required evidence item that remains applicable. If `build` is required, run `{{QUALITY_GATE_BUILD}}`
 If verify-gates fails, the missing phase was SKIPPED. Go back and complete it.
 CRITICAL: 3/5 phases is NOT success. All 5 phases are required.

@@ -26,7 +26,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: After spec-dev, before any implementation.
 
-**What it does**: Reviews spec-dev output, spawns analysts, decomposes into tasks with acceptance criteria, creates beads issues, and creates Review + Compound blocking tasks.
+**What it does**: Reviews spec-dev output, spawns analysts, decomposes into tasks with acceptance criteria, writes an epic-local Verification Contract, creates beads issues, and creates Review + Compound blocking tasks.
 
 ### `/compound:work`
 
@@ -34,7 +34,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: After plan, when tasks are ready in beads.
 
-**What it does**: Picks tasks from `bd ready`, deploys an AgentTeam with test-writers and implementers, coordinates agent work, commits incrementally, runs `/implementation-reviewer` as mandatory gate.
+**What it does**: Picks tasks from `bd ready`, reads the epic's Acceptance Criteria and Verification Contract, deploys an AgentTeam with test-writers and implementers, coordinates agent work, commits incrementally, and produces the required evidence before `/implementation-reviewer`.
 
 ### `/compound:review`
 
@@ -42,7 +42,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: After all work tasks are closed.
 
-**What it does**: Runs quality gates, selects reviewer tier based on diff size (4-11 reviewers), spawns reviewers in an AgentTeam, classifies findings by severity, fixes all P1s, runs `/implementation-reviewer`.
+**What it does**: Runs baseline quality gates plus contract-required build checks, verifies Acceptance Criteria and Verification Contract evidence, selects reviewer tier based on diff size (4-11 reviewers), spawns reviewers in an AgentTeam, classifies findings by severity, fixes all P1s, runs `/implementation-reviewer`.
 
 ### `/compound:compound`
 
@@ -50,7 +50,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: After review is approved.
 
-**What it does**: Spawns an analysis pipeline (context-analyzer, lesson-extractor, pattern-matcher, solution-writer, compounding), applies quality filters, classifies items by type and severity, stores via `ca learn`, runs `ca verify-gates`.
+**What it does**: Spawns an analysis pipeline (context-analyzer, lesson-extractor, pattern-matcher, solution-writer, compounding), applies quality filters, classifies items by type and severity, stores via `ca learn`, checks for verification-contract drift, and runs `ca verify-gates`.
 
 ### `/compound:cook-it`
 

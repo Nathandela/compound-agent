@@ -503,7 +503,11 @@ func TestInstallPhaseSkills_UpdatesStaleContent(t *testing.T) {
 
 func TestInstallPhaseSkills_SubstitutesQualityGates(t *testing.T) {
 	dir := t.TempDir()
-	stack := StackInfo{TestCmd: "go test ./...", LintCmd: "golangci-lint run ./..."}
+	stack := StackInfo{
+		TestCmd:  "go test ./...",
+		LintCmd:  "golangci-lint run ./...",
+		BuildCmd: "go build ./...",
+	}
 
 	_, _, err := InstallPhaseSkills(dir, stack)
 	if err != nil {
@@ -522,17 +526,27 @@ func TestInstallPhaseSkills_SubstitutesQualityGates(t *testing.T) {
 	if strings.Contains(string(content), "{{QUALITY_GATE_LINT}}") {
 		t.Error("work/SKILL.md still has {{QUALITY_GATE_LINT}} placeholder")
 	}
+	if strings.Contains(string(content), "{{QUALITY_GATE_BUILD}}") {
+		t.Error("work/SKILL.md still has {{QUALITY_GATE_BUILD}} placeholder")
+	}
 	if !strings.Contains(string(content), "go test ./...") {
 		t.Error("work/SKILL.md missing substituted test command")
 	}
 	if !strings.Contains(string(content), "golangci-lint run ./...") {
 		t.Error("work/SKILL.md missing substituted lint command")
 	}
+	if !strings.Contains(string(content), "go build ./...") {
+		t.Error("work/SKILL.md missing substituted build command")
+	}
 }
 
 func TestInstallDocTemplates_SubstitutesQualityGates(t *testing.T) {
 	dir := t.TempDir()
-	stack := StackInfo{TestCmd: "cargo test", LintCmd: "cargo clippy"}
+	stack := StackInfo{
+		TestCmd:  "cargo test",
+		LintCmd:  "cargo clippy",
+		BuildCmd: "cargo build",
+	}
 
 	_, _, err := InstallDocTemplates(dir, "1.0.0", stack)
 	if err != nil {
@@ -548,8 +562,14 @@ func TestInstallDocTemplates_SubstitutesQualityGates(t *testing.T) {
 	if strings.Contains(string(content), "{{QUALITY_GATE_TEST}}") {
 		t.Error("WORKFLOW.md still has {{QUALITY_GATE_TEST}} placeholder")
 	}
+	if strings.Contains(string(content), "{{QUALITY_GATE_BUILD}}") {
+		t.Error("WORKFLOW.md still has {{QUALITY_GATE_BUILD}} placeholder")
+	}
 	if !strings.Contains(string(content), "cargo test") {
 		t.Error("WORKFLOW.md missing substituted test command")
+	}
+	if !strings.Contains(string(content), "cargo build") {
+		t.Error("WORKFLOW.md missing substituted build command")
 	}
 }
 
@@ -557,7 +577,11 @@ func TestInstallPhaseSkills_StackChangeUpdatesContent(t *testing.T) {
 	dir := t.TempDir()
 
 	// Install with Node/npm stack
-	npmStack := StackInfo{TestCmd: "npm test", LintCmd: "npm run lint"}
+	npmStack := StackInfo{
+		TestCmd:  "npm test",
+		LintCmd:  "npm run lint",
+		BuildCmd: "npm run build",
+	}
 	_, _, err := InstallPhaseSkills(dir, npmStack)
 	if err != nil {
 		t.Fatalf("InstallPhaseSkills (npm): %v", err)
@@ -574,7 +598,11 @@ func TestInstallPhaseSkills_StackChangeUpdatesContent(t *testing.T) {
 	}
 
 	// Re-install with Go stack (simulates user adding go.mod)
-	goStack := StackInfo{TestCmd: "go test ./...", LintCmd: "golangci-lint run ./..."}
+	goStack := StackInfo{
+		TestCmd:  "go test ./...",
+		LintCmd:  "golangci-lint run ./...",
+		BuildCmd: "go build ./...",
+	}
 	_, updated, err := InstallPhaseSkills(dir, goStack)
 	if err != nil {
 		t.Fatalf("InstallPhaseSkills (go): %v", err)
@@ -593,6 +621,12 @@ func TestInstallPhaseSkills_StackChangeUpdatesContent(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "go test ./...") {
 		t.Error("work/SKILL.md should contain go test ./... after stack change")
+	}
+	if strings.Contains(string(content), "npm run build") {
+		t.Error("work/SKILL.md should no longer contain npm run build")
+	}
+	if !strings.Contains(string(content), "go build ./...") {
+		t.Error("work/SKILL.md should contain go build ./... after stack change")
 	}
 }
 

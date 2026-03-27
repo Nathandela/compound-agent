@@ -17,6 +17,9 @@ func TestDetectStack_Go(t *testing.T) {
 	if info.LintCmd != "golangci-lint run ./..." {
 		t.Errorf("LintCmd = %q, want %q", info.LintCmd, "golangci-lint run ./...")
 	}
+	if info.BuildCmd != "go build ./..." {
+		t.Errorf("BuildCmd = %q, want %q", info.BuildCmd, "go build ./...")
+	}
 }
 
 func TestDetectStack_Rust(t *testing.T) {
@@ -43,6 +46,9 @@ func TestDetectStack_Python(t *testing.T) {
 	if info.LintCmd != "ruff check ." {
 		t.Errorf("LintCmd = %q, want %q", info.LintCmd, "ruff check .")
 	}
+	if info.BuildCmd != "python -m compileall ." {
+		t.Errorf("BuildCmd = %q, want %q", info.BuildCmd, "python -m compileall .")
+	}
 }
 
 func TestDetectStack_PythonSetupPy(t *testing.T) {
@@ -66,6 +72,9 @@ func TestDetectStack_NodePnpm(t *testing.T) {
 	}
 	if info.LintCmd != "pnpm lint" {
 		t.Errorf("LintCmd = %q, want %q", info.LintCmd, "pnpm lint")
+	}
+	if info.BuildCmd != "pnpm build" {
+		t.Errorf("BuildCmd = %q, want %q", info.BuildCmd, "pnpm build")
 	}
 }
 
@@ -146,6 +155,9 @@ func TestDetectStack_Unknown(t *testing.T) {
 	if info.LintCmd != FallbackLintCmd {
 		t.Errorf("LintCmd = %q, want %q", info.LintCmd, FallbackLintCmd)
 	}
+	if info.BuildCmd != FallbackBuildCmd {
+		t.Errorf("BuildCmd = %q, want %q", info.BuildCmd, FallbackBuildCmd)
+	}
 }
 
 func TestDetectStack_PriorityGoOverNode(t *testing.T) {
@@ -171,6 +183,9 @@ func TestDetectStack_MakefileOnly(t *testing.T) {
 	}
 	if info.LintCmd != "make lint" {
 		t.Errorf("LintCmd = %q, want %q", info.LintCmd, "make lint")
+	}
+	if info.BuildCmd != "make build" {
+		t.Errorf("BuildCmd = %q, want %q", info.BuildCmd, "make build")
 	}
 }
 

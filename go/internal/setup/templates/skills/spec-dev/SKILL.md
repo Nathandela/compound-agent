@@ -67,7 +67,7 @@ Scale formality to risk: skip for trivial (<1h), lightweight (EARS + epic) for s
 ### Phase 4: Hand off
 1. Create beads epic if needed (`bd create --title="..." --type=epic --priority=<N>`)
 2. Store spec in the epic description (`bd update <epic-id> --description="..."`) -- single source of truth, including both EARS requirements and scenario table
-3. **Note on Acceptance Criteria**: The EARS requirements you write here are the source material for the Acceptance Criteria table. The plan phase will extract testable AC rows from these EARS requirements and append the AC table to the epic description. Write EARS requirements with testability in mind — each should map cleanly to at least one verifiable criterion.
+3. **Note on downstream contracts**: The EARS requirements you write here are the source material for both the Acceptance Criteria table and the Verification Contract. The plan phase will extract testable AC rows and derive the epic-local proof of done from the product profile, touched surfaces, and risks. Write EARS requirements with testability in mind, and call out user-visible surfaces, public APIs, persistence changes, packaging concerns, and operational risks explicitly.
 4. Flag open questions for plan phase
 5. Capture lessons: `ca learn`
 
@@ -90,6 +90,7 @@ Read `.claude/skills/compound/spec-dev/references/spec-guide.md` on demand for E
 - Specifying implementation instead of requirements
 - Skipping scenario table generation after EARS requirements
 - Writing EARS requirements that cannot be mapped to testable acceptance criteria
+- Hiding important surfaces or risks in prose so plan cannot derive a clean Verification Contract
 
 ## Quality Criteria
 - [ ] Requirements use EARS notation
@@ -102,3 +103,4 @@ Read `.claude/skills/compound/spec-dev/references/spec-guide.md` on demand for E
 - [ ] Spec and scenario table stored in beads epic description
 - [ ] ADRs created for significant decisions
 - [ ] **EARS requirements are testable and can map to acceptance criteria**
+- [ ] **Important surfaces and risks are explicit enough for plan to derive a Verification Contract**

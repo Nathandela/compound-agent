@@ -126,6 +126,7 @@ func TestTemplateDrift_ReviewerNamesMatchAgentRoleSkills(t *testing.T) {
 	nonAgentTokens := []string{
 		"ca-search", "P0-P3", "P1-P2", "well-known",
 		"role-name", "sqlite-fts5", "go-embed",
+		"build-great-things",
 	}
 	for _, tok := range nonAgentTokens {
 		delete(nameSet, tok)
@@ -148,6 +149,7 @@ func TestTemplateDrift_ReviewerNamesMatchAgentRoleSkills(t *testing.T) {
 		"doc-gardener",
 		"drift-detector",
 		"runtime-verifier",
+		"design-craft-reviewer",
 	}
 	for _, name := range expectedMinimum {
 		if !nameSet[name] {
