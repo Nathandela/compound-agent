@@ -54,6 +54,13 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    - The reviewer evaluates changed UI code against the `build-great-things` quality checklist: states (loading/empty/error), interaction feedback (hover/active/focus/transitions), visual craft (spacing scale, typography hierarchy, color semantics, shadows, borders), motion, responsiveness, and accessibility
    - **Non-UI projects without `design_craft_check` in the contract**: **SKIP** and record INFO ("Design craft review not required by Verification Contract")
    - Role skill: `.claude/skills/compound/agents/design-craft-reviewer/SKILL.md`
+10b. **Visual Verification (contract-driven)**: When the Verification Contract includes `browser_evidence`, `design_craft_check`, or `responsive_check`, take Playwright screenshots as evidence.
+   - Auto-detect: Use the QA Engineer detection priority (see `.claude/skills/compound/qa-engineer/SKILL.md` Phase 1) to check for a runnable UI. If no UI framework detected, **SKIP** and record INFO.
+   - **If UI detected**: Start the dev server in the background, wait for HTTP readiness (poll every 1s, timeout 30s), then take headless Playwright screenshots at 4 viewports: 375px (mobile), 768px (tablet), 1024px (small desktop), 1440px (desktop). Navigate key routes (up to 10) and screenshot each.
+   - **Evidence**: Save screenshots alongside review artifacts. Reference them in the Verification Contract evidence table as proof for `browser_evidence` or `responsive_check`.
+   - **Visual critique**: Include layout, spacing, contrast, hierarchy, and responsive observations in the review findings with screenshot references.
+   - **Graceful degradation**: If Playwright is unavailable, record a **P3/INFO** finding ("Playwright not available for visual verification") and proceed with code-only review. Tag visual concerns with [NEEDS_QA] for the QA Engineer.
+   - **Cleanup**: Stop the dev server after screenshot capture.
 11. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with `team_name`):
    - Role skills: `.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer,scenario-coverage-reviewer}/SKILL.md`
    - Security specialist skills (on-demand, spawned by security-reviewer): `.claude/skills/compound/agents/{security-injection,security-secrets,security-auth,security-data,security-deps}/SKILL.md`
@@ -159,6 +166,8 @@ When the runtime-verifier is triggered by the Verification Contract:
 - Not invoking QA Engineer when the Verification Contract requires browser/UI evidence
 - Not spawning design-craft-reviewer when the Verification Contract includes `design_craft_check`
 - Skipping design-craft-reviewer for non-UI projects that don't have `design_craft_check` in the contract (correct behavior — not a pitfall)
+- Not taking visual screenshots when the Verification Contract requires `browser_evidence` or `responsive_check` (reviewers should see what users see)
+- Taking screenshots on non-UI projects (waste of time — auto-detect first)
 
 ## Quality Criteria
 - Baseline quality gates pass (`{{QUALITY_GATE_TEST}}`, `{{QUALITY_GATE_LINT}}`)
@@ -177,6 +186,7 @@ When the runtime-verifier is triggered by the Verification Contract:
 - **Runtime verifier ran when required by the Verification Contract or reported why it was not required**
 - **Design craft reviewer ran when `design_craft_check` was in the Verification Contract or reported why it was not required**
 - **QA Engineer invoked when contract-required browser/UI evidence was in scope**
+- **Visual screenshots taken at 4 viewports when contract requires browser/UI evidence, or INFO recorded explaining why skipped**
 - All P1 findings fixed before `/implementation-reviewer` approval
 - All spec requirements verified against implementation
 - **All acceptance criteria checked and verified (PASS/FAIL)**

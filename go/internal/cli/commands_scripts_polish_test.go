@@ -162,6 +162,55 @@ func TestPolishCommand_FullSpectrumPriority(t *testing.T) {
 	if !strings.Contains(script, "npx ca load-session") {
 		t.Error("polish architect must load session context")
 	}
+	// Architect must route NEEDS_QA findings to QA Engineer
+	if !strings.Contains(script, "NEEDS_QA") {
+		t.Error("polish architect prompt must reference NEEDS_QA for QA routing")
+	}
+	if !strings.Contains(script, "qa-engineer") {
+		t.Error("polish architect prompt must reference qa-engineer skill")
+	}
+	if !strings.Contains(script, "browser_evidence") {
+		t.Error("polish architect prompt must instruct UI epics to include browser_evidence in Verification Contract")
+	}
+}
+
+func TestPolishCommand_AuditCoversFullSpectrum(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/specs/my-spec.md",
+		"--meta-epic", "test-epic-123")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Audit must cover all dimensions, not just UI
+	dimensions := map[string]string{
+		"Security":      "security",
+		"Architecture":  "architecture",
+		"Test coverage": "test",
+		"Error handling": "error handling",
+	}
+	for desc, keyword := range dimensions {
+		if !strings.Contains(strings.ToLower(script), keyword) {
+			t.Errorf("audit prompt must cover %s (expected %q)", desc, keyword)
+		}
+	}
+
+	// Must reference QA Engineer skill for browser/runtime verification
+	if !strings.Contains(script, "qa-engineer") {
+		t.Error("audit prompt must reference qa-engineer skill for browser verification")
+	}
+	if !strings.Contains(script, "NEEDS_QA") {
+		t.Error("audit prompt must include [NEEDS_QA] tagging mechanism for findings needing runtime verification")
+	}
 }
 
 func TestPolishCommand_ShellInjection(t *testing.T) {
@@ -462,5 +511,64 @@ func TestPolishCommand_ReviewerHealthCheck(t *testing.T) {
 	// Must include health check beyond just command -v
 	if !strings.Contains(script, "--version") {
 		t.Error("expected reviewer health check (--version probe)")
+	}
+}
+
+func TestPolishCommand_VisualVerification(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/specs/my-spec.md",
+		"--meta-epic", "test-epic-123")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Must have a Visual Verification section in the audit prompt
+	if !strings.Contains(script, "Visual Verification") {
+		t.Error("audit prompt must contain a Visual Verification section")
+	}
+
+	// Must reference Playwright for screenshots
+	if !strings.Contains(script, "Playwright") && !strings.Contains(script, "playwright") {
+		t.Error("visual verification must reference Playwright for screenshots")
+	}
+
+	// Must include auto-detect heuristics
+	heuristics := []string{"package.json", "vite.config"}
+	for _, h := range heuristics {
+		if !strings.Contains(script, h) {
+			t.Errorf("visual verification must include auto-detect heuristic: %s", h)
+		}
+	}
+
+	// Must include viewport sizes for responsive screenshots
+	viewports := []string{"375", "768", "1024", "1440"}
+	for _, vp := range viewports {
+		if !strings.Contains(script, vp) {
+			t.Errorf("visual verification must include viewport width: %s", vp)
+		}
+	}
+
+	// Must include graceful degradation
+	if !strings.Contains(script, "skip") || !strings.Contains(script, "no UI") {
+		t.Error("visual verification must include graceful degradation (skip when no UI detected)")
+	}
+
+	// Graceful degradation must reference [NEEDS_QA] fallback
+	if !strings.Contains(script, "NEEDS_QA") {
+		t.Error("visual verification graceful degradation must reference [NEEDS_QA] tagging")
+	}
+
+	// Must include dev server cleanup instruction
+	if !strings.Contains(script, "Stop the dev server") {
+		t.Error("visual verification must include dev server cleanup instruction")
 	}
 }

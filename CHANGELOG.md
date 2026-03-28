@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.1] - 2026-03-28
+
+### Added
+
+- **Visual verification in polish audit**: Reviewers now auto-detect UI projects and take Playwright screenshots at 4 viewports (375px, 768px, 1024px, 1440px) as part of their audit, critiquing layout, spacing, contrast, hierarchy, and responsiveness alongside static code analysis. Graceful degradation when Playwright is unavailable or no UI detected (P3/INFO + [NEEDS_QA] fallback).
+- **Visual verification in cook-it review**: Step 10b in the review skill takes Playwright screenshots when the Verification Contract requires `browser_evidence`, `design_craft_check`, or `responsive_check`. References QA Engineer detection logic for framework auto-detection.
+
 ## [2.5.0] - 2026-03-27
 
 ### Added
