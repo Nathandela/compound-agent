@@ -193,9 +193,9 @@ func TestPolishCommand_AuditCoversFullSpectrum(t *testing.T) {
 
 	// Audit must cover all dimensions, not just UI
 	dimensions := map[string]string{
-		"Security":      "security",
-		"Architecture":  "architecture",
-		"Test coverage": "test",
+		"Security":       "security",
+		"Architecture":   "architecture",
+		"Test coverage":  "test",
 		"Error handling": "error handling",
 	}
 	for desc, keyword := range dimensions {
@@ -395,18 +395,18 @@ func TestPolishCommand_StructuralCorrectness(t *testing.T) {
 	script := string(data)
 
 	checks := map[string]string{
-		"set -euo pipefail":         "strict bash mode",
-		"_polish_cleanup":           "crash handler",
-		"portable_timeout":          "timeout function",
-		"detect_polish_reviewers":   "reviewer detection function",
-		"run_polish_audit":          "audit function",
-		"synthesize_report":         "synthesize function",
-		"run_polish_architect":      "polish architect function",
-		"run_inner_loop":            "inner loop function",
-		"POLISH_EPIC:":              "epic ID marker",
-		"--output-format text":      "text output format for architect",
-		"BASH_LINENO":               "crash handler line info",
-		"REVIEW_TIMEOUT":            "review timeout config",
+		"set -euo pipefail":       "strict bash mode",
+		"_polish_cleanup":         "crash handler",
+		"portable_timeout":        "timeout function",
+		"detect_polish_reviewers": "reviewer detection function",
+		"run_polish_audit":        "audit function",
+		"synthesize_report":       "synthesize function",
+		"run_polish_architect":    "polish architect function",
+		"run_inner_loop":          "inner loop function",
+		"POLISH_EPIC:":            "epic ID marker",
+		"--output-format text":    "text output format for architect",
+		"BASH_LINENO":             "crash handler line info",
+		"REVIEW_TIMEOUT":          "review timeout config",
 	}
 	for pattern, desc := range checks {
 		if !strings.Contains(script, pattern) {
