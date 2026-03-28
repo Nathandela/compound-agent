@@ -192,6 +192,50 @@ grep '"duration_s":0' agent_logs/loop-execution.jsonl
 
 ---
 
+### Context window is 200K instead of 1M
+
+**Symptom**: Claude sessions run out of context quickly. The `--model` value in the script is `claude-opus-4-6` without the `[1m]` suffix. Output token counts are low (~4K instead of ~32K).
+
+**Root cause**: The model ID `claude-opus-4-6` defaults to 200K context. The `[1m]` suffix (`claude-opus-4-6[1m]`) is required to request 1M context. Claude Code strips the suffix before sending the API call.
+
+**Fix**: Regenerate the script with the correct model:
+```bash
+ca loop --model 'claude-opus-4-6[1m]' --force
+```
+Or edit the existing script: change `MODEL='claude-opus-4-6'` to `MODEL='claude-opus-4-6[1m]'`.
+
+**Diagnosis**:
+```bash
+grep "^MODEL=" infinity-loop.sh
+# Should show: MODEL='claude-opus-4-6[1m]'
+# Bad: MODEL='claude-opus-4-6' (missing [1m])
+```
+
+---
+
+### Session stuck in plan mode (ExitPlanMode denied)
+
+**Symptom**: Claude enters plan mode but never transitions to implementation. Logs show `end_turn` stop reason with low output tokens. The session produces a plan but no code changes.
+
+**Root cause**: `ExitPlanMode` can fail even with `--dangerously-skip-permissions` (known Claude Code issue). The plan-to-implementation transition requires explicit permission approval.
+
+**Fix**: Add `--permission-mode auto` to the Claude invocation. This uses a background classifier to auto-approve routine tool calls (including plan mode transitions) while blocking genuinely risky actions.
+
+Regenerate:
+```bash
+ca loop --force   # New versions include --permission-mode auto
+```
+Or edit the existing script: add `--permission-mode auto \` after `--dangerously-skip-permissions \` in the Claude invocation block.
+
+**Diagnosis**:
+```bash
+grep "permission-mode" infinity-loop.sh
+# Should find: --permission-mode auto
+grep "end_turn" agent_logs/trace_*.jsonl | tail -5
+```
+
+---
+
 ### Consumer migration after upgrade
 
 After upgrading compound-agent (`npm update compound-agent` or `pnpm update compound-agent`), consumers must regenerate their loop script to pick up fixes.

@@ -176,7 +176,7 @@ if [ -n "${TOPICS:-}" ]; then
       log "Iteration $ITER/$MAX_ITERS for $TOPIC"
 
       PROMPT=$(build_improve_prompt "$TOPIC")
-      claude --dangerously-skip-permissions --model "$MODEL" --output-format stream-json --verbose \
+      claude --dangerously-skip-permissions --permission-mode auto --model "$MODEL" --output-format stream-json --verbose \
         -p "$PROMPT" 2>/dev/null | tee "$TRACEFILE" | extract_text > "$LOGFILE" || true
       MARKER=$(detect_improve_marker "$LOGFILE" "$TRACEFILE")
 `, opts.maxIters, opts.timeBudget)

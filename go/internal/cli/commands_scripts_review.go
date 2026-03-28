@@ -309,11 +309,13 @@ spawn_reviewers() {
         if [ "$cycle" -eq 1 ]; then
           (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
             --dangerously-skip-permissions \
+            --permission-mode auto \
             --output-format text --session-id "$sid" \
             -p "$(cat "$prompt_file")" > "$report" 2>&1 || true) &
         else
           (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
             --dangerously-skip-permissions \
+            --permission-mode auto \
             --output-format text --resume "$sid" \
             -p "$follow_up" > "$report" 2>&1 || true) &
         fi
@@ -390,6 +392,7 @@ IMPL_PROMPT_FOOTER
   impl_start=$(date +%s)
   portable_timeout "$REVIEW_TIMEOUT" claude --model "$REVIEW_MODEL" --output-format text \
          --dangerously-skip-permissions \
+         --permission-mode auto \
          -p "$impl_prompt" > "$implementer_report" 2>&1 || true
   local impl_duration=$(( $(date +%s) - impl_start ))
   log "Implementer session complete (${impl_duration}s)"

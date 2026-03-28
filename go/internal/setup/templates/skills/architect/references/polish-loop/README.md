@@ -1,82 +1,79 @@
 # Polish Loop Reference
 
-The polish loop iterates N cycles of quality refinement after the infinity loop completes. Each cycle: audit fleet evaluates the full implementation against the build-great-things quality bar, a mini-architect decomposes findings into improvement epics, and an inner infinity loop implements them.
+> Loaded on demand. Read when referenced by SKILL.md.
 
-## Parameters
+The polish loop (`ca polish`) generates a standalone bash script that iterates N cycles of: multi-model audit fleet -> mini-architect -> inner infinity loop. It runs AFTER the main infinity loop completes, addressing quality gaps across the full priority spectrum (P0 critical through P2 nice-to-have).
 
-| Parameter | CLI Flag | Required | Default | Description |
-|-----------|----------|----------|---------|-------------|
-| Cycles | `--cycles <N>` | Yes | (none) | Exact number of polish cycles to run |
-| Meta-epic | `--meta-epic <id>` | Yes | (none) | Parent meta-epic ID |
-| Spec file | `--spec <path>` | Yes | (none) | Path to system spec for reviewer context |
-| Reviewers | `--reviewers <names...>` | Yes | (none) | Comma-separated: claude-opus, claude-sonnet, gemini, codex |
-| Model | `--model <model>` | No | claude-opus-4-6[1m] | Model for mini-architect and inner loop |
-| Output | `-o, --output <path>` | No | polish-loop.sh | Generated script path |
-| Force | `--force` | No | false | Overwrite existing script |
+## Configuration Parameters
 
-## Cycle Structure
+| Parameter | CLI Flag | Default | Description |
+|-----------|----------|---------|-------------|
+| Cycles | `--cycles <n>` | 3 | Number of audit/fix cycles |
+| Model | `--model <model>` | claude-opus-4-6[1m] | Claude model for sessions |
+| Spec file | `--spec-file <path>` | (required) | Spec file for audit context |
+| Meta-epic | `--meta-epic <id>` | (required) | Parent meta-epic ID |
+| Reviewers | `--reviewers <names>` | claude-sonnet,claude-opus,gemini,codex | Audit fleet |
+| Output | `-o, --output <path>` | ./polish-loop.sh | Script output path |
+| Force | `--force` | false | Overwrite existing script |
 
-Each of the N cycles runs exactly three steps:
+## How It Works
 
-### Step 1: Audit
+Each polish cycle runs four steps:
 
-All configured reviewers evaluate the full implementation in parallel. Each reviewer receives:
-- The build-great-things pre-ship checklist (34 quality items + 12 laziness anti-patterns)
-- The system spec for context
-- The current cycle number
+1. **Audit fleet**: Spawns all configured reviewers (Claude, Gemini, Codex) to evaluate the full codebase against the Build Great Things pre-ship checklist. Each reviewer produces a P0/P1/P2 findings report.
 
-Reviewers produce structured reports with P0/P1/P2 severity findings. Reports are collected into `agent_logs/polish-cycle-<N>/`.
+2. **Synthesize report**: Combines all reviewer reports into a single `docs/specs/polish-report-cycle-N.md`.
 
-### Step 2: Mini-Architect
+3. **Polish architect**: Reads the synthesized report, explores the codebase, and creates ambitious improvement epics for ALL findings (P0, P1, AND P2) plus its own discoveries. Aims for 3-6 well-structured epics.
 
-A Claude Opus[1M] session reads the synthesized audit report and:
-1. Groups related findings into improvement epics (2-5 per cycle)
-2. Creates beads via `bd create`
-3. Wires dependencies via `bd dep add`
+4. **Inner loop**: Generates and runs a new infinity loop (`npx ca loop`) to implement the polish epics.
 
-The mini-architect outputs `POLISH_EPIC: <id>` markers for each created epic.
+## Full-Spectrum Priority
 
-### Step 3: Inner Loop
+The polish loop explicitly addresses all priority levels:
+- **P0 (Must Fix)**: Critical quality blockers
+- **P1 (Should Fix)**: Significant quality gaps
+- **P2 (Nice to Fix)**: Polish opportunities
 
-A fresh `ca loop` script is generated and executed for the improvement epics. This reuses the full cook-it pipeline (plan, work, review, compound) for each epic.
+This is intentional. The polish phase exists precisely to address the "nice-to-have" items that get deprioritized during initial implementation.
 
-## Loop Behavior
+## Pipeline Usage
 
-- The loop runs exactly N times. No early exit.
-- If the mini-architect creates no epics in a cycle, the inner loop is a no-op and the next cycle's audit evaluates the current state.
-- `git push` runs after all cycles complete.
-
-## Reviewer CLI Flags
-
-| Reviewer | CLI | Flags |
-|----------|-----|-------|
-| claude-opus | claude | `--model claude-opus-4-6 --dangerously-skip-permissions --output-format text` |
-| claude-sonnet | claude | `--model claude-sonnet-4-6 --dangerously-skip-permissions --output-format text` |
-| gemini | gemini | `--yolo` |
-| codex | codex | `exec --full-auto -o <report>` |
-
-## Observability
-
-| File | Content |
-|------|---------|
-| `agent_logs/.polish-status.json` | Current cycle and status |
-| `agent_logs/polish-cycle-<N>/` | Per-cycle audit reports, architect logs |
-| `agent_logs/polish-cycle-<N>/<reviewer>-report.md` | Individual reviewer reports |
-| `agent_logs/polish-cycle-<N>/mini-architect.log` | Architect session output |
-| `agent_logs/polish-cycle-<N>/inner-loop.sh` | Generated inner loop script |
-| `docs/specs/polish-report-cycle-<N>.md` | Synthesized polish report |
-
-## Dry Run
+Run the infinity loop first, then the polish loop:
 
 ```bash
-POLISH_DRY_RUN=1 ./polish-loop.sh
+# Generate both scripts
+ca loop --epics E1 E2 E3 --reviewers claude-sonnet gemini --force
+ca polish --spec-file docs/specs/my-spec.md --meta-epic my-meta-epic \
+  --reviewers claude-sonnet,claude-opus,gemini --cycles 3 --force
+
+# Run in sequence
+bash infinity-loop.sh && bash polish-loop.sh
 ```
 
-Validates configuration, prints what would happen, but does not spawn any sessions.
+Or create a pipeline script:
 
-## Graceful Degradation
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+bash infinity-loop.sh
+bash polish-loop.sh
+git push 2>/dev/null || echo "git push failed"
+```
 
-- If a reviewer CLI is unavailable, it is skipped with a warning.
-- If no reviewer CLIs are available, the script exits with an error.
-- If the inner loop exits non-zero, the polish loop logs a warning and continues to the next cycle.
-- On crash, the EXIT trap writes status to `.polish-status.json`.
+## Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `POLISH_DRY_RUN` | unset | Set to `1` to preview without executing |
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `npx not found` | Node.js/npm not installed | Install Node.js 18+ |
+| `claude CLI not found` | Claude Code not installed | Install Claude Code |
+| `bd CLI not found` | Beads not installed | Install beads |
+| No epics created | Mini-architect found nothing to fix | Check audit reports in `agent_logs/polish-cycle-N/` |
+| Inner loop crashes | Generated inner loop has issues | Check `agent_logs/polish-cycle-N/inner-loop.stderr` |
+| Reviewer produces empty output | CLI crash or timeout | Check `agent_logs/polish-cycle-N/<reviewer>.stderr` |

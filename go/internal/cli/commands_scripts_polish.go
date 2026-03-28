@@ -13,9 +13,9 @@ import (
 
 // polishCmdOptions captures all flag values for the polish command.
 type polishCmdOptions struct {
-	output, model, metaEpic, spec, reviewers string
-	cycles                                   int
-	force                                    bool
+	output, model, specFile, metaEpic, reviewers string
+	cycles                                       int
+	force                                        bool
 }
 
 func polishCmd() *cobra.Command {
@@ -23,7 +23,7 @@ func polishCmd() *cobra.Command {
 
 	cmd := &cobra.Command{
 		Use:   "polish",
-		Short: "Generate polish loop script for iterative quality refinement",
+		Short: "Generate polish loop script (audit fleet + polish architect + inner loop)",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runPolish(cmd, &o)
@@ -31,65 +31,50 @@ func polishCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVarP(&o.output, "output", "o", "polish-loop.sh", "Output script path")
-	cmd.Flags().IntVar(&o.cycles, "cycles", 0, "Number of polish cycles (required)")
-	cmd.Flags().StringVar(&o.metaEpic, "meta-epic", "", "Meta-epic ID to polish (required)")
-	cmd.Flags().StringVar(&o.spec, "spec", "", "Path to spec file for reviewer context (required)")
-	cmd.Flags().StringVar(&o.reviewers, "reviewers", "", "Comma-separated reviewers (claude-opus,claude-sonnet,gemini,codex) (required)")
-	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-6[1m]", "Claude model for architect and inner loop sessions")
+	cmd.Flags().IntVar(&o.cycles, "cycles", 3, "Number of polish cycles")
+	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-6[1m]", "Claude model to use")
+	cmd.Flags().StringVar(&o.specFile, "spec-file", "", "Path to spec file for audit context (required)")
+	cmd.Flags().StringVar(&o.metaEpic, "meta-epic", "", "Parent meta-epic ID (required)")
+	cmd.Flags().StringVar(&o.reviewers, "reviewers", "claude-sonnet,claude-opus,gemini,codex", "Comma-separated reviewers")
 	cmd.Flags().BoolVar(&o.force, "force", false, "Overwrite existing script")
 	return cmd
 }
 
-// validatePolishOptions checks required flags and reviewer names.
-func validatePolishOptions(o *polishCmdOptions) ([]string, error) {
-	if o.cycles < 1 {
-		return nil, fmt.Errorf("--cycles is required and must be >= 1")
+func runPolish(cmd *cobra.Command, o *polishCmdOptions) error {
+	if o.specFile == "" {
+		return fmt.Errorf("--spec-file is required")
 	}
 	if o.metaEpic == "" {
-		return nil, fmt.Errorf("--meta-epic is required")
+		return fmt.Errorf("--meta-epic is required")
 	}
-	if o.spec == "" {
-		return nil, fmt.Errorf("--spec is required")
+	if !o.force {
+		if _, err := os.Stat(o.output); err == nil {
+			return fmt.Errorf("file %s already exists (use --force to overwrite)", o.output)
+		}
 	}
-	if o.reviewers == "" {
-		return nil, fmt.Errorf("--reviewers is required")
-	}
+
 	reviewerList := strings.Split(o.reviewers, ",")
 	if err := validateReviewers(reviewerList); err != nil {
-		return nil, err
-	}
-	return reviewerList, nil
-}
-
-func runPolish(cmd *cobra.Command, o *polishCmdOptions) error {
-	reviewerList, err := validatePolishOptions(o)
-	if err != nil {
 		return err
-	}
-
-	output := o.output
-	if !o.force {
-		if _, err := os.Stat(output); err == nil {
-			return fmt.Errorf("file %s already exists (use --force to overwrite)", output)
-		}
 	}
 
 	script := generatePolishScript(polishGenerateOptions{
 		cycles:    o.cycles,
 		model:     o.model,
+		specFile:  o.specFile,
 		metaEpic:  o.metaEpic,
-		spec:      o.spec,
 		reviewers: reviewerList,
 	})
 
-	if err := os.MkdirAll(filepath.Dir(output), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(o.output), 0755); err != nil {
 		return fmt.Errorf("create directory: %w", err)
 	}
-	if err := os.WriteFile(output, []byte(script), 0755); err != nil {
+	if err := os.WriteFile(o.output, []byte(script), 0755); err != nil {
 		return fmt.Errorf("write script: %w", err)
 	}
-	cmd.Printf("[ok] Generated polish loop script: %s\n", output)
-	cmd.Println("Run it with: bash " + output)
+
+	cmd.Printf("[ok] Generated polish script: %s\n", o.output)
+	cmd.Println("Run it with: bash " + o.output)
 	return nil
 }
 
@@ -97,41 +82,38 @@ func runPolish(cmd *cobra.Command, o *polishCmdOptions) error {
 type polishGenerateOptions struct {
 	cycles    int
 	model     string
+	specFile  string
 	metaEpic  string
-	spec      string
 	reviewers []string
 }
 
 func generatePolishScript(opts polishGenerateOptions) string {
-	escapedModel := util.ShellEscape(opts.model)
-	escapedMetaEpic := util.ShellEscape(opts.metaEpic)
-	escapedSpec := util.ShellEscape(opts.spec)
-	escapedReviewers := util.ShellEscape(strings.Join(opts.reviewers, " "))
-
-	config := polishScriptConfig(opts.cycles, escapedModel, escapedMetaEpic, escapedSpec, escapedReviewers)
-	logFn := polishScriptLogFunction()
-	crashHandler := polishScriptCrashHandler()
-	prereqs := polishScriptPrerequisites()
-	reviewerDetection := polishScriptReviewerDetection()
-	auditPrompt := polishScriptAuditPrompt()
-	spawnReviewers := polishScriptSpawnReviewers()
-	synthesize := polishScriptSynthesizeReport()
-	miniArchitect := polishScriptMiniArchitect()
-	innerLoop := polishScriptInnerLoop()
-	mainLoop := polishScriptMainLoop()
-	postLoop := polishScriptPostLoop()
-
-	return config + logFn + crashHandler + prereqs +
-		reviewerDetection + auditPrompt + spawnReviewers +
-		synthesize + miniArchitect + innerLoop + mainLoop + postLoop
+	return polishScriptConfig(opts) +
+		polishScriptCrashHandler() +
+		polishScriptTimeout() +
+		polishScriptPrerequisites() +
+		polishScriptReviewerDetection() +
+		polishScriptAuditPrompt() +
+		polishScriptRunAudit() +
+		polishScriptSynthesizeReport() +
+		polishScriptPolishArchitect() +
+		polishScriptInnerLoop() +
+		polishScriptMainLoop() +
+		polishScriptPostLoop()
 }
 
-func polishScriptConfig(cycles int, escapedModel, escapedMetaEpic, escapedSpec, escapedReviewers string) string {
+// polishScriptConfig returns the header and config section.
+func polishScriptConfig(opts polishGenerateOptions) string {
 	timestamp := time.Now().Format(time.RFC3339)
+	escapedModel := util.ShellEscape(opts.model)
+	escapedMetaEpic := util.ShellEscape(opts.metaEpic)
+	escapedSpecFile := util.ShellEscape(opts.specFile)
+	escapedReviewers := util.ShellEscape(strings.Join(opts.reviewers, " "))
+
 	return fmt.Sprintf(`#!/usr/bin/env bash
 # Polish Loop - Generated by: ca polish
 # Date: %s
-# Iterates N cycles of: audit fleet → mini-architect → inner infinity loop
+# Iterates N cycles of: audit fleet -> polish architect -> inner infinity loop
 #
 # Usage:
 #   ./polish-loop.sh
@@ -146,19 +128,27 @@ META_EPIC=%s
 SPEC_FILE=%s
 CONFIGURED_REVIEWERS=%s
 LOG_DIR="agent_logs"
+REVIEW_TIMEOUT=${REVIEW_TIMEOUT:-600}
 
 mkdir -p "$LOG_DIR"
 
-`, timestamp, cycles, escapedModel, escapedMetaEpic, escapedSpec, escapedReviewers)
+# --- Logging ---
+log() {
+  echo "[$(date '+%%Y-%%m-%%d %%H:%%M:%%S')] [polish] $*" >&2
 }
 
+`, timestamp, opts.cycles, escapedModel, escapedMetaEpic,
+		escapedSpecFile, escapedReviewers)
+}
+
+// polishScriptCrashHandler returns the EXIT trap.
 func polishScriptCrashHandler() string {
 	return `# --- Crash Handler ---
 _polish_cleanup() {
   local exit_code=$?
   if [ $exit_code -ne 0 ]; then
-    log "Polish loop crashed with exit code $exit_code"
-    echo "{\"status\":\"crashed\",\"exit_code\":$exit_code,\"cycle\":${cycle:-0},\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$LOG_DIR/.polish-status.json"
+    log "Polish loop crashed with exit code $exit_code at line ${BASH_LINENO[0]:-unknown}"
+    echo "{\"status\":\"crashed\",\"exit_code\":$exit_code,\"cycle\":${cycle:-0},\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"line\":\"${BASH_LINENO[0]:-unknown}\"}" > "$LOG_DIR/.polish-status.json"
     exit $exit_code
   fi
 }
@@ -167,25 +157,44 @@ trap _polish_cleanup EXIT
 `
 }
 
+// polishScriptTimeout returns the portable_timeout function.
+func polishScriptTimeout() string {
+	return `# --- Portable Timeout ---
+# GNU timeout -> gtimeout (macOS Homebrew) -> shell fallback
+portable_timeout() {
+  local secs="$1"; shift
+  if command -v timeout >/dev/null 2>&1; then
+    timeout "$secs" "$@"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    gtimeout "$secs" "$@"
+  else
+    "$@" &
+    local pid=$!
+    ( sleep "$secs" && kill "$pid" 2>/dev/null ) &
+    local watchdog=$!
+    wait "$pid" 2>/dev/null
+    local rc=$?
+    kill "$watchdog" 2>/dev/null
+    wait "$watchdog" 2>/dev/null
+    return $rc
+  fi
+}
+
+`
+}
+
+// polishScriptPrerequisites returns the prerequisite checks.
 func polishScriptPrerequisites() string {
 	return `# --- Prerequisites ---
 command -v claude >/dev/null 2>&1 || { echo "ERROR: claude CLI not found"; exit 1; }
 command -v bd >/dev/null 2>&1 || { echo "ERROR: bd CLI not found"; exit 1; }
-command -v ca >/dev/null 2>&1 || { echo "ERROR: ca CLI not found (needed for inner loop)"; exit 1; }
+command -v npx >/dev/null 2>&1 || { echo "ERROR: npx not found (needed for inner loop)"; exit 1; }
 [ -f "$SPEC_FILE" ] || { log "ERROR: spec file not found: $SPEC_FILE"; exit 1; }
 
 `
 }
 
-func polishScriptLogFunction() string {
-	return `# --- Logging ---
-log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [polish] $*" >&2
-}
-
-`
-}
-
+// polishScriptReviewerDetection returns the reviewer CLI detection function with health checks.
 func polishScriptReviewerDetection() string {
 	return `# --- Reviewer Detection ---
 detect_polish_reviewers() {
@@ -193,13 +202,17 @@ detect_polish_reviewers() {
   for reviewer in $CONFIGURED_REVIEWERS; do
     local cli_name
     case "$reviewer" in
-      claude-sonnet|claude-opus) cli_name="claude" ;;
-      gemini)                    cli_name="gemini" ;;
-      codex)                     cli_name="codex" ;;
-      *) log "WARN: unknown reviewer $reviewer"; continue ;;
+      (claude-sonnet|claude-opus) cli_name="claude" ;;
+      (gemini)                    cli_name="gemini" ;;
+      (codex)                     cli_name="codex" ;;
+      (*) log "WARN: unknown reviewer $reviewer"; continue ;;
     esac
     if ! command -v "$cli_name" >/dev/null 2>&1; then
-      log "WARN: $reviewer configured but $cli_name CLI not found — skipping"
+      log "WARN: $reviewer configured but $cli_name CLI not found -- skipping"
+      continue
+    fi
+    if ! portable_timeout 10 "$cli_name" --version >/dev/null 2>&1; then
+      log "WARN: $reviewer configured but $cli_name health check failed -- skipping"
       continue
     fi
     AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS $reviewer"
@@ -215,6 +228,7 @@ detect_polish_reviewers() {
 `
 }
 
+// polishScriptAuditPrompt returns the build_audit_prompt function.
 func polishScriptAuditPrompt() string { //nolint:funlen // bash template string
 	return `# --- Audit Prompt (BGT Checklist) ---
 build_audit_prompt() {
@@ -227,34 +241,34 @@ You are a senior quality auditor performing a holistic review of the entire impl
 
 ## Your Task
 Evaluate the FULL codebase against the Build Great Things pre-ship quality checklist below.
-Do NOT focus on recent diffs — review the entire implementation holistically.
+Do NOT focus on recent diffs -- review the entire implementation holistically.
 Produce a structured report with P0/P1/P2 findings.
 
 ## Build Great Things Pre-Ship Checklist
 
 ### States (5 required per data view)
-- [ ] loading state — skeleton or spinner while data fetches
-- [ ] empty state — helpful message and CTA when no data exists
-- [ ] error state — clear error message with recovery action
-- [ ] offline state — graceful degradation when network unavailable
-- [ ] partial data state — sensible rendering with incomplete data
+- [ ] loading state -- skeleton or spinner while data fetches
+- [ ] empty state -- helpful message and CTA when no data exists
+- [ ] error state -- clear error message with recovery action
+- [ ] offline state -- graceful degradation when network unavailable
+- [ ] partial data state -- sensible rendering with incomplete data
 
 ### Interaction
 - [ ] hover/active/focus/disabled states defined for all interactive elements
 - [ ] focus styles visible and accessible (not just outline: none)
-- [ ] press feedback — visual response within 100ms
-- [ ] validation feedback — inline, immediate, specific
-- [ ] page transitions — smooth, purposeful, not jarring
+- [ ] press feedback -- visual response within 100ms
+- [ ] validation feedback -- inline, immediate, specific
+- [ ] page transitions -- smooth, purposeful, not jarring
 
 ### Visual Craft
 - [ ] 3+ levels of typography hierarchy (size, weight, color)
 - [ ] de-emphasis used (not everything can be bold/primary)
-- [ ] geometric spacing scale (4/8/16/24/32/48/64) — no arbitrary values
+- [ ] geometric spacing scale (4/8/16/24/32/48/64) -- no arbitrary values
 - [ ] no borders where spacing, background color, or shadow would work
 - [ ] consistent elevation/shadow scale
 - [ ] semantic color tokens (not raw hex)
-- [ ] scroll animations — choreographed, not just fade-in
-- [ ] optimized images — proper format, sizing, lazy loading
+- [ ] scroll animations -- choreographed, not just fade-in
+- [ ] optimized images -- proper format, sizing, lazy loading
 - [ ] consistent icon style and sizing
 
 ### Responsiveness
@@ -281,29 +295,29 @@ Produce a structured report with P0/P1/P2 findings.
 - [ ] print styles or print-friendly view
 
 ### Common AI Laziness Anti-Patterns
-- [ ] NOT shallow component design — components have deep interfaces, not just pass-through props
-- [ ] NOT generic UI — curated palettes, specific typeface pairings, deliberate whitespace
-- [ ] NOT skipping polish phases — motion and performance phases are mandatory
-- [ ] NOT first-design-only — design it twice before committing
-- [ ] NOT missing visual hierarchy — use all three channels: size, weight, color
-- [ ] NOT edge states only on happy path — empty/loading/error/partial/offline are design surfaces
-- [ ] NOT flat interactions — every click/hover/scroll needs feedback
-- [ ] NOT cookie-cutter layouts — vary section structures, use negative space
-- [ ] NOT borders everywhere — try spacing, background color, shadows first
-- [ ] NOT afterthought mobile — mobile needs different IA, content priority, interaction patterns
-- [ ] NOT ignoring font loading — font-display strategy, preloading, size-adjust fallbacks
-- [ ] NOT arbitrary spacing — use geometric scale only
+- [ ] NOT shallow component design
+- [ ] NOT generic UI -- curated palettes, specific typeface pairings, deliberate whitespace
+- [ ] NOT skipping polish phases -- motion and performance phases are mandatory
+- [ ] NOT first-design-only -- design it twice before committing
+- [ ] NOT missing visual hierarchy
+- [ ] NOT edge states only on happy path
+- [ ] NOT flat interactions -- every click/hover/scroll needs feedback
+- [ ] NOT cookie-cutter layouts
+- [ ] NOT borders everywhere -- try spacing, background color, shadows first
+- [ ] NOT afterthought mobile
+- [ ] NOT ignoring font loading
+- [ ] NOT arbitrary spacing -- use geometric scale only
 
 ## Output Format
 Structure your report as:
 
-### P0 — Must Fix (blocks quality)
+### P0 -- Must Fix (blocks quality)
 - Finding description with file/line references
 
-### P1 — Should Fix (significant quality gap)
+### P1 -- Should Fix (significant quality gap)
 - Finding description with file/line references
 
-### P2 — Nice to Fix (polish opportunity)
+### P2 -- Nice to Fix (polish opportunity)
 - Finding description with file/line references
 
 ### Summary
@@ -323,7 +337,8 @@ AUDIT_PROMPT_EOF
 `
 }
 
-func polishScriptSpawnReviewers() string { //nolint:funlen // bash template string
+// polishScriptRunAudit returns the run_polish_audit function with PID tracking and timeouts.
+func polishScriptRunAudit() string { //nolint:funlen // bash template string
 	return `# --- Spawn Reviewers ---
 run_polish_audit() {
   local cycle_num="$1"
@@ -335,63 +350,53 @@ run_polish_audit() {
   build_audit_prompt "$cycle_num" > "$prompt_file"
 
   log "Cycle $cycle_num: spawning reviewers"
+  local pids=""
   for reviewer in $AVAILABLE_REVIEWERS; do
     local report="$cycle_dir/$reviewer-report.md"
-    local cli_name model_flag
+    local model_name=""
 
     case "$reviewer" in
-      claude-opus)
-        cli_name="claude"
-        model_flag="--model claude-opus-4-6"
-        ;;
-      claude-sonnet)
-        cli_name="claude"
-        model_flag="--model claude-sonnet-4-6"
-        ;;
-      gemini)
-        cli_name="gemini"
-        model_flag=""
-        ;;
-      codex)
-        cli_name="codex"
-        model_flag=""
-        ;;
+      (claude-opus)   model_name="claude-opus-4-6[1m]" ;;
+      (claude-sonnet) model_name="claude-sonnet-4-6" ;;
     esac
 
     if [ "${POLISH_DRY_RUN:-}" = "1" ]; then
       log "DRY RUN: would spawn $reviewer"
-      echo "(dry run — no actual review)" > "$report"
+      echo "(dry run -- no actual review)" > "$report"
       continue
     fi
 
     case "$reviewer" in
-      claude-opus|claude-sonnet)
-        claude $model_flag \
+      (claude-opus|claude-sonnet)
+        (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
           --dangerously-skip-permissions \
+          --permission-mode auto \
           --output-format text \
-          -p - < "$prompt_file" > "$report" 2>"$cycle_dir/$reviewer.stderr" &
+          -p - < "$prompt_file" > "$report" 2>"$cycle_dir/$reviewer.stderr" || true) &
         ;;
-      gemini)
-        gemini --yolo \
+      (gemini)
+        (portable_timeout "$REVIEW_TIMEOUT" gemini --yolo \
           < "$prompt_file" \
-          > "$report" 2>"$cycle_dir/$reviewer.stderr" &
+          > "$report" 2>"$cycle_dir/$reviewer.stderr" || true) &
         ;;
-      codex)
-        codex exec --full-auto \
-          -o "$report" -- - < "$prompt_file" 2>"$cycle_dir/$reviewer.stderr" &
+      (codex)
+        (portable_timeout "$REVIEW_TIMEOUT" codex exec --full-auto \
+          -o "$report" -- - < "$prompt_file" 2>"$cycle_dir/$reviewer.stderr" || true) &
         ;;
     esac
+    pids="$pids $!"
     log "Spawned $reviewer (PID $!)"
   done
 
   log "Waiting for all reviewers to complete"
-  wait
+  for pid in $pids; do wait "$pid" 2>/dev/null || true; done
   log "All reviewers completed for cycle $cycle_num"
 }
 
 `
 }
 
+// polishScriptSynthesizeReport returns the synthesize_report function.
 func polishScriptSynthesizeReport() string {
 	return `# --- Synthesize Report ---
 synthesize_report() {
@@ -404,7 +409,7 @@ synthesize_report() {
   log "Synthesizing polish report for cycle $cycle_num"
 
   {
-    echo "# Polish Report — Cycle $cycle_num"
+    echo "# Polish Report -- Cycle $cycle_num"
     echo ""
     echo "Generated: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo ""
@@ -419,7 +424,7 @@ synthesize_report() {
       else
         echo "## $reviewer"
         echo ""
-        echo "(no output — reviewer may have crashed or timed out)"
+        echo "(no output -- reviewer may have crashed or timed out)"
         echo ""
       fi
     done
@@ -432,36 +437,84 @@ synthesize_report() {
 `
 }
 
-func polishScriptMiniArchitect() string { //nolint:funlen // bash template string
-	return `# --- Mini-Architect ---
-run_mini_architect() {
+// polishScriptPolishArchitect returns the run_polish_architect function.
+func polishScriptPolishArchitect() string { //nolint:funlen // bash template string
+	return `# --- Polish Architect ---
+run_polish_architect() {
   local cycle_num="$1"
   local report_file="$2"
   local cycle_dir="$LOG_DIR/polish-cycle-$cycle_num"
-  local architect_log="$cycle_dir/mini-architect.log"
+  local architect_log="$cycle_dir/polish-architect.log"
 
-  log "Cycle $cycle_num: spawning mini-architect"
+  log "Cycle $cycle_num: spawning polish architect"
 
   if [ "${POLISH_DRY_RUN:-}" = "1" ]; then
-    log "DRY RUN: would spawn mini-architect"
+    log "DRY RUN: would spawn polish architect"
     return 0
   fi
 
-  # Build prompt file (quoted heredoc prevents shell expansion of report content)
-  local prompt_file="$cycle_dir/mini-architect-prompt.md"
+  if [ -z "$report_file" ] || [ ! -s "$report_file" ]; then
+    log "ERROR: polish report is empty or missing, skipping architect"
+    return 1
+  fi
+
+  local prompt_file="$cycle_dir/polish-architect-prompt.md"
   {
     cat <<'ARCHITECT_HEADER_EOF'
-You are a mini-architect for a polish cycle.
+You are a polish architect. Your job is NOT just to mechanically convert reviewer findings
+into tickets. You are here to push the product toward exceptional quality and craft.
 
-## Your Task
-Read the polish report below and create improvement epic beads for the findings.
+## Step 1: Load Context
+Prime your session so you understand the product, its vision, and what has been built:
 
-## Instructions
-1. Read the polish report carefully
-2. Group related findings into improvement epics (aim for 2-5 epics)
-3. For each epic, run: bd create --title="Polish: <summary>" --description="<findings>" --type=epic --priority=2
-4. Wire dependencies between epics if needed: bd dep add <dependent> <dependency>
-5. Output the created epic IDs, one per line
+` + "```bash" + `
+npx ca load-session
+` + "```" + `
+
+Then read the spec file to understand the product vision and goals:
+
+` + "```bash" + `
+cat "$SPEC_FILE"
+` + "```" + `
+
+Explore the codebase. Understand the current state -- what's built, what's working, what's rough.
+
+## Step 2: Study the Audit Report
+Read the polish report below. Reviewer findings are your STARTING POINT, not your ceiling.
+
+## Step 3: Think Ambitiously
+Go beyond the findings. Ask yourself:
+- What would make a user fall in love with this product?
+- Where does the current implementation feel "good enough" but not great?
+- What micro-interactions, transitions, or details would elevate the experience?
+- Are there rough edges the reviewers missed because they were checking a list?
+- Does the product feel cohesive, or like a collection of features?
+- Would you be proud to ship this? What would you fix first if not?
+
+The polish loop exists to close the gap between "it works" and "it's exceptional."
+Address ALL priority levels -- P0 critical issues, P1 quality gaps, AND P2 polish
+opportunities. P2 items are not optional in a polish cycle -- they are the whole point.
+Add your own P2/P3 discoveries beyond what reviewers found.
+
+## Step 4: Create Improvement Epics
+Group your improvements into well-structured epics (aim for 3-6). Each epic should:
+- Have a clear, ambitious goal (not just "fix findings from reviewer X")
+- Include specific acceptance criteria
+- Cover a coherent bounded context (e.g., "interaction polish", "visual hierarchy", "performance")
+- Mix reviewer findings WITH your own discoveries
+
+For each epic:
+` + "```bash" + `
+bd create --title="Polish: <ambitious goal>" \
+  --description="<what and why, acceptance criteria, specific files/areas>" \
+  --type=epic --priority=2
+` + "```" + `
+
+Wire dependencies if needed: ` + "`bd dep add <dependent> <dependency>`" + `
+
+## Step 5: Output Epic IDs
+After creating all epics, output each ID on its own line:
+POLISH_EPIC: <epic-id>
 
 ARCHITECT_HEADER_EOF
     echo "## Polish Report"
@@ -470,15 +523,16 @@ ARCHITECT_HEADER_EOF
     echo "## Meta-Epic"
     echo "Parent: $META_EPIC"
     echo ""
-    echo "## Output Format"
-    echo "After creating all epics, output each ID on its own line:"
-    echo "POLISH_EPIC: <epic-id>"
+    echo "## Spec File"
+    echo "Read this file for product vision: $SPEC_FILE"
   } > "$prompt_file"
 
   claude --model "$MODEL" \
     --dangerously-skip-permissions \
+    --permission-mode auto \
     --output-format text \
-    -p - < "$prompt_file" > "$architect_log" 2>"$cycle_dir/mini-architect.stderr" || true
+    --verbose \
+    -p - < "$prompt_file" > "$architect_log" 2>"$cycle_dir/polish-architect.stderr" || true
 
   # Extract created epic IDs
   POLISH_EPICS=""
@@ -492,15 +546,16 @@ ARCHITECT_HEADER_EOF
   POLISH_EPICS="${POLISH_EPICS# }"
 
   if [ -z "$POLISH_EPICS" ]; then
-    log "Cycle $cycle_num: mini-architect created no epics"
+    log "Cycle $cycle_num: polish architect created no epics"
   else
-    log "Cycle $cycle_num: mini-architect created epics: $POLISH_EPICS"
+    log "Cycle $cycle_num: polish architect created epics: $POLISH_EPICS"
   fi
 }
 
 `
 }
 
+// polishScriptInnerLoop returns the run_inner_loop function.
 func polishScriptInnerLoop() string {
 	return `# --- Inner Loop ---
 run_inner_loop() {
@@ -508,7 +563,7 @@ run_inner_loop() {
   local cycle_dir="$LOG_DIR/polish-cycle-$cycle_num"
 
   if [ -z "$POLISH_EPICS" ]; then
-    log "Cycle $cycle_num: no epics to process — skipping inner loop"
+    log "Cycle $cycle_num: no epics to process -- skipping inner loop"
     return 0
   fi
 
@@ -519,11 +574,11 @@ run_inner_loop() {
   epic_csv=$(echo "$POLISH_EPICS" | tr ' ' ',')
 
   if [ "${POLISH_DRY_RUN:-}" = "1" ]; then
-    log "DRY RUN: would run ca loop --epics $epic_csv"
+    log "DRY RUN: would run npx ca loop --epics $epic_csv"
     return 0
   fi
 
-  ca loop --epics "$epic_csv" --model "$MODEL" --force -o "$inner_script" 2>"$cycle_dir/ca-loop-gen.stderr" || {
+  npx ca loop --epics "$epic_csv" --model "$MODEL" --force -o "$inner_script" 2>"$cycle_dir/ca-loop-gen.stderr" || {
     log "ERROR: failed to generate inner loop script"
     return 1
   }
@@ -539,6 +594,7 @@ run_inner_loop() {
 `
 }
 
+// polishScriptMainLoop returns the main orchestration loop.
 func polishScriptMainLoop() string {
 	return `# --- Main Loop ---
 detect_polish_reviewers
@@ -547,10 +603,12 @@ log "Starting polish loop: $CYCLES cycles"
 echo "{\"status\":\"running\",\"cycles\":$CYCLES,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$LOG_DIR/.polish-status.json"
 
 POLISH_EPICS=""
+POLISH_REPORT=""
 
 for ((cycle=1; cycle<=CYCLES; cycle++)); do
   log "=== Cycle $cycle/$CYCLES ==="
   POLISH_EPICS=""
+  POLISH_REPORT=""
   echo "{\"status\":\"running\",\"cycle\":$cycle,\"cycles\":$CYCLES,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$LOG_DIR/.polish-status.json"
 
   # Step 1: Audit
@@ -559,8 +617,12 @@ for ((cycle=1; cycle<=CYCLES; cycle++)); do
   # Step 2: Synthesize
   synthesize_report "$cycle"
 
-  # Step 3: Mini-Architect
-  run_mini_architect "$cycle" "$POLISH_REPORT"
+  # Step 3: Polish Architect
+  if [ -n "$POLISH_REPORT" ]; then
+    run_polish_architect "$cycle" "$POLISH_REPORT" || log "WARN: polish architect failed for cycle $cycle"
+  else
+    log "WARN: no polish report produced, skipping architect for cycle $cycle"
+  fi
 
   # Step 4: Inner Loop
   run_inner_loop "$cycle"
@@ -571,6 +633,7 @@ done
 `
 }
 
+// polishScriptPostLoop returns the post-loop cleanup and push section.
 func polishScriptPostLoop() string {
 	return `# --- Post Loop ---
 log "Polish loop completed: $CYCLES cycles"

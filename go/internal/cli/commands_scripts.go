@@ -54,7 +54,7 @@ func improveCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&output, "output", "o", "improvement-loop.sh", "Output script path")
 	cmd.Flags().IntVar(&maxIters, "max-iters", 5, "Max iterations per topic")
 	cmd.Flags().IntVar(&budget, "time-budget", 0, "Total time budget in seconds (0=unlimited)")
-	cmd.Flags().StringVar(&model, "model", "claude-sonnet-4-6", "Claude model to use")
+	cmd.Flags().StringVar(&model, "model", "claude-opus-4-6[1m]", "Claude model to use")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing script")
 	cmd.Flags().StringVar(&topics, "topics", "", "Comma-separated topic names to run")
 	return cmd
@@ -235,7 +235,7 @@ for topic in $(get_topics); do
 
     # Spawn Claude session
     PROMPT=$(build_prompt "$topic")
-    claude --model "$MODEL" --output-format stream-json -p "$PROMPT" > "$TRACE_FILE" 2>/dev/null || true
+    claude --dangerously-skip-permissions --permission-mode auto --model "$MODEL" --output-format stream-json -p "$PROMPT" > "$TRACE_FILE" 2>/dev/null || true
 
     # Extract text and detect marker
     if command -v jq >/dev/null 2>&1; then
@@ -306,14 +306,14 @@ func loopCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&o.output, "output", "o", "infinity-loop.sh", "Output script path")
 	cmd.Flags().IntVar(&o.maxRetries, "max-retries", 1, "Max retries per epic on failure")
-	cmd.Flags().StringVar(&o.model, "model", "claude-sonnet-4-6", "Claude model to use")
+	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-6[1m]", "Claude model to use")
 	cmd.Flags().BoolVar(&o.force, "force", false, "Overwrite existing script")
 	cmd.Flags().StringVar(&o.epics, "epics", "", "Comma-separated epic IDs to process")
 	cmd.Flags().StringVar(&o.reviewers, "reviewers", "", "Comma-separated reviewers (claude-sonnet,claude-opus,gemini,codex)")
 	cmd.Flags().IntVar(&o.reviewEvery, "review-every", 0, "Review every N completed epics (0=end-only)")
 	cmd.Flags().IntVar(&o.maxReviewCycles, "max-review-cycles", 3, "Max review/fix iterations")
 	cmd.Flags().BoolVar(&o.reviewBlocking, "review-blocking", false, "Fail loop if review not approved after max cycles")
-	cmd.Flags().StringVar(&o.reviewModel, "review-model", "claude-opus-4-6", "Model for implementer fix sessions")
+	cmd.Flags().StringVar(&o.reviewModel, "review-model", "claude-opus-4-6[1m]", "Model for implementer fix sessions")
 	cmd.Flags().BoolVar(&o.improve, "improve", false, "Run improvement phase after all epics complete")
 	cmd.Flags().IntVar(&o.improveMaxIters, "improve-max-iters", 5, "Max improvement iterations per topic")
 	cmd.Flags().IntVar(&o.improveTimeBudget, "improve-time-budget", 0, "Total improvement time budget in seconds (0=unlimited)")
@@ -925,6 +925,7 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
     MEM_LOG="$LOG_DIR/memory_${EPIC_ID}-${TS}.log"
     (
       claude --dangerously-skip-permissions \
+             --permission-mode auto \
              --model "$MODEL" \
              --output-format stream-json \
              --verbose \

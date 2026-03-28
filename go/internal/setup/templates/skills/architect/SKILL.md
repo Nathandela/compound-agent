@@ -204,6 +204,22 @@ This phase is OPT-IN. After Phase 4:
    - Execution log: \`cat agent_logs/loop-execution.jsonl\`
    - For ongoing health monitoring, see the 30-minute probe protocol in the reference guide.
 
+8. **Generate polish loop** (optional, if user wants post-implementation quality polishing):
+   Ask the user if they want a polish phase after the infinity loop completes. If yes:
+   \`\`\`bash
+   ca polish --spec-file <spec-path> --meta-epic <meta-epic-id> \
+     --reviewers <reviewer1,reviewer2,...> \
+     --cycles <N> --model <model> --force
+   \`\`\`
+   This generates \`./polish-loop.sh\` which runs N cycles of: audit fleet -> mini-architect -> inner infinity loop.
+   The polish loop addresses ALL priority levels (P0 critical through P2 nice-to-have).
+   See \`architect/references/polish-loop/README.md\` for the full parameter reference.
+
+   To run both loops in sequence, create a pipeline script:
+   \`\`\`bash
+   bash infinity-loop.sh && bash polish-loop.sh
+   \`\`\`
+
 See \`architect/references/infinity-loop/README.md\` for full reference. For troubleshooting, read \`infinity-loop/troubleshooting.md\` and \`improve-loop/troubleshooting.md\`.
 
 ### Phase 6: Polish (Opt-in, post-loop)
