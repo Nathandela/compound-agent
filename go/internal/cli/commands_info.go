@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 
 	"github.com/nathandelacretaz/compound-agent/internal/build"
@@ -85,17 +86,18 @@ func openURL(url string) {
 	_ = exec.Command(cmd, url).Start()
 }
 
-// infoCmd creates the "info" command. If repoRoot is non-empty, it uses that
+// infoCmd creates the "info" command. If testRepoRoot is non-empty, it uses that
 // path directly (used in tests); otherwise it detects the repo root.
-func infoCmd(repoRoot string) *cobra.Command {
+func infoCmd(testRepoRoot string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "info",
 		Short: "Show a structured overview of hooks, skills, phases, telemetry, and lessons",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if repoRoot == "" {
-				repoRoot = util.GetRepoRoot()
+			root := testRepoRoot
+			if root == "" {
+				root = util.GetRepoRoot()
 			}
-			cmd.Print(buildInfoOutput(repoRoot))
+			cmd.Print(buildInfoOutput(root))
 			return nil
 		},
 	}
@@ -187,7 +189,7 @@ func formatInfoPhase(repoRoot string) string {
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "Active workflow: %s (phase %d/5)\n", state.CurrentPhase, state.PhaseIndex)
+	fmt.Fprintf(&b, "Active workflow: %s (phase %d/%d)\n", state.CurrentPhase, state.PhaseIndex, len(hook.Phases))
 	fmt.Fprintf(&b, "  Epic: %s\n", state.EpicID)
 	if len(state.SkillsRead) > 0 {
 		fmt.Fprintf(&b, "  Skills read: %s\n", strings.Join(state.SkillsRead, ", "))
@@ -200,6 +202,11 @@ func formatInfoPhase(repoRoot string) string {
 
 // formatInfoTelemetry returns the telemetry section content.
 func formatInfoTelemetry(repoRoot string) string {
+	dbPath := filepath.Join(repoRoot, storage.DBPath)
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		return "Telemetry: no data yet.\n"
+	}
+
 	db, err := storage.OpenRepoDB(repoRoot)
 	if err != nil {
 		return "Telemetry: no data yet.\n"
@@ -229,7 +236,7 @@ func formatInfoTelemetry(repoRoot string) string {
 func formatInfoLessons(repoRoot string) string {
 	result, err := memory.ReadItems(repoRoot)
 	if err != nil {
-		return fmt.Sprintf("Lessons: 0 (no corpus found)\n")
+		return "Lessons: 0 (no corpus found)\n"
 	}
 
 	total := len(result.Items)
@@ -255,6 +262,7 @@ func formatInfoLessons(repoRoot string) string {
 		for typ, count := range typeCounts {
 			parts = append(parts, fmt.Sprintf("%s: %d", typ, count))
 		}
+		sort.Strings(parts)
 		fmt.Fprintf(&b, "  Types: %s\n", strings.Join(parts, ", "))
 	}
 

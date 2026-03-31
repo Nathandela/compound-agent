@@ -192,17 +192,10 @@ func makeLessonSearchFunc(repoRoot string, hookName string) LessonSearchFunc {
 			return nil, err
 		}
 
-		// Log per-lesson retrieval telemetry events (REQ-E4: lesson_id, query_hash, score, hook_name).
+		// Log per-lesson retrieval telemetry events (REQ-E4: "WHEN a lesson is retrieved").
+		// Only log when lessons are actually returned — empty searches are not retrievals.
 		query := strings.Join(tokens, " ")
 		qh := telemetry.HashQuery(query)
-		if len(scored) == 0 {
-			_ = telemetry.LogEvent(db, telemetry.Event{
-				EventType: telemetry.EventLessonRetrieval,
-				HookName:  hookName,
-				QueryHash: qh,
-				Outcome:   telemetry.OutcomeEmpty,
-			})
-		}
 		for _, s := range scored {
 			_ = telemetry.LogEvent(db, telemetry.Event{
 				EventType: telemetry.EventLessonRetrieval,
