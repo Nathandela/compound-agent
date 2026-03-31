@@ -334,8 +334,9 @@ func TestDoctorWSL2Check(t *testing.T) {
 	for _, c := range checks {
 		if c.Name == "WSL2 recommended" {
 			hasWSL2Check = true
-			if c.Status != "warn" {
-				t.Errorf("WSL2 check should be warn, got %s", c.Status)
+			// On Windows: "warn" (no WSL) or "info" (WSL detected)
+			if c.Status != "warn" && c.Status != "info" {
+				t.Errorf("WSL2 check should be warn or info, got %s", c.Status)
 			}
 		}
 	}
