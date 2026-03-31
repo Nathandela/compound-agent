@@ -6,7 +6,7 @@ summary: "Complete CLI command reference for compound-agent"
 
 # CLI Reference
 
-All commands use `npx ca` (or `npx compound-agent`). Global flags: `-v, --verbose` and `-q, --quiet`.
+All commands use `ca` (or `npx ca` if not in PATH). Global flags: `-v, --verbose` and `-q, --quiet`.
 
 ---
 
