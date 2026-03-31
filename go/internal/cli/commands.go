@@ -50,6 +50,7 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	registerScriptCommands(rootCmd)
 	registerMigrateCommands(rootCmd)
 	registerPhaseCommands(rootCmd)
+	registerHealthCommands(rootCmd)
 }
 
 // --- search command ---

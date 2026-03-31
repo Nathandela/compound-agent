@@ -2,6 +2,7 @@ package hook
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
 	"github.com/nathandelacretaz/compound-agent/internal/storage"
+	"github.com/nathandelacretaz/compound-agent/internal/telemetry"
 	"github.com/nathandelacretaz/compound-agent/internal/util"
 )
 
@@ -75,6 +77,31 @@ func RunHook(hookName string, stdin io.Reader, stdout io.Writer) int {
 	if result != nil {
 		writeHookOutput(stdout, result)
 	}
+	return code
+}
+
+// RunHookWithTelemetry runs a hook and logs a telemetry event to db.
+// Telemetry is recorded at the output boundary, after dispatch completes.
+func RunHookWithTelemetry(hookName string, stdin io.Reader, stdout io.Writer, db *sql.DB) int {
+	start := time.Now()
+	code := RunHook(hookName, stdin, stdout)
+	durationMs := time.Since(start).Milliseconds()
+
+	outcome := telemetry.OutcomeSuccess
+	if code != 0 {
+		outcome = telemetry.OutcomeError
+	}
+
+	ev := telemetry.Event{
+		EventType:  telemetry.EventHookExecution,
+		HookName:   hookName,
+		DurationMs: durationMs,
+		Outcome:    outcome,
+	}
+	if err := telemetry.LogEvent(db, ev); err != nil {
+		slog.Debug("telemetry write failed", "hook", hookName, "error", err)
+	}
+
 	return code
 }
 

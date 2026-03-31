@@ -11,7 +11,7 @@ import (
 )
 
 // SchemaVersion is the current schema version for migration detection.
-const SchemaVersion = 6
+const SchemaVersion = 7
 
 // DBPath is the relative path to the SQLite database from repo root.
 const DBPath = ".claude/.cache/lessons.sqlite"
@@ -80,6 +80,22 @@ const schemaDDL = `
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS telemetry (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    hook_name TEXT NOT NULL DEFAULT '',
+    phase TEXT NOT NULL DEFAULT '',
+    duration_ms INTEGER NOT NULL DEFAULT 0,
+    success INTEGER NOT NULL DEFAULT 1,
+    query_hash TEXT NOT NULL DEFAULT '',
+    metadata TEXT NOT NULL DEFAULT '{}'
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_telemetry_timestamp ON telemetry(timestamp);
+  CREATE INDEX IF NOT EXISTS idx_telemetry_event_type ON telemetry(event_type);
+  CREATE INDEX IF NOT EXISTS idx_telemetry_hook_name ON telemetry(hook_name);
 `
 
 // OpenDB opens or creates a SQLite database with the lessons schema.
@@ -94,9 +110,12 @@ func OpenDB(path string) (*sql.DB, error) {
 			return nil, fmt.Errorf("create dir: %w", err)
 		}
 
-		// Check existing DB version
+		// Check existing DB version; use file-based lock to prevent
+		// concurrent processes from racing to delete/recreate the DB.
 		if needsRebuild(path) {
-			os.Remove(path)
+			if err := lockedRebuild(path); err != nil {
+				return nil, fmt.Errorf("locked rebuild: %w", err)
+			}
 		}
 	}
 
@@ -144,6 +163,28 @@ func needsRebuild(path string) bool {
 	}
 
 	return version != SchemaVersion
+}
+
+// lockedRebuild acquires a file-based lock before deleting a stale DB.
+// If the lock is already held by another process, it skips the rebuild
+// and lets OpenDB attempt to open the (possibly stale) database.
+func lockedRebuild(path string) error {
+	lockPath := path + ".lock"
+
+	// Try to acquire lock (exclusive create)
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	if err != nil {
+		// Lock already held — skip rebuild, let OpenDB try with existing file
+		return nil
+	}
+	f.Close()
+	defer os.Remove(lockPath)
+
+	// Re-check after acquiring lock (another process may have rebuilt)
+	if needsRebuild(path) {
+		os.Remove(path)
+	}
+	return nil
 }
 
 // buildDSN constructs a SQLite DSN from a path, appending WAL journal mode

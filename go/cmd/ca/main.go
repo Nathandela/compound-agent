@@ -6,6 +6,8 @@ import (
 
 	"github.com/nathandelacretaz/compound-agent/internal/cli"
 	"github.com/nathandelacretaz/compound-agent/internal/hook"
+	"github.com/nathandelacretaz/compound-agent/internal/storage"
+	"github.com/nathandelacretaz/compound-agent/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -24,7 +26,17 @@ func buildHooksCmd() *cobra.Command {
 			if len(args) > 0 {
 				hookName = args[0]
 			}
-			exitCode := hook.RunHook(hookName, os.Stdin, os.Stdout)
+
+			// Open DB for telemetry; fall back to RunHook without telemetry if DB unavailable.
+			repoRoot := util.GetRepoRoot()
+			db, err := storage.OpenRepoDB(repoRoot)
+			if err != nil {
+				slog.Debug("telemetry db unavailable", "error", err)
+				os.Exit(hook.RunHook(hookName, os.Stdin, os.Stdout))
+			}
+			defer db.Close()
+
+			exitCode := hook.RunHookWithTelemetry(hookName, os.Stdin, os.Stdout, db)
 			os.Exit(exitCode)
 		},
 	}
