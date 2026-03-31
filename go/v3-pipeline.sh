@@ -3,6 +3,7 @@
 # Launch: cd go && screen -dmS compound-loop-learning-agent bash v3-pipeline.sh
 
 set -e
+trap 'echo "[pipeline] FAILED at line $LINENO" >&2' ERR
 cd "$(dirname "$0")"
 
 echo "[pipeline] Starting infinity loop..."
