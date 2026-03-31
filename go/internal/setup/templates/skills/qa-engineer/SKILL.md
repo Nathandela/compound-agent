@@ -1,6 +1,7 @@
 ---
 name: QA Engineer
 description: Hands-on QA testing of running applications via browser automation. Use whenever the user asks to test a running app, perform exploratory testing, verify UI/UX behavior, check accessibility, test forms and inputs, inspect network requests, do a smoke test, or systematically try to break things. Also use when review needs runtime verification beyond automated tests -- visual checks, boundary inputs, interaction flows, and design review against a live application. Triggers on phrases like "test this app", "QA this", "check the UI", "try to break it", "smoke test", "does this look right", "test the form", "check accessibility", "poke at it", or any request to manually verify a running web application or API.
+phase: review
 ---
 
 # QA Engineer Skill

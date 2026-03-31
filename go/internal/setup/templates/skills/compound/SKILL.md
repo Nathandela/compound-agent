@@ -1,6 +1,7 @@
 ---
 name: Compound
 description: Reflect on the cycle and capture high-quality lessons for future sessions
+phase: compound
 ---
 
 # Compound Skill

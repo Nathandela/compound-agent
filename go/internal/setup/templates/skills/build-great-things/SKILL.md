@@ -1,6 +1,7 @@
 ---
 name: Build Great Things
 description: Comprehensive playbook for building world-class websites, landing pages, web applications, and dashboards. Covers the full build sequence from brand identity and information architecture through layout, typography, color, scroll animations, micro-interactions, hover effects, loading states, empty states, error handling, accessibility, SEO, and conversion optimization. Use this skill whenever building a new website or web app from scratch, redesigning pages (pricing, landing, portfolio), adding polish or animations, fixing generic-looking UI, improving visual hierarchy, or when the user says anything looks "janky", "generic", "amateur", or "needs more polish". Also use when adding hover states, scroll effects, page transitions, or doing a design review pass.
+phase: work
 ---
 
 # How to Build Great Things

@@ -15,6 +15,74 @@ import (
 	"github.com/nathandelacretaz/compound-agent/internal/setup/templates"
 )
 
+// SkillEntry represents a single skill in the compiled index.
+type SkillEntry struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Phase       string `json:"phase,omitempty"`
+	Dir         string `json:"dir"`
+}
+
+// SkillsIndex is the top-level structure of skills_index.json.
+type SkillsIndex struct {
+	Skills []SkillEntry `json:"skills"`
+}
+
+// extractFrontmatter extracts YAML frontmatter fields from SKILL.md content.
+func extractFrontmatter(content string) (name, description, phase string) {
+	lines := strings.Split(content, "\n")
+	inFrontmatter := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "---" {
+			if inFrontmatter {
+				break
+			}
+			inFrontmatter = true
+			continue
+		}
+		if !inFrontmatter {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "name:") {
+			name = strings.TrimSpace(strings.TrimPrefix(trimmed, "name:"))
+		} else if strings.HasPrefix(trimmed, "description:") {
+			description = strings.TrimSpace(strings.TrimPrefix(trimmed, "description:"))
+		} else if strings.HasPrefix(trimmed, "phase:") {
+			phase = strings.TrimSpace(strings.TrimPrefix(trimmed, "phase:"))
+		}
+	}
+	return
+}
+
+// CompileSkillsIndex pre-compiles a skills_index.json from embedded SKILL.md
+// frontmatter. Written to .claude/skills/compound/skills_index.json during setup.
+func CompileSkillsIndex(repoRoot string) error {
+	skills := templates.PhaseSkills()
+	var entries []SkillEntry
+	for dir, content := range skills {
+		name, description, phase := extractFrontmatter(content)
+		entries = append(entries, SkillEntry{
+			Name:        name,
+			Description: description,
+			Phase:       phase,
+			Dir:         dir,
+		})
+	}
+
+	index := SkillsIndex{Skills: entries}
+	data, err := json.MarshalIndent(index, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal skills index: %w", err)
+	}
+
+	indexPath := filepath.Join(repoRoot, ".claude", "skills", "compound", "skills_index.json")
+	if err := os.MkdirAll(filepath.Dir(indexPath), 0755); err != nil {
+		return fmt.Errorf("mkdir for skills index: %w", err)
+	}
+	return os.WriteFile(indexPath, data, 0644)
+}
+
 // docDatePattern matches last-updated frontmatter dates for normalization.
 var docDatePattern = regexp.MustCompile(`last-updated: "\d{4}-\d{2}-\d{2}"`)
 
@@ -431,6 +499,9 @@ func prunePhaseSkillInternals(skillsDir string) (int, error) {
 			expectedDirs[dir] = true
 		}
 	}
+
+	// Preserve generated files at the skills root
+	expectedFiles["skills_index.json"] = true
 
 	return pruneManagedSubtree(skillsDir, "", expectedFiles, expectedDirs, map[string]bool{"agents": true})
 }

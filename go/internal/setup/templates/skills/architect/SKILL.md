@@ -1,6 +1,7 @@
 ---
 name: Architect
 description: Decompose a large system specification into cook-it-ready epic beads via DDD bounded contexts
+phase: architect
 ---
 
 # Architect Skill

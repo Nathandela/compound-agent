@@ -1,6 +1,7 @@
 ---
 name: Agentic Codebase
 description: Audit and set up a codebase for agentic AI development using the 15-principle manifesto
+phase: work
 ---
 
 # Agentic Codebase Skill

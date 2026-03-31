@@ -1,6 +1,7 @@
 ---
 name: Work
 description: Team-based TDD execution with adaptive complexity and agent delegation
+phase: work
 ---
 
 # Work Skill

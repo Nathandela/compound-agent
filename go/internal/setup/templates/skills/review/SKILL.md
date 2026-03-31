@@ -1,6 +1,7 @@
 ---
 name: Review
 description: Multi-agent review with lesson-calibrated reviewers, runtime verification, and severity classification
+phase: review
 ---
 
 # Review Skill

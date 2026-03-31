@@ -163,6 +163,10 @@ func installTemplateGroups(repoRoot string, version string, stack StackInfo, res
 		return fmt.Errorf("prune stale templates: %w", err)
 	}
 	result.TemplatesPruned = pruned
+
+	if err := CompileSkillsIndex(repoRoot); err != nil {
+		return fmt.Errorf("compile skills index: %w", err)
+	}
 	return nil
 }
 
@@ -208,6 +212,7 @@ func EnsureGitignore(repoRoot string) error {
 .ca-phase-state.json
 .ca-failure-state.json
 .ca-read-state.json
+skills_index.json
 `
 
 	// If gitignore exists, check for our marker

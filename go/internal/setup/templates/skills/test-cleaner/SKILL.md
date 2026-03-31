@@ -1,6 +1,7 @@
 ---
 name: Test Cleaner
 description: Multi-phase test suite optimization with adversarial review
+phase: review
 ---
 
 # Test Cleaner Skill

@@ -1,6 +1,7 @@
 ---
 name: Spec Dev
 description: Develop precise specifications through Socratic dialogue, EARS notation, and Mermaid diagrams
+phase: spec-dev
 ---
 
 # Spec Dev Skill

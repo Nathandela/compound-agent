@@ -1,6 +1,7 @@
 ---
 name: Plan
 description: Decompose work into small testable tasks with clear dependencies
+phase: plan
 ---
 
 # Plan Skill
