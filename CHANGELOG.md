@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-04-01
+
+### Added
+
+- **Self-Explaining System (`ca info`)** (Epic 4): New CLI command displaying comprehensive system health — version, hooks, skills, phase state, telemetry, and lesson corpus stats. 13 tests.
+- **Skill Phase Metadata** (Epic 3): Structured `phase` field in YAML frontmatter of all SKILL.md files with pre-compiled `skills_index.json` for fast runtime skill lookup. Phase guard uses `ResolveSkillPath` for phase-aware routing.
+- **Telemetry Foundation** (Epic 2): Schema v7 with telemetry table, `ca health` command, file-based lock for concurrent access, and hook execution instrumentation.
+- **V3.0 Harness Overhaul Specification**: Spec and advisory brief for upcoming harness overhaul.
+- **GOTCHA.md for architect skill**: Documented common pitfalls for architect workflows.
+
+### Fixed
+
+- **Documentation inaccuracies** (Epic 1): Fixed TypeScript/npm references across docs and templates, corrected hook counts, rewrote README with Mermaid diagram, added WSL2 doctor check.
+- **Screen session name collisions**: Unique session names using `compound-loop-$(basename $(pwd))` pattern to avoid host-level collisions (PR #10).
+- **6 golangci-lint violations**: gofmt alignment in map literals, extracted `checkHooks`/`printDoctorResults` helpers to reduce cyclop/funlen, handled `flockUnlock` error return.
+- **Review findings**: Multiple rounds of P0-P3 fixes from external reviewers across Epics 1-4.
+
+### Dependencies
+
+- **go-sqlite3**: 1.14.37 to 1.14.38 — bounds check elimination in hot paths, missing constraint op types (PR #11).
+- **thiserror**: 1.0.69 to 2.0.18 in Rust embed daemon — major version bump with no-std support and improved diagnostics (PR #8).
+
 ## [2.5.2] - 2026-03-31
 
 ### Added
