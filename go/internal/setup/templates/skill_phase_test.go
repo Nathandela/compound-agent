@@ -15,17 +15,17 @@ var validSkillPhases = map[string]bool{
 // expectedPhaseMapping defines the expected phase for each skill directory.
 // Skills without an entry here are expected to have NO phase (load-all fallback).
 var expectedPhaseMapping = map[string]string{
-	"spec-dev":          "spec-dev",
-	"plan":              "plan",
-	"work":              "work",
-	"review":            "review",
-	"compound":          "compound",
-	"architect":         "architect",
-	"researcher":        "spec-dev",
-	"agentic":           "work",
-	"test-cleaner":      "review",
+	"spec-dev":           "spec-dev",
+	"plan":               "plan",
+	"work":               "work",
+	"review":             "review",
+	"compound":           "compound",
+	"architect":          "architect",
+	"researcher":         "spec-dev",
+	"agentic":            "work",
+	"test-cleaner":       "review",
 	"build-great-things": "work",
-	"qa-engineer":       "review",
+	"qa-engineer":        "review",
 	// cook-it: no phase (orchestrator, REQ-S3 fallback)
 }
 

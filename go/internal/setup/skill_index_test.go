@@ -76,17 +76,17 @@ func TestCompileSkillsIndex_PhaseFieldsCorrect(t *testing.T) {
 	}
 
 	expected := map[string]string{
-		"spec-dev":          "spec-dev",
-		"plan":              "plan",
-		"work":              "work",
-		"review":            "review",
-		"compound":          "compound",
-		"architect":         "architect",
-		"researcher":        "spec-dev",
-		"agentic":           "work",
-		"test-cleaner":      "review",
+		"spec-dev":           "spec-dev",
+		"plan":               "plan",
+		"work":               "work",
+		"review":             "review",
+		"compound":           "compound",
+		"architect":          "architect",
+		"researcher":         "spec-dev",
+		"agentic":            "work",
+		"test-cleaner":       "review",
 		"build-great-things": "work",
-		"qa-engineer":       "review",
+		"qa-engineer":        "review",
 	}
 
 	skillMap := make(map[string]SkillEntry)
