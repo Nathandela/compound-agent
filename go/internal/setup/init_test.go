@@ -125,6 +125,9 @@ func TestInitRepo_InstallsTemplates(t *testing.T) {
 	if result.DocsInstalled == 0 {
 		t.Error("expected doc templates to be installed")
 	}
+	if result.ResearchInstalled == 0 {
+		t.Error("expected research docs to be installed")
+	}
 	if !result.AgentsMdUpdated {
 		t.Error("expected AGENTS.md to be updated")
 	}
@@ -144,12 +147,14 @@ func TestInitRepo_InstallsTemplates(t *testing.T) {
 		t.Fatalf("second InitRepo failed: %v", err)
 	}
 	totalTemplates := result2.AgentsInstalled + result2.CommandsInstalled +
-		result2.SkillsInstalled + result2.RoleSkillsInstalled + result2.DocsInstalled
+		result2.SkillsInstalled + result2.RoleSkillsInstalled + result2.DocsInstalled +
+		result2.ResearchInstalled
 	if totalTemplates != 0 {
 		t.Errorf("idempotent init installed %d templates, want 0", totalTemplates)
 	}
 	totalUpdated := result2.AgentsUpdated + result2.CommandsUpdated +
-		result2.SkillsUpdated + result2.RoleSkillsUpdated + result2.DocsUpdated
+		result2.SkillsUpdated + result2.RoleSkillsUpdated + result2.DocsUpdated +
+		result2.ResearchUpdated
 	if totalUpdated != 0 {
 		t.Errorf("idempotent init updated %d templates, want 0", totalUpdated)
 	}
@@ -326,6 +331,55 @@ func TestInitRepo_UpdatesStalePlugin(t *testing.T) {
 	}
 	if !result.PluginUpdated {
 		t.Error("expected PluginUpdated=true")
+	}
+}
+
+func TestInitRepo_DedupesDuplicateHooks(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
+		t.Fatalf("mkdir .git: %v", err)
+	}
+
+	_, err := InitRepo(dir, InitOptions{
+		SkipTemplates: true,
+		BinaryPath:    "/usr/local/bin/ca",
+	})
+	if err != nil {
+		t.Fatalf("first InitRepo failed: %v", err)
+	}
+
+	settingsPath := filepath.Join(dir, ".claude", "settings.json")
+	settings, err := ReadClaudeSettings(settingsPath)
+	if err != nil {
+		t.Fatalf("read settings: %v", err)
+	}
+	hooks := settings["hooks"].(map[string]any)
+	hooks["SessionStart"] = append(hooks["SessionStart"].([]any), hookEntry("", "/usr/local/bin/ca prime 2>/dev/null || true"))
+	if err := WriteClaudeSettings(settingsPath, settings); err != nil {
+		t.Fatalf("write duplicated settings: %v", err)
+	}
+
+	if !HooksNeedDedupe(settings) {
+		t.Fatal("expected duplicate hooks before second init")
+	}
+
+	_, err = InitRepo(dir, InitOptions{
+		SkipTemplates: true,
+		BinaryPath:    "/usr/local/bin/ca",
+	})
+	if err != nil {
+		t.Fatalf("second InitRepo failed: %v", err)
+	}
+
+	settings, err = ReadClaudeSettings(settingsPath)
+	if err != nil {
+		t.Fatalf("read reconciled settings: %v", err)
+	}
+	if HooksNeedDedupe(settings) {
+		t.Error("expected duplicate hooks to be removed")
+	}
+	if got := len(settings["hooks"].(map[string]any)["SessionStart"].([]any)); got != 1 {
+		t.Errorf("expected 1 SessionStart entry after init reconciliation, got %d", got)
 	}
 }
 

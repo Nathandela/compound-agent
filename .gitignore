@@ -3,9 +3,10 @@ node_modules/
 
 # Build output
 go/dist/
+dist/
 
-# Cache
-.claude/.cache/
+# Cache (any nesting depth)
+**/.claude/.cache/
 .claude/.ca-*.json
 
 # Setup-generated (ca setup dogfooding on source repo)
@@ -37,8 +38,23 @@ go/dist/
 # Go build artifacts
 go/ca
 
+# Binary build output (keep bin/ca wrapper script)
+bin/ca-binary
+bin/ca-embed
+bin/ca-test
+bin/checksums.txt
+
+# Nested .claude dirs from test runs / dogfooding
+go/.claude/
+go/internal/**/.claude/
+
 # Rust build artifacts
 rust/embed-daemon/target/
+
+# Generated loop scripts (output of ca loop / ca polish / ca improve)
+infinity-loop.sh
+polish-loop.sh
+improvement-loop.sh
 
 # Agent logs
 agent_logs/
@@ -53,6 +69,8 @@ agent_logs/
 # Dolt database files (added by bd init)
 .dolt/
 *.db
+*.db-shm
+*.db-wal
 
 # Release artifacts (CI only)
 release-bins/

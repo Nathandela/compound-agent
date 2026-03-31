@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -72,7 +73,7 @@ func (s *SearchDB) SearchKeyword(query string, limit int, typeFilter memory.Item
 		return nil, nil
 	}
 
-	rows, err := s.executeFts(sanitized, limit, typeFilter, false)
+	rows, err := s.executeFts(context.Background(), sanitized, limit, typeFilter, false)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +92,32 @@ func (s *SearchDB) SearchKeywordScored(query string, limit int, typeFilter memor
 		return nil, nil
 	}
 
-	return s.executeFts(sanitized, limit, typeFilter, true)
+	return s.executeFts(context.Background(), sanitized, limit, typeFilter, true)
+}
+
+// SearchKeywordScoredOR searches using FTS5 with OR between tokens.
+// Each token is sanitized individually. This provides broader matching than
+// the default implicit-AND behavior, returning results that match any term.
+func (s *SearchDB) SearchKeywordScoredOR(tokens []string, limit int, typeFilter memory.ItemType) ([]ScoredResult, error) {
+	return s.SearchKeywordScoredORContext(context.Background(), tokens, limit, typeFilter)
+}
+
+// SearchKeywordScoredORContext is like SearchKeywordScoredOR but accepts a context
+// that is propagated through to the database query, enabling timeout and cancellation.
+func (s *SearchDB) SearchKeywordScoredORContext(ctx context.Context, tokens []string, limit int, typeFilter memory.ItemType) ([]ScoredResult, error) {
+	var sanitized []string
+	for _, t := range tokens {
+		clean := SanitizeFtsQuery(t)
+		if clean != "" {
+			sanitized = append(sanitized, clean)
+		}
+	}
+	if len(sanitized) == 0 {
+		return nil, nil
+	}
+
+	query := strings.Join(sanitized, " OR ")
+	return s.executeFts(ctx, query, limit, typeFilter, true)
 }
 
 // ReadAll reads all non-invalidated memory items from SQLite.
@@ -114,7 +140,7 @@ func (s *SearchDB) ReadAll() ([]memory.Item, error) {
 	return items, rows.Err()
 }
 
-func (s *SearchDB) executeFts(sanitized string, limit int, typeFilter memory.ItemType, withRank bool) ([]ScoredResult, error) {
+func (s *SearchDB) executeFts(ctx context.Context, sanitized string, limit int, typeFilter memory.ItemType, withRank bool) ([]ScoredResult, error) {
 	selectCols := lessonSelectColsAliased
 	orderClause := ""
 	if withRank {
@@ -139,7 +165,7 @@ func (s *SearchDB) executeFts(sanitized string, limit int, typeFilter memory.Ite
 		` + orderClause + `
 		LIMIT ?`
 
-	rows, err := s.db.Query(query, args...)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("FTS search: %w", err)
 	}

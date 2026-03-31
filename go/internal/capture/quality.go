@@ -3,6 +3,7 @@ package capture
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 
@@ -87,6 +88,7 @@ func isNovel(repoRoot string, insight string, embedder search.Embedder, threshol
 	// Open DB; if it fails, fall back to novel=true
 	db, err := storage.OpenRepoDB(repoRoot)
 	if err != nil {
+		slog.Debug("isNovel: DB open failed, falling back to novel=true", "error", err)
 		return NoveltyResult{Novel: true}
 	}
 	defer db.Close()
@@ -96,20 +98,23 @@ func isNovel(repoRoot string, insight string, embedder search.Embedder, threshol
 
 // isNovelWithDB checks novelty against an already-opened database.
 func isNovelWithDB(db *sql.DB, insight string, embedder search.Embedder, threshold float64) NoveltyResult {
-	similar, err := search.FindSimilarLessons(db, embedder, insight, threshold, "")
+	similar, err := search.FindSimilarLessons(db, embedder, insight, threshold, "", nil)
 	if err != nil {
+		slog.Debug("isNovelWithDB: similarity search failed, falling back to novel=true", "error", err)
 		return NoveltyResult{Novel: true}
 	}
 
 	if len(similar) > 0 {
 		top := similar[0]
 		truncated := top.Item.Insight
+		suffix := ""
 		if len(truncated) > 50 {
 			truncated = truncated[:50]
+			suffix = "..."
 		}
 		return NoveltyResult{
 			Novel:      false,
-			Reason:     fmt.Sprintf("Near-duplicate of existing lesson: \"%s...\"", truncated),
+			Reason:     fmt.Sprintf("Near-duplicate of existing lesson: \"%s%s\"", truncated, suffix),
 			ExistingID: top.Item.ID,
 		}
 	}

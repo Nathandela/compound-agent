@@ -1,6 +1,7 @@
 ---
 name: Test Cleaner
 description: Multi-phase test suite optimization with adversarial review
+phase: review
 ---
 
 # Test Cleaner Skill
@@ -42,17 +43,18 @@ This is the critical quality gate. Loop as many times as needed. The test suite 
 Apply the agreed changes:
 - Machine-readable output format: `ERROR [file:line] type: description`
 - Include `REMEDIATION` suggestions and `SEE` references
-- Use `pnpm test:segment`, `pnpm test:random`, `pnpm test:critical` for targeted validation
+- Run targeted test validation using the project's test runner (e.g., `{{QUALITY_GATE_TEST}}` with module/path filters)
 
 ### Phase 5: Verification
-- Run full test suite after changes
+- Run full test suite (`{{QUALITY_GATE_TEST}}`) and linter (`{{QUALITY_GATE_LINT}}`) after changes
 - Compare before/after metrics (count, duration, coverage)
 - Feed findings into compound-agent memory via `ca learn`
 
-## Test Scripts Integration
-- `pnpm test:segment <module>` -- Test specific module in isolation
-- `pnpm test:random <pct>` -- Deterministic random subset (seeded per-agent)
-- `pnpm test:critical` -- P1/critical tests only (fast CI feedback)
+## Targeted Test Execution
+Adapt test commands to the project's stack:
+- **Module isolation**: Run tests for a specific module/path (e.g., `{{QUALITY_GATE_TEST}}` with path filter)
+- **Subset testing**: Run a subset of tests for fast feedback (e.g., critical/smoke tests only)
+- **Full suite**: Run `{{QUALITY_GATE_TEST}}` for complete validation
 
 ## Memory Integration
 - Run `ca search "test optimization"` before starting

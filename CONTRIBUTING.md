@@ -223,65 +223,73 @@ src/
 
 ## Releasing
 
+Releases are fully automated via GitHub Actions. Pushing a version tag triggers the build and publish pipeline.
+
 ### Pre-Release Checklist
 
-Before publishing a new version, **both test gates must pass**:
+Before tagging a release, ensure quality gates pass locally:
 
 ```bash
-# Gate 1: Business logic tests (deterministic, no native deps required)
-pnpm test
-
-# Gate 2: Full suite with embedding model (requires compatible runner)
-# This ensures native bindings and embedding model work correctly
-pnpm test:all
-
-# Additional checks
-pnpm lint          # Type checking
-pnpm build         # Build verification
-pnpm pack --dry-run # Tarball contents
+cd go && go test -tags sqlite_fts5 ./...    # All tests pass
+cd go && golangci-lint run ./...             # Zero lint violations
+cd go && go build -tags sqlite_fts5 ./cmd/ca # Binary builds
 ```
 
-**Test Gates Explained:**
-- `pnpm test`: Runs all tests. Embedding tests skip gracefully if model unavailable.
-- `pnpm test:all`: Downloads model first, then runs all tests. Required for release.
-
-**Release is blocked until both gates are green.**
-
-Expected tarball contents:
-- `dist/` (compiled JavaScript + TypeScript declarations)
-- `package.json`
-- `README.md`
-- `CHANGELOG.md`
-
-### Publishing
+### How to Release
 
 ```bash
 # 1. Update version in package.json
-pnpm version patch  # or minor, or major
+#    - "version" field
+#    - ALL 4 entries in "optionalDependencies" (@syottos/*)
+#    Both MUST match. See "Critical: Version Sync" below.
 
-# 2. Update CHANGELOG.md with new version
+# 2. Move [Unreleased] entries in CHANGELOG.md under a new version header
+#    ## [x.x.x] - YYYY-MM-DD
 
-# 3. Commit version bump
-git add -A && git commit -m "chore: bump version to x.x.x"
+# 3. Commit the version bump + changelog
+git add package.json CHANGELOG.md && git commit -m "chore(release): bump version to vx.x.x"
 
-# 4. Create git tag
+# 4. Create and push the version tag
 git tag vx.x.x
-
-# 5. Verify publish (dry run)
-pnpm publish --dry-run
-
-# 6. Publish to npm
-pnpm publish
-
-# 7. Push commits and tag
 git push && git push --tags
 ```
 
+### Critical: Version Sync
+
+The `optionalDependencies` in `package.json` MUST match the `version` field. The release workflow publishes `@syottos/*` platform packages at the same version, then publishes the main `compound-agent` package. If optionalDependencies point to an older version, users get stale Go binaries with outdated templates -- new skills, updated references, and bug fixes silently missing.
+
+```jsonc
+// package.json -- both versions MUST be identical
+{
+  "version": "2.4.1",              // <-- this
+  "optionalDependencies": {
+    "@syottos/darwin-arm64": "2.4.1",  // <-- must match
+    "@syottos/darwin-x64": "2.4.1",
+    "@syottos/linux-arm64": "2.4.1",
+    "@syottos/linux-x64": "2.4.1"
+  }
+}
+```
+
+A CI test (`TestPlatformVersionSync`) enforces this at build time.
+
+### What Happens Automatically
+
+Pushing a `v*` tag triggers `.github/workflows/release.yml`, which:
+
+1. **Builds Go CLI** (`ca`) for 4 platforms: linux-amd64, linux-arm64, darwin-arm64, darwin-amd64 — with SQLite FTS5 and version/commit embedded via ldflags
+2. **Builds Rust daemon** (`ca-embed`) for 3 platforms: linux-amd64, linux-arm64, darwin-arm64 (Intel Macs use Rosetta)
+3. **Creates a GitHub Release** with all binaries and SHA256 checksums
+4. **Publishes 4 platform-specific npm packages** (`@syottos/darwin-arm64`, `@syottos/darwin-x64`, `@syottos/linux-arm64`, `@syottos/linux-x64`) — each containing the `ca` and `ca-embed` binaries
+5. **Publishes the main `compound-agent` npm package** — the shell wrapper that resolves the platform-specific binary at runtime
+
+All npm packages are published with `--provenance` for supply chain security.
+
 ### Version Guidelines
 
-- **patch**: Bug fixes, documentation updates
-- **minor**: New features, backwards compatible
-- **major**: Breaking changes
+- **patch** (x.x.1): Bug fixes, documentation updates
+- **minor** (x.1.0): New features, new skills, new research docs (backwards compatible)
+- **major** (1.0.0): Breaking changes to CLI interface or template structure
 
 ## Questions?
 

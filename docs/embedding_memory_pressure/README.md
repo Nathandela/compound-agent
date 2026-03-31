@@ -1,7 +1,7 @@
 # Embedding & Test Memory Pressure Investigation
 
 > **Date**: 2026-03-17
-> **Status**: Under review -- pending team decision
+> **Status**: Completed — findings integrated into pipeline improvements v1 (SPEC-0007)
 
 ## Problem Statement
 
@@ -25,7 +25,6 @@ solutions ranging from quick fixes to architectural changes.
 - Unit tests alone peak at **572 MB** due to native module duplication across worker threads
 - The test collection phase (154s) is nearly as expensive as execution (216s)
 
-## Decision Required
+## Resolution
 
-The team should review and select which proposals to implement. See
-[proposals.md](proposals.md) for the full menu with effort/impact ratings.
+Investigation complete. Findings were incorporated into [Pipeline Improvements v1](../specs/pipeline-improvements-v1.md) (SPEC-0007). See [proposals.md](proposals.md) for the full menu with effort/impact ratings.

@@ -15,14 +15,17 @@ var agentsFS embed.FS
 //go:embed commands/*.md
 var commandsFS embed.FS
 
-//go:embed skills/*/SKILL.md skills/*/references/*.md
+//go:embed skills
 var skillsFS embed.FS
 
-//go:embed agent-role-skills/*/SKILL.md
+//go:embed agent-role-skills
 var agentRoleSkillsFS embed.FS
 
 //go:embed docs/*.md
 var docsFS embed.FS
+
+//go:embed docs/research
+var researchFS embed.FS
 
 //go:embed agents-md.md
 var agentsMdTemplate string
@@ -139,10 +142,56 @@ func AgentRoleSkills() map[string]string {
 	return result
 }
 
+// AgentRoleSkillReferences returns a map of "role/relative-path" -> content
+// for reference files alongside agent role skills.
+func AgentRoleSkillReferences() map[string]string {
+	result := make(map[string]string)
+	_ = fs.WalkDir(agentRoleSkillsFS, "agent-role-skills", func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		if path.Base(p) == "SKILL.md" {
+			return nil // Skip SKILL.md itself
+		}
+		// Path: "agent-role-skills/<role>/references/<file>.md"
+		// Key: "<role>/references/<file>.md"
+		parts := strings.Split(p, "/")
+		if len(parts) >= 2 {
+			relPath := strings.Join(parts[1:], "/") // strip "agent-role-skills/" prefix
+			data, readErr := fs.ReadFile(agentRoleSkillsFS, p)
+			if readErr == nil {
+				result[relPath] = string(data)
+			}
+		}
+		return nil
+	})
+	return result
+}
+
 // DocTemplates returns a map of filename -> content for documentation .md files.
 // Content includes {{VERSION}} and {{DATE}} placeholders for substitution.
 func DocTemplates() map[string]string {
 	return readEmbedDir(docsFS, "docs")
+}
+
+// ResearchDocs returns a map of relative-path -> content for research documentation.
+// Paths are relative to the research root (e.g., "security/overview.md", "index.md").
+func ResearchDocs() map[string]string {
+	const root = "docs/research"
+	result := make(map[string]string)
+	_ = fs.WalkDir(researchFS, root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		// Strip "docs/research/" prefix to get relative path
+		rel := strings.TrimPrefix(p, root+"/")
+		data, readErr := fs.ReadFile(researchFS, p)
+		if readErr == nil {
+			result[rel] = string(data)
+		}
+		return nil
+	})
+	return result
 }
 
 // readEmbedDir reads all files from an embedded FS directory into a map.

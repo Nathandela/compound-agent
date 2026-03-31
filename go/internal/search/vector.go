@@ -205,12 +205,19 @@ type uncachedInsightEntry struct {
 // Only items with similarity >= threshold are returned. The item with excludeID
 // is skipped (useful to avoid matching an item against itself).
 //
+// If preloaded is non-nil, it is used instead of reading from the database,
+// avoiding redundant I/O when the caller already has the item list.
+//
 // Uses insight-only embeddings (not trigger+insight like Vector).
-func FindSimilarLessons(db *sql.DB, embedder Embedder, text string, threshold float64, excludeID string) ([]ScoredItem, error) {
-	sdb := storage.NewSearchDB(db)
-	items, err := sdb.ReadAll()
-	if err != nil {
-		return nil, err
+func FindSimilarLessons(db *sql.DB, embedder Embedder, text string, threshold float64, excludeID string, preloaded []memory.Item) ([]ScoredItem, error) {
+	items := preloaded
+	if items == nil {
+		sdb := storage.NewSearchDB(db)
+		var err error
+		items, err = sdb.ReadAll()
+		if err != nil {
+			return nil, err
+		}
 	}
 	if len(items) == 0 {
 		return nil, nil

@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 
 	"github.com/nathandelacretaz/compound-agent/internal/setup"
 	"github.com/nathandelacretaz/compound-agent/internal/util"
@@ -13,30 +15,35 @@ import (
 
 func initCmd() *cobra.Command {
 	var (
-		skipHooks bool
-		jsonOut   bool
-		repoRoot  string
+		skipHooks  bool
+		skipAgents bool
+		skipClaude bool
+		jsonOut    bool
+		repoRoot   string
 	)
 
 	cmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize compound-agent in this repository",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runInit(cmd, resolveRoot(repoRoot), skipHooks, jsonOut)
+			return runInit(cmd, resolveRoot(repoRoot), skipHooks || skipClaude, skipAgents, jsonOut)
 		},
 	}
 
 	cmd.Flags().BoolVar(&skipHooks, "skip-hooks", false, "Skip installing Claude Code hooks")
+	cmd.Flags().BoolVar(&skipAgents, "skip-agents", false, "Skip template installation (AGENTS.md, skills, commands, docs)")
+	cmd.Flags().BoolVar(&skipClaude, "skip-claude", false, "Skip Claude Code hooks installation")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root (defaults to git root)")
 	return cmd
 }
 
 // runInit performs the init command logic.
-func runInit(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool) error {
+func runInit(cmd *cobra.Command, repoRoot string, skipHooks, skipAgents, jsonOut bool) error {
 	result, err := setup.InitRepo(repoRoot, setup.InitOptions{
-		SkipHooks:  skipHooks,
-		BinaryPath: resolveBinaryPath(),
+		SkipHooks:     skipHooks,
+		SkipTemplates: skipAgents,
+		BinaryPath:    resolveBinaryPath(),
 	})
 	if err != nil {
 		return fmt.Errorf("init: %w", err)
@@ -47,9 +54,11 @@ func runInit(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool) error
 		return nil
 	}
 
-	cmd.Printf("[ok] Compound agent initialized in %s\n", repoRoot)
-	printInitResultText(cmd, result)
-	printBeadsStatus(cmd, repoRoot)
+	if !isQuiet(cmd) {
+		cmd.Printf("[ok] Compound agent initialized in %s\n", repoRoot)
+		printInitResultText(cmd, result)
+		printBeadsStatus(cmd, repoRoot)
+	}
 	return nil
 }
 
@@ -92,9 +101,11 @@ func runSetup(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool) erro
 		return nil
 	}
 
-	cmd.Println("[ok] Compound agent setup complete")
-	printSetupResultText(cmd, result)
-	printBeadsStatus(cmd, repoRoot)
+	if !isQuiet(cmd) {
+		cmd.Println("[ok] Compound agent setup complete")
+		printSetupResultText(cmd, result)
+		printBeadsStatus(cmd, repoRoot)
+	}
 	return nil
 }
 
@@ -125,6 +136,8 @@ func printInitResultJSON(cmd *cobra.Command, result *setup.InitResult) {
 		"roleSkillsUpdated":   result.RoleSkillsUpdated,
 		"docsInstalled":       result.DocsInstalled,
 		"docsUpdated":         result.DocsUpdated,
+		"researchInstalled":   result.ResearchInstalled,
+		"researchUpdated":     result.ResearchUpdated,
 		"templatesPruned":     result.TemplatesPruned,
 	})
 	cmd.Println(string(data))
@@ -170,66 +183,75 @@ func printMdUpdates(cmd *cobra.Command, result *setup.InitResult) {
 	}
 }
 
+// setupClaudeOpts holds the parsed flags for setup claude.
+type setupClaudeOpts struct {
+	uninstall, status, global, dryRun, jsonOut bool
+	repoRoot                                   string
+}
+
+// runSetupClaude executes the setup claude command logic.
+func runSetupClaude(cmd *cobra.Command, opts *setupClaudeOpts) error {
+	if opts.repoRoot == "" {
+		opts.repoRoot = util.GetRepoRoot()
+	}
+
+	settingsPath := filepath.Join(opts.repoRoot, ".claude", "settings.json")
+	displayPath := ".claude/settings.json"
+	if opts.global {
+		home, _ := os.UserHomeDir()
+		settingsPath = filepath.Join(home, ".claude", "settings.json")
+		displayPath = "~/.claude/settings.json"
+	}
+
+	settings, err := setup.ReadClaudeSettings(settingsPath)
+	if err != nil {
+		return fmt.Errorf("read settings: %w", err)
+	}
+
+	installed := setup.HasAllHooks(settings)
+	binaryPath := resolveBinaryPath()
+	needsUpgrade := setup.HooksNeedUpgrade(settings, binaryPath)
+	needsDedupe := setup.HooksNeedDedupe(settings)
+
+	if opts.status {
+		return handleClaudeStatus(cmd, installed, needsUpgrade, needsDedupe, displayPath, settingsPath, opts.jsonOut)
+	}
+	if opts.uninstall {
+		return handleClaudeUninstall(cmd, settings, settingsPath, installed, displayPath, opts.jsonOut)
+	}
+	if opts.dryRun {
+		return handleClaudeDryRun(cmd, installed, needsUpgrade, needsDedupe, displayPath, opts.jsonOut)
+	}
+	return handleClaudeInstall(cmd, settings, settingsPath, installed, needsUpgrade, needsDedupe, binaryPath, displayPath, opts.jsonOut)
+}
+
 func registerSetupClaudeCmd(parent *cobra.Command) {
-	var (
-		uninstall bool
-		status    bool
-		global    bool
-		jsonOut   bool
-		repoRoot  string
-	)
+	opts := &setupClaudeOpts{}
 
 	cmd := &cobra.Command{
 		Use:   "claude",
 		Short: "Install Claude Code hooks",
-		RunE: func(cmd *cobra.Command, args []string) error {
-			if repoRoot == "" {
-				repoRoot = util.GetRepoRoot()
-			}
-
-			settingsPath := filepath.Join(repoRoot, ".claude", "settings.json")
-			displayPath := ".claude/settings.json"
-			if global {
-				home, _ := os.UserHomeDir()
-				settingsPath = filepath.Join(home, ".claude", "settings.json")
-				displayPath = "~/.claude/settings.json"
-			}
-
-			settings, err := setup.ReadClaudeSettings(settingsPath)
-			if err != nil {
-				return fmt.Errorf("read settings: %w", err)
-			}
-
-			alreadyInstalled := setup.HasAllHooks(settings)
-			binaryPath := resolveBinaryPath()
-			needsUpgrade := setup.HooksNeedUpgrade(settings, binaryPath)
-
-			if status {
-				return handleClaudeStatus(cmd, alreadyInstalled, needsUpgrade, displayPath, settingsPath, jsonOut)
-			}
-			if uninstall {
-				return handleClaudeUninstall(cmd, settings, settingsPath, alreadyInstalled, displayPath, jsonOut)
-			}
-			return handleClaudeInstall(cmd, settings, settingsPath, alreadyInstalled, needsUpgrade, binaryPath, displayPath, jsonOut)
-		},
+		RunE:  func(cmd *cobra.Command, args []string) error { return runSetupClaude(cmd, opts) },
 	}
 
-	cmd.Flags().BoolVar(&uninstall, "uninstall", false, "Remove compound-agent hooks")
-	cmd.Flags().BoolVar(&status, "status", false, "Check integration status")
-	cmd.Flags().BoolVar(&global, "global", false, "Use global ~/.claude/ settings")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
-	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root")
+	cmd.Flags().BoolVar(&opts.uninstall, "uninstall", false, "Remove compound-agent hooks")
+	cmd.Flags().BoolVar(&opts.status, "status", false, "Check integration status")
+	cmd.Flags().BoolVar(&opts.global, "global", false, "Use global ~/.claude/ settings")
+	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "Show what would change without writing")
+	cmd.Flags().BoolVar(&opts.jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().StringVar(&opts.repoRoot, "repo-root", "", "Repository root")
 
 	parent.AddCommand(cmd)
 }
 
-func handleClaudeStatus(cmd *cobra.Command, installed bool, stale bool, displayPath, settingsPath string, jsonOut bool) error {
+func handleClaudeStatus(cmd *cobra.Command, installed bool, stale bool, duplicated bool, displayPath, settingsPath string, jsonOut bool) error {
 	if jsonOut {
 		data, _ := json.Marshal(map[string]any{
-			"settingsFile":  displayPath,
-			"hookInstalled": installed,
-			"hookStale":     stale,
-			"status":        statusLabel(installed, stale),
+			"settingsFile":   displayPath,
+			"hookInstalled":  installed,
+			"hookStale":      stale,
+			"hookDuplicated": duplicated,
+			"status":         statusLabel(installed, stale, duplicated),
 		})
 		cmd.Println(string(data))
 		return nil
@@ -243,10 +265,13 @@ func handleClaudeStatus(cmd *cobra.Command, installed bool, stale bool, displayP
 	} else {
 		cmd.Println("  [missing] File not found")
 	}
-	if installed && !stale {
+	if installed && !stale && !duplicated {
 		cmd.Println("  [ok] Compound Agent hooks installed")
 	} else if installed && stale {
 		cmd.Println("  [warn] Compound Agent hooks installed but stale (using npx instead of binary)")
+		cmd.Println("         Fix: ca setup claude")
+	} else if installed && duplicated {
+		cmd.Println("  [warn] Compound Agent hooks installed but duplicated")
 		cmd.Println("         Fix: ca setup claude")
 	} else {
 		cmd.Println("  [warn] Compound Agent hooks not installed")
@@ -254,18 +279,68 @@ func handleClaudeStatus(cmd *cobra.Command, installed bool, stale bool, displayP
 	return nil
 }
 
-func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPath string, installed bool, needsUpgrade bool, binaryPath string, displayPath string, jsonOut bool) error {
-	if installed && !needsUpgrade {
-		if jsonOut {
-			data, _ := json.Marshal(map[string]any{
-				"installed": true,
-				"location":  displayPath,
-				"action":    "unchanged",
-			})
-			cmd.Println(string(data))
-		} else {
-			cmd.Printf("[info] Compound agent hooks already installed at %s\n", displayPath)
-		}
+// hookAction classifies the action to take based on hook state.
+// Returns a present-tense verb ("install", "upgrade", "reconcile", "unchanged").
+func hookAction(installed, needsUpgrade, needsDedupe bool) string {
+	if installed && !needsUpgrade && !needsDedupe {
+		return "unchanged"
+	}
+	if needsUpgrade && needsDedupe {
+		return "reconcile"
+	}
+	if needsUpgrade {
+		return "upgrade"
+	}
+	if needsDedupe {
+		return "reconcile"
+	}
+	return "install"
+}
+
+// hookActionPastTense maps present-tense actions to past-tense for output messages.
+var hookActionPastTense = map[string]string{
+	"install":   "installed",
+	"upgrade":   "upgraded",
+	"reconcile": "reconciled",
+	"unchanged": "unchanged",
+}
+
+func handleClaudeDryRun(cmd *cobra.Command, installed bool, needsUpgrade bool, needsDedupe bool, displayPath string, jsonOut bool) error {
+	action := hookAction(installed, needsUpgrade, needsDedupe)
+
+	if jsonOut {
+		data, _ := json.Marshal(map[string]any{
+			"dryRun":       true,
+			"location":     displayPath,
+			"action":       action,
+			"installed":    installed,
+			"needsUpgrade": needsUpgrade,
+			"needsDedupe":  needsDedupe,
+		})
+		cmd.Println(string(data))
+		return nil
+	}
+
+	cmd.Println("[dry-run] Claude Code hooks analysis:")
+	cmd.Printf("  Settings file: %s\n", displayPath)
+	cmd.Printf("  Currently installed: %v\n", installed)
+	if action == "unchanged" {
+		cmd.Println("  Action: no changes needed")
+	} else {
+		cmd.Printf("  Action would: %s\n", action)
+	}
+	if needsUpgrade {
+		cmd.Println("  Upgrade: npx hooks would be upgraded to binary path")
+	}
+	if needsDedupe {
+		cmd.Println("  Deduplicate: duplicate hook entries would be removed")
+	}
+	return nil
+}
+
+func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPath string, installed bool, needsUpgrade bool, needsDedupe bool, binaryPath string, displayPath string, jsonOut bool) error {
+	if installed && !needsUpgrade && !needsDedupe {
+		printClaudeResult(cmd, displayPath, "unchanged", jsonOut)
 		return nil
 	}
 
@@ -274,11 +349,12 @@ func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPa
 		return fmt.Errorf("write settings: %w", err)
 	}
 
-	action := "installed"
-	if needsUpgrade {
-		action = "upgraded"
-	}
+	action := hookActionPastTense[hookAction(installed, needsUpgrade, needsDedupe)]
+	printClaudeResult(cmd, displayPath, action, jsonOut)
+	return nil
+}
 
+func printClaudeResult(cmd *cobra.Command, displayPath string, action string, jsonOut bool) {
 	if jsonOut {
 		data, _ := json.Marshal(map[string]any{
 			"installed": true,
@@ -286,15 +362,23 @@ func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPa
 			"action":    action,
 		})
 		cmd.Println(string(data))
+		return
+	}
+
+	messages := map[string]string{
+		"unchanged":  fmt.Sprintf("[info] Compound agent hooks already installed at %s", displayPath),
+		"installed":  fmt.Sprintf("[ok] Claude Code hooks installed to %s", displayPath),
+		"upgraded":   fmt.Sprintf("[ok] Claude Code hooks upgraded in %s (npx → binary)", displayPath),
+		"reconciled": fmt.Sprintf("[ok] Claude Code hooks reconciled in %s (upgraded + deduplicated)", displayPath),
+	}
+	if msg, ok := messages[action]; ok {
+		cmd.Println(msg)
 	} else {
-		if needsUpgrade {
-			cmd.Printf("[ok] Claude Code hooks upgraded in %s (npx → binary)\n", displayPath)
-		} else {
-			cmd.Printf("[ok] Claude Code hooks installed to %s\n", displayPath)
-		}
+		cmd.Printf("[ok] Claude Code hooks %s in %s\n", action, displayPath)
+	}
+	if action != "unchanged" {
 		cmd.Println("  Hooks: SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse, PreToolUse, Stop")
 	}
-	return nil
 }
 
 func handleClaudeUninstall(cmd *cobra.Command, settings map[string]any, settingsPath string, installed bool, displayPath string, jsonOut bool) error {
@@ -326,9 +410,12 @@ func handleClaudeUninstall(cmd *cobra.Command, settings map[string]any, settings
 	return nil
 }
 
-func statusLabel(installed bool, stale bool) string {
+func statusLabel(installed bool, stale bool, duplicated bool) string {
 	if installed && stale {
 		return "stale"
+	}
+	if installed && duplicated {
+		return "duplicated"
 	}
 	if installed {
 		return "connected"
@@ -339,19 +426,23 @@ func statusLabel(installed bool, stale bool) string {
 // printTemplatesSummary prints installed/updated template counts.
 func printTemplatesSummary(cmd *cobra.Command, result *setup.InitResult) {
 	totalInstalled := result.AgentsInstalled + result.CommandsInstalled +
-		result.SkillsInstalled + result.RoleSkillsInstalled + result.DocsInstalled
+		result.SkillsInstalled + result.RoleSkillsInstalled + result.DocsInstalled +
+		result.ResearchInstalled
 	totalUpdated := result.AgentsUpdated + result.CommandsUpdated +
-		result.SkillsUpdated + result.RoleSkillsUpdated + result.DocsUpdated
+		result.SkillsUpdated + result.RoleSkillsUpdated + result.DocsUpdated +
+		result.ResearchUpdated
 
 	if totalInstalled > 0 {
-		cmd.Printf("  Templates: %d installed (agents:%d commands:%d skills:%d roles:%d docs:%d)\n",
+		cmd.Printf("  Templates: %d installed (agents:%d commands:%d skills:%d roles:%d docs:%d research:%d)\n",
 			totalInstalled, result.AgentsInstalled, result.CommandsInstalled,
-			result.SkillsInstalled, result.RoleSkillsInstalled, result.DocsInstalled)
+			result.SkillsInstalled, result.RoleSkillsInstalled, result.DocsInstalled,
+			result.ResearchInstalled)
 	}
 	if totalUpdated > 0 {
-		cmd.Printf("  Templates: %d updated (agents:%d commands:%d skills:%d roles:%d docs:%d)\n",
+		cmd.Printf("  Templates: %d updated (agents:%d commands:%d skills:%d roles:%d docs:%d research:%d)\n",
 			totalUpdated, result.AgentsUpdated, result.CommandsUpdated,
-			result.SkillsUpdated, result.RoleSkillsUpdated, result.DocsUpdated)
+			result.SkillsUpdated, result.RoleSkillsUpdated, result.DocsUpdated,
+			result.ResearchUpdated)
 	}
 	if result.TemplatesPruned > 0 {
 		cmd.Printf("  Templates: %d retired files removed\n", result.TemplatesPruned)
@@ -371,7 +462,7 @@ func resolveBinaryPath() string {
 
 type doctorCheck struct {
 	Name   string `json:"name"`
-	Status string `json:"status"` // "pass", "fail", "warn"
+	Status string `json:"status"` // "pass", "fail", "warn", "info"
 	Fix    string `json:"fix,omitempty"`
 }
 
@@ -396,7 +487,7 @@ func doctorCmd() *cobra.Command {
 				return nil
 			}
 
-			passCount, failCount, warnCount := 0, 0, 0
+			passCount, failCount, warnCount, infoCount := 0, 0, 0, 0
 			for _, c := range checks {
 				icon := "[ok]"
 				switch c.Status {
@@ -406,6 +497,9 @@ func doctorCmd() *cobra.Command {
 				case "warn":
 					icon = "[WARN]"
 					warnCount++
+				case "info":
+					icon = "[INFO]"
+					infoCount++
 				default:
 					passCount++
 				}
@@ -416,7 +510,11 @@ func doctorCmd() *cobra.Command {
 			}
 
 			cmd.Println()
-			cmd.Printf("Results: %d passed, %d failed, %d warnings\n", passCount, failCount, warnCount)
+			if infoCount > 0 {
+				cmd.Printf("Results: %d passed, %d failed, %d warnings, %d info\n", passCount, failCount, warnCount, infoCount)
+			} else {
+				cmd.Printf("Results: %d passed, %d failed, %d warnings\n", passCount, failCount, warnCount)
+			}
 			return nil
 		},
 	}
@@ -451,6 +549,8 @@ func runDoctorChecks(repoRoot string) []doctorCheck {
 		binaryPath := resolveBinaryPath()
 		if setup.HooksNeedUpgrade(settings, binaryPath) {
 			checks = append(checks, doctorCheck{Name: "Claude Code hooks installed", Status: "warn", Fix: "Hooks are stale (npx). Run: ca setup claude"})
+		} else if setup.HooksNeedDedupe(settings) {
+			checks = append(checks, doctorCheck{Name: "Claude Code hooks installed", Status: "warn", Fix: "Hooks are duplicated. Run: ca setup claude"})
 		} else {
 			checks = append(checks, doctorCheck{Name: "Claude Code hooks installed", Status: "pass"})
 		}
@@ -476,7 +576,28 @@ func runDoctorChecks(repoRoot string) []doctorCheck {
 		checks = append(checks, doctorCheck{Name: "Beads initialized", Status: "warn", Fix: "Run: bd init"})
 	}
 
+	// 7. WSL2 recommendation on native Windows (under WSL2, GOOS is "linux")
+	if runtime.GOOS == "windows" {
+		status := "warn"
+		fix := "compound-agent requires WSL2 on Windows. See: https://learn.microsoft.com/en-us/windows/wsl/install"
+		if wslAvailable() {
+			status = "info"
+			fix = "WSL2 detected. Run compound-agent inside WSL2 for full support."
+		}
+		checks = append(checks, doctorCheck{
+			Name:   "WSL2 recommended",
+			Status: status,
+			Fix:    fix,
+		})
+	}
+
 	return checks
+}
+
+// wslAvailable checks whether WSL is installed by looking for wsl.exe.
+func wslAvailable() bool {
+	_, err := exec.LookPath("wsl.exe")
+	return err == nil
 }
 
 // printBeadsStatus reports beads CLI and repo initialization status.

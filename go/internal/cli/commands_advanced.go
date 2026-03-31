@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -152,40 +153,61 @@ func synthesizeAndWrite(cmd *cobra.Command, repoRoot string, items []memory.Item
 	return nil
 }
 
+// printDownloadModelResult outputs model download result in the requested format.
+func printDownloadModelResult(cmd *cobra.Command, status, modelPath, tokenizerPath string, jsonOut bool) {
+	if jsonOut {
+		data, _ := json.Marshal(map[string]any{
+			"status":        status,
+			"modelPath":     modelPath,
+			"tokenizerPath": tokenizerPath,
+		})
+		cmd.Println(string(data))
+		return
+	}
+	switch status {
+	case "already_exists":
+		cmd.Println("[ok] Model files already present:")
+	case "downloaded":
+		cmd.Println("[ok] Model downloaded successfully.")
+	}
+	cmd.Printf("  Model:     %s\n", modelPath)
+	cmd.Printf("  Tokenizer: %s\n", tokenizerPath)
+}
+
 // downloadModelCmd downloads the ONNX embedding model and tokenizer.
 func downloadModelCmd() *cobra.Command {
-	return &cobra.Command{
+	var jsonOut bool
+	cmd := &cobra.Command{
 		Use:   "download-model",
 		Short: "Download the embedding model",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			repoRoot := util.GetRepoRoot()
 
-			// Check if model files already exist
 			modelPath, tokenizerPath := embed.FindModelFiles(repoRoot)
 			if modelPath != "" && tokenizerPath != "" {
-				cmd.Println("[ok] Model files already present:")
-				cmd.Printf("  Model:     %s\n", modelPath)
-				cmd.Printf("  Tokenizer: %s\n", tokenizerPath)
+				printDownloadModelResult(cmd, "already_exists", modelPath, tokenizerPath, jsonOut)
 				return nil
 			}
 
 			result, err := embed.DownloadModel(repoRoot, func(msg string) {
-				cmd.Println("[info] " + msg)
+				if !jsonOut {
+					cmd.Println("[info] " + msg)
+				}
 			})
 			if err != nil {
 				return fmt.Errorf("download model: %w", err)
 			}
 
+			status := "downloaded"
 			if result.AlreadyExists {
-				cmd.Println("[ok] Model already downloaded.")
-			} else {
-				cmd.Println("[ok] Model downloaded successfully.")
+				status = "already_exists"
 			}
-			cmd.Printf("  Model:     %s\n", result.ModelPath)
-			cmd.Printf("  Tokenizer: %s\n", result.TokenizerPath)
+			printDownloadModelResult(cmd, status, result.ModelPath, result.TokenizerPath, jsonOut)
 			return nil
 		},
 	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	return cmd
 }
 
 func registerAdvancedCommands(rootCmd *cobra.Command) {

@@ -2,10 +2,17 @@ package cli
 
 import (
 	"bytes"
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nathandelacretaz/compound-agent/internal/build"
+	"github.com/nathandelacretaz/compound-agent/internal/hook"
+	"github.com/nathandelacretaz/compound-agent/internal/storage"
+	"github.com/nathandelacretaz/compound-agent/internal/telemetry"
 	"github.com/spf13/cobra"
 )
 
@@ -112,4 +119,301 @@ func TestFeedbackCommandOpenHint(t *testing.T) {
 	if !strings.Contains(out, "ca feedback --open") {
 		t.Error("expected hint to use --open flag")
 	}
+}
+
+// --- info command tests ---
+
+func runInfoCmd(t *testing.T, repoRoot string, args ...string) string {
+	t.Helper()
+	cmd := infoCmd(repoRoot)
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(cmd)
+
+	var out bytes.Buffer
+	root.SetOut(&out)
+	root.SetErr(&out)
+	root.SetArgs(append([]string{"info"}, args...))
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("info command failed: %v", err)
+	}
+	return out.String()
+}
+
+func TestInfoCmd_VersionSection(t *testing.T) {
+	dir := t.TempDir()
+	output := runInfoCmd(t, dir)
+
+	if !strings.Contains(output, "compound-agent") {
+		t.Errorf("expected 'compound-agent' in output, got: %s", output)
+	}
+	if !strings.Contains(output, "Version") {
+		t.Errorf("expected 'Version' header, got: %s", output)
+	}
+	if !strings.Contains(output, build.Version) {
+		t.Errorf("expected build version %q, got: %s", build.Version, output)
+	}
+}
+
+func TestInfoCmd_HooksInstalled(t *testing.T) {
+	dir := t.TempDir()
+
+	settingsDir := filepath.Join(dir, ".claude")
+	if err := os.MkdirAll(settingsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	settings := map[string]any{}
+	addAllHooksForInfoTest(settings)
+	data, _ := json.MarshalIndent(settings, "", "  ")
+	if err := os.WriteFile(filepath.Join(settingsDir, "settings.json"), data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	output := runInfoCmd(t, dir)
+	if !strings.Contains(output, "Hooks") {
+		t.Errorf("expected 'Hooks' section, got: %s", output)
+	}
+	if !strings.Contains(output, "installed") {
+		t.Errorf("expected installed status for hooks, got: %s", output)
+	}
+}
+
+func TestInfoCmd_NoHooksInstalled(t *testing.T) {
+	dir := t.TempDir()
+
+	output := runInfoCmd(t, dir)
+	if !strings.Contains(output, "Hooks") {
+		t.Errorf("expected 'Hooks' section, got: %s", output)
+	}
+	if !strings.Contains(output, "not installed") {
+		t.Errorf("expected 'not installed' for hooks, got: %s", output)
+	}
+}
+
+func TestInfoCmd_SkillsFromIndex(t *testing.T) {
+	dir := t.TempDir()
+
+	skillsDir := filepath.Join(dir, ".claude", "skills", "compound")
+	if err := os.MkdirAll(skillsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	indexData := `{"skills":[{"name":"spec-dev","description":"Spec development","phase":"spec-dev","dir":"spec-dev"},{"name":"plan","description":"Planning","phase":"plan","dir":"plan"}]}`
+	if err := os.WriteFile(filepath.Join(skillsDir, "skills_index.json"), []byte(indexData), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	output := runInfoCmd(t, dir)
+	if !strings.Contains(output, "Skills") {
+		t.Errorf("expected 'Skills' section, got: %s", output)
+	}
+	if !strings.Contains(output, "spec-dev") {
+		t.Errorf("expected 'spec-dev' skill in output, got: %s", output)
+	}
+	if !strings.Contains(output, "plan") {
+		t.Errorf("expected 'plan' skill in output, got: %s", output)
+	}
+}
+
+func TestInfoCmd_NoSkillsIndex(t *testing.T) {
+	dir := t.TempDir()
+
+	output := runInfoCmd(t, dir)
+	if !strings.Contains(output, "Skills") {
+		t.Errorf("expected 'Skills' section, got: %s", output)
+	}
+	if !strings.Contains(output, "ca setup") {
+		t.Errorf("expected 'ca setup' hint when no skills index, got: %s", output)
+	}
+}
+
+func TestInfoCmd_PhaseStateActive(t *testing.T) {
+	dir := t.TempDir()
+
+	claudeDir := filepath.Join(dir, ".claude")
+	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	state := hook.PhaseState{
+		CookitActive: true,
+		EpicID:       "test-epic-123",
+		CurrentPhase: "work",
+		PhaseIndex:   3,
+		SkillsRead:   []string{"spec-dev", "plan"},
+		GatesPassed:  []string{"post-plan"},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	}
+	data, _ := json.MarshalIndent(state, "", "  ")
+	if err := os.WriteFile(hook.PhaseStatePath(dir), data, 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	output := runInfoCmd(t, dir)
+	if !strings.Contains(output, "Phase") {
+		t.Errorf("expected 'Phase' section, got: %s", output)
+	}
+	if !strings.Contains(output, "work") {
+		t.Errorf("expected 'work' phase in output, got: %s", output)
+	}
+	if !strings.Contains(output, "test-epic-123") {
+		t.Errorf("expected epic ID in output, got: %s", output)
+	}
+}
+
+func TestInfoCmd_NoPhaseState(t *testing.T) {
+	dir := t.TempDir()
+
+	output := runInfoCmd(t, dir)
+	if !strings.Contains(output, "Phase") {
+		t.Errorf("expected 'Phase' section, got: %s", output)
+	}
+	if !strings.Contains(strings.ToLower(output), "no active workflow") {
+		t.Errorf("expected 'no active workflow' message, got: %s", output)
+	}
+}
+
+func TestInfoCmd_TelemetryWithData(t *testing.T) {
+	dir := t.TempDir()
+
+	cacheDir := filepath.Join(dir, ".claude", ".cache")
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	db, err := storage.OpenDB(filepath.Join(cacheDir, "lessons.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	events := []telemetry.Event{
+		{EventType: telemetry.EventHookExecution, HookName: "user-prompt", DurationMs: 15, Outcome: telemetry.OutcomeSuccess},
+		{EventType: telemetry.EventHookExecution, HookName: "user-prompt", DurationMs: 25, Outcome: telemetry.OutcomeSuccess},
+		{EventType: telemetry.EventLessonRetrieval, HookName: "user-prompt", DurationMs: 5, Outcome: telemetry.OutcomeSuccess},
+	}
+	for _, ev := range events {
+		if err := telemetry.LogEvent(db, ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+	db.Close()
+
+	output := runInfoCmd(t, dir)
+	if !strings.Contains(output, "Telemetry") {
+		t.Errorf("expected 'Telemetry' section, got: %s", output)
+	}
+	if !strings.Contains(output, "user-prompt") {
+		t.Errorf("expected 'user-prompt' hook name, got: %s", output)
+	}
+}
+
+func TestInfoCmd_TelemetryEmpty(t *testing.T) {
+	dir := t.TempDir()
+
+	output := runInfoCmd(t, dir)
+	if !strings.Contains(output, "Telemetry") {
+		t.Errorf("expected 'Telemetry' section, got: %s", output)
+	}
+	if !strings.Contains(output, "no data yet") {
+		t.Errorf("expected 'no data yet' for empty telemetry, got: %s", output)
+	}
+}
+
+func TestInfoCmd_LessonCorpusStats(t *testing.T) {
+	dir := t.TempDir()
+
+	lessonsDir := filepath.Join(dir, ".claude", "lessons")
+	if err := os.MkdirAll(lessonsDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	lessons := []string{
+		`{"id":"L001","insight":"test lesson 1","trigger":"test","type":"lesson","source":"manual","severity":"high","tags":["testing"],"created":"2026-03-01T00:00:00Z"}`,
+		`{"id":"L002","insight":"test lesson 2","trigger":"test","type":"solution","source":"self_correction","severity":"medium","tags":["go"],"created":"2026-03-15T00:00:00Z"}`,
+	}
+	if err := os.WriteFile(filepath.Join(lessonsDir, "index.jsonl"), []byte(strings.Join(lessons, "\n")+"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	output := runInfoCmd(t, dir)
+	if !strings.Contains(output, "Lessons") {
+		t.Errorf("expected 'Lessons' section, got: %s", output)
+	}
+	if !strings.Contains(output, "2") {
+		t.Errorf("expected lesson count in output, got: %s", output)
+	}
+}
+
+func TestInfoCmd_NoLessons(t *testing.T) {
+	dir := t.TempDir()
+
+	output := runInfoCmd(t, dir)
+	if !strings.Contains(output, "Lessons") {
+		t.Errorf("expected 'Lessons' section, got: %s", output)
+	}
+	if !strings.Contains(output, "0") {
+		t.Errorf("expected '0' lesson count, got: %s", output)
+	}
+}
+
+func TestInfoCmd_AllSixSections(t *testing.T) {
+	dir := t.TempDir()
+	output := runInfoCmd(t, dir)
+
+	sections := []string{"Version", "Hooks", "Skills", "Phase", "Telemetry", "Lessons"}
+	for _, section := range sections {
+		if !strings.Contains(output, section) {
+			t.Errorf("expected section '%s' in output, got: %s", section, output)
+		}
+	}
+}
+
+func TestInfoCmd_IsRegistered(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	registerInfoCommands(root)
+
+	found := false
+	for _, cmd := range root.Commands() {
+		if cmd.Use == "info" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("info command should be registered by registerInfoCommands")
+	}
+}
+
+// addAllHooksForInfoTest creates a hook config that HasAllHooks recognizes.
+func addAllHooksForInfoTest(settings map[string]any) {
+	hooks := map[string]any{}
+	specs := []struct {
+		hookType string
+		matcher  string
+		command  string
+	}{
+		{"SessionStart", "", "npx ca prime 2>/dev/null || true"},
+		{"PreCompact", "", "npx ca prime 2>/dev/null || true"},
+		{"UserPromptSubmit", "", "npx ca hooks run user-prompt 2>/dev/null || true"},
+		{"PostToolUseFailure", "Bash|Edit|Write", "npx ca hooks run post-tool-failure 2>/dev/null || true"},
+		{"PostToolUse", "Bash|Edit|Write", "npx ca hooks run post-tool-success 2>/dev/null || true"},
+		{"PostToolUse", "Read", "npx ca hooks run post-read 2>/dev/null || true"},
+		{"PreToolUse", "Edit|Write", "npx ca hooks run phase-guard 2>/dev/null || true"},
+		{"Stop", "", "npx ca hooks run phase-audit 2>/dev/null || true"},
+	}
+
+	for _, spec := range specs {
+		entry := map[string]any{
+			"matcher": spec.matcher,
+			"hooks": []any{
+				map[string]any{
+					"type":    "command",
+					"command": spec.command,
+				},
+			},
+		}
+		arr, ok := hooks[spec.hookType].([]any)
+		if !ok {
+			arr = []any{}
+		}
+		hooks[spec.hookType] = append(arr, entry)
+	}
+
+	settings["hooks"] = hooks
 }

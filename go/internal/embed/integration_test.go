@@ -18,7 +18,10 @@ func findRepoRoot() string {
 	if root := os.Getenv("CA_REPO_ROOT"); root != "" {
 		return root
 	}
-	cwd, _ := os.Getwd()
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
 	dir := cwd
 	for {
 		if _, err := os.Stat(filepath.Join(dir, "rust", "embed-daemon")); err == nil {

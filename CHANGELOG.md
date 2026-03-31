@@ -7,6 +7,167 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+## [2.5.2] - 2026-03-31
+
+### Added
+
+- **Stale output watchdog (Layer 4)**: New background watchdog monitors trace file for output inactivity during Claude sessions. If no output is written for `SESSION_STALE_TIMEOUT` seconds (default: 1800s/30min), the session is killed and the loop proceeds. Prevents indefinite hangs when the Claude CLI completes its API work but fails to exit.
+
+### Fixed
+
+- **Polish loop deadlock**: Architect prompt no longer uses `Parent: $META_EPIC` label, which caused the architect to wire blocking dependencies to a meta-epic that never closes. Replaced with context-only reference and explicit prohibition against `--parent` and `bd dep add` to the meta-epic.
+- **Silent zero-work exit**: Infinity loop now exits with code 2 (distinct from success=0 and failure=1) when zero epics are completed and zero failed, signaling that all epics were blocked or skipped.
+- **Inner loop exit code swallowed**: Polish loop's `run_inner_loop` used `|| true` which discarded the exit code. Now captures exit code properly and detects zero-work (exit 2) to surface blocked-epic deadlocks.
+- **Inner loop `set -e` cascade**: `run_inner_loop` call in main polish loop now guarded with `||` handler, matching the pattern used for `run_polish_architect`, preventing a single failed cycle from aborting the entire polish script.
+
+### Removed
+
+- **Improve loop references from architect skill**: Removed `ca improve` references from shipped architect SKILL.md, infinity-loop README, pre-flight docs, and deleted the `references/improve-loop/` directory. The improve loop remains available as a standalone CLI command but is not part of the architect workflow.
+
+## [2.5.1] - 2026-03-28
+
+### Added
+
+- **Visual verification in polish audit**: Reviewers now auto-detect UI projects and take Playwright screenshots at 4 viewports (375px, 768px, 1024px, 1440px) as part of their audit, critiquing layout, spacing, contrast, hierarchy, and responsiveness alongside static code analysis. Graceful degradation when Playwright is unavailable or no UI detected (P3/INFO + [NEEDS_QA] fallback).
+- **Visual verification in cook-it review**: Step 10b in the review skill takes Playwright screenshots when the Verification Contract requires `browser_evidence`, `design_craft_check`, or `responsive_check`. References QA Engineer detection logic for framework auto-detection.
+
+## [2.5.0] - 2026-03-27
+
+### Added
+
+- **Polish Loop (Phase 6)**: New `ca polish` CLI command generates a standalone bash script for iterative quality refinement. Runs N cycles of: multi-model audit fleet evaluating full implementation against the build-great-things pre-ship checklist (34 quality items + 12 laziness anti-patterns), mini-architect decomposing findings into improvement epics, and inner infinity loop implementing them. Supports claude-opus, claude-sonnet, gemini, and codex as reviewers. Includes dry-run mode, crash handler with status JSON, reviewer CLI detection with graceful degradation, and per-cycle observability (individual reports, synthesized reports, architect logs).
+- **Architect Phase 6**: Opt-in phase in architect SKILL.md that activates after the infinity loop completes. Gate 5 for user confirmation. Generates and launches the polish loop script with monitoring commands.
+- **Polish loop reference docs**: `architect/references/polish-loop/README.md` (configuration reference) and `audit-prompt.md` (audit prompt design explaining how it differs from the review fleet).
+
+### Fixed
+
+- **Polish loop: dry-run crash** (P0): `POLISH_EPICS` variable initialized before the loop and at start of each cycle to prevent unbound variable error under `set -u`.
+- **Polish loop: crash handler exit code** (P0): EXIT trap now preserves the original exit code with `exit $exit_code` so callers detect failures.
+- **Polish loop: log() ordering** (P1): `log()` function defined before crash handler in script assembly to prevent `log: command not found` during early failures.
+- **Polish loop: missing ca prerequisite** (P1): Added `command -v ca` check alongside claude and bd.
+- **Polish loop: ARG_MAX risk** (P1): Reviewer prompts piped via stdin (`-p - < file`) instead of command substitution to handle large specs.
+- **Polish loop: architect heredoc expansion** (P1): Mini-architect prompt uses quoted heredoc + file-based injection to prevent shell expansion of report content containing `$` or backticks.
+- **Polish loop: spec file validation** (P1): Script fails fast if spec file doesn't exist at runtime.
+- **Polish loop: git commit before push**: Post-loop commits synthesized reports and status artifacts before pushing.
+
+## [2.4.1] - 2026-03-26
+
+### Fixed
+
+- **Platform binary version mismatch**: `package.json` optionalDependencies pointed `@syottos/*` packages at `2.3.0` while the main package was `2.4.0`. Users installing `compound-agent@2.4.0` got v2.3.0 Go binaries, silently missing `build-great-things` and `qa-engineer` skills, updated `architect` references (advisory fleet, improve loop), and updated `review` skill (QA engineer integration). Added `TestPlatformVersionSync` CI test and documented the version sync requirement in CONTRIBUTING.md and CLAUDE.md to prevent recurrence.
+
+## [2.4.0] - 2026-03-26
+
+### Added
+
+- **Build Great Things skill**: New `skills/build-great-things/` ships a comprehensive design and development playbook via `ca init`. Covers both software design philosophy (Ousterhout's complexity management, deep modules, information hiding) and the full build sequence for user-facing products across 6 phases (Foundation → Structure → Craft → Motion → Performance → Launch) with separate website and webapp tracks. Includes mandatory quality checklist, 12 anti-patterns for common AI laziness, and routing table for task-specific guidance. 12 reference files provide phase-specific design principles and research pointers.
+- **Design research library**: 50 new research documents shipped under `docs/compound/research/` covering web design (typography, color theory, IA, interaction design, accessibility, responsive design), frontend craft (CSS/WebGL, motion design, award-winning site anatomy), financial report design (dashboards, data visualization, tables), design styles (Swiss International, brutalist, editorial, luxury, academic, synthwave), B2C product strategy (JTBD, positioning, conversion, behavioral psychology, growth loops), and software design philosophy (Ousterhout). All indexed in `research/index.md` with skill/agent targeting.
+- **Architect design skill detection**: Architect skill Phase 1 now auto-detects systems where design quality matters and Phase 2 adds an advisory note recommending `/compound:build-great-things` for applicable epics.
+- **Research docs shipping**: `ca init` now installs `docs/compound/research/` (42 files across 9 topic directories) to consumer repos via `go:embed`. Restores research delivery that was lost during the Go migration -- ~25 template files (agent-role-skills, phase skills, commands) reference these docs for domain knowledge (security, TDD, property testing, code review, etc.).
+- **Research drift tests**: `TestTemplateDrift_ResearchSourceMatchesEmbed` verifies source and embedded research trees stay in sync. `TestTemplateDrift_ResearchReferencesResolve` validates all `docs/compound/research/` path references in templates point to files that actually exist.
+- **Nested reference directories**: `//go:embed` patterns changed from explicit file globs to directory-level embedding (`skills`, `agent-role-skills`), enabling skills to ship structured reference subdirectories. The install/prune pipeline already supported nesting — only the embed pattern was blocking.
+- **Architect infinity-loop reference restructure**: Replaced the 734-line monolith `infinity-loop.md` with 7 concern-based files in `references/infinity-loop/`: README.md (symptom→file router), pre-flight.md, memory-safety.md, epic-ordering.md, logging.md, review-fleet.md, troubleshooting.md. Includes 4 new failure modes from overnight run post-mortem analysis.
+- **Architect advisory fleet**: New `references/advisory-fleet.md` adds a multi-model advisory phase before Gate 2 (post-Spec). Spawns up to 4 external model CLIs (claude-sonnet, gemini, codex, claude-opus) in parallel via background Bash calls, each evaluating the spec through a different lens (security/reliability, scalability/performance, organizational/delivery, simplicity/alternatives). All CLI invocation patterns live-tested against actual CLIs. Advisory only — informs the human's decision at the gate but cannot veto. Gracefully degrades when CLIs are unavailable.
+- **QA Engineer skill**: New `skills/qa-engineer/` ships hands-on browser-based QA testing via `ca init`. Decision-tree routing (Web UI / HTTP API / CLI skip), reconnaissance-first methodology (networkidle → screenshot → DOM → console → network capture before acting), 6 test strategies (smoke, exploratory break-things, visual review, accessibility, form/input boundary, network inspection), and structured P0-P3 reporting. Three reference docs: `exploratory-testing.md` (systematic boundary/state/auth/fuzzing playbook), `browser-automation.md` (Playwright patterns, server lifecycle, viewport testing, axe-core integration), `constitution-schema.md` (optional persistent test definitions per page). Design informed by deep analysis of Anthropic's webapp-testing, lackeyjb/playwright-skill, and hemangjoshi37a/claude-code-frontend-dev. Integrated into review SKILL.md as optional step 8 for visual/UI changes and referenced in infinity-loop review-fleet.md.
+
+### Fixed
+
+- **Phantom runtime-verification references**: 4 template files referenced `docs/research/q-and-a/runtime-verification.md` which never existed. Redirected to `docs/compound/research/scenario-testing/`.
+- **Research index.md accuracy**: Fixed source path (was `docs/research/`, now `docs/compound/research/`). Added managed-directory warning so users know `docs/compound/research/` is fully managed by `ca init` and user research belongs in `docs/research/`.
+- **Loop generator: `log()` stdout corruption** (P0): `log()` now writes to stderr (`>&2`). Previously, `log()` wrote to stdout, causing skip messages from `check_deps_closed()` to corrupt epic IDs when captured via `EPIC_ID=$(get_next_epic)`. This single bug caused 5 cascading failures in a 6-hour overnight run.
+- **Loop generator: Claude reviewers silent** (P1): Added `--dangerously-skip-permissions` to Claude reviewer invocations (both `--session-id` cycle 1 and `--resume` cycle 2+). Without it, reviewers couldn't use tools in non-interactive mode, producing 1-byte output files.
+- **Loop generator: Codex reviewer broken** (P1): Fixed Codex invocation — `-p` is `--profile` (not prompt), prompt is a positional arg. Changed to `codex exec --full-auto -o "$report" -- - < "$prompt_file"` for stdin input and clean output capture. Stdout redirect (`>`) captured UI chrome; `-o` captures only the assistant's response.
+- **Loop generator: dry-run contamination** (P2): Guarded `COMPLETED` increment, `log_result`, periodic review trigger, git dirty check, summary JSONL write, `write_status`, and `git push` with `LOOP_DRY_RUN` checks. Previously, dry-run wrote ghost entries to the execution log.
+
+## [2.3.0] - 2026-03-25
+
+### Added
+
+- **Smarter failure escalation** (Epic 1): When Claude Code tools fail repeatedly (≥3 same-target or ≥3 total), the post-tool-failure hook now searches the lesson database for relevant past solutions instead of showing a static tip. Includes injectable `LessonSearchFunc`, rune-safe token extraction from error output, BM25-scored FTS5 search with 500ms timeout, 4-level fallback chain, and confidence annotations for low-scoring matches.
+- **Architect intelligence** (Epic 2): Architect skill gains a research sufficiency gate (search `ca search` + `docs/research/` before spec writing) and automatic integration verification epic creation during decomposition.
+- **Acceptance criteria protocol** (Epic 3): AC table generation from EARS requirements in the plan phase, AC reading in the work phase, and an AC gate between plan and work in the cook-it pipeline.
+- **Lesson-calibrated reviews** (Epic 4): Review skill now searches past lessons per-reviewer (3-5 cap, recency bias) and conditionally triggers runtime verification via the new `runtime-verifier` agent role skill for ephemeral Playwright testing.
+- **Integration verification** (Epic 5): Template drift detection test that verifies reviewer names in skill templates have matching agent role skill directories.
+- **Context-aware FTS5 search**: New `SearchKeywordScoredORContext()` method threads `context.Context` through to `QueryContext`, enforcing the 500ms timeout contract at the database layer.
+
+### Fixed
+
+- **Failure threshold off-by-one**: `sameTargetThreshold` changed from 2 to 3 to match EARS spec FE-1 (≥3 failures before escalation).
+- **Phantom reviewer names**: Fixed `cct-reviewer` → `cct-subagent` and `docs-reviewer` → `doc-gardener` in review and compound skill templates.
+- **Cyclop complexity violation**: Extracted `installAgentRoleSkillReferences()` helper from `InstallAgentRoleSkills()` in `primitives.go` to stay within the cyclomatic complexity limit.
+- **Comma-separated epic IDs in loop generator**: `ca loop` now converts comma-separated epic IDs to space-separated for bash `for` loop compatibility.
+
+## [2.2.1] - 2026-03-24
+
+### Added
+
+- **Loop generator production parity**: Brought the Go `ca loop` script generator to full parity with the hardened production `infinity-loop.sh`. Ported crash handler (EXIT trap with status file logging), 3-layer memory safety (repo-scoped orphan cleanup, memory gate, background watchdog with PID tracking), `parse_json()` with jq/python3 fallback, dependency-aware epic ordering (`check_deps_closed()`), dual-file anchored marker detection, and CLI prerequisite checks.
+- **Loop review and improve phases**: Implemented 8 missing flags from the former TS CLI: `--reviewers`, `--review-every`, `--max-review-cycles`, `--review-blocking`, `--review-model`, `--improve`, `--improve-max-iters`, `--improve-time-budget`. Review phase supports multi-model spawning, session management, and review cycles with implementer fix loop. Improve phase supports topic discovery, iteration with rollback, and time budget.
+- **Field-tested enhancements**: Git status check after epic completion (auto-commits if dirty), git push at loop end (with remote availability check), reviewer availability summary logging.
+- **Infinity-loop reference docs**: Added troubleshooting section and real-world example from compound-agent's own 6-epic loop run.
+
+### Fixed
+
+- **Review triggers were dead code**: Review phase triggers were placed after an exit statement and never executed.
+- **Undefined variable in periodic trigger**: `$RESULT` replaced with `$SUCCESS` in periodic review trigger.
+- **Review base SHA reset in loop**: `REVIEW_BASE_SHA` was incorrectly reset inside the while loop on every iteration.
+- **Improve phase stdin piping**: `extract_text` was using file args instead of stdin pipe.
+- **Conditional exit**: Exit line now omitted when improve phase follows review phase.
+
+## [2.2.0] - 2026-03-23
+
+### Added
+
+- **CLI flag parity with TypeScript**: Ported 5 missing flags from the former TS CLI to the Go implementation for full migration parity:
+  - `--quiet` / `-q` global flag — suppresses non-essential `[ok]`/status output in `init` and `setup`
+  - `init --skip-agents` — skips template installation (AGENTS.md, skills, commands, docs)
+  - `init --skip-claude` — skips Claude Code hooks installation (alias for `--skip-hooks`)
+  - `setup claude --dry-run` — previews what would be installed/upgraded/reconciled without writing
+  - `download-model --json` — outputs download result as JSON
+- **Stack-aware quality gates**: `ca setup` now detects the project stack (Go, Rust, Python, Node, Make) and substitutes `{{QUALITY_GATE_TEST}}` / `{{QUALITY_GATE_LINT}}` placeholders in skill and doc templates with the correct commands. Non-JS codebases no longer see hardcoded `pnpm test` / `pnpm lint`.
+
+### Changed
+
+- **Refactored `main.go`**: Extracted `buildHooksCmd()` helper from `main()` to stay within 50-line function limit.
+- **Refactored `commands_setup.go`**: Extracted `setupClaudeOpts` struct and `runSetupClaude()` function from the `registerSetupClaudeCmd` inline closure.
+- **Refactored `commands_advanced.go`**: Extracted `printDownloadModelResult()` helper from `downloadModelCmd`.
+
+## [2.1.2] - 2026-03-23
+
+### Fixed
+
+- **Compound-agent prime output was invisible in Claude hooks**: `ca prime` now writes normal command output to stdout instead of stderr, so `SessionStart` and `PreCompact` hook output is visible to Claude Code rather than being dropped by stderr redirection or ignored by hook rendering.
+- **Duplicate Claude hook reconciliation**: `ca setup claude` now detects and repairs duplicated compound-agent hook entries in `.claude/settings.json` instead of treating them as healthy installs. Hook detection and removal now correctly recognize shell-escaped binary commands like `'/path/to/ca' prime`.
+
+## [2.1.1] - 2026-03-23
+
+### Fixed
+
+- **Tip strings broken for npm-installed users**: Reverted `npx ca` → `ca` change in user-facing tip strings (correction reminder, planning reminder, failure tip, trust language). npm-installed users only have `npx ca` in PATH — the `ca` binary lives in `node_modules/.bin/`. Hook commands in `settings.json` correctly use absolute binary paths and are unaffected.
+- **CI lint action**: Upgraded `golangci-lint-action` from v6 to v7 (v6 doesn't support golangci-lint v2).
+
+## [2.1.0] - 2026-03-23
+
+### Added
+
+- **Structured logging via `log/slog`**: Replaced all ad-hoc `fmt.Fprintf(os.Stderr, ...)` calls in production code with structured `slog` calls (Error/Warn/Debug levels). No external dependencies — uses Go stdlib only.
+- **`--verbose` / `-v` global flag**: New persistent flag on the root command enables debug-level JSON logging to stderr. Default level is Warn (silent in normal operation).
+- **Dependabot configuration**: Added `.github/dependabot.yml` for automated weekly dependency update PRs targeting Go modules (`/go`) and Cargo (`/rust/embed-daemon`).
+
+### Changed
+
+- **AGENTS.md rewritten for Go**: Complete rewrite of AGENTS.md to reflect the Go-based architecture. Removed all stale TypeScript/pnpm/vitest/Commander.js references. Now accurately documents Cobra CLI commands, `go/internal/` package layout, Go conventions, and build/test commands.
+
+### Fixed
+
+- **CI lint pipeline**: Upgraded golangci-lint to v2.11.4 (Go 1.26 support), migrated `.golangci.yml` from v1 to v2 format, resolved all 313 pre-existing lint violations across 72 files. All refactoring is purely structural — no behavior changes.
+- **Stale `npx ca` references in runtime strings**: Replaced `npx ca` with `ca` in user-facing hook messages (pre-commit reminder, correction/planning reminders, failure tips) and AI context strings (`ca prime` trust language, loop prompt builder).
+- **Setup upgrade reconciliation**: `ca setup` now reconciles existing managed files during upgrades, prunes retired templates and nested phase reference files from managed `compound/` directories.
+- **GoReleaser config**: Fixed deprecated `.goreleaser.yml` fields (`format` → `formats`, `builds` → `ids`).
+- **Duplicate function**: Removed duplicate `countOldLessons` definition in `commands_scripts.go`.
+
 ## [2.0.3] - 2026-03-22
 
 ### Fixed

@@ -1,6 +1,7 @@
 ---
 name: Agentic Codebase
 description: Audit and set up a codebase for agentic AI development using the 15-principle manifesto
+phase: work
 ---
 
 # Agentic Codebase Skill
@@ -153,7 +154,7 @@ Score 2: Well-decomposed with clear interfaces
 1. Run \`ca search "agentic codebase"\` for relevant lessons
 2. Detect project stack (see Stack Detection above)
 3. Use Glob and Grep to check for evidence of each principle:
-   - Glob for: docs/**, *.test.*, .eslintrc*, AGENTS.md, CLAUDE.md
+   - Glob for: docs/**, *.test.*, *_test.go, test_*.py, *_test.rs, .eslintrc*, AGENTS.md, CLAUDE.md
    - Grep for: type annotations, structured logging, ADR format
    - Read key files: README, config files, sample source files
 4. Score each principle (0-2) with specific evidence
@@ -212,7 +213,7 @@ Run the full audit first. Setup only addresses gaps found by the audit.
 ### Setup Completion Gate
 After all approved actions are applied, verify:
 - List all files created/modified during setup
-- Run quality gates if available (\`pnpm test\`, \`pnpm lint\`, or stack equivalent)
+- Run quality gates if available (\`{{QUALITY_GATE_TEST}}\`, \`{{QUALITY_GATE_LINT}}\`)
 - Confirm no existing files were overwritten without approval
 - Present summary: principles addressed, files created, remaining gaps
 

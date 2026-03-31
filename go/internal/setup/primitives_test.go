@@ -80,7 +80,7 @@ func TestInstallWorkflowCommands(t *testing.T) {
 func TestInstallPhaseSkills(t *testing.T) {
 	dir := t.TempDir()
 
-	n, u, err := InstallPhaseSkills(dir)
+	n, u, err := InstallPhaseSkills(dir, StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallPhaseSkills: %v", err)
 	}
@@ -104,7 +104,7 @@ func TestInstallPhaseSkills(t *testing.T) {
 	}
 
 	// Verify idempotency
-	n2, u2, _ := InstallPhaseSkills(dir)
+	n2, u2, _ := InstallPhaseSkills(dir, StackInfo{})
 	if n2 != 0 {
 		t.Errorf("idempotent install created %d files, want 0", n2)
 	}
@@ -146,7 +146,7 @@ func TestInstallAgentRoleSkills(t *testing.T) {
 func TestInstallDocTemplates(t *testing.T) {
 	dir := t.TempDir()
 
-	n, u, err := InstallDocTemplates(dir, "1.0.0")
+	n, u, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates: %v", err)
 	}
@@ -171,12 +171,80 @@ func TestInstallDocTemplates(t *testing.T) {
 	}
 
 	// Verify idempotency
-	n2, u2, _ := InstallDocTemplates(dir, "1.0.0")
+	n2, u2, _ := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if n2 != 0 {
 		t.Errorf("idempotent install created %d files, want 0", n2)
 	}
 	if u2 != 0 {
 		t.Errorf("idempotent install updated %d files, want 0", u2)
+	}
+}
+
+func TestInstallResearchDocs(t *testing.T) {
+	dir := t.TempDir()
+
+	n, u, err := InstallResearchDocs(dir)
+	if err != nil {
+		t.Fatalf("InstallResearchDocs: %v", err)
+	}
+	if n == 0 {
+		t.Fatal("expected files to be created")
+	}
+	if u != 0 {
+		t.Errorf("expected 0 updated on first install, got %d", u)
+	}
+
+	// Verify nested research file exists
+	overviewPath := filepath.Join(dir, "docs", "compound", "research", "security", "overview.md")
+	if _, err := os.Stat(overviewPath); err != nil {
+		t.Errorf("missing security/overview.md: %v", err)
+	}
+
+	// Verify index.md at root
+	indexPath := filepath.Join(dir, "docs", "compound", "research", "index.md")
+	content, err := os.ReadFile(indexPath)
+	if err != nil {
+		t.Fatalf("ReadFile index.md: %v", err)
+	}
+	if len(content) == 0 {
+		t.Error("index.md is empty")
+	}
+
+	// Verify idempotency: second install creates/updates nothing
+	n2, u2, err := InstallResearchDocs(dir)
+	if err != nil {
+		t.Fatalf("InstallResearchDocs (2nd): %v", err)
+	}
+	if n2 != 0 {
+		t.Errorf("idempotent install created %d files, want 0", n2)
+	}
+	if u2 != 0 {
+		t.Errorf("idempotent install updated %d files, want 0", u2)
+	}
+}
+
+func TestInstallResearchDocs_UpdatesStaleContent(t *testing.T) {
+	dir := t.TempDir()
+
+	// First install
+	_, _, err := InstallResearchDocs(dir)
+	if err != nil {
+		t.Fatalf("InstallResearchDocs: %v", err)
+	}
+
+	// Corrupt a file to simulate stale content
+	overviewPath := filepath.Join(dir, "docs", "compound", "research", "security", "overview.md")
+	if err := os.WriteFile(overviewPath, []byte("stale content"), 0644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	// Re-install should update
+	_, u, err := InstallResearchDocs(dir)
+	if err != nil {
+		t.Fatalf("InstallResearchDocs (2nd): %v", err)
+	}
+	if u == 0 {
+		t.Error("expected stale file to be updated")
 	}
 }
 
@@ -402,7 +470,7 @@ func TestInstallWorkflowCommands_UpdatesStaleContent(t *testing.T) {
 func TestInstallPhaseSkills_UpdatesStaleContent(t *testing.T) {
 	dir := t.TempDir()
 
-	created, _, err := InstallPhaseSkills(dir)
+	created, _, err := InstallPhaseSkills(dir, StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallPhaseSkills: %v", err)
 	}
@@ -416,7 +484,7 @@ func TestInstallPhaseSkills_UpdatesStaleContent(t *testing.T) {
 		t.Fatalf("write stale: %v", err)
 	}
 
-	_, updated, err := InstallPhaseSkills(dir)
+	_, updated, err := InstallPhaseSkills(dir, StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallPhaseSkills (update): %v", err)
 	}
@@ -430,6 +498,135 @@ func TestInstallPhaseSkills_UpdatesStaleContent(t *testing.T) {
 	}
 	if string(content) == "# stale skill\n" {
 		t.Error("stale skill was not overwritten")
+	}
+}
+
+func TestInstallPhaseSkills_SubstitutesQualityGates(t *testing.T) {
+	dir := t.TempDir()
+	stack := StackInfo{
+		TestCmd:  "go test ./...",
+		LintCmd:  "golangci-lint run ./...",
+		BuildCmd: "go build ./...",
+	}
+
+	_, _, err := InstallPhaseSkills(dir, stack)
+	if err != nil {
+		t.Fatalf("InstallPhaseSkills: %v", err)
+	}
+
+	// Check that a skill with quality gate placeholders got them substituted
+	workSkill := filepath.Join(dir, ".claude", "skills", "compound", "work", "SKILL.md")
+	content, err := os.ReadFile(workSkill)
+	if err != nil {
+		t.Fatalf("read work/SKILL.md: %v", err)
+	}
+	if strings.Contains(string(content), "{{QUALITY_GATE_TEST}}") {
+		t.Error("work/SKILL.md still has {{QUALITY_GATE_TEST}} placeholder")
+	}
+	if strings.Contains(string(content), "{{QUALITY_GATE_LINT}}") {
+		t.Error("work/SKILL.md still has {{QUALITY_GATE_LINT}} placeholder")
+	}
+	if strings.Contains(string(content), "{{QUALITY_GATE_BUILD}}") {
+		t.Error("work/SKILL.md still has {{QUALITY_GATE_BUILD}} placeholder")
+	}
+	if !strings.Contains(string(content), "go test ./...") {
+		t.Error("work/SKILL.md missing substituted test command")
+	}
+	if !strings.Contains(string(content), "golangci-lint run ./...") {
+		t.Error("work/SKILL.md missing substituted lint command")
+	}
+	if !strings.Contains(string(content), "go build ./...") {
+		t.Error("work/SKILL.md missing substituted build command")
+	}
+}
+
+func TestInstallDocTemplates_SubstitutesQualityGates(t *testing.T) {
+	dir := t.TempDir()
+	stack := StackInfo{
+		TestCmd:  "cargo test",
+		LintCmd:  "cargo clippy",
+		BuildCmd: "cargo build",
+	}
+
+	_, _, err := InstallDocTemplates(dir, "1.0.0", stack)
+	if err != nil {
+		t.Fatalf("InstallDocTemplates: %v", err)
+	}
+
+	// WORKFLOW.md has quality gate references
+	workflowPath := filepath.Join(dir, "docs", "compound", "WORKFLOW.md")
+	content, err := os.ReadFile(workflowPath)
+	if err != nil {
+		t.Fatalf("read WORKFLOW.md: %v", err)
+	}
+	if strings.Contains(string(content), "{{QUALITY_GATE_TEST}}") {
+		t.Error("WORKFLOW.md still has {{QUALITY_GATE_TEST}} placeholder")
+	}
+	if strings.Contains(string(content), "{{QUALITY_GATE_BUILD}}") {
+		t.Error("WORKFLOW.md still has {{QUALITY_GATE_BUILD}} placeholder")
+	}
+	if !strings.Contains(string(content), "cargo test") {
+		t.Error("WORKFLOW.md missing substituted test command")
+	}
+	if !strings.Contains(string(content), "cargo build") {
+		t.Error("WORKFLOW.md missing substituted build command")
+	}
+}
+
+func TestInstallPhaseSkills_StackChangeUpdatesContent(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install with Node/npm stack
+	npmStack := StackInfo{
+		TestCmd:  "npm test",
+		LintCmd:  "npm run lint",
+		BuildCmd: "npm run build",
+	}
+	_, _, err := InstallPhaseSkills(dir, npmStack)
+	if err != nil {
+		t.Fatalf("InstallPhaseSkills (npm): %v", err)
+	}
+
+	// Verify npm commands are in the file
+	workSkill := filepath.Join(dir, ".claude", "skills", "compound", "work", "SKILL.md")
+	content, err := os.ReadFile(workSkill)
+	if err != nil {
+		t.Fatalf("read work/SKILL.md: %v", err)
+	}
+	if !strings.Contains(string(content), "npm test") {
+		t.Fatal("work/SKILL.md should contain npm test after first install")
+	}
+
+	// Re-install with Go stack (simulates user adding go.mod)
+	goStack := StackInfo{
+		TestCmd:  "go test ./...",
+		LintCmd:  "golangci-lint run ./...",
+		BuildCmd: "go build ./...",
+	}
+	_, updated, err := InstallPhaseSkills(dir, goStack)
+	if err != nil {
+		t.Fatalf("InstallPhaseSkills (go): %v", err)
+	}
+	if updated == 0 {
+		t.Error("expected skills to be updated when stack changed")
+	}
+
+	// Verify Go commands replaced npm commands
+	content, err = os.ReadFile(workSkill)
+	if err != nil {
+		t.Fatalf("read work/SKILL.md after update: %v", err)
+	}
+	if strings.Contains(string(content), "npm test") {
+		t.Error("work/SKILL.md should no longer contain npm test")
+	}
+	if !strings.Contains(string(content), "go test ./...") {
+		t.Error("work/SKILL.md should contain go test ./... after stack change")
+	}
+	if strings.Contains(string(content), "npm run build") {
+		t.Error("work/SKILL.md should no longer contain npm run build")
+	}
+	if !strings.Contains(string(content), "go build ./...") {
+		t.Error("work/SKILL.md should contain go build ./... after stack change")
 	}
 }
 
@@ -462,7 +659,7 @@ func TestInstallAgentRoleSkills_UpdatesStaleContent(t *testing.T) {
 func TestInstallDocTemplates_UpdatesStaleContent(t *testing.T) {
 	dir := t.TempDir()
 
-	created, _, err := InstallDocTemplates(dir, "1.0.0")
+	created, _, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates: %v", err)
 	}
@@ -481,7 +678,7 @@ func TestInstallDocTemplates_UpdatesStaleContent(t *testing.T) {
 		t.Fatalf("write stale: %v", err)
 	}
 
-	_, updated, err := InstallDocTemplates(dir, "1.0.0")
+	_, updated, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates (update): %v", err)
 	}
@@ -494,7 +691,7 @@ func TestInstallDocTemplates_DateChangeNotStale(t *testing.T) {
 	dir := t.TempDir()
 
 	// Install
-	_, _, err := InstallDocTemplates(dir, "1.0.0")
+	_, _, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates: %v", err)
 	}
@@ -517,7 +714,7 @@ func TestInstallDocTemplates_DateChangeNotStale(t *testing.T) {
 	}
 
 	// Re-install should NOT trigger update (only date changed)
-	_, updated, err := InstallDocTemplates(dir, "1.0.0")
+	_, updated, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates (date check): %v", err)
 	}
@@ -530,13 +727,13 @@ func TestInstallDocTemplates_VersionChangeUpdates(t *testing.T) {
 	dir := t.TempDir()
 
 	// Install with version 1.0.0
-	_, _, err := InstallDocTemplates(dir, "1.0.0")
+	_, _, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates: %v", err)
 	}
 
 	// Re-install with new version should update
-	_, updated, err := InstallDocTemplates(dir, "2.0.0")
+	_, updated, err := InstallDocTemplates(dir, "2.0.0", StackInfo{})
 	if err != nil {
 		t.Fatalf("InstallDocTemplates (version change): %v", err)
 	}
@@ -634,7 +831,7 @@ func TestPruneStaleTemplates_RemovesStaleSkillDirs(t *testing.T) {
 	dir := t.TempDir()
 
 	// Install phase skills
-	if _, _, err := InstallPhaseSkills(dir); err != nil {
+	if _, _, err := InstallPhaseSkills(dir, StackInfo{}); err != nil {
 		t.Fatalf("InstallPhaseSkills: %v", err)
 	}
 
@@ -665,7 +862,7 @@ func TestPruneStaleTemplates_RemovesStalePhaseReferenceEntries(t *testing.T) {
 	dir := t.TempDir()
 
 	// Install phase skills and references.
-	if _, _, err := InstallPhaseSkills(dir); err != nil {
+	if _, _, err := InstallPhaseSkills(dir, StackInfo{}); err != nil {
 		t.Fatalf("InstallPhaseSkills: %v", err)
 	}
 
@@ -732,6 +929,101 @@ func TestPruneStaleTemplates_RemovesStaleRoleDirs(t *testing.T) {
 
 	if _, err := os.Stat(staleRole); !os.IsNotExist(err) {
 		t.Error("retired-role directory should be removed")
+	}
+}
+
+func TestPruneStaleTemplates_RemovesStaleAgentRoleReferenceEntries(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install agent role skills and references.
+	if _, _, err := InstallAgentRoleSkills(dir); err != nil {
+		t.Fatalf("InstallAgentRoleSkills: %v", err)
+	}
+
+	// Add retired entries inside a still-valid role directory.
+	roleDir := filepath.Join(dir, ".claude", "skills", "compound", "agents", "runtime-verifier")
+	staleRef := filepath.Join(roleDir, "references", "retired.md")
+	if err := os.WriteFile(staleRef, []byte("# old ref\n"), 0644); err != nil {
+		t.Fatalf("write retired ref: %v", err)
+	}
+	staleDir := filepath.Join(roleDir, "retired-dir")
+	if err := os.MkdirAll(staleDir, 0755); err != nil {
+		t.Fatalf("mkdir retired-dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(staleDir, "note.md"), []byte("# old dir\n"), 0644); err != nil {
+		t.Fatalf("write retired dir note: %v", err)
+	}
+
+	pruned, err := PruneStaleTemplates(dir)
+	if err != nil {
+		t.Fatalf("PruneStaleTemplates: %v", err)
+	}
+	if pruned < 2 {
+		t.Errorf("expected at least 2 pruned entries, got %d", pruned)
+	}
+
+	if _, err := os.Stat(staleRef); !os.IsNotExist(err) {
+		t.Error("retired reference file should be removed")
+	}
+	if _, err := os.Stat(staleDir); !os.IsNotExist(err) {
+		t.Error("retired nested directory should be removed")
+	}
+
+	// Current reference file must remain.
+	currentRef := filepath.Join(roleDir, "references", "playwright-patterns.md")
+	if _, err := os.Stat(currentRef); err != nil {
+		t.Errorf("current reference file should be preserved: %v", err)
+	}
+
+	// Current SKILL.md must remain.
+	skillFile := filepath.Join(roleDir, "SKILL.md")
+	if _, err := os.Stat(skillFile); err != nil {
+		t.Errorf("SKILL.md should be preserved: %v", err)
+	}
+}
+
+func TestPruneStaleTemplates_RemovesStaleResearchFiles(t *testing.T) {
+	dir := t.TempDir()
+
+	// Install research docs first
+	if _, _, err := InstallResearchDocs(dir); err != nil {
+		t.Fatalf("InstallResearchDocs: %v", err)
+	}
+
+	// Add a stale research file
+	staleFile := filepath.Join(dir, "docs", "compound", "research", "retired-topic.md")
+	if err := os.WriteFile(staleFile, []byte("# old research\n"), 0644); err != nil {
+		t.Fatalf("write stale file: %v", err)
+	}
+
+	// Add a stale research directory
+	staleDir := filepath.Join(dir, "docs", "compound", "research", "retired-topic")
+	if err := os.MkdirAll(staleDir, 0755); err != nil {
+		t.Fatalf("mkdir stale dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(staleDir, "old.md"), []byte("# old\n"), 0644); err != nil {
+		t.Fatalf("write stale dir file: %v", err)
+	}
+
+	pruned, err := PruneStaleTemplates(dir)
+	if err != nil {
+		t.Fatalf("PruneStaleTemplates: %v", err)
+	}
+	if pruned < 2 {
+		t.Errorf("expected at least 2 pruned (stale file + dir), got %d", pruned)
+	}
+
+	if _, err := os.Stat(staleFile); !os.IsNotExist(err) {
+		t.Error("stale research file should be removed")
+	}
+	if _, err := os.Stat(staleDir); !os.IsNotExist(err) {
+		t.Error("stale research directory should be removed")
+	}
+
+	// Current research files must remain
+	indexPath := filepath.Join(dir, "docs", "compound", "research", "index.md")
+	if _, err := os.Stat(indexPath); err != nil {
+		t.Errorf("index.md should be preserved: %v", err)
 	}
 }
 

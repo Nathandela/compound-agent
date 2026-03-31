@@ -9,11 +9,92 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/nathandelacretaz/compound-agent/internal/setup/templates"
 )
+
+// SkillEntry represents a single skill in the compiled index.
+type SkillEntry struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Phase       string `json:"phase,omitempty"`
+	Dir         string `json:"dir"`
+}
+
+// SkillsIndex is the top-level structure of skills_index.json.
+type SkillsIndex struct {
+	Skills []SkillEntry `json:"skills"`
+}
+
+// extractFrontmatter extracts YAML frontmatter fields from SKILL.md content.
+func extractFrontmatter(content string) (name, description, phase string) {
+	lines := strings.Split(content, "\n")
+	inFrontmatter := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "---" {
+			if inFrontmatter {
+				break
+			}
+			inFrontmatter = true
+			continue
+		}
+		if !inFrontmatter {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "name:") {
+			name = stripYAMLQuotes(strings.TrimSpace(strings.TrimPrefix(trimmed, "name:")))
+		} else if strings.HasPrefix(trimmed, "description:") {
+			description = stripYAMLQuotes(strings.TrimSpace(strings.TrimPrefix(trimmed, "description:")))
+		} else if strings.HasPrefix(trimmed, "phase:") {
+			phase = stripYAMLQuotes(strings.TrimSpace(strings.TrimPrefix(trimmed, "phase:")))
+		}
+	}
+	return
+}
+
+// stripYAMLQuotes removes surrounding single or double quotes from a YAML value.
+func stripYAMLQuotes(s string) string {
+	if len(s) >= 2 && ((s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'')) {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+// CompileSkillsIndex pre-compiles a skills_index.json from embedded SKILL.md
+// frontmatter. Written to .claude/skills/compound/skills_index.json during setup.
+func CompileSkillsIndex(repoRoot string) error {
+	skills := templates.PhaseSkills()
+	var entries []SkillEntry
+	for dir, content := range skills {
+		name, description, phase := extractFrontmatter(content)
+		entries = append(entries, SkillEntry{
+			Name:        name,
+			Description: description,
+			Phase:       phase,
+			Dir:         dir,
+		})
+	}
+
+	sort.Slice(entries, func(i, j int) bool {
+		return entries[i].Dir < entries[j].Dir
+	})
+
+	index := SkillsIndex{Skills: entries}
+	data, err := json.MarshalIndent(index, "", "  ")
+	if err != nil {
+		return fmt.Errorf("marshal skills index: %w", err)
+	}
+
+	indexPath := filepath.Join(repoRoot, ".claude", "skills", "compound", "skills_index.json")
+	if err := os.MkdirAll(filepath.Dir(indexPath), 0755); err != nil {
+		return fmt.Errorf("mkdir for skills index: %w", err)
+	}
+	return os.WriteFile(indexPath, data, 0644)
+}
 
 // docDatePattern matches last-updated frontmatter dates for normalization.
 var docDatePattern = regexp.MustCompile(`last-updated: "\d{4}-\d{2}-\d{2}"`)
@@ -69,12 +150,24 @@ func writeSkillFile(filePath string, content string) (bool, bool, error) {
 	return reconcileFile(filePath, content)
 }
 
+// substituteQualityGates replaces quality gate placeholders in content with the
+// detected stack commands.
+func substituteQualityGates(content string, stack StackInfo) string {
+	stack = stack.withFallbacks()
+	content = strings.ReplaceAll(content, "{{QUALITY_GATE_TEST}}", stack.TestCmd)
+	content = strings.ReplaceAll(content, "{{QUALITY_GATE_LINT}}", stack.LintCmd)
+	content = strings.ReplaceAll(content, "{{QUALITY_GATE_BUILD}}", stack.BuildCmd)
+	return content
+}
+
 // InstallPhaseSkills writes phase SKILL.md files to .claude/skills/compound/<phase>/SKILL.md.
-// Also writes reference files alongside skills. Creates missing and updates stale files.
-// Returns (created, updated, error).
-func InstallPhaseSkills(repoRoot string) (int, int, error) {
+// Also writes reference files alongside skills. Substitutes quality gate
+// placeholders with detected stack commands.
+// Creates missing and updates stale files. Returns (created, updated, error).
+func InstallPhaseSkills(repoRoot string, stack StackInfo) (int, int, error) {
 	created, updated := 0, 0
 	for phase, content := range templates.PhaseSkills() {
+		content = substituteQualityGates(content, stack)
 		filePath := filepath.Join(repoRoot, ".claude", "skills", "compound", phase, "SKILL.md")
 		c, u, err := writeSkillFile(filePath, content)
 		if err != nil {
@@ -89,6 +182,7 @@ func InstallPhaseSkills(repoRoot string) (int, int, error) {
 	}
 
 	for relPath, content := range templates.PhaseSkillReferences() {
+		content = substituteQualityGates(content, stack)
 		filePath := filepath.Join(repoRoot, ".claude", "skills", "compound", relPath)
 		c, u, err := writeSkillFile(filePath, content)
 		if err != nil {
@@ -110,12 +204,37 @@ func InstallPhaseSkills(repoRoot string) (int, int, error) {
 // Creates missing and updates stale files. Returns (created, updated, error).
 func InstallAgentRoleSkills(repoRoot string) (int, int, error) {
 	created, updated := 0, 0
+	agentsDir := filepath.Join(repoRoot, ".claude", "skills", "compound", "agents")
 	for role, content := range templates.AgentRoleSkills() {
-		skillDir := filepath.Join(repoRoot, ".claude", "skills", "compound", "agents", role)
+		skillDir := filepath.Join(agentsDir, role)
 		if err := os.MkdirAll(skillDir, 0755); err != nil {
 			return created, updated, fmt.Errorf("mkdir %s: %w", skillDir, err)
 		}
-		filePath := filepath.Join(skillDir, "SKILL.md")
+		c, u, err := reconcileFile(filepath.Join(skillDir, "SKILL.md"), content)
+		if err != nil {
+			return created, updated, err
+		}
+		if c {
+			created++
+		}
+		if u {
+			updated++
+		}
+	}
+	c, u, err := installAgentRoleSkillReferences(agentsDir)
+	created += c
+	updated += u
+	return created, updated, err
+}
+
+// installAgentRoleSkillReferences writes reference files for agent role skills.
+func installAgentRoleSkillReferences(agentsDir string) (int, int, error) {
+	created, updated := 0, 0
+	for relPath, content := range templates.AgentRoleSkillReferences() {
+		filePath := filepath.Join(agentsDir, relPath)
+		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
+			return created, updated, fmt.Errorf("mkdir %s: %w", filepath.Dir(filePath), err)
+		}
 		c, u, err := reconcileFile(filePath, content)
 		if err != nil {
 			return created, updated, err
@@ -131,9 +250,10 @@ func InstallAgentRoleSkills(repoRoot string) (int, int, error) {
 }
 
 // InstallDocTemplates writes documentation .md files to docs/compound/.
-// Substitutes {{VERSION}} and {{DATE}} placeholders. Creates missing and updates
-// stale files (date-only changes are ignored). Returns (created, updated, error).
-func InstallDocTemplates(repoRoot string, version string) (int, int, error) {
+// Substitutes {{VERSION}}, {{DATE}}, and quality gate placeholders.
+// Creates missing and updates stale files (date-only changes are ignored).
+// Returns (created, updated, error).
+func InstallDocTemplates(repoRoot string, version string, stack StackInfo) (int, int, error) {
 	dir := filepath.Join(repoRoot, "docs", "compound")
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return 0, 0, fmt.Errorf("mkdir %s: %w", dir, err)
@@ -145,6 +265,7 @@ func InstallDocTemplates(repoRoot string, version string) (int, int, error) {
 		filePath := filepath.Join(dir, filename)
 		content := strings.ReplaceAll(tmpl, "{{VERSION}}", version)
 		content = strings.ReplaceAll(content, "{{DATE}}", date)
+		content = substituteQualityGates(content, stack)
 
 		existing, err := os.ReadFile(filePath)
 		if errors.Is(err, os.ErrNotExist) {
@@ -162,6 +283,32 @@ func InstallDocTemplates(repoRoot string, version string) (int, int, error) {
 			if wErr := os.WriteFile(filePath, []byte(content), 0644); wErr != nil {
 				return created, updated, fmt.Errorf("write %s: %w", filePath, wErr)
 			}
+			updated++
+		}
+	}
+	return created, updated, nil
+}
+
+// InstallResearchDocs writes research documentation files to docs/compound/research/.
+// Walks the embedded research tree and creates intermediate directories as needed.
+// Creates missing and updates stale files. Returns (created, updated, error).
+func InstallResearchDocs(repoRoot string) (int, int, error) {
+	researchDir := filepath.Join(repoRoot, "docs", "compound", "research")
+	if err := os.MkdirAll(researchDir, 0755); err != nil {
+		return 0, 0, fmt.Errorf("mkdir %s: %w", researchDir, err)
+	}
+
+	created, updated := 0, 0
+	for relPath, content := range templates.ResearchDocs() {
+		filePath := filepath.Join(researchDir, filepath.FromSlash(relPath))
+		c, u, err := writeSkillFile(filePath, content)
+		if err != nil {
+			return created, updated, err
+		}
+		if c {
+			created++
+		}
+		if u {
 			updated++
 		}
 	}
@@ -261,10 +408,8 @@ func CreatePluginManifest(repoRoot string, version string) (bool, bool, error) {
 // PruneStaleTemplates removes managed files and directories that no longer
 // exist in the current template set. Only touches compound/ namespaces.
 // Returns count of items removed.
-func PruneStaleTemplates(repoRoot string) (int, error) {
+func pruneFlatDirs(repoRoot string) (int, error) {
 	pruned := 0
-
-	// Flat directories: prune files not in current template set
 	flatDirs := []struct {
 		dir      string
 		expected map[string]string
@@ -280,10 +425,29 @@ func PruneStaleTemplates(repoRoot string) (int, error) {
 		}
 		pruned += n
 	}
+	return pruned, nil
+}
+
+// PruneStaleTemplates removes installed templates that no longer
+// exist in the current template set. Only touches compound/ namespaces.
+// Returns count of items removed.
+func PruneStaleTemplates(repoRoot string) (int, error) {
+	pruned, err := pruneFlatDirs(repoRoot)
+	if err != nil {
+		return pruned, err
+	}
+
+	// Research docs: prune stale files and directories
+	researchDir := filepath.Join(repoRoot, "docs", "compound", "research")
+	n, err := pruneResearchInternals(researchDir)
+	if err != nil {
+		return pruned, err
+	}
+	pruned += n
 
 	// Phase skills: prune stale phase directories (skip "agents/" subdir)
 	skillsDir := filepath.Join(repoRoot, ".claude", "skills", "compound")
-	n, err := pruneStaleSubdirs(skillsDir, templates.PhaseSkills(), []string{"agents"})
+	n, err = pruneStaleSubdirs(skillsDir, templates.PhaseSkills(), []string{"agents"})
 	if err != nil {
 		return pruned, err
 	}
@@ -305,7 +469,31 @@ func PruneStaleTemplates(repoRoot string) (int, error) {
 	}
 	pruned += n
 
+	// Agent role skill internals: prune retired nested files/dirs (for example
+	// old references under a still-valid role directory).
+	n, err = pruneAgentRoleSkillInternals(rolesDir)
+	if err != nil {
+		return pruned, err
+	}
+	pruned += n
+
 	return pruned, nil
+}
+
+// pruneResearchInternals removes files and directories from the research tree
+// that no longer exist in the embedded template set.
+func pruneResearchInternals(researchDir string) (int, error) {
+	expectedFiles := make(map[string]bool)
+	expectedDirs := make(map[string]bool)
+
+	for relPath := range templates.ResearchDocs() {
+		expectedFiles[relPath] = true
+		for dir := path.Dir(relPath); dir != "." && dir != ""; dir = path.Dir(dir) {
+			expectedDirs[dir] = true
+		}
+	}
+
+	return pruneManagedSubtree(researchDir, "", expectedFiles, expectedDirs, nil)
 }
 
 // prunePhaseSkillInternals removes retired files and directories inside current
@@ -325,7 +513,32 @@ func prunePhaseSkillInternals(skillsDir string) (int, error) {
 		}
 	}
 
+	// Preserve generated files at the skills root. Added after the loop
+	// because skills_index.json is generated by CompileSkillsIndex, not
+	// embedded in templates — it must not be pruned as stale.
+	expectedFiles["skills_index.json"] = true
+
 	return pruneManagedSubtree(skillsDir, "", expectedFiles, expectedDirs, map[string]bool{"agents": true})
+}
+
+// pruneAgentRoleSkillInternals removes retired files and directories inside current
+// agent role skill directories while preserving the current SKILL.md and reference files.
+func pruneAgentRoleSkillInternals(rolesDir string) (int, error) {
+	expectedFiles := make(map[string]bool)
+	expectedDirs := make(map[string]bool)
+
+	for role := range templates.AgentRoleSkills() {
+		expectedDirs[role] = true
+		expectedFiles[path.Join(role, "SKILL.md")] = true
+	}
+	for relPath := range templates.AgentRoleSkillReferences() {
+		expectedFiles[relPath] = true
+		for dir := path.Dir(relPath); dir != "." && dir != ""; dir = path.Dir(dir) {
+			expectedDirs[dir] = true
+		}
+	}
+
+	return pruneManagedSubtree(rolesDir, "", expectedFiles, expectedDirs, nil)
 }
 
 // pruneStaleFiles removes files from dir that are not in the expected map (by filename key).

@@ -229,8 +229,8 @@ func TestBuildDSN(t *testing.T) {
 		isMemory bool
 		want     string
 	}{
-		{"test.sqlite", false, "test.sqlite?_journal_mode=WAL"},
-		{"test.sqlite?mode=rwc", false, "test.sqlite?mode=rwc&_journal_mode=WAL"},
+		{"test.sqlite", false, "test.sqlite?_journal_mode=WAL&_busy_timeout=5000"},
+		{"test.sqlite?mode=rwc", false, "test.sqlite?mode=rwc&_journal_mode=WAL&_busy_timeout=5000"},
 		{":memory:", true, ":memory:"},
 		{"file::memory:?cache=shared", true, "file::memory:?cache=shared"},
 	}
@@ -239,6 +239,119 @@ func TestBuildDSN(t *testing.T) {
 		if got != tt.want {
 			t.Errorf("buildDSN(%q, %v) = %q, want %q", tt.path, tt.isMemory, got, tt.want)
 		}
+	}
+}
+
+func TestOpenDB_TelemetryTable(t *testing.T) {
+	db, err := OpenDB(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	// Verify telemetry table exists
+	var name string
+	err = db.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='telemetry'").Scan(&name)
+	if err != nil {
+		t.Fatalf("telemetry table not found: %v", err)
+	}
+
+	// Verify telemetry columns
+	expectedCols := []string{
+		"id", "timestamp", "event_type", "hook_name", "phase",
+		"duration_ms", "success", "query_hash", "metadata",
+	}
+	rows, err := db.Query("PRAGMA table_info(telemetry)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	var columns []string
+	for rows.Next() {
+		var cid int
+		var colName, typ string
+		var notnull int
+		var dflt sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &colName, &typ, &notnull, &dflt, &pk); err != nil {
+			t.Fatal(err)
+		}
+		columns = append(columns, colName)
+	}
+
+	if len(columns) != len(expectedCols) {
+		t.Fatalf("telemetry: got %d columns, want %d: %v", len(columns), len(expectedCols), columns)
+	}
+	for i, col := range columns {
+		if col != expectedCols[i] {
+			t.Errorf("telemetry column %d: got %q, want %q", i, col, expectedCols[i])
+		}
+	}
+}
+
+func TestOpenDB_TelemetryInsert(t *testing.T) {
+	db, err := OpenDB(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`INSERT INTO telemetry (timestamp, event_type, hook_name, phase, duration_ms, success, query_hash, metadata)
+		VALUES ('2026-01-01T00:00:00Z', 'hook_execution', 'user-prompt', 'retrieve', 42, 1, 'abc123', '{"key":"val"}')`)
+	if err != nil {
+		t.Fatalf("insert telemetry: %v", err)
+	}
+
+	var id int64
+	var eventType, hookName string
+	var durationMs int64
+	var success int
+	err = db.QueryRow("SELECT id, event_type, hook_name, duration_ms, success FROM telemetry WHERE id = 1").
+		Scan(&id, &eventType, &hookName, &durationMs, &success)
+	if err != nil {
+		t.Fatalf("query telemetry: %v", err)
+	}
+	if eventType != "hook_execution" || hookName != "user-prompt" || durationMs != 42 || success != 1 {
+		t.Errorf("got (%q, %q, %d, %d), want (hook_execution, user-prompt, 42, 1)", eventType, hookName, durationMs, success)
+	}
+}
+
+func TestOpenDB_TelemetryIndex(t *testing.T) {
+	db, err := OpenDB(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	expectedIndexes := []string{
+		"idx_telemetry_timestamp",
+		"idx_telemetry_event_type",
+		"idx_telemetry_hook_name",
+	}
+	for _, idx := range expectedIndexes {
+		var name string
+		err := db.QueryRow("SELECT name FROM sqlite_master WHERE type='index' AND name=?", idx).Scan(&name)
+		if err != nil {
+			t.Errorf("index %q not found: %v", idx, err)
+		}
+	}
+}
+
+func TestOpenDB_SchemaVersionIs7(t *testing.T) {
+	db, err := OpenDB(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	var version int
+	err = db.QueryRow("PRAGMA user_version").Scan(&version)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if version != 7 {
+		t.Errorf("schema version = %d, want 7", version)
 	}
 }
 

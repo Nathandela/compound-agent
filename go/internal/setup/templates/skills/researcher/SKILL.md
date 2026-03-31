@@ -1,6 +1,7 @@
 ---
 name: Researcher
 description: Deep research producing structured survey documents for informed decision-making
+phase: spec-dev
 ---
 
 # Researcher Skill

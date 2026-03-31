@@ -52,6 +52,18 @@ Deep research produced via `/compound:get-a-phd` for agent domain knowledge. Eac
 | [security/data-exposure.md](security/data-exposure.md) | security-reviewer, security-data |
 | [security/dependency-security.md](security/dependency-security.md) | security-reviewer, security-deps |
 
+### Architecture & Domain Modeling
+
+| Document | Target Agents |
+|----------|---------------|
+| [q-and-a/architecture-domain-modeling.md](q-and-a/architecture-domain-modeling.md) | architect, spec-writer, decomposition-planner; covers DDD, ADRs, prior art survey, constraint discovery, ATAM/SAAM/CBAM, AI-native patterns |
+
+### Pipeline Measurement Science
+
+| Document | Target Agents |
+|----------|---------------|
+| [q-and-a/measurement-science.md](q-and-a/measurement-science.md) | implementation-reviewer, anti-cargo-cult-reviewer, drift-detector; covers SNR/precision-recall, ablation methodology, ODC defect taxonomy, cost-benefit analysis, reviewer redundancy detection, model capability tracking |
+
 ## Existing Analysis
 
 | Document | Description |

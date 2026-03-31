@@ -1,6 +1,6 @@
 ---
-version: "1.8.0"
-last-updated: "2026-03-15"
+version: "2.2.1"
+last-updated: "2026-03-24"
 summary: "Complete CLI command reference for compound-agent"
 ---
 
@@ -78,17 +78,21 @@ ca prime                                 # Reload workflow context after compact
 
 ```bash
 ca init                    # Initialize in current repo
-ca init --skip-hooks       # Skip hook installation
+ca init --skip-agents      # Skip AGENTS.md and template installation
+ca init --skip-hooks       # Skip git hook installation
+ca init --skip-claude      # Skip Claude Code hooks
 ca init --json             # Output result as JSON
-ca init --repo-root <path> # Specify repository root
 ca setup                   # Full setup (init + hooks + templates)
-ca setup --skip-hooks      # Skip hook installation
-ca setup --json            # Output result as JSON
-ca setup --repo-root <path> # Specify repository root
+ca setup --update          # Regenerate templates (preserves user files)
+ca setup --uninstall       # Remove compound-agent integration
+ca setup --status          # Show installation status
 ca setup claude            # Install Claude Code hooks only
 ca setup claude --status   # Check hook status
-ca setup claude --uninstall # Remove Claude Code hooks
+ca setup claude --dry-run  # Preview changes without writing
 ca setup claude --global   # Use global ~/.claude/ settings
+ca setup claude --uninstall # Remove compound-agent hooks
+ca download-model          # Download embedding model (~23MB)
+ca download-model --json   # Output result as JSON
 ```
 
 ## Reviewer commands

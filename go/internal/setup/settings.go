@@ -13,18 +13,19 @@ import (
 
 // HookMarkers are strings that identify compound-agent hooks in settings.json.
 var HookMarkers = []string{
-	"ca prime",
+	"BIN prime",
+	"BIN load-session",
 	"ca load-session",
 	"compound-agent load-session",
-	"ca hooks run user-prompt",
-	"ca hooks run post-tool-failure",
-	"ca hooks run post-tool-success",
-	"ca hooks run phase-guard",
-	"ca hooks run read-tracker",
-	"ca hooks run stop-audit",
-	"ca hooks run post-read",
-	"ca hooks run phase-audit",
-	"ca index-docs",
+	"BIN hooks run user-prompt",
+	"BIN hooks run post-tool-failure",
+	"BIN hooks run post-tool-success",
+	"BIN hooks run phase-guard",
+	"BIN hooks run read-tracker",
+	"BIN hooks run stop-audit",
+	"BIN hooks run post-read",
+	"BIN hooks run phase-audit",
+	"BIN index-docs",
 	"hook-runner.js",
 }
 
@@ -32,6 +33,66 @@ var HookMarkers = []string{
 var HookTypes = []string{
 	"SessionStart", "PreCompact", "UserPromptSubmit",
 	"PostToolUseFailure", "PostToolUse", "PreToolUse", "Stop",
+}
+
+type managedHookSpec struct {
+	hookType     string
+	matcher      string
+	markers      []string
+	buildCommand func(binaryPath string) string
+}
+
+var managedHookSpecs = []managedHookSpec{
+	{hookType: "SessionStart", matcher: "", markers: []string{"BIN prime"}, buildCommand: makePrimeCommand},
+	{hookType: "PreCompact", matcher: "", markers: []string{"BIN prime"}, buildCommand: makePrimeCommand},
+	{
+		hookType: "UserPromptSubmit",
+		matcher:  "",
+		markers:  []string{"BIN hooks run user-prompt", "hook-runner.js\" user-prompt"},
+		buildCommand: func(binaryPath string) string {
+			return makeHookCommand(binaryPath, "user-prompt")
+		},
+	},
+	{
+		hookType: "PostToolUseFailure",
+		matcher:  "Bash|Edit|Write",
+		markers:  []string{"BIN hooks run post-tool-failure", "hook-runner.js\" post-tool-failure"},
+		buildCommand: func(binaryPath string) string {
+			return makeHookCommand(binaryPath, "post-tool-failure")
+		},
+	},
+	{
+		hookType: "PostToolUse",
+		matcher:  "Bash|Edit|Write",
+		markers:  []string{"BIN hooks run post-tool-success", "hook-runner.js\" post-tool-success"},
+		buildCommand: func(binaryPath string) string {
+			return makeHookCommand(binaryPath, "post-tool-success")
+		},
+	},
+	{
+		hookType: "PostToolUse",
+		matcher:  "Read",
+		markers:  []string{"BIN hooks run post-read", "BIN hooks run read-tracker", "hook-runner.js\" post-read"},
+		buildCommand: func(binaryPath string) string {
+			return makeHookCommand(binaryPath, "post-read")
+		},
+	},
+	{
+		hookType: "PreToolUse",
+		matcher:  "Edit|Write",
+		markers:  []string{"BIN hooks run phase-guard", "hook-runner.js\" phase-guard"},
+		buildCommand: func(binaryPath string) string {
+			return makeHookCommand(binaryPath, "phase-guard")
+		},
+	},
+	{
+		hookType: "Stop",
+		matcher:  "",
+		markers:  []string{"BIN hooks run phase-audit", "BIN hooks run stop-audit", "hook-runner.js\" phase-audit"},
+		buildCommand: func(binaryPath string) string {
+			return makeHookCommand(binaryPath, "phase-audit")
+		},
+	},
 }
 
 // ReadClaudeSettings reads and parses a Claude Code settings.json file.
@@ -145,13 +206,107 @@ func hasHookMarker(arr []any, markers []string) bool {
 			}
 			cmd, _ := hMap["command"].(string)
 			for _, marker := range markers {
-				if strings.Contains(cmd, marker) {
+				if commandHasMarker(cmd, marker) {
 					return true
 				}
 			}
 		}
 	}
 	return false
+}
+
+func normalizeManagedCommand(cmd string) string {
+	trimmed := strings.TrimSpace(cmd)
+	if strings.HasPrefix(trimmed, "npx ca ") {
+		return "BIN " + strings.TrimPrefix(trimmed, "npx ca ")
+	}
+	if strings.HasPrefix(trimmed, "'") {
+		if end := strings.Index(trimmed[1:], "'"); end >= 0 {
+			return "BIN" + trimmed[end+2:]
+		}
+	}
+	if idx := strings.Index(trimmed, " "); idx >= 0 {
+		first := trimmed[:idx]
+		if first == "ca" || strings.HasSuffix(first, "/ca") {
+			return "BIN" + trimmed[idx:]
+		}
+	}
+	return trimmed
+}
+
+func commandHasMarker(cmd, marker string) bool {
+	if strings.Contains(cmd, marker) {
+		return true
+	}
+	if strings.HasPrefix(marker, "BIN ") {
+		return strings.Contains(normalizeManagedCommand(cmd), marker)
+	}
+	return false
+}
+
+func hookHasMarker(hook any, markers []string) bool {
+	hMap, ok := hook.(map[string]any)
+	if !ok {
+		return false
+	}
+	cmd, _ := hMap["command"].(string)
+	for _, marker := range markers {
+		if commandHasMarker(cmd, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+func filterHookEntries(arr []any, markers []string) ([]any, int, string) {
+	filtered := make([]any, 0, len(arr))
+	matchCount := 0
+	firstCommand := ""
+
+	for _, entry := range arr {
+		entryMap, ok := entry.(map[string]any)
+		if !ok {
+			filtered = append(filtered, entry)
+			continue
+		}
+		hooksList, ok := entryMap["hooks"].([]any)
+		if !ok {
+			filtered = append(filtered, entry)
+			continue
+		}
+
+		keptHooks := make([]any, 0, len(hooksList))
+		removedAny := false
+		for _, hook := range hooksList {
+			if hookHasMarker(hook, markers) {
+				if firstCommand == "" {
+					hMap, _ := hook.(map[string]any)
+					firstCommand, _ = hMap["command"].(string)
+				}
+				matchCount++
+				removedAny = true
+				continue
+			}
+			keptHooks = append(keptHooks, hook)
+		}
+
+		if !removedAny {
+			filtered = append(filtered, entry)
+			continue
+		}
+		if len(keptHooks) == 0 {
+			continue
+		}
+
+		cloned := make(map[string]any, len(entryMap))
+		for key, value := range entryMap {
+			cloned[key] = value
+		}
+		cloned["hooks"] = keptHooks
+		filtered = append(filtered, cloned)
+	}
+
+	return filtered, matchCount, firstCommand
 }
 
 // upgradeNpxHooks replaces "npx ca" commands with the direct binary path.
@@ -196,52 +351,14 @@ func AddAllHooks(settings map[string]any, binaryPath string) {
 	// Upgrade existing npx-based hooks to use direct binary path
 	upgradeNpxHooks(hooks, binaryPath)
 
-	// SessionStart
-	arr := getHookArray(hooks, "SessionStart")
-	if !hasHookMarker(arr, []string{"ca prime"}) {
-		hooks["SessionStart"] = append(arr, hookEntry("", makePrimeCommand(binaryPath)))
-	}
-
-	// PreCompact
-	arr = getHookArray(hooks, "PreCompact")
-	if !hasHookMarker(arr, []string{"ca prime"}) {
-		hooks["PreCompact"] = append(arr, hookEntry("", makePrimeCommand(binaryPath)))
-	}
-
-	// UserPromptSubmit
-	arr = getHookArray(hooks, "UserPromptSubmit")
-	if !hasHookMarker(arr, []string{"ca hooks run user-prompt", "hook-runner.js\" user-prompt"}) {
-		hooks["UserPromptSubmit"] = append(arr, hookEntry("", makeHookCommand(binaryPath, "user-prompt")))
-	}
-
-	// PostToolUseFailure
-	arr = getHookArray(hooks, "PostToolUseFailure")
-	if !hasHookMarker(arr, []string{"ca hooks run post-tool-failure", "hook-runner.js\" post-tool-failure"}) {
-		hooks["PostToolUseFailure"] = append(arr, hookEntry("Bash|Edit|Write", makeHookCommand(binaryPath, "post-tool-failure")))
-	}
-
-	// PostToolUse - success reset
-	arr = getHookArray(hooks, "PostToolUse")
-	if !hasHookMarker(arr, []string{"ca hooks run post-tool-success", "hook-runner.js\" post-tool-success"}) {
-		hooks["PostToolUse"] = append(arr, hookEntry("Bash|Edit|Write", makeHookCommand(binaryPath, "post-tool-success")))
-	}
-
-	// PostToolUse - read tracker
-	arr = getHookArray(hooks, "PostToolUse")
-	if !hasHookMarker(arr, []string{"ca hooks run post-read", "ca hooks run read-tracker", "hook-runner.js\" post-read"}) {
-		hooks["PostToolUse"] = append(arr, hookEntry("Read", makeHookCommand(binaryPath, "post-read")))
-	}
-
-	// PreToolUse - phase guard
-	arr = getHookArray(hooks, "PreToolUse")
-	if !hasHookMarker(arr, []string{"ca hooks run phase-guard", "hook-runner.js\" phase-guard"}) {
-		hooks["PreToolUse"] = append(arr, hookEntry("Edit|Write", makeHookCommand(binaryPath, "phase-guard")))
-	}
-
-	// Stop - phase audit
-	arr = getHookArray(hooks, "Stop")
-	if !hasHookMarker(arr, []string{"ca hooks run phase-audit", "ca hooks run stop-audit", "hook-runner.js\" phase-audit"}) {
-		hooks["Stop"] = append(arr, hookEntry("", makeHookCommand(binaryPath, "phase-audit")))
+	for _, spec := range managedHookSpecs {
+		arr := getHookArray(hooks, spec.hookType)
+		filtered, _, firstCommand := filterHookEntries(arr, spec.markers)
+		command := spec.buildCommand(binaryPath)
+		if binaryPath == "" && firstCommand != "" && !strings.Contains(firstCommand, "npx ca ") {
+			command = firstCommand
+		}
+		hooks[spec.hookType] = append(filtered, hookEntry(spec.matcher, command))
 	}
 }
 
@@ -252,26 +369,12 @@ func HasAllHooks(settings map[string]any) bool {
 		return false
 	}
 
-	checks := []struct {
-		hookType string
-		markers  []string
-	}{
-		{"SessionStart", []string{"ca prime"}},
-		{"PreCompact", []string{"ca prime"}},
-		{"UserPromptSubmit", []string{"ca hooks run user-prompt", "hook-runner.js\" user-prompt"}},
-		{"PostToolUseFailure", []string{"ca hooks run post-tool-failure", "hook-runner.js\" post-tool-failure"}},
-		{"PostToolUse", []string{"ca hooks run post-tool-success", "hook-runner.js\" post-tool-success"}},
-		{"PostToolUse", []string{"ca hooks run post-read", "ca hooks run read-tracker", "hook-runner.js\" post-read"}},
-		{"PreToolUse", []string{"ca hooks run phase-guard", "hook-runner.js\" phase-guard"}},
-		{"Stop", []string{"ca hooks run phase-audit", "ca hooks run stop-audit", "hook-runner.js\" phase-audit"}},
-	}
-
-	for _, check := range checks {
-		arr, ok := hooks[check.hookType].([]any)
+	for _, spec := range managedHookSpecs {
+		arr, ok := hooks[spec.hookType].([]any)
 		if !ok {
 			return false
 		}
-		if !hasHookMarker(arr, check.markers) {
+		if !hasHookMarker(arr, spec.markers) {
 			return false
 		}
 	}
@@ -325,6 +428,25 @@ func HooksNeedUpgrade(settings map[string]any, binaryPath string) bool {
 	return false
 }
 
+// HooksNeedDedupe returns true if compound-agent hooks are duplicated and should be reconciled.
+func HooksNeedDedupe(settings map[string]any) bool {
+	hooks, ok := settings["hooks"].(map[string]any)
+	if !ok {
+		return false
+	}
+	for _, spec := range managedHookSpecs {
+		arr, ok := hooks[spec.hookType].([]any)
+		if !ok {
+			continue
+		}
+		_, matchCount, _ := filterHookEntries(arr, spec.markers)
+		if matchCount > 1 {
+			return true
+		}
+	}
+	return false
+}
+
 // isCompoundHookEntry returns true if the hook entry contains any compound-agent marker.
 func isCompoundHookEntry(entry any) bool {
 	entryMap, ok := entry.(map[string]any)
@@ -342,7 +464,7 @@ func isCompoundHookEntry(entry any) bool {
 		}
 		cmd, _ := hMap["command"].(string)
 		for _, marker := range HookMarkers {
-			if strings.Contains(cmd, marker) {
+			if commandHasMarker(cmd, marker) {
 				return true
 			}
 		}

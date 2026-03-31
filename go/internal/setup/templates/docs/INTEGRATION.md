@@ -52,7 +52,7 @@ The index is rebuilt automatically when the JSONL changes. Force rebuild with `c
 
 ## Claude Code hooks
 
-Compound-agent installs five hooks into `.claude/settings.json`:
+Compound-agent installs seven hooks into `.claude/settings.json`:
 
 | Hook | Trigger | Action |
 |------|---------|--------|
@@ -61,6 +61,8 @@ Compound-agent installs five hooks into `.claude/settings.json`:
 | **UserPromptSubmit** | Every user message | Detects correction/planning language, injects memory reminders |
 | **PostToolUseFailure** | Bash/Edit/Write failures | After 2 failures on same file or 3 total, suggests `ca search` |
 | **PostToolUse** | After successful tool use | Resets failure tracking; tracks skill file reads for phase guard |
+| **PreToolUse** | During cook-it phases | Enforces phase gates — prevents jumping ahead in the workflow |
+| **Stop** | Session end | Enforces phase gates — blocks stop if an active cook-it phase gate has not been verified |
 
 ### Memory usage during sessions
 

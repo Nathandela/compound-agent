@@ -28,6 +28,12 @@ const (
 	AgeFlagThresholdDays  = 90
 )
 
+// isQuiet returns true if the --quiet/-q global flag is set.
+func isQuiet(cmd *cobra.Command) bool {
+	q, _ := cmd.Root().PersistentFlags().GetBool("quiet")
+	return q
+}
+
 // RegisterCommands registers all CLI subcommands on the root cobra command.
 func RegisterCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(searchCmd())
@@ -44,6 +50,7 @@ func RegisterCommands(rootCmd *cobra.Command) {
 	registerScriptCommands(rootCmd)
 	registerMigrateCommands(rootCmd)
 	registerPhaseCommands(rootCmd)
+	registerHealthCommands(rootCmd)
 }
 
 // --- search command ---

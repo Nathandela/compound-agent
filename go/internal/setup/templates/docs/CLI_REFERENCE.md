@@ -6,7 +6,7 @@ summary: "Complete CLI command reference for compound-agent"
 
 # CLI Reference
 
-All commands use `npx ca` (or `npx compound-agent`). Global flags: `-v, --verbose` and `-q, --quiet`.
+All commands use `ca` (or `npx ca` if not in PATH). Global flags: `-v, --verbose` and `-q, --quiet`.
 
 ---
 
@@ -88,8 +88,11 @@ ca setup --uninstall       # Remove compound-agent integration
 ca setup --status          # Show installation status
 ca setup claude            # Install Claude Code hooks only
 ca setup claude --status   # Check hook status
-ca hooks                   # Install git hooks
+ca setup claude --dry-run  # Preview changes without writing
+ca setup claude --global   # Use global ~/.claude/ settings
+ca setup claude --uninstall # Remove compound-agent hooks
 ca download-model          # Download embedding model (~23MB)
+ca download-model --json   # Output result as JSON
 ```
 
 ## Reviewer commands

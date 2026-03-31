@@ -26,7 +26,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: After spec-dev, before any implementation.
 
-**What it does**: Reviews spec-dev output, spawns analysts, decomposes into tasks with acceptance criteria, creates beads issues, and creates Review + Compound blocking tasks.
+**What it does**: Reviews spec-dev output, spawns analysts, decomposes into tasks with acceptance criteria, writes an epic-local Verification Contract, creates beads issues, and creates Review + Compound blocking tasks.
 
 ### `/compound:work`
 
@@ -34,7 +34,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: After plan, when tasks are ready in beads.
 
-**What it does**: Picks tasks from `bd ready`, deploys an AgentTeam with test-writers and implementers, coordinates agent work, commits incrementally, runs `/implementation-reviewer` as mandatory gate.
+**What it does**: Picks tasks from `bd ready`, reads the epic's Acceptance Criteria and Verification Contract, deploys an AgentTeam with test-writers and implementers, coordinates agent work, commits incrementally, and produces the required evidence before `/implementation-reviewer`.
 
 ### `/compound:review`
 
@@ -42,7 +42,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: After all work tasks are closed.
 
-**What it does**: Runs quality gates, selects reviewer tier based on diff size (4-11 reviewers), spawns reviewers in an AgentTeam, classifies findings by severity, fixes all P1s, runs `/implementation-reviewer`.
+**What it does**: Runs baseline quality gates plus contract-required build checks, verifies Acceptance Criteria and Verification Contract evidence, selects reviewer tier based on diff size (4-11 reviewers), spawns reviewers in an AgentTeam, classifies findings by severity, fixes all P1s, runs `/implementation-reviewer`.
 
 ### `/compound:compound`
 
@@ -50,7 +50,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: After review is approved.
 
-**What it does**: Spawns an analysis pipeline (context-analyzer, lesson-extractor, pattern-matcher, solution-writer, compounding), applies quality filters, classifies items by type and severity, stores via `ca learn`, runs `ca verify-gates`.
+**What it does**: Spawns an analysis pipeline (context-analyzer, lesson-extractor, pattern-matcher, solution-writer, compounding), applies quality filters, classifies items by type and severity, stores via `ca learn`, checks for verification-contract drift, and runs `ca verify-gates`.
 
 ### `/compound:cook-it`
 
@@ -84,6 +84,22 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **What it does**: Runs the full audit first, then proposes concrete remediation actions for each gap found. Creates real content (AGENTS.md, docs/, ADRs, lint configs) generated from actual codebase analysis. Asks for user approval before each file creation.
 
+### `/compound:build-great-things`
+
+**Purpose**: Comprehensive playbook for building world-class websites, web apps, and dashboards.
+
+**When invoked**: When building a new website/web app from scratch, redesigning pages, adding polish/animations, fixing generic-looking UI, or improving visual hierarchy.
+
+**What it does**: Guides through a 6-phase build sequence (Foundation → Structure → Craft → Motion → Performance → Launch) with separate tracks for websites and web applications. Covers brand identity, IA, typography, color, scroll animations, micro-interactions, hover effects, loading/empty/error states, accessibility, SEO, and conversion optimization. Includes a mandatory quality checklist and anti-patterns for common AI laziness. References deep research on design theory, perceptual science, and UX methodology.
+
+### `/compound:architect`
+
+**Purpose**: Decompose a large system specification into cook-it-ready epic beads via DDD bounded contexts.
+
+**When invoked**: When a large system needs to be broken down into naturally-scoped epics before implementation.
+
+**What it does**: Runs 5 phases (Socratic → Spec → Decompose → Materialize → Launch) with human gates. Uses DDD bounded contexts, STPA analysis, and a 6-angle decomposition convoy. Optionally configures and launches the infinity loop with improvement programs.
+
 ---
 
 ## Skill invocation
@@ -102,6 +118,8 @@ Skills are invoked as Claude Code slash commands:
 /compound:get-a-phd <focus>       # Deep research for agent knowledge
 /compound:agentic-audit    # Audit codebase against agentic manifesto
 /compound:agentic-setup    # Audit then set up agentic infrastructure
+/compound:build-great-things   # Web design/development playbook
+/compound:architect        # System decomposition into epics
 /compound:learn-that       # Conversation-aware lesson capture with confirmation
 /compound:check-that       # Search lessons and apply to current work
 /compound:prime            # Prime session with workflow context

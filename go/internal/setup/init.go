@@ -33,6 +33,8 @@ type InitResult struct {
 	RoleSkillsUpdated   int
 	DocsInstalled       int
 	DocsUpdated         int
+	ResearchInstalled   int
+	ResearchUpdated     int
 	TemplatesPruned     int
 	AgentsMdUpdated     bool
 	ClaudeMdUpdated     bool
@@ -82,8 +84,9 @@ func initHooks(repoRoot string, binaryPath string, result *InitResult) error {
 
 	needsInstall := !HasAllHooks(settings)
 	needsUpgrade := HooksNeedUpgrade(settings, binaryPath)
+	needsDedupe := HooksNeedDedupe(settings)
 
-	if needsInstall || needsUpgrade {
+	if needsInstall || needsUpgrade || needsDedupe {
 		AddAllHooks(settings, binaryPath)
 		if err := WriteClaudeSettings(settingsPath, settings); err != nil {
 			return fmt.Errorf("write settings: %w", err)
@@ -95,6 +98,7 @@ func initHooks(repoRoot string, binaryPath string, result *InitResult) error {
 }
 
 // installTemplates installs all template assets (agents, commands, skills, docs).
+// Detects the project stack to substitute quality gate placeholders.
 func installTemplates(repoRoot string, result *InitResult) error {
 	version := build.Version
 
@@ -117,11 +121,13 @@ func installTemplates(repoRoot string, result *InitResult) error {
 	result.PluginCreated = created
 	result.PluginUpdated = pluginUpdated
 
-	return installTemplateGroups(repoRoot, version, result)
+	stack := DetectStack(repoRoot)
+	return installTemplateGroups(repoRoot, version, stack, result)
 }
 
 // installTemplateGroups installs agent, command, skill, role skill, and doc templates.
-func installTemplateGroups(repoRoot string, version string, result *InitResult) error {
+// Stack info is used to substitute quality gate placeholders in skills and docs.
+func installTemplateGroups(repoRoot string, version string, stack StackInfo, result *InitResult) error {
 	type installFunc struct {
 		fn   func() (int, int, error)
 		setN func(int)
@@ -133,12 +139,14 @@ func installTemplateGroups(repoRoot string, version string, result *InitResult) 
 			func(n int) { result.AgentsInstalled = n }, func(u int) { result.AgentsUpdated = u }, "agent templates"},
 		{func() (int, int, error) { return InstallWorkflowCommands(repoRoot) },
 			func(n int) { result.CommandsInstalled = n }, func(u int) { result.CommandsUpdated = u }, "workflow commands"},
-		{func() (int, int, error) { return InstallPhaseSkills(repoRoot) },
+		{func() (int, int, error) { return InstallPhaseSkills(repoRoot, stack) },
 			func(n int) { result.SkillsInstalled = n }, func(u int) { result.SkillsUpdated = u }, "phase skills"},
 		{func() (int, int, error) { return InstallAgentRoleSkills(repoRoot) },
 			func(n int) { result.RoleSkillsInstalled = n }, func(u int) { result.RoleSkillsUpdated = u }, "agent role skills"},
-		{func() (int, int, error) { return InstallDocTemplates(repoRoot, version) },
+		{func() (int, int, error) { return InstallDocTemplates(repoRoot, version, stack) },
 			func(n int) { result.DocsInstalled = n }, func(u int) { result.DocsUpdated = u }, "doc templates"},
+		{func() (int, int, error) { return InstallResearchDocs(repoRoot) },
+			func(n int) { result.ResearchInstalled = n }, func(u int) { result.ResearchUpdated = u }, "research docs"},
 	}
 
 	for _, g := range groups {
@@ -155,6 +163,10 @@ func installTemplateGroups(repoRoot string, version string, result *InitResult) 
 		return fmt.Errorf("prune stale templates: %w", err)
 	}
 	result.TemplatesPruned = pruned
+
+	if err := CompileSkillsIndex(repoRoot); err != nil {
+		return fmt.Errorf("compile skills index: %w", err)
+	}
 	return nil
 }
 
@@ -200,6 +212,7 @@ func EnsureGitignore(repoRoot string) error {
 .ca-phase-state.json
 .ca-failure-state.json
 .ca-read-state.json
+skills/compound/skills_index.json
 `
 
 	// If gitignore exists, check for our marker

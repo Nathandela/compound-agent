@@ -66,6 +66,7 @@ func TestPhaseSkills(t *testing.T) {
 	expected := []string{
 		"spec-dev", "plan", "work", "review", "compound",
 		"cook-it", "researcher", "test-cleaner", "agentic", "architect",
+		"qa-engineer",
 	}
 	for _, phase := range expected {
 		content, ok := skills[phase]
@@ -80,6 +81,59 @@ func TestPhaseSkills(t *testing.T) {
 	t.Logf("phase skills: %d", len(skills))
 }
 
+func TestPhaseSkills_QualityGatePlaceholders(t *testing.T) {
+	skills := PhaseSkills()
+
+	// Skills that must have quality gate placeholders
+	needsPlaceholders := []string{"cook-it", "review", "work", "compound", "agentic", "test-cleaner"}
+	for _, phase := range needsPlaceholders {
+		content, ok := skills[phase]
+		if !ok {
+			t.Errorf("missing phase skill: %s", phase)
+			continue
+		}
+		if !strings.Contains(content, "{{QUALITY_GATE_TEST}}") {
+			t.Errorf("phase skill %s missing {{QUALITY_GATE_TEST}} placeholder", phase)
+		}
+		if !strings.Contains(content, "{{QUALITY_GATE_LINT}}") {
+			t.Errorf("phase skill %s missing {{QUALITY_GATE_LINT}} placeholder", phase)
+		}
+		// Verify no hardcoded pnpm commands remain
+		if strings.Contains(content, "pnpm test") || strings.Contains(content, "pnpm lint") {
+			t.Errorf("phase skill %s still has hardcoded pnpm commands", phase)
+		}
+	}
+
+	needsBuildPlaceholder := []string{"cook-it", "review", "work", "compound"}
+	for _, phase := range needsBuildPlaceholder {
+		content, ok := skills[phase]
+		if !ok {
+			t.Errorf("missing phase skill: %s", phase)
+			continue
+		}
+		if !strings.Contains(content, "{{QUALITY_GATE_BUILD}}") {
+			t.Errorf("phase skill %s missing {{QUALITY_GATE_BUILD}} placeholder", phase)
+		}
+		if strings.Contains(content, "pnpm build") {
+			t.Errorf("phase skill %s still has hardcoded pnpm build", phase)
+		}
+	}
+}
+
+func TestPhaseSkills_VerificationContractInstructions(t *testing.T) {
+	skills := PhaseSkills()
+	for _, phase := range []string{"plan", "work", "review", "cook-it"} {
+		content, ok := skills[phase]
+		if !ok {
+			t.Errorf("missing phase skill: %s", phase)
+			continue
+		}
+		if !strings.Contains(content, "## Verification Contract") {
+			t.Errorf("phase skill %s missing Verification Contract guidance", phase)
+		}
+	}
+}
+
 func TestPhaseSkillReferences(t *testing.T) {
 	refs := PhaseSkillReferences()
 	if len(refs) == 0 {
@@ -91,9 +145,37 @@ func TestPhaseSkillReferences(t *testing.T) {
 		t.Error("missing spec-dev/references/spec-guide.md")
 	}
 
-	// Verify architect reference
-	if _, ok := refs["architect/references/infinity-loop.md"]; !ok {
-		t.Error("missing architect/references/infinity-loop.md")
+	// Verify architect advisory-fleet reference
+	if _, ok := refs["architect/references/advisory-fleet.md"]; !ok {
+		t.Error("missing architect/references/advisory-fleet.md")
+	}
+
+	// Verify qa-engineer references
+	expectedQAEngineer := []string{
+		"qa-engineer/references/exploratory-testing.md",
+		"qa-engineer/references/browser-automation.md",
+		"qa-engineer/references/constitution-schema.md",
+	}
+	for _, refPath := range expectedQAEngineer {
+		if _, ok := refs[refPath]; !ok {
+			t.Errorf("missing %s", refPath)
+		}
+	}
+
+	// Verify architect infinity-loop reference directory (nested)
+	expectedInfinityLoop := []string{
+		"architect/references/infinity-loop/README.md",
+		"architect/references/infinity-loop/pre-flight.md",
+		"architect/references/infinity-loop/memory-safety.md",
+		"architect/references/infinity-loop/epic-ordering.md",
+		"architect/references/infinity-loop/logging.md",
+		"architect/references/infinity-loop/review-fleet.md",
+		"architect/references/infinity-loop/troubleshooting.md",
+	}
+	for _, refPath := range expectedInfinityLoop {
+		if _, ok := refs[refPath]; !ok {
+			t.Errorf("missing %s", refPath)
+		}
 	}
 	t.Logf("phase skill references: %d", len(refs))
 }
@@ -157,6 +239,30 @@ func TestDocTemplates(t *testing.T) {
 	t.Logf("doc templates: %d", len(docs))
 }
 
+func TestDocTemplates_QualityGatePlaceholders(t *testing.T) {
+	docs := DocTemplates()
+	// WORKFLOW.md should have quality gate placeholders
+	content, ok := docs["WORKFLOW.md"]
+	if !ok {
+		t.Fatal("missing WORKFLOW.md doc template")
+	}
+	if !strings.Contains(content, "{{QUALITY_GATE_TEST}}") {
+		t.Error("WORKFLOW.md missing {{QUALITY_GATE_TEST}} placeholder")
+	}
+	if !strings.Contains(content, "{{QUALITY_GATE_LINT}}") {
+		t.Error("WORKFLOW.md missing {{QUALITY_GATE_LINT}} placeholder")
+	}
+	if !strings.Contains(content, "{{QUALITY_GATE_BUILD}}") {
+		t.Error("WORKFLOW.md missing {{QUALITY_GATE_BUILD}} placeholder")
+	}
+	if strings.Contains(content, "pnpm test") || strings.Contains(content, "pnpm lint") || strings.Contains(content, "pnpm build") {
+		t.Error("WORKFLOW.md still has hardcoded pnpm commands")
+	}
+	if !strings.Contains(content, "Verification Contract") {
+		t.Error("WORKFLOW.md missing Verification Contract guidance")
+	}
+}
+
 func TestAgentsMdTemplate(t *testing.T) {
 	tmpl := AgentsMdTemplate()
 	if tmpl == "" {
@@ -197,6 +303,48 @@ func TestPluginJSON(t *testing.T) {
 	if !strings.Contains(pj, "{{VERSION}}") {
 		t.Error("plugin.json missing {{VERSION}} placeholder")
 	}
+}
+
+func TestResearchDocs(t *testing.T) {
+	docs := ResearchDocs()
+	if len(docs) == 0 {
+		t.Fatal("expected research docs, got none")
+	}
+
+	// Verify expected research files exist (spot check key paths)
+	expected := []string{
+		"index.md",
+		"security/overview.md",
+		"security/injection-patterns.md",
+		"tdd/test-driven-development-methodology.md",
+		"code-review/systematic-review-methodology.md",
+		"learning-systems/knowledge-compounding-for-agents.md",
+		"property-testing/property-based-testing-and-invariants.md",
+	}
+	for _, relPath := range expected {
+		content, ok := docs[relPath]
+		if !ok {
+			t.Errorf("missing research doc: %s", relPath)
+			continue
+		}
+		if len(content) == 0 {
+			t.Errorf("research doc %s is empty", relPath)
+		}
+	}
+
+	// Verify nested directories are included
+	hasNested := false
+	for key := range docs {
+		if strings.Contains(key, "/") {
+			hasNested = true
+			break
+		}
+	}
+	if !hasNested {
+		t.Error("research docs should include nested paths (e.g., security/overview.md)")
+	}
+
+	t.Logf("research docs: %d", len(docs))
 }
 
 func TestConstants(t *testing.T) {
