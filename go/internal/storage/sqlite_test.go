@@ -3,6 +3,7 @@ package storage
 import (
 	"database/sql"
 	"os"
+	"syscall"
 	"testing"
 )
 
@@ -230,8 +231,8 @@ func TestBuildDSN(t *testing.T) {
 		isMemory bool
 		want     string
 	}{
-		{"test.sqlite", false, "test.sqlite?_journal_mode=WAL"},
-		{"test.sqlite?mode=rwc", false, "test.sqlite?mode=rwc&_journal_mode=WAL"},
+		{"test.sqlite", false, "test.sqlite?_journal_mode=WAL&_busy_timeout=5000"},
+		{"test.sqlite?mode=rwc", false, "test.sqlite?mode=rwc&_journal_mode=WAL&_busy_timeout=5000"},
 		{":memory:", true, ":memory:"},
 		{"file::memory:?cache=shared", true, "file::memory:?cache=shared"},
 	}
@@ -368,18 +369,25 @@ func TestOpenDB_FileLockOnRebuild(t *testing.T) {
 	db1.Exec("PRAGMA user_version = 1")
 	db1.Close()
 
-	// Verify lock file is created during rebuild and cleaned up after
+	// After OpenDB completes, flock is released (file may still exist on disk)
 	lockPath := dbPath + ".lock"
-	// After OpenDB completes, lock should be gone
 	db2, err := OpenDB(dbPath)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer db2.Close()
 
-	if _, err := os.Stat(lockPath); !os.IsNotExist(err) {
-		t.Error("lock file should be cleaned up after rebuild")
+	// With flock, the lock file persists but the OS lock is released.
+	// Verify we can acquire the lock again (proving it was released).
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		t.Fatal(err)
 	}
+	defer f.Close()
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		t.Error("flock should be released after rebuild completes")
+	}
+	syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 }
 
 func TestOpenDB_ConcurrentRebuild(t *testing.T) {
@@ -394,25 +402,27 @@ func TestOpenDB_ConcurrentRebuild(t *testing.T) {
 	db1.Exec("PRAGMA user_version = 1")
 	db1.Close()
 
-	// Simulate lock held by another process
+	// Simulate lock held by another process using flock
 	lockPath := dbPath + ".lock"
-	lockFile, err := os.Create(lockPath)
+	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		t.Fatal(err)
 	}
-	lockFile.Close()
+	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
+		t.Fatal(err)
+	}
 
-	// OpenDB should still work (skip rebuild since lock is held)
+	// OpenDB should still work (skip rebuild since flock is held)
 	db2, err := OpenDB(dbPath)
 	if err != nil {
-		// This is acceptable - lock prevents rebuild which may cause issues.
-		// But ideally we should open the stale DB rather than fail.
 		t.Logf("OpenDB with lock held: %v (acceptable)", err)
-		os.Remove(lockPath)
+		syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+		lockFile.Close()
 		return
 	}
 	defer db2.Close()
-	os.Remove(lockPath)
+	syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
+	lockFile.Close()
 }
 
 func TestOpenDB_VersionMismatch_Rebuild(t *testing.T) {

@@ -152,6 +152,9 @@ func QueryStats(db *sql.DB) (*Stats, error) {
 		}
 		stats.HookStats = append(stats.HookStats, hs)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
 
 	// Retrieval count
 	if err := db.QueryRow(

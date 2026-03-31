@@ -102,6 +102,10 @@ func RunHookWithTelemetry(hookName string, stdin io.Reader, stdout io.Writer, db
 		slog.Debug("telemetry write failed", "hook", hookName, "error", err)
 	}
 
+	if _, err := telemetry.PruneEvents(db, telemetry.MaxRows); err != nil {
+		slog.Debug("telemetry prune failed", "error", err)
+	}
+
 	return code
 }
 

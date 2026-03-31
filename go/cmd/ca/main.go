@@ -34,9 +34,9 @@ func buildHooksCmd() *cobra.Command {
 				slog.Debug("telemetry db unavailable", "error", err)
 				os.Exit(hook.RunHook(hookName, os.Stdin, os.Stdout))
 			}
-			defer db.Close()
 
 			exitCode := hook.RunHookWithTelemetry(hookName, os.Stdin, os.Stdout, db)
+			db.Close()
 			os.Exit(exitCode)
 		},
 	}

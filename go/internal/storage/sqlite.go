@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver registration
 )
@@ -165,24 +166,29 @@ func needsRebuild(path string) bool {
 	return version != SchemaVersion
 }
 
-// lockedRebuild acquires a file-based lock before deleting a stale DB.
-// If the lock is already held by another process, it skips the rebuild
-// and lets OpenDB attempt to open the (possibly stale) database.
+// lockedRebuild acquires an OS-level file lock (flock) before deleting a stale DB.
+// flock is automatically released on process death, preventing stale lock files.
+// If the lock is already held, it skips the rebuild and lets OpenDB proceed.
 func lockedRebuild(path string) error {
 	lockPath := path + ".lock"
 
-	// Try to acquire lock (exclusive create)
-	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		// Lock already held — skip rebuild, let OpenDB try with existing file
+		return fmt.Errorf("open lock file: %w", err)
+	}
+	defer f.Close()
+
+	// Non-blocking exclusive lock; skip rebuild if another process holds it.
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
 		return nil
 	}
-	f.Close()
-	defer os.Remove(lockPath)
+	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 
 	// Re-check after acquiring lock (another process may have rebuilt)
 	if needsRebuild(path) {
-		os.Remove(path)
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("remove stale db: %w", err)
+		}
 	}
 	return nil
 }
@@ -197,5 +203,5 @@ func buildDSN(path string, isMemory bool) string {
 	if strings.Contains(path, "?") {
 		sep = "&"
 	}
-	return path + sep + "_journal_mode=WAL"
+	return path + sep + "_journal_mode=WAL&_busy_timeout=5000"
 }
