@@ -103,42 +103,19 @@ const schemaDDL = `
 // For in-memory databases, pass ":memory:".
 // If the on-disk DB has an older schema version, it is deleted and recreated.
 func OpenDB(path string) (*sql.DB, error) {
-	isMemory := path == ":memory:"
-
-	if !isMemory {
-		dir := filepath.Dir(path)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return nil, fmt.Errorf("create dir: %w", err)
+	if path == ":memory:" {
+		db, err := sql.Open("sqlite3", path)
+		if err != nil {
+			return nil, fmt.Errorf("open: %w", err)
 		}
-
-		// Check existing DB version; use file-based lock to prevent
-		// concurrent processes from racing to delete/recreate the DB.
-		if needsRebuild(path) {
-			if err := lockedRebuild(path); err != nil {
-				return nil, fmt.Errorf("locked rebuild: %w", err)
-			}
-		}
+		return initSchema(db)
 	}
 
-	dsn := buildDSN(path, isMemory)
-
-	db, err := sql.Open("sqlite3", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("open: %w", err)
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("create dir: %w", err)
 	}
-
-	if _, err := db.Exec(schemaDDL); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("create schema: %w", err)
-	}
-
-	// Set schema version
-	if _, err := db.Exec(fmt.Sprintf("PRAGMA user_version = %d", SchemaVersion)); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("set version: %w", err)
-	}
-
-	return db, nil
+	return lockedOpenDB(path)
 }
 
 // OpenRepoDB opens the standard lessons.sqlite for a given repo root.
@@ -166,31 +143,52 @@ func needsRebuild(path string) bool {
 	return version != SchemaVersion
 }
 
-// lockedRebuild acquires an OS-level file lock (flock) before deleting a stale DB.
-// flock is automatically released on process death, preventing stale lock files.
-// If the lock is already held, it skips the rebuild and lets OpenDB proceed.
-func lockedRebuild(path string) error {
+// initSchema applies the DDL and sets the schema version on an open database.
+func initSchema(db *sql.DB) (*sql.DB, error) {
+	if _, err := db.Exec(schemaDDL); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("create schema: %w", err)
+	}
+	if _, err := db.Exec(fmt.Sprintf("PRAGMA user_version = %d", SchemaVersion)); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("set version: %w", err)
+	}
+	return db, nil
+}
+
+// lockedOpenDB acquires a blocking OS-level flock and holds it across the
+// entire check-version, remove-stale, open, apply-schema, set-version cycle.
+// This prevents concurrent processes from racing to delete/recreate the DB.
+// The flock is automatically released on process death.
+func lockedOpenDB(path string) (*sql.DB, error) {
 	lockPath := path + ".lock"
 
 	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
-		return fmt.Errorf("open lock file: %w", err)
+		return nil, fmt.Errorf("open lock file: %w", err)
 	}
 	defer f.Close()
 
-	// Non-blocking exclusive lock; skip rebuild if another process holds it.
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX|syscall.LOCK_NB); err != nil {
-		return nil
+	// Blocking exclusive lock; waits for other processes to finish.
+	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+		return nil, fmt.Errorf("flock: %w", err)
 	}
 	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 
-	// Re-check after acquiring lock (another process may have rebuilt)
+	// Under lock: check version, remove stale file if needed.
 	if needsRebuild(path) {
 		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return fmt.Errorf("remove stale db: %w", err)
+			return nil, fmt.Errorf("remove stale db: %w", err)
 		}
 	}
-	return nil
+
+	// Open (or create) the database and apply schema — still under lock.
+	dsn := buildDSN(path, false)
+	db, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("open: %w", err)
+	}
+	return initSchema(db)
 }
 
 // buildDSN constructs a SQLite DSN from a path, appending WAL journal mode

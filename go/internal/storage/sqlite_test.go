@@ -5,6 +5,7 @@ import (
 	"os"
 	"syscall"
 	"testing"
+	"time"
 )
 
 func TestOpenDB_InMemory(t *testing.T) {
@@ -412,17 +413,31 @@ func TestOpenDB_ConcurrentRebuild(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// OpenDB should still work (skip rebuild since flock is held)
-	db2, err := OpenDB(dbPath)
-	if err != nil {
-		t.Logf("OpenDB with lock held: %v (acceptable)", err)
-		syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
-		lockFile.Close()
-		return
-	}
-	defer db2.Close()
+	// OpenDB should block until lock is released (blocking flock).
+	done := make(chan error, 1)
+	go func() {
+		db2, err := OpenDB(dbPath)
+		if err != nil {
+			done <- err
+			return
+		}
+		db2.Close()
+		done <- nil
+	}()
+
+	// Release lock after a short delay, allowing OpenDB to proceed.
+	time.Sleep(50 * time.Millisecond)
 	syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN)
 	lockFile.Close()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("OpenDB after lock release: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("OpenDB blocked for too long after lock release")
+	}
 }
 
 func TestOpenDB_VersionMismatch_Rebuild(t *testing.T) {

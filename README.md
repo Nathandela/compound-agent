@@ -19,7 +19,7 @@ AI coding agents forget everything between sessions. Each session starts with wh
 | Component | What ships |
 |-----------|-----------|
 | 16 slash commands | `/compound:architect`, `cook-it`, `spec-dev`, `plan`, `work`, `review`, `compound`, `learn-that`, `check-that`, and more |
-| 11 agent role skills | TDD pair, drift detector, audit, research specialist, external reviewers, and more |
+| 26 agent role skills | TDD pair, drift detector, audit, research specialist, external reviewers, and more |
 | 7 automatic hooks | Fire on session start, prompt submit, tool use, tool failure, pre-compact, phase guard, and session stop |
 | 5 phase skill files | Full workflow instructions for `architect`, `spec-dev`, `cook-it`, `work`, and `review` |
 | 5 deployed docs | Workflow reference, CLI reference, skills guide, integration guide, and overview |

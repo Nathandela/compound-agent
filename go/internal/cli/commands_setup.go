@@ -462,7 +462,7 @@ func resolveBinaryPath() string {
 
 type doctorCheck struct {
 	Name   string `json:"name"`
-	Status string `json:"status"` // "pass", "fail", "warn"
+	Status string `json:"status"` // "pass", "fail", "warn", "info"
 	Fix    string `json:"fix,omitempty"`
 }
 
@@ -487,7 +487,7 @@ func doctorCmd() *cobra.Command {
 				return nil
 			}
 
-			passCount, failCount, warnCount := 0, 0, 0
+			passCount, failCount, warnCount, infoCount := 0, 0, 0, 0
 			for _, c := range checks {
 				icon := "[ok]"
 				switch c.Status {
@@ -497,6 +497,9 @@ func doctorCmd() *cobra.Command {
 				case "warn":
 					icon = "[WARN]"
 					warnCount++
+				case "info":
+					icon = "[INFO]"
+					infoCount++
 				default:
 					passCount++
 				}
@@ -507,7 +510,11 @@ func doctorCmd() *cobra.Command {
 			}
 
 			cmd.Println()
-			cmd.Printf("Results: %d passed, %d failed, %d warnings\n", passCount, failCount, warnCount)
+			if infoCount > 0 {
+				cmd.Printf("Results: %d passed, %d failed, %d warnings, %d info\n", passCount, failCount, warnCount, infoCount)
+			} else {
+				cmd.Printf("Results: %d passed, %d failed, %d warnings\n", passCount, failCount, warnCount)
+			}
 			return nil
 		},
 	}

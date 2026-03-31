@@ -51,7 +51,7 @@ C4Context
 
     Person(user, "Developer", "Uses compound-agent to improve AI-assisted development")
     System(ca, "Compound Agent CLI", "Go binary: memory, hooks, skills, telemetry, setup")
-    System(embed, "Embed Daemon", "Rust binary: local embedding generation via Transformers.js")
+    System(embed, "Embed Daemon", "Rust binary: local embedding generation via ONNX Runtime")
     System(cc, "Claude Code", "Anthropic's AI coding assistant — the host environment")
     System(npm, "npm Registry", "Distribution channel for platform binaries")
     SystemDb(sqlite, "SQLite + FTS5", "Lesson index, knowledge index, telemetry tables")

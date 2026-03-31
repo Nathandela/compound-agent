@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
@@ -188,6 +189,19 @@ func makeLessonSearchFunc(repoRoot string) LessonSearchFunc {
 		scored, err := sdb.SearchKeywordScoredORContext(ctx, tokens, limit, memory.TypeLesson)
 		if err != nil {
 			return nil, err
+		}
+
+		// Log lesson_retrieval telemetry event (best-effort).
+		if len(scored) > 0 {
+			query := strings.Join(tokens, " ")
+			ev := telemetry.Event{
+				EventType: telemetry.EventLessonRetrieval,
+				HookName:  "post-tool-failure",
+				QueryHash: telemetry.HashQuery(query),
+				Outcome:   telemetry.OutcomeSuccess,
+				Metadata:  map[string]interface{}{"result_count": len(scored)},
+			}
+			_ = telemetry.LogEvent(db, ev)
 		}
 
 		var matches []LessonMatch
