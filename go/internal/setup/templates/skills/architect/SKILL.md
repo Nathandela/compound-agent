@@ -176,15 +176,18 @@ This phase is OPT-IN. After Phase 4:
 
 5. **Launch in background**:
    Verify screen is available: \`command -v screen\`. If not, use \`nohup ./infinity-loop.sh > loop-output.log 2>&1 &\` as fallback.
+   Use a unique session name to avoid collisions when multiple loops run on the same host:
    \`\`\`bash
-   screen -dmS compound-loop ./infinity-loop.sh
+   LOOP_SESSION="compound-loop-$(basename $(pwd))"
+   screen -dmS "$LOOP_SESSION" ./infinity-loop.sh
+   echo "$LOOP_SESSION" > .beads/loop-session-name
    \`\`\`
-   Verify: \`screen -ls | grep compound-loop\`
+   Verify: \`screen -ls | grep "$LOOP_SESSION"\`
 
 6. **Report monitoring commands** to the user:
    - Live watch: \`ca watch\`
    - Status: \`cat agent_logs/.loop-status.json\`
-   - Attach: \`screen -r compound-loop\`
+   - Attach: \`screen -r $(cat .beads/loop-session-name)\`
    - Execution log: \`cat agent_logs/loop-execution.jsonl\`
    - For ongoing health monitoring, see the 30-minute probe protocol in the reference guide.
 

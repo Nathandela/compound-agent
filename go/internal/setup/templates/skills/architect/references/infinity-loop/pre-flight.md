@@ -42,10 +42,12 @@ It DOES print the epic ordering, dependency checks, and reviewer detection so yo
 
 ## Launch in Background
 
-**Preferred -- screen:**
+**Preferred -- screen** (use a unique session name to avoid collisions):
 ```bash
-screen -dmS compound-loop ./infinity-loop.sh
-screen -ls | grep compound-loop   # Verify launch
+LOOP_SESSION="compound-loop-$(basename $(pwd))"
+screen -dmS "$LOOP_SESSION" ./infinity-loop.sh
+echo "$LOOP_SESSION" > .beads/loop-session-name
+screen -ls | grep "$LOOP_SESSION"   # Verify launch
 ```
 
 **Fallback -- nohup** (when screen is unavailable):
@@ -64,8 +66,8 @@ echo $!   # Save PID for later
 | `cat agent_logs/.loop-status.json` | Current loop state |
 | `wc -l agent_logs/loop-execution.jsonl` | Count completed epics |
 | `grep '"result":"failed"' agent_logs/loop-execution.jsonl` | Find failures |
-| `screen -r compound-loop` | Attach to running loop (Ctrl-A D to detach) |
-| `screen -S compound-loop -X quit` | Kill the loop |
+| `screen -r $(cat .beads/loop-session-name)` | Attach to running loop (Ctrl-A D to detach) |
+| `screen -S $(cat .beads/loop-session-name) -X quit` | Kill the loop |
 
 ## 30-Minute Probe Protocol
 

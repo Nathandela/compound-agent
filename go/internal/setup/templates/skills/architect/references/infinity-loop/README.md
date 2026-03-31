@@ -39,7 +39,8 @@ Use this decision tree to find the right reference file:
 ```bash
 ca loop --force
 LOOP_DRY_RUN=1 ./infinity-loop.sh
-screen -dmS compound-loop ./infinity-loop.sh
+LOOP_SESSION="compound-loop-$(basename $(pwd))"
+screen -dmS "$LOOP_SESSION" ./infinity-loop.sh
 ```
 
 ### Full review fleet
