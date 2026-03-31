@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -52,8 +51,7 @@ func IsDaemonRunning(pidPath string) bool {
 	if err != nil {
 		return false
 	}
-	err = proc.Signal(syscall.Signal(0))
-	return err == nil
+	return processAlive(proc)
 }
 
 // EnsureDaemon ensures the daemon is running and returns a connected client.
@@ -102,10 +100,10 @@ func ensureDaemonLocked(sockPath, modelPath, tokenizerPath string) (*Client, err
 	defer lockFile.Close()
 
 	// Exclusive lock — blocks until other processes release
-	if err := syscall.Flock(int(lockFile.Fd()), syscall.LOCK_EX); err != nil {
+	if err := flockExclusive(lockFile); err != nil {
 		return nil, fmt.Errorf("acquire lock: %w", err)
 	}
-	defer func() { _ = syscall.Flock(int(lockFile.Fd()), syscall.LOCK_UN) }()
+	defer func() { _ = flockUnlock(lockFile) }()
 
 	// Re-check after acquiring lock — another process may have started the daemon
 	if client, err := tryConnect(sockPath); err == nil {

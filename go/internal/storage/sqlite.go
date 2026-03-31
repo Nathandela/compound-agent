@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 
 	_ "github.com/mattn/go-sqlite3" // SQLite driver registration
 )
@@ -173,10 +172,10 @@ func lockedOpenDB(path string) (*sql.DB, error) {
 	defer f.Close()
 
 	// Blocking exclusive lock; waits for other processes to finish.
-	if err := syscall.Flock(int(f.Fd()), syscall.LOCK_EX); err != nil {
+	if err := flockExclusive(f); err != nil {
 		return nil, fmt.Errorf("flock: %w", err)
 	}
-	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
+	defer flockUnlock(f)
 
 	// Under lock: check version, remove stale file if needed.
 	// Remove WAL/SHM alongside the main DB to prevent corruption from
