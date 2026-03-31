@@ -14,12 +14,12 @@ AI coding agents forget everything between sessions. Each session starts with wh
 
 ## What gets installed
 
-`npx ca setup` injects a complete development environment into your repository:
+`ca setup` injects a complete development environment into your repository:
 
 | Component | What ships |
 |-----------|-----------|
-| 15 slash commands | `/compound:architect`, `cook-it`, `spec-dev`, `plan`, `work`, `review`, `compound`, `learn-that`, `check-that`, and more |
-| 24 agent role skills | Security reviewers, TDD pair, decomposition convoy, spec writers, test analysers, drift detectors, and more |
+| 16 slash commands | `/compound:architect`, `cook-it`, `spec-dev`, `plan`, `work`, `review`, `compound`, `learn-that`, `check-that`, and more |
+| 26 agent role skills | Security reviewers, TDD pair, decomposition convoy, spec writers, test analysers, drift detectors, and more |
 | 7 automatic hooks | Fire on session start, prompt submit, tool use, tool failure, pre-compact, phase guard, and session stop |
 | 5 phase skill files | Full workflow instructions for `architect`, `spec-dev`, `cook-it`, `work`, and `review` |
 | 5 deployed docs | Workflow reference, CLI reference, skills guide, integration guide, and overview |
@@ -204,7 +204,7 @@ Once installed, seven Claude Code hooks fire without any commands:
 | `PostToolUseFailure` | After tool failure | Tracks failures; suggests memory search after repeated errors |
 | `Stop` | Session end | Audits session for uncaptured lessons and unclosed issues |
 
-No configuration needed. `npx ca setup` wires them into your `.claude/settings.json`.
+No configuration needed. `ca setup` wires them into your `.claude/settings.json`.
 
 ## `/compound:architect`
 
@@ -235,25 +235,24 @@ npx ca setup
 
 ### Requirements
 
-- Node.js >= 20
+- Node.js >= 20 (for `npx` wrapper — the CLI itself is a Go binary)
 - ~278MB disk space for the embedding model (one-time download, shared across projects)
-- ~23MB RAM during embedding operations (nomic-embed-text-v1.5 via Transformers.js)
+- Embedding runs via `ca-embed` Rust daemon (nomic-embed-text-v1.5 ONNX)
 
-### pnpm Users
+### Windows Users
 
-pnpm v9+ blocks native addon builds by default. Running `npx ca setup` automatically detects pnpm and adds the required config to your `package.json`.
+Compound-agent requires WSL2 on Windows. Native Windows is not supported due to CGO and Unix socket dependencies.
 
-If you prefer to configure manually, add to your `package.json`:
+```bash
+# Install WSL2 (PowerShell as admin)
+wsl --install
 
-```json
-{
-  "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "onnxruntime-node"]
-  }
-}
+# Then install and run compound-agent inside WSL2
+pnpm add -D compound-agent
+npx ca setup
 ```
 
-Then run `pnpm install`.
+Run `ca doctor` inside WSL2 to verify your environment.
 
 ## CLI Reference
 
@@ -380,16 +379,16 @@ confirmation_boost: confirmed=1.3, unconfirmed=1.0
 A: mem0 is a cloud memory layer for general AI agents. Compound Agent is local-first with git-tracked storage and local embeddings — no API keys or cloud services needed. It also goes beyond memory with structured workflows, multi-agent review, and issue tracking.
 
 **Q: Does this work offline?**
-A: Yes, completely. Embeddings run locally via @huggingface/transformers (Transformers.js). No network requests after the initial model download.
+A: Yes, completely. Embeddings run locally via the `ca-embed` Rust daemon (nomic-embed-text-v1.5 ONNX). No network requests after the initial model download.
 
 **Q: How much disk space does it need?**
 A: ~278MB for the embedding model (one-time download, shared across projects) plus negligible space for lessons.
 
 **Q: Can I use it with other AI coding tools?**
-A: The CLI (`ca`) works standalone with any tool. Full hook integration is available for Claude Code and Gemini CLI. The TypeScript API can be integrated into other tools.
+A: The CLI (`ca`) works standalone with any tool. Full hook integration is available for Claude Code and Gemini CLI.
 
 **Q: What happens if the embedding model isn't available?**
-A: Search gracefully falls back to keyword-only mode. Other commands that require embeddings will tell you what's missing. Run `npx ca doctor` to diagnose issues.
+A: Search gracefully falls back to keyword-only mode. Other commands that require embeddings will tell you what's missing. Run `ca doctor` to diagnose issues.
 
 **Q: Is the loop production-ready?**
 A: The loop works and has been used to ship real projects, including compound-agent itself. Long-duration autonomous runs across many epics are the current area of hardening. For 3–5 epic sequences, it is reliable today.
@@ -415,6 +414,48 @@ cd go && go vet -tags sqlite_fts5 ./...         # Static analysis
 | CLI | Cobra |
 | Release | GoReleaser |
 | Issue Tracking | Beads (bd) |
+
+## Architecture
+
+```mermaid
+graph TD
+    subgraph "Claude Code Session"
+        H[Hooks] -->|SessionStart| P[ca prime]
+        H -->|UserPromptSubmit| UP[user-prompt hook]
+        H -->|PostToolUseFailure| TF[failure tracker]
+        H -->|PreToolUse| PG[phase guard]
+        H -->|Stop| SA[stop audit]
+    end
+
+    subgraph "CLI (Go + Cobra)"
+        CA[ca binary] --> LEARN[ca learn]
+        CA --> SEARCH[ca search]
+        CA --> LOOP[ca loop]
+        CA --> SETUP[ca setup]
+        CA --> DOCTOR[ca doctor]
+    end
+
+    subgraph "Storage"
+        JSONL[".claude/lessons/index.jsonl<br/>(git-tracked source of truth)"]
+        SQLITE[".claude/.cache/lessons.sqlite<br/>(FTS5 search index)"]
+        JSONL -->|rebuild| SQLITE
+    end
+
+    subgraph "Embeddings"
+        EMBED["ca-embed (Rust daemon)"] -->|IPC via Unix socket| VEC[Vector similarity]
+    end
+
+    UP -->|inject lessons| SEARCH
+    TF -->|suggest search| SEARCH
+    LEARN --> JSONL
+    SEARCH --> SQLITE
+    SEARCH --> VEC
+```
+
+Three layers work together:
+- **Portable storage**: JSONL in git for conflict-free collaboration
+- **Fast index**: SQLite + FTS5 for keyword search, rebuilt from JSONL on demand
+- **Semantic search**: Rust embedding daemon for vector similarity, falls back to keyword-only if unavailable
 
 ## Documentation
 
@@ -447,4 +488,4 @@ Bug reports and feature requests are welcome via [Issues](https://github.com/Nat
 
 MIT — see [LICENSE](LICENSE) for details.
 
-> The embedding model (EmbeddingGemma-300M) is downloaded on-demand and subject to Google's [Gemma Terms of Use](https://ai.google.dev/gemma/terms). See [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for full dependency license information.
+> The embedding model (nomic-embed-text-v1.5) is downloaded on-demand from Hugging Face under the Apache 2.0 license. See [THIRD-PARTY-LICENSES.md](THIRD-PARTY-LICENSES.md) for full dependency license information.

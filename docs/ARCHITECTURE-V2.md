@@ -92,34 +92,44 @@ This is the same proven three-layer model from beads (fast local DB + portable J
 
 **Schema (extended from compound-agent):**
 
-```typescript
-interface MemoryItem {
-  // Identity
-  id: string;                                    // Hash-based, like beads
-  type: 'lesson' | 'solution' | 'pattern' | 'preference';
+```go
+type MemoryItem struct {
+    // Identity
+    ID   string `json:"id"`   // Hash-based, like beads
+    Type string `json:"type"` // "lesson" | "solution" | "pattern" | "preference"
 
-  // Core content (embeddings generated from trigger + insight)
-  trigger: string;                               // What caused/prompted this
-  insight: string;                               // What was learned
-  evidence?: string;                             // Supporting evidence
+    // Core content (embeddings generated from trigger + insight)
+    Trigger  string `json:"trigger"`            // What caused/prompted this
+    Insight  string `json:"insight"`            // What was learned
+    Evidence string `json:"evidence,omitempty"` // Supporting evidence
 
-  // Metadata
-  tags: string[];
-  severity: 'high' | 'medium' | 'low';
-  source: string;                                // How captured
-  context?: { tool: string; intent: string };
-  citation?: { file: string; line?: number; commit?: string };
-  created: string;
-  confirmed: boolean;
+    // Metadata
+    Tags     []string `json:"tags"`
+    Severity string   `json:"severity"` // "high" | "medium" | "low"
+    Source   string   `json:"source"`   // How captured
+    Context  *struct {
+        Tool   string `json:"tool"`
+        Intent string `json:"intent"`
+    } `json:"context,omitempty"`
+    Citation *struct {
+        File   string `json:"file"`
+        Line   int    `json:"line,omitempty"`
+        Commit string `json:"commit,omitempty"`
+    } `json:"citation,omitempty"`
+    Created   string `json:"created"`
+    Confirmed bool   `json:"confirmed"`
 
-  // Lifecycle
-  retrievalCount: number;
-  supersedes: string[];
-  related: string[];
-  compactionLevel: 0 | 1 | 2;
+    // Lifecycle
+    RetrievalCount  int      `json:"retrievalCount"`
+    Supersedes      []string `json:"supersedes"`
+    Related         []string `json:"related"`
+    CompactionLevel int      `json:"compactionLevel"` // 0, 1, or 2
 
-  // Type-specific
-  pattern?: { bad: string; good: string };       // For patterns/lessons
+    // Type-specific
+    Pattern *struct {
+        Bad  string `json:"bad"`
+        Good string `json:"good"`
+    } `json:"pattern,omitempty"` // For patterns/lessons
 }
 ```
 
@@ -503,14 +513,14 @@ User: /compound:compound
 
 | Component | Technology | Notes |
 |-----------|------------|-------|
-| Language | TypeScript (ESM) | Same as current compound-agent |
-| Package Manager | pnpm | Same |
-| Build | tsup | Same |
-| Testing | Vitest + fast-check | Same |
-| Storage | better-sqlite3 + FTS5 | Same |
-| Embeddings | @huggingface/transformers + nomic-embed-text-v1.5 | Updated |
-| CLI | Commander.js | Same |
-| Schema | Zod | Same |
+| Language | Go | Migrated from prior Node.js implementation |
+| Package Manager | Go modules (+ pnpm for npm wrapper) | Migrated |
+| Build | go build with CGO + sqlite_fts5 tag | Migrated |
+| Testing | go test + table-driven tests | Migrated |
+| Storage | mattn/go-sqlite3 + FTS5 | Migrated |
+| Embeddings | ca-embed (Rust daemon via IPC) | Migrated |
+| CLI | Cobra | Migrated |
+| Schema | Go structs + JSON tags | Migrated |
 | Issue tracking | Beads (bd) | Foundation layer |
 | Agent teams | Claude Code agent teams | New: inter-communicating agents |
 | Slash commands | Claude Code commands | New: workflow phase triggers |

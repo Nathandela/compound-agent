@@ -12,13 +12,13 @@ A learning system for Claude Code that captures, indexes, and retrieves lessons 
 
 ## What is compound-agent?
 
-Compound-agent is a TypeScript CLI plugin for Claude Code. When Claude makes a mistake and gets corrected, or discovers a useful pattern, that knowledge is stored as a **memory item** in `.claude/lessons/index.jsonl`. Future sessions search this memory before planning and implementing.
+Compound-agent is a Go CLI that integrates with Claude Code. When Claude makes a mistake and gets corrected, or discovers a useful pattern, that knowledge is stored as a **memory item** in `.claude/lessons/index.jsonl`. Future sessions search this memory before planning and implementing.
 
 The system uses:
 
 - **JSONL storage** (`.claude/lessons/index.jsonl`) as the git-tracked source of truth
 - **SQLite + FTS5** (`.claude/.cache/lessons.sqlite`) as a rebuildable search index
-- **Semantic embeddings** (nomic-embed-text-v1.5 via @huggingface/transformers) for vector similarity search
+- **Semantic embeddings** (ca-embed Rust daemon with local model) for vector similarity search
 - **Claude Code hooks** to inject memory at session start, before compaction, and on tool failures
 
 Memory items have four types: `lesson`, `solution`, `pattern`, and `preference`. Each has a trigger, an insight, tags, severity, and optional citations.
@@ -46,7 +46,7 @@ ca doctor
 4. Creates `.claude/plugin.json` manifest
 5. Installs agent templates, workflow commands, phase skills, and agent role skills
 6. Installs a git pre-commit hook (lesson capture reminder)
-7. Installs Claude Code hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse)
+7. Installs Claude Code hooks (SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse, PreToolUse, Stop)
 8. For pnpm projects: auto-configures `onlyBuiltDependencies` for native addons
 
 `setup` does everything `init` does. The embedding model is managed separately by the embed daemon.

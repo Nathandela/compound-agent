@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/nathandelacretaz/compound-agent/internal/setup"
 	"github.com/nathandelacretaz/compound-agent/internal/util"
@@ -565,6 +566,15 @@ func runDoctorChecks(repoRoot string) []doctorCheck {
 		checks = append(checks, doctorCheck{Name: "Beads initialized", Status: "pass"})
 	} else {
 		checks = append(checks, doctorCheck{Name: "Beads initialized", Status: "warn", Fix: "Run: bd init"})
+	}
+
+	// 7. WSL2 recommendation on Windows
+	if runtime.GOOS == "windows" {
+		checks = append(checks, doctorCheck{
+			Name:   "WSL2 recommended",
+			Status: "warn",
+			Fix:    "compound-agent works best under WSL2. See: https://learn.microsoft.com/en-us/windows/wsl/install",
+		})
 	}
 
 	return checks
