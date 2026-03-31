@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **go-sqlite3**: 1.14.37 to 1.14.38 — bounds check elimination in hot paths, missing constraint op types (PR #11).
 - **thiserror**: 1.0.69 to 2.0.18 in Rust embed daemon — major version bump with no-std support and improved diagnostics (PR #8).
+- **tokenizers**: 0.21.4 to 0.22.2 in Rust embed daemon — PyO3 0.26, faster vocab loading, GIL-free (PR #7).
 
 ## [2.5.2] - 2026-03-31
 
