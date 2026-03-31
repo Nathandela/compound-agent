@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.2] - 2026-03-31
+
 ### Added
 
 - **Stale output watchdog (Layer 4)**: New background watchdog monitors trace file for output inactivity during Claude sessions. If no output is written for `SESSION_STALE_TIMEOUT` seconds (default: 1800s/30min), the session is killed and the loop proceeds. Prevents indefinite hangs when the Claude CLI completes its API work but fails to exit.
@@ -19,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Silent zero-work exit**: Infinity loop now exits with code 2 (distinct from success=0 and failure=1) when zero epics are completed and zero failed, signaling that all epics were blocked or skipped.
 - **Inner loop exit code swallowed**: Polish loop's `run_inner_loop` used `|| true` which discarded the exit code. Now captures exit code properly and detects zero-work (exit 2) to surface blocked-epic deadlocks.
 - **Inner loop `set -e` cascade**: `run_inner_loop` call in main polish loop now guarded with `||` handler, matching the pattern used for `run_polish_architect`, preventing a single failed cycle from aborting the entire polish script.
+
+### Removed
+
+- **Improve loop references from architect skill**: Removed `ca improve` references from shipped architect SKILL.md, infinity-loop README, pre-flight docs, and deleted the `references/improve-loop/` directory. The improve loop remains available as a standalone CLI command but is not part of the architect workflow.
 
 ## [2.5.1] - 2026-03-28
 
