@@ -175,7 +175,7 @@ func lockedOpenDB(path string) (*sql.DB, error) {
 	if err := flockExclusive(f); err != nil {
 		return nil, fmt.Errorf("flock: %w", err)
 	}
-	defer flockUnlock(f)
+	defer func() { _ = flockUnlock(f) }()
 
 	// Under lock: check version, remove stale file if needed.
 	// Remove WAL/SHM alongside the main DB to prevent corruption from

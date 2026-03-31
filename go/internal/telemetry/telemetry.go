@@ -13,7 +13,7 @@ import (
 type EventType string
 
 const (
-	EventHookExecution  EventType = "hook_execution"
+	EventHookExecution   EventType = "hook_execution"
 	EventLessonRetrieval EventType = "lesson_retrieval"
 )
 

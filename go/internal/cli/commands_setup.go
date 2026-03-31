@@ -460,6 +460,37 @@ func resolveBinaryPath() string {
 
 // --- doctor command ---
 
+// printDoctorResults renders doctor check results to the command output.
+func printDoctorResults(cmd *cobra.Command, checks []doctorCheck) {
+	passCount, failCount, warnCount, infoCount := 0, 0, 0, 0
+	for _, c := range checks {
+		icon := "[ok]"
+		switch c.Status {
+		case "fail":
+			icon = "[FAIL]"
+			failCount++
+		case "warn":
+			icon = "[WARN]"
+			warnCount++
+		case "info":
+			icon = "[INFO]"
+			infoCount++
+		default:
+			passCount++
+		}
+		cmd.Printf("  %s %s\n", icon, c.Name)
+		if c.Fix != "" {
+			cmd.Printf("       Fix: %s\n", c.Fix)
+		}
+	}
+	cmd.Println()
+	if infoCount > 0 {
+		cmd.Printf("Results: %d passed, %d failed, %d warnings, %d info\n", passCount, failCount, warnCount, infoCount)
+	} else {
+		cmd.Printf("Results: %d passed, %d failed, %d warnings\n", passCount, failCount, warnCount)
+	}
+}
+
 type doctorCheck struct {
 	Name   string `json:"name"`
 	Status string `json:"status"` // "pass", "fail", "warn", "info"
@@ -478,43 +509,13 @@ func doctorCmd() *cobra.Command {
 			if repoRoot == "" {
 				repoRoot = util.GetRepoRoot()
 			}
-
 			checks := runDoctorChecks(repoRoot)
-
 			if jsonOut {
 				data, _ := json.Marshal(map[string]any{"checks": checks})
 				cmd.Println(string(data))
 				return nil
 			}
-
-			passCount, failCount, warnCount, infoCount := 0, 0, 0, 0
-			for _, c := range checks {
-				icon := "[ok]"
-				switch c.Status {
-				case "fail":
-					icon = "[FAIL]"
-					failCount++
-				case "warn":
-					icon = "[WARN]"
-					warnCount++
-				case "info":
-					icon = "[INFO]"
-					infoCount++
-				default:
-					passCount++
-				}
-				cmd.Printf("  %s %s\n", icon, c.Name)
-				if c.Fix != "" {
-					cmd.Printf("       Fix: %s\n", c.Fix)
-				}
-			}
-
-			cmd.Println()
-			if infoCount > 0 {
-				cmd.Printf("Results: %d passed, %d failed, %d warnings, %d info\n", passCount, failCount, warnCount, infoCount)
-			} else {
-				cmd.Printf("Results: %d passed, %d failed, %d warnings\n", passCount, failCount, warnCount)
-			}
+			printDoctorResults(cmd, checks)
 			return nil
 		},
 	}
@@ -543,20 +544,7 @@ func runDoctorChecks(repoRoot string) []doctorCheck {
 	}
 
 	// 3. Claude hooks configured
-	settingsPath := filepath.Join(repoRoot, ".claude", "settings.json")
-	settings, err := setup.ReadClaudeSettings(settingsPath)
-	if err == nil && setup.HasAllHooks(settings) {
-		binaryPath := resolveBinaryPath()
-		if setup.HooksNeedUpgrade(settings, binaryPath) {
-			checks = append(checks, doctorCheck{Name: "Claude Code hooks installed", Status: "warn", Fix: "Hooks are stale (npx). Run: ca setup claude"})
-		} else if setup.HooksNeedDedupe(settings) {
-			checks = append(checks, doctorCheck{Name: "Claude Code hooks installed", Status: "warn", Fix: "Hooks are duplicated. Run: ca setup claude"})
-		} else {
-			checks = append(checks, doctorCheck{Name: "Claude Code hooks installed", Status: "pass"})
-		}
-	} else {
-		checks = append(checks, doctorCheck{Name: "Claude Code hooks installed", Status: "warn", Fix: "Run: ca setup claude"})
-	}
+	checks = append(checks, checkHooks(repoRoot))
 
 	// 4. .gitignore health
 	gitignorePath := filepath.Join(repoRoot, ".claude", ".gitignore")
@@ -592,6 +580,23 @@ func runDoctorChecks(repoRoot string) []doctorCheck {
 	}
 
 	return checks
+}
+
+// checkHooks verifies Claude Code hooks are installed and healthy.
+func checkHooks(repoRoot string) doctorCheck {
+	settingsPath := filepath.Join(repoRoot, ".claude", "settings.json")
+	settings, err := setup.ReadClaudeSettings(settingsPath)
+	if err != nil || !setup.HasAllHooks(settings) {
+		return doctorCheck{Name: "Claude Code hooks installed", Status: "warn", Fix: "Run: ca setup claude"}
+	}
+	binaryPath := resolveBinaryPath()
+	if setup.HooksNeedUpgrade(settings, binaryPath) {
+		return doctorCheck{Name: "Claude Code hooks installed", Status: "warn", Fix: "Hooks are stale (npx). Run: ca setup claude"}
+	}
+	if setup.HooksNeedDedupe(settings) {
+		return doctorCheck{Name: "Claude Code hooks installed", Status: "warn", Fix: "Hooks are duplicated. Run: ca setup claude"}
+	}
+	return doctorCheck{Name: "Claude Code hooks installed", Status: "pass"}
 }
 
 // wslAvailable checks whether WSL is installed by looking for wsl.exe.
