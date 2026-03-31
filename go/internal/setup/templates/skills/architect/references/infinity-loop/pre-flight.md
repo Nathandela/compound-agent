@@ -60,7 +60,6 @@ echo $!   # Save PID for later
 |---------|---------|
 | `ca watch` | Live trace from active session |
 | `ca watch --epic <id>` | Watch specific epic |
-| `ca watch --improve` | Watch improvement phase |
 | `ca watch --no-follow` | Print current trace and exit |
 | `cat agent_logs/.loop-status.json` | Current loop state |
 | `wc -l agent_logs/loop-execution.jsonl` | Count completed epics |

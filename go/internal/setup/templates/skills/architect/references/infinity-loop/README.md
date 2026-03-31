@@ -18,11 +18,6 @@ The infinity loop (`ca loop`) generates a standalone bash script that autonomous
 | Review cycles | `--max-review-cycles <n>` | 3 | Max review/fix iterations |
 | Review blocking | `--review-blocking` | false | Fail loop if review not approved |
 | Review model | `--review-model <model>` | claude-opus-4-6[1m] | Model for fix sessions |
-| Improve | `--improve` | false | Run improvement phase after epics |
-| Improve iters | `--improve-max-iters <n>` | 5 | Max iterations per topic |
-| Improve budget | `--improve-time-budget <s>` | 0 (unlimited) | Total improvement time budget |
-
-> For improve program authoring and examples, see `../improve-loop/program-authoring.md` and `../improve-loop/example-programs.md`.
 
 ## Where to Look
 
@@ -37,7 +32,6 @@ Use this decision tree to find the right reference file:
 | Empty logs, missing markers, silent sessions | `logging.md` |
 | Reviewer fleet issues, 1-byte output, broken reviews | `review-fleet.md` |
 | Any failure you can't diagnose | `troubleshooting.md` |
-| Improve phase: topics not running, markers not detected | `../improve-loop/troubleshooting.md` |
 
 ## Examples
 
@@ -48,14 +42,12 @@ LOOP_DRY_RUN=1 ./infinity-loop.sh
 screen -dmS compound-loop ./infinity-loop.sh
 ```
 
-### Full review fleet with improvement phase
+### Full review fleet
 ```bash
 ca loop --epics E1 E2 E3 \
   --reviewers claude-sonnet claude-opus gemini codex \
   --max-review-cycles 3 \
   --review-blocking \
-  --improve \
-  --improve-max-iters 5 \
   --force
 ```
 
