@@ -6,6 +6,7 @@ Feature specifications written before implementation (Spec-Driven Development). 
 
 | Document | Description |
 |----------|-------------|
+| [v3-harness-overhaul.md](v3-harness-overhaul.md) | v3.0 harness overhaul: Windows support, skill metadata, observability, self-explanation (Draft) |
 | [packaging.md](packaging.md) | Pnpm packaging specification for compound-agent (Spec 0006, Approved) |
 | [TEMPLATE.md](TEMPLATE.md) | Template for creating new feature specs |
 | [README.md](README.md) | Spec-Driven Development process and guidelines |
