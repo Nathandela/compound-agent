@@ -69,6 +69,8 @@ agent_logs/
 # Dolt database files (added by bd init)
 .dolt/
 *.db
+*.db-shm
+*.db-wal
 
 # Release artifacts (CI only)
 release-bins/

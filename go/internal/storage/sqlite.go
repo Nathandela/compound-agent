@@ -104,6 +104,9 @@ const schemaDDL = `
 // If the on-disk DB has an older schema version, it is deleted and recreated.
 func OpenDB(path string) (*sql.DB, error) {
 	if path == ":memory:" {
+		// In-memory DBs skip WAL and busy-timeout DSN parameters: WAL is
+		// irrelevant and busy-timeout is unnecessary for single-connection
+		// in-process databases (used only in tests).
 		db, err := sql.Open("sqlite3", path)
 		if err != nil {
 			return nil, fmt.Errorf("open: %w", err)
@@ -176,9 +179,13 @@ func lockedOpenDB(path string) (*sql.DB, error) {
 	defer syscall.Flock(int(f.Fd()), syscall.LOCK_UN)
 
 	// Under lock: check version, remove stale file if needed.
+	// Remove WAL/SHM alongside the main DB to prevent corruption from
+	// orphaned journal files being applied to a freshly created database.
 	if needsRebuild(path) {
-		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-			return nil, fmt.Errorf("remove stale db: %w", err)
+		for _, suffix := range []string{"", "-wal", "-shm"} {
+			if err := os.Remove(path + suffix); err != nil && !os.IsNotExist(err) {
+				return nil, fmt.Errorf("remove stale db %s: %w", path+suffix, err)
+			}
 		}
 	}
 

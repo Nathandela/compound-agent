@@ -171,13 +171,14 @@ func dispatchToolFailure(stdin io.Reader, hookName string) (interface{}, int) {
 	}
 	repoRoot := util.GetRepoRoot()
 	stateDir := filepath.Join(repoRoot, ".claude")
-	searchFn := makeLessonSearchFunc(repoRoot)
+	searchFn := makeLessonSearchFunc(repoRoot, hookName)
 	return ProcessToolFailureWithSearch(data.ToolName, data.ToolInput, data.ToolOutput, stateDir, searchFn), 0
 }
 
 // makeLessonSearchFunc creates a LessonSearchFunc backed by FTS5 keyword search.
-// Uses OR between tokens for broad matching.
-func makeLessonSearchFunc(repoRoot string) LessonSearchFunc {
+// Uses OR between tokens for broad matching. hookName identifies the calling
+// hook for telemetry attribution.
+func makeLessonSearchFunc(repoRoot string, hookName string) LessonSearchFunc {
 	return func(ctx context.Context, tokens []string, limit int) ([]LessonMatch, error) {
 		db, err := storage.OpenRepoDB(repoRoot)
 		if err != nil {
@@ -192,17 +193,19 @@ func makeLessonSearchFunc(repoRoot string) LessonSearchFunc {
 		}
 
 		// Log lesson_retrieval telemetry event (best-effort).
-		if len(scored) > 0 {
-			query := strings.Join(tokens, " ")
-			ev := telemetry.Event{
-				EventType: telemetry.EventLessonRetrieval,
-				HookName:  "post-tool-failure",
-				QueryHash: telemetry.HashQuery(query),
-				Outcome:   telemetry.OutcomeSuccess,
-				Metadata:  map[string]interface{}{"result_count": len(scored)},
-			}
-			_ = telemetry.LogEvent(db, ev)
+		query := strings.Join(tokens, " ")
+		outcome := telemetry.OutcomeSuccess
+		if len(scored) == 0 {
+			outcome = telemetry.OutcomeEmpty
 		}
+		ev := telemetry.Event{
+			EventType: telemetry.EventLessonRetrieval,
+			HookName:  hookName,
+			QueryHash: telemetry.HashQuery(query),
+			Outcome:   outcome,
+			Metadata:  map[string]interface{}{"result_count": len(scored)},
+		}
+		_ = telemetry.LogEvent(db, ev)
 
 		var matches []LessonMatch
 		for _, s := range scored {

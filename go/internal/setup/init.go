@@ -212,7 +212,7 @@ func EnsureGitignore(repoRoot string) error {
 .ca-phase-state.json
 .ca-failure-state.json
 .ca-read-state.json
-skills_index.json
+skills/compound/skills_index.json
 `
 
 	// If gitignore exists, check for our marker
