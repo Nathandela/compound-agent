@@ -3,7 +3,7 @@ module github.com/nathandelacretaz/compound-agent
 go 1.26.1
 
 require (
-	github.com/mattn/go-sqlite3 v1.14.37
+	github.com/mattn/go-sqlite3 v1.14.38
 	github.com/spf13/cobra v1.10.2
 )
 
