@@ -211,7 +211,7 @@ This phase is OPT-IN. After Phase 4:
      --reviewers <reviewer1,reviewer2,...> \
      --cycles <N> --model <model> --force
    \`\`\`
-   This generates \`./polish-loop.sh\` which runs N cycles of: audit fleet -> mini-architect -> inner infinity loop.
+   This generates \`./polish-loop.sh\` which runs N cycles of: audit fleet -> polish architect -> inner infinity loop.
    The polish loop addresses ALL priority levels (P0 critical through P2 nice-to-have).
    See \`architect/references/polish-loop/README.md\` for the full parameter reference.
 
@@ -231,7 +231,7 @@ After the infinity loop completes, ask the user via \`AskUserQuestion\`: "The im
 1. **Gather parameters**:
    - Number of cycles (\`--cycles N\`) -- user must specify upfront, no default
    - Reviewer fleet (\`--reviewers\`) -- which model CLIs to use for audit
-   - Model for mini-architect sessions (\`--model\`, default: \`claude-opus-4-6[1m]\`)
+   - Model for polish architect sessions (\`--model\`, default: \`claude-opus-4-6[1m]\`)
    - Spec file path (\`--spec\`) for reviewer context
 
 2. **Generate polish script**:
@@ -255,7 +255,7 @@ After the infinity loop completes, ask the user via \`AskUserQuestion\`: "The im
 
 Each polish cycle executes three steps:
 - **Audit**: All configured reviewers evaluate the full implementation against the \`build-great-things\` pre-ship checklist (34 quality items + 12 laziness anti-patterns). This is a holistic craft review, not a diff review.
-- **Mini-Architect**: A Claude Opus[1M] session reads the synthesized audit report, groups findings into improvement epics, creates beads, and wires dependencies.
+- **Polish Architect**: A Claude Opus[1M] session reads the synthesized audit report, groups findings into improvement epics, creates beads, and wires inter-epic dependencies (never to the meta-epic).
 - **Inner Loop**: A fresh \`ca loop\` runs the cook-it pipeline for each improvement epic.
 
 The loop runs exactly N times. No early exit. Read \`build-great-things/SKILL.md\` for the full quality checklist that drives the audit.

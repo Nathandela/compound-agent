@@ -342,6 +342,153 @@ func TestLoopCommand_NoStaleTypeScriptRefs(t *testing.T) {
 	}
 }
 
+func TestLoopCommand_StaleWatchdogPresent(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Must have SESSION_STALE_TIMEOUT config variable
+	if !strings.Contains(script, "SESSION_STALE_TIMEOUT") {
+		t.Error("expected SESSION_STALE_TIMEOUT config variable")
+	}
+
+	// Must have stale watchdog functions
+	if !strings.Contains(script, "start_stale_watchdog") {
+		t.Error("expected start_stale_watchdog function")
+	}
+	if !strings.Contains(script, "stop_stale_watchdog") {
+		t.Error("expected stop_stale_watchdog function")
+	}
+	if !strings.Contains(script, "STALE_WATCHDOG_PID") {
+		t.Error("expected STALE_WATCHDOG_PID global variable")
+	}
+
+	// Must wire stale watchdog into session spawning (alongside memory watchdog)
+	if !strings.Contains(script, `start_stale_watchdog "$CLAUDE_PGID"`) {
+		t.Error("expected stale watchdog to be started with CLAUDE_PGID")
+	}
+	if !strings.Contains(script, `stop_stale_watchdog`) {
+		t.Error("expected stale watchdog to be stopped after wait")
+	}
+
+	// Stale watchdog must monitor the trace file
+	if !strings.Contains(script, "TRACEFILE") {
+		t.Error("expected stale watchdog to reference TRACEFILE")
+	}
+}
+
+func TestLoopCommand_StaleWatchdogOnlyCountsAfterOutput(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Must only start counting inactivity after trace file has content (prev_size > 0)
+	// to avoid killing sessions that are slow to start
+	if !strings.Contains(script, "cur_size") || !strings.Contains(script, "last_size") {
+		t.Error("stale watchdog must track file sizes to detect output inactivity")
+	}
+}
+
+func TestLoopCommand_StaleWatchdogInCrashHandler(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Crash handler must clean up stale watchdog to prevent orphan processes
+	if !strings.Contains(script, "_loop_cleanup") {
+		t.Error("expected _loop_cleanup crash handler")
+	}
+
+	// The crash handler must stop the stale watchdog
+	// Check that stop_stale_watchdog appears in the trap handler section
+	cleanupIdx := strings.Index(script, "_loop_cleanup()")
+	trapIdx := strings.Index(script, "trap _loop_cleanup EXIT")
+	if cleanupIdx < 0 || trapIdx < 0 {
+		t.Fatal("missing crash handler structure")
+	}
+
+	cleanupBody := script[cleanupIdx:trapIdx]
+	if !strings.Contains(cleanupBody, "stop_stale_watchdog") {
+		t.Error("crash handler must call stop_stale_watchdog to prevent orphan processes")
+	}
+}
+
+func TestLoopCommand_StaleWatchdogDetection(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Must detect stale watchdog kills after wait returns
+	if !strings.Contains(script, "STALE_WATCHDOG:") {
+		t.Error("expected STALE_WATCHDOG: marker for stale kill detection")
+	}
+}
+
+func TestLoopCommand_ZeroWorkExitCode(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Must exit 2 when zero epics completed and zero failed (all blocked/skipped)
+	if !strings.Contains(script, "exit 2") {
+		t.Error("expected exit 2 for zero-work loop runs")
+	}
+	// Must log warning about zero completed
+	if !strings.Contains(script, "Zero epics completed") {
+		t.Error("expected warning message about zero completed epics")
+	}
+}
+
 func TestImproveInitSubcommand(t *testing.T) {
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(improveCmd())

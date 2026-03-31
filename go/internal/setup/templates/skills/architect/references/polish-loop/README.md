@@ -2,7 +2,7 @@
 
 > Loaded on demand. Read when referenced by SKILL.md.
 
-The polish loop (`ca polish`) generates a standalone bash script that iterates N cycles of: multi-model audit fleet -> mini-architect -> inner infinity loop. It runs AFTER the main infinity loop completes, addressing quality gaps across the full priority spectrum (P0 critical through P2 nice-to-have).
+The polish loop (`ca polish`) generates a standalone bash script that iterates N cycles of: multi-model audit fleet -> polish architect -> inner infinity loop. It runs AFTER the main infinity loop completes, addressing quality gaps across the full priority spectrum (P0 critical through P2 nice-to-have).
 
 ## Configuration Parameters
 
@@ -24,7 +24,7 @@ Each polish cycle runs four steps:
 
 2. **Synthesize report**: Combines all reviewer reports into a single `docs/specs/polish-report-cycle-N.md`.
 
-3. **Polish architect**: Reads the synthesized report, explores the codebase, and creates ambitious improvement epics for ALL findings (P0, P1, AND P2) plus its own discoveries. Aims for 3-6 well-structured epics.
+3. **Polish architect**: Reads the synthesized report, explores the codebase, and creates ambitious improvement epics for ALL findings (P0, P1, AND P2) plus its own discoveries. Aims for 3-6 well-structured epics. Polish epics are created independently — they must NOT depend on the meta-epic (which never closes), or the inner loop will deadlock.
 
 4. **Inner loop**: Generates and runs a new infinity loop (`npx ca loop`) to implement the polish epics.
 
@@ -66,6 +66,8 @@ git push 2>/dev/null || echo "git push failed"
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `POLISH_DRY_RUN` | unset | Set to `1` to preview without executing |
+| `REVIEW_TIMEOUT` | 600 | Timeout in seconds for each reviewer invocation |
+| `SESSION_STALE_TIMEOUT` | 1800 | Kill inner loop session if no output for this many seconds |
 
 ## Troubleshooting
 
@@ -74,6 +76,7 @@ git push 2>/dev/null || echo "git push failed"
 | `npx not found` | Node.js/npm not installed | Install Node.js 18+ |
 | `claude CLI not found` | Claude Code not installed | Install Claude Code |
 | `bd CLI not found` | Beads not installed | Install beads |
-| No epics created | Mini-architect found nothing to fix | Check audit reports in `agent_logs/polish-cycle-N/` |
+| No epics created | Polish architect found nothing to fix | Check audit reports in `agent_logs/polish-cycle-N/` |
+| Inner loop exits with code 2 | All polish epics blocked (likely dep on meta-epic) | Run `bd blocked` and remove stale deps |
 | Inner loop crashes | Generated inner loop has issues | Check `agent_logs/polish-cycle-N/inner-loop.stderr` |
 | Reviewer produces empty output | CLI crash or timeout | Check `agent_logs/polish-cycle-N/<reviewer>.stderr` |

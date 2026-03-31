@@ -597,7 +597,12 @@ bd create --title="Polish: <ambitious goal>" \
   --type=epic --priority=2
 ` + "```" + `
 
-Wire dependencies if needed: ` + "`bd dep add <dependent> <dependency>`" + `
+Wire dependencies between your epics if needed (e.g., QA epic before fix epics):
+` + "`bd dep add <dependent> <dependency>`" + `
+
+CRITICAL: Do NOT use ` + "`--parent=$META_EPIC`" + ` or ` + "`bd dep add <epic> $META_EPIC`" + `.
+Polish epics must be independently actionable. Dependencies to the meta-epic will deadlock the loop
+because the meta-epic never closes.
 
 ## Step 6: Output Epic IDs
 After creating all epics, output each ID on its own line:
@@ -607,8 +612,8 @@ ARCHITECT_HEADER_EOF
     echo "## Polish Report"
     cat "$report_file"
     echo ""
-    echo "## Meta-Epic"
-    echo "Parent: $META_EPIC"
+    echo "## Context"
+    echo "These epics are part of the $META_EPIC polish initiative (for traceability only)."
     echo ""
     echo "## Spec File"
     echo "Read this file for product vision: $SPEC_FILE"
@@ -671,9 +676,15 @@ run_inner_loop() {
   }
 
   log "Cycle $cycle_num: running inner infinity loop"
-  bash "$inner_script" >"$cycle_dir/inner-loop.stdout" 2>"$cycle_dir/inner-loop.stderr" || {
-    log "WARN: inner loop exited with non-zero status"
-  }
+  local inner_rc=0
+  bash "$inner_script" >"$cycle_dir/inner-loop.stdout" 2>"$cycle_dir/inner-loop.stderr" || inner_rc=$?
+
+  if [ "$inner_rc" -eq 2 ]; then
+    log "ERROR: Inner loop completed zero epics in cycle $cycle_num (epics may be blocked)"
+    return 1
+  elif [ "$inner_rc" -ne 0 ]; then
+    log "WARN: inner loop exited with status $inner_rc"
+  fi
 
   log "Cycle $cycle_num: inner loop completed"
 }
@@ -712,7 +723,9 @@ for ((cycle=1; cycle<=CYCLES; cycle++)); do
   fi
 
   # Step 4: Inner Loop
-  run_inner_loop "$cycle"
+  run_inner_loop "$cycle" || {
+    log "WARN: inner loop failed for cycle $cycle"
+  }
 
   log "=== Cycle $cycle/$CYCLES complete ==="
 done

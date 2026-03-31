@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Stale output watchdog (Layer 4)**: New background watchdog monitors trace file for output inactivity during Claude sessions. If no output is written for `SESSION_STALE_TIMEOUT` seconds (default: 1800s/30min), the session is killed and the loop proceeds. Prevents indefinite hangs when the Claude CLI completes its API work but fails to exit.
+
+### Fixed
+
+- **Polish loop deadlock**: Architect prompt no longer uses `Parent: $META_EPIC` label, which caused the architect to wire blocking dependencies to a meta-epic that never closes. Replaced with context-only reference and explicit prohibition against `--parent` and `bd dep add` to the meta-epic.
+- **Silent zero-work exit**: Infinity loop now exits with code 2 (distinct from success=0 and failure=1) when zero epics are completed and zero failed, signaling that all epics were blocked or skipped.
+- **Inner loop exit code swallowed**: Polish loop's `run_inner_loop` used `|| true` which discarded the exit code. Now captures exit code properly and detects zero-work (exit 2) to surface blocked-epic deadlocks.
+- **Inner loop `set -e` cascade**: `run_inner_loop` call in main polish loop now guarded with `||` handler, matching the pattern used for `run_polish_architect`, preventing a single failed cycle from aborting the entire polish script.
+
 ## [2.5.1] - 2026-03-28
 
 ### Added

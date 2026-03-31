@@ -13,7 +13,9 @@
 7. [Epic IDs corrupted or loop processes wrong epic](#epic-ids-corrupted-or-loop-processes-wrong-epic)
 8. [Reviewers produce 1-byte or empty output](#reviewers-produce-1-byte-or-empty-output)
 9. [Dry-run creates ghost entries in execution log](#dry-run-creates-ghost-entries-in-execution-log)
-10. [Consumer migration after upgrade](#consumer-migration-after-upgrade)
+10. [Session hangs after completion (stale process)](#session-hangs-after-completion-stale-process)
+11. [Zero epics completed (exit code 2)](#zero-epics-completed-exit-code-2)
+12. [Consumer migration after upgrade](#consumer-migration-after-upgrade)
 
 ---
 
@@ -100,7 +102,7 @@ head -1 agent_logs/trace_*.jsonl | jq .   # Test jq parsing
 
 **Root cause**: The Claude session (or spawned test processes) consumed too much memory. The watchdog killed the session to prevent system freeze.
 
-**Fix**: Tune thresholds or kill memory-hungry processes before running. See `memory-safety.md` for the full 3-layer defense.
+**Fix**: Tune thresholds or kill memory-hungry processes before running. See `memory-safety.md` for the full 4-layer defense.
 
 **Diagnosis**:
 ```bash
@@ -232,6 +234,50 @@ Or edit the existing script: add `--permission-mode auto \` after `--dangerously
 grep "permission-mode" infinity-loop.sh
 # Should find: --permission-mode auto
 grep "end_turn" agent_logs/trace_*.jsonl | tail -5
+```
+
+---
+
+### Session hangs after completion (stale process)
+
+**Symptom**: The loop is stuck waiting for a Claude session. Trace file shows a final `result` event but the process is still alive with 0 CPU activity.
+
+**Root cause**: Non-deterministic Claude CLI bug where the process completes its API work but does not exit. More likely in complex sessions (many tool calls, spawned background processes).
+
+**Fix**: The stale output watchdog (Layer 4) detects this automatically. If the trace file has no new output for `SESSION_STALE_TIMEOUT` seconds (default: 1800s/30min), the process is killed and the loop proceeds to marker detection.
+
+**Diagnosis**:
+```bash
+grep "STALE_WATCHDOG" agent_logs/memory_*.log
+# Tune the timeout for your workload:
+SESSION_STALE_TIMEOUT=900 ./infinity-loop.sh   # 15 min (aggressive)
+SESSION_STALE_TIMEOUT=3600 ./infinity-loop.sh  # 60 min (lenient)
+```
+
+---
+
+### Zero epics completed (exit code 2)
+
+**Symptom**: Loop exits with code 2. Logs show "Zero epics completed -- all may be blocked or skipped."
+
+**Root cause**: All target epics were blocked by unresolved dependencies or required human intervention. No sessions were successfully completed.
+
+**Fix**: Check which epics are blocked and why:
+```bash
+bd blocked                    # Show all blocked issues
+bd show <epic-id>             # Check depends_on status
+bd list --type=epic --ready   # Show actionable epics
+```
+
+Common causes:
+- Epics depend on a meta-epic that never closes (see polish loop deadlock below)
+- Epics depend on tasks that were never completed
+- All epics already closed before the loop ran
+
+**Diagnosis**:
+```bash
+grep "Skip.*blocked by" agent_logs/loop_*.log 2>/dev/null
+tail -1 agent_logs/loop-execution.jsonl   # Check summary
 ```
 
 ---

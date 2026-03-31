@@ -445,7 +445,8 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string) strin
 	fmt.Fprintf(&b, "LOG_DIR=\"agent_logs\"\n")
 	fmt.Fprintf(&b, "MIN_FREE_MEMORY_PCT=${MIN_FREE_MEMORY_PCT:-20}  # Stop loop if free memory drops below this %%\n")
 	fmt.Fprintf(&b, "WATCHDOG_THRESHOLD=${WATCHDOG_THRESHOLD:-15}     # Kill session if free memory drops below this %%\n")
-	fmt.Fprintf(&b, "WATCHDOG_INTERVAL=${WATCHDOG_INTERVAL:-30}       # Seconds between watchdog checks\n\n")
+	fmt.Fprintf(&b, "WATCHDOG_INTERVAL=${WATCHDOG_INTERVAL:-30}       # Seconds between watchdog checks\n")
+	fmt.Fprintf(&b, "SESSION_STALE_TIMEOUT=${SESSION_STALE_TIMEOUT:-1800}  # Kill session if no output for this many seconds\n\n")
 
 	// Helpers
 	fmt.Fprintf(&b, "# Helpers\n")
@@ -476,6 +477,7 @@ func loopScriptCrashHandler() string {
 _loop_cleanup() {
   local exit_code=$?
   stop_memory_watchdog 2>/dev/null || true
+  stop_stale_watchdog 2>/dev/null || true
   if [ $exit_code -ne 0 ]; then
     log "CRASH: Script exited with code $exit_code at line ${BASH_LINENO[0]:-unknown}"
     echo "{\"status\":\"crashed\",\"exit_code\":$exit_code,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"line\":\"${BASH_LINENO[0]:-unknown}\"}" > "${LOG_DIR:-.}/.loop-status.json" 2>/dev/null || true
@@ -486,10 +488,10 @@ trap _loop_cleanup EXIT
 `
 }
 
-// loopScriptMemorySafety returns the 3-layer memory defense: orphan cleanup,
-// memory gate, and background memory watchdog.
+// loopScriptMemorySafety returns the 4-layer memory defense: orphan cleanup,
+// memory gate, memory watchdog, and stale output watchdog.
 func loopScriptMemorySafety() string { //nolint:funlen // bash template string
-	return `# --- Memory Safety (3-Layer Defense) ---
+	return `# --- Memory Safety (4-Layer Defense) ---
 
 # cleanup_orphans() - Kill leftover test/build processes from THIS repo between sessions
 # Scoped to current working directory to avoid killing unrelated processes
@@ -575,6 +577,46 @@ stop_memory_watchdog() {
     kill "$WATCHDOG_PID" 2>/dev/null || true
     wait "$WATCHDOG_PID" 2>/dev/null || true
     WATCHDOG_PID=""
+  fi
+}
+
+# start_stale_watchdog() - Background monitor that kills target PID on output inactivity
+# Args: $1=PID to kill, $2=trace file to monitor, $3=log file for events
+# Sets: STALE_WATCHDOG_PID (global)
+STALE_WATCHDOG_PID=""
+
+start_stale_watchdog() {
+  local target_pid="$1"
+  local trace_file="$2"
+  local log_file="$3"
+  (
+    local last_size=0
+    local stale_secs=0
+    while kill -0 "$target_pid" 2>/dev/null; do
+      sleep "$WATCHDOG_INTERVAL"
+      local cur_size=0
+      [ -f "$trace_file" ] && cur_size=$(wc -c < "$trace_file" 2>/dev/null || echo 0)
+      if [ "$cur_size" -eq "$last_size" ] && [ "$last_size" -gt 0 ]; then
+        stale_secs=$((stale_secs + WATCHDOG_INTERVAL))
+        if [ "$stale_secs" -ge "$SESSION_STALE_TIMEOUT" ]; then
+          echo "[$(date '+%Y-%m-%d_%H-%M-%S')] STALE_WATCHDOG: no output for ${stale_secs}s, killing PID $target_pid" >> "$log_file"
+          kill -TERM -- -"$target_pid" 2>/dev/null || kill "$target_pid" 2>/dev/null || true
+          exit 0
+        fi
+      else
+        stale_secs=0
+      fi
+      last_size=$cur_size
+    done
+  ) &
+  STALE_WATCHDOG_PID=$!
+}
+
+stop_stale_watchdog() {
+  if [ -n "$STALE_WATCHDOG_PID" ]; then
+    kill "$STALE_WATCHDOG_PID" 2>/dev/null || true
+    wait "$STALE_WATCHDOG_PID" 2>/dev/null || true
+    STALE_WATCHDOG_PID=""
   fi
 }
 
@@ -934,11 +976,16 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
     ) &
     CLAUDE_PGID=$!
     start_memory_watchdog "$CLAUDE_PGID" "$MEM_LOG"
+    start_stale_watchdog "$CLAUDE_PGID" "$TRACEFILE" "$MEM_LOG"
     wait "$CLAUDE_PGID" 2>/dev/null || true
+    stop_stale_watchdog
     stop_memory_watchdog
 
     # Detect if watchdog killed the session
-    if [ -f "$MEM_LOG" ] && grep -q "WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
+    if [ -f "$MEM_LOG" ] && grep -q "STALE_WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
+      log "WARN: Session killed by stale output watchdog (see $MEM_LOG)"
+      cleanup_orphans
+    elif [ -f "$MEM_LOG" ] && grep -q "WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
       log "WARN: Session killed by memory watchdog (see $MEM_LOG)"
       cleanup_orphans
     fi
@@ -1025,7 +1072,13 @@ done
 // loopScriptPostLoop returns the post-loop section: final review trigger, summary, git push.
 // When hasImprove is true, the exit line is omitted (the improve phase footer handles exit).
 func loopScriptPostLoop(finalTrigger string, hasImprove bool) string {
-	exit := "[ $FAILED_COUNT -eq 0 ] && exit 0 || exit 1\n"
+	exit := `# Zero-work detection: exit 2 if no epics completed and none failed
+if [ "$COMPLETED" -eq 0 ] && [ "$FAILED_COUNT" -eq 0 ]; then
+  log "WARN: Zero epics completed -- all may be blocked or skipped"
+  exit 2
+fi
+[ $FAILED_COUNT -eq 0 ] && exit 0 || exit 1
+`
 	if hasImprove {
 		exit = "" // improve phase footer provides its own exit
 	}

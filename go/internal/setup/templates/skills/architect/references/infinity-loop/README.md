@@ -30,6 +30,7 @@ Use this decision tree to find the right reference file:
 
 | Symptom / Task | File |
 |----------------|------|
+| Stale session hangs, output inactivity | `memory-safety.md` (Layer 4) |
 | Setting up and launching the loop | `pre-flight.md` |
 | Memory issues, OOM, watchdog kills | `memory-safety.md` |
 | Epics skipped, stuck, wrong order | `epic-ordering.md` |

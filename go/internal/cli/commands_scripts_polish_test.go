@@ -442,6 +442,117 @@ func TestPolishCommand_NamingConsistency(t *testing.T) {
 	}
 }
 
+func TestPolishCommand_ArchitectNoMetaEpicDependency(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/specs/my-spec.md",
+		"--meta-epic", "test-epic-123")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Must NOT use "Parent:" label which leads architect to create parent dependencies
+	if strings.Contains(script, "Parent: $META_EPIC") {
+		t.Error("architect prompt must not use 'Parent: $META_EPIC' label (causes deadlock)")
+	}
+
+	// Must explicitly prohibit wiring dependencies to meta-epic
+	if !strings.Contains(script, "Do NOT") || !strings.Contains(script, "META_EPIC") {
+		t.Error("architect prompt must explicitly prohibit wiring deps to META_EPIC")
+	}
+
+	// Must prohibit --parent flag
+	if !strings.Contains(script, "--parent") {
+		t.Error("architect prompt must mention --parent flag in prohibition")
+	}
+
+	// Must still include meta-epic ID for context/traceability
+	if !strings.Contains(script, "$META_EPIC") {
+		t.Error("architect prompt must still reference META_EPIC for context")
+	}
+}
+
+func TestPolishCommand_InnerLoopCapturesExitCode(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/specs/my-spec.md",
+		"--meta-epic", "test-epic-123")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Must NOT use "|| true" which swallows exit codes
+	// The inner loop invocation must capture the exit code properly
+	innerLoopIdx := strings.Index(script, "run_inner_loop()")
+	if innerLoopIdx < 0 {
+		t.Fatal("expected run_inner_loop function")
+	}
+
+	innerLoopFunc := script[innerLoopIdx:]
+	// Find end of function (next function definition or end of script)
+	nextFuncIdx := strings.Index(innerLoopFunc[1:], "\n}")
+	if nextFuncIdx > 0 {
+		innerLoopFunc = innerLoopFunc[:nextFuncIdx+2]
+	}
+
+	// Must capture exit code, not swallow with || true
+	if strings.Contains(innerLoopFunc, `|| true`) {
+		t.Error("run_inner_loop must not use '|| true' on inner script invocation (swallows exit code)")
+	}
+
+	// Must detect zero-work exit code (exit 2)
+	if !strings.Contains(innerLoopFunc, "exit 2") && !strings.Contains(innerLoopFunc, "eq 2") {
+		t.Error("run_inner_loop must detect zero-work exit code (2)")
+	}
+}
+
+func TestPolishCommand_InnerLoopCallGuarded(t *testing.T) {
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/specs/my-spec.md",
+		"--meta-epic", "test-epic-123")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The main loop call to run_inner_loop must be guarded with ||
+	// to prevent set -e from killing the entire polish script
+	mainLoopIdx := strings.Index(script, "# Step 4: Inner Loop")
+	if mainLoopIdx < 0 {
+		t.Fatal("expected '# Step 4: Inner Loop' in main loop")
+	}
+
+	// Check that the call has an || guard
+	callRegion := script[mainLoopIdx : mainLoopIdx+200]
+	if !strings.Contains(callRegion, "||") {
+		t.Error("run_inner_loop call in main loop must have || guard to prevent set -e cascade")
+	}
+}
+
 func TestPolishCommand_ReviewerModelQuoting(t *testing.T) {
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())

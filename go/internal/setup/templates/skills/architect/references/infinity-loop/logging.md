@@ -139,6 +139,7 @@ set -euo pipefail
 _loop_cleanup() {
   local exit_code=$?
   stop_memory_watchdog 2>/dev/null || true
+  stop_stale_watchdog 2>/dev/null || true
   if [ $exit_code -ne 0 ]; then
     log "CRASH: Script exited with code $exit_code at line ${BASH_LINENO[0]:-unknown}"
     echo "{\"status\":\"crashed\",\"exit_code\":$exit_code,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"line\":\"${BASH_LINENO[0]:-unknown}\"}" \
