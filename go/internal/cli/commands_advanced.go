@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -154,15 +153,13 @@ func synthesizeAndWrite(cmd *cobra.Command, repoRoot string, items []memory.Item
 }
 
 // printDownloadModelResult outputs model download result in the requested format.
-func printDownloadModelResult(cmd *cobra.Command, status, modelPath, tokenizerPath string, jsonOut bool) {
+func printDownloadModelResult(cmd *cobra.Command, status, modelPath, tokenizerPath string, jsonOut bool) error {
 	if jsonOut {
-		data, _ := json.Marshal(map[string]any{
+		return writeJSON(cmd, map[string]any{
 			"status":        status,
 			"modelPath":     modelPath,
 			"tokenizerPath": tokenizerPath,
 		})
-		cmd.Println(string(data))
-		return
 	}
 	switch status {
 	case "already_exists":
@@ -172,6 +169,7 @@ func printDownloadModelResult(cmd *cobra.Command, status, modelPath, tokenizerPa
 	}
 	cmd.Printf("  Model:     %s\n", modelPath)
 	cmd.Printf("  Tokenizer: %s\n", tokenizerPath)
+	return nil
 }
 
 // downloadModelCmd downloads the ONNX embedding model and tokenizer.
@@ -185,8 +183,7 @@ func downloadModelCmd() *cobra.Command {
 
 			modelPath, tokenizerPath := embed.FindModelFiles(repoRoot)
 			if modelPath != "" && tokenizerPath != "" {
-				printDownloadModelResult(cmd, "already_exists", modelPath, tokenizerPath, jsonOut)
-				return nil
+				return printDownloadModelResult(cmd, "already_exists", modelPath, tokenizerPath, jsonOut)
 			}
 
 			result, err := embed.DownloadModel(repoRoot, func(msg string) {
@@ -202,11 +199,10 @@ func downloadModelCmd() *cobra.Command {
 			if result.AlreadyExists {
 				status = "already_exists"
 			}
-			printDownloadModelResult(cmd, status, result.ModelPath, result.TokenizerPath, jsonOut)
-			return nil
+			return printDownloadModelResult(cmd, status, result.ModelPath, result.TokenizerPath, jsonOut)
 		},
 	}
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
 	return cmd
 }
 

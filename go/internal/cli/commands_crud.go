@@ -47,7 +47,9 @@ func showCmd() *cobra.Command {
 					msg = fmt.Sprintf("Lesson %s not found (deleted)", id)
 				}
 				if jsonOut {
-					_ = writeJSON(cmd, map[string]string{"error": msg})
+					if err := writeJSON(cmd, map[string]string{"error": msg}); err != nil {
+						return fmt.Errorf("%s: %w", msg, err)
+					}
 				} else {
 					cmd.PrintErrln(msg)
 				}
@@ -103,7 +105,9 @@ func updateCmd() *cobra.Command {
 // reportError prints an error as JSON or stderr, then returns it.
 func reportError(cmd *cobra.Command, msg string, jsonOut bool) error {
 	if jsonOut {
-		_ = writeJSON(cmd, map[string]string{"error": msg})
+		if err := writeJSON(cmd, map[string]string{"error": msg}); err != nil {
+			return fmt.Errorf("%s: %w", msg, err)
+		}
 	} else {
 		cmd.PrintErrln(msg)
 	}

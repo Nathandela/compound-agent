@@ -411,7 +411,7 @@ func formatListResults(items []memory.Item, total int, skippedCount int) string 
 
 func formatSessionHuman(items []memory.Item, totalCount int) string {
 	if len(items) == 0 {
-		return "No high-severity lessons found.\n"
+		return "No high-severity lessons found. Run `ca learn \"<insight>\"` to capture your first lesson.\n"
 	}
 
 	var b strings.Builder

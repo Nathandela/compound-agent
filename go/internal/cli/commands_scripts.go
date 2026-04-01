@@ -55,7 +55,7 @@ func improveCmd() *cobra.Command {
 	cmd.Flags().IntVar(&maxIters, "max-iters", 5, "Max iterations per topic")
 	cmd.Flags().IntVar(&budget, "time-budget", 0, "Total time budget in seconds (0=unlimited)")
 	cmd.Flags().StringVar(&model, "model", "claude-opus-4-6[1m]", "Claude model to use")
-	cmd.Flags().BoolVar(&force, "force", false, "Overwrite existing script")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "Overwrite existing script")
 	cmd.Flags().StringVar(&topics, "topics", "", "Comma-separated topic names to run")
 	return cmd
 }
@@ -307,7 +307,7 @@ func loopCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&o.output, "output", "o", "infinity-loop.sh", "Output script path")
 	cmd.Flags().IntVar(&o.maxRetries, "max-retries", 1, "Max retries per epic on failure")
 	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-6[1m]", "Claude model to use")
-	cmd.Flags().BoolVar(&o.force, "force", false, "Overwrite existing script")
+	cmd.Flags().BoolVarP(&o.force, "force", "f", false, "Overwrite existing script")
 	cmd.Flags().StringVar(&o.epics, "epics", "", "Comma-separated epic IDs to process")
 	cmd.Flags().StringVar(&o.reviewers, "reviewers", "", "Comma-separated reviewers (claude-sonnet,claude-opus,gemini,codex)")
 	cmd.Flags().IntVar(&o.reviewEvery, "review-every", 0, "Review every N completed epics (0=end-only)")
@@ -1415,7 +1415,10 @@ func auditCmd() *cobra.Command {
 			report := runAuditChecks(repoRoot)
 
 			if jsonOut {
-				data, _ := json.MarshalIndent(report, "", "  ")
+				data, err := json.MarshalIndent(report, "", "  ")
+				if err != nil {
+					return fmt.Errorf("marshal audit report: %w", err)
+				}
 				cmd.Println(string(data))
 				return nil
 			}
@@ -1437,7 +1440,7 @@ func auditCmd() *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
 	return cmd
 }
 

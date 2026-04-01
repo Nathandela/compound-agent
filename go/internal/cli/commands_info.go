@@ -89,7 +89,8 @@ func openURL(url string) {
 // infoCmd creates the "info" command. If testRepoRoot is non-empty, it uses that
 // path directly (used in tests); otherwise it detects the repo root.
 func infoCmd(testRepoRoot string) *cobra.Command {
-	return &cobra.Command{
+	var jsonOut bool
+	cmd := &cobra.Command{
 		Use:   "info",
 		Short: "Show a structured overview of hooks, skills, phases, telemetry, and lessons",
 		RunE: func(cmd *cobra.Command, args []string) error {
@@ -97,9 +98,98 @@ func infoCmd(testRepoRoot string) *cobra.Command {
 			if root == "" {
 				root = util.GetRepoRoot()
 			}
+			if jsonOut {
+				return writeJSON(cmd, buildInfoJSON(root))
+			}
 			cmd.Print(buildInfoOutput(root))
 			return nil
 		},
+	}
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
+	return cmd
+}
+
+// buildInfoJSON assembles the structured JSON representation of all info sections.
+func buildInfoJSON(repoRoot string) map[string]any {
+	result := map[string]any{
+		"version":   build.Version,
+		"commit":    build.Commit,
+		"hooks":     buildInfoHooksJSON(repoRoot),
+		"skills":    buildInfoSkillsJSON(repoRoot),
+		"phase":     buildInfoPhaseJSON(repoRoot),
+		"telemetry": buildInfoTelemetryJSON(repoRoot),
+		"lessons":   buildInfoLessonsJSON(repoRoot),
+	}
+	return result
+}
+
+func buildInfoHooksJSON(repoRoot string) map[string]any {
+	settingsPath := filepath.Join(repoRoot, ".claude", "settings.json")
+	settings, err := setup.ReadClaudeSettings(settingsPath)
+	if err != nil {
+		return map[string]any{"installed": false, "error": err.Error()}
+	}
+	return map[string]any{"installed": setup.HasAllHooks(settings)}
+}
+
+func buildInfoSkillsJSON(repoRoot string) map[string]any {
+	indexPath := filepath.Join(repoRoot, ".claude", "skills", "compound", "skills_index.json")
+	data, err := os.ReadFile(indexPath)
+	if err != nil {
+		return map[string]any{"count": 0, "skills": []any{}}
+	}
+	var index setup.SkillsIndex
+	if err := json.Unmarshal(data, &index); err != nil {
+		return map[string]any{"count": 0, "error": err.Error()}
+	}
+	return map[string]any{"count": len(index.Skills), "skills": index.Skills}
+}
+
+func buildInfoPhaseJSON(repoRoot string) map[string]any {
+	state := hook.GetPhaseState(repoRoot)
+	if state == nil {
+		return map[string]any{"active": false}
+	}
+	return map[string]any{
+		"active":       true,
+		"currentPhase": state.CurrentPhase,
+		"phaseIndex":   state.PhaseIndex,
+		"epicId":       state.EpicID,
+	}
+}
+
+func buildInfoTelemetryJSON(repoRoot string) map[string]any {
+	dbPath := filepath.Join(repoRoot, storage.DBPath)
+	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
+		return map[string]any{"totalEvents": 0}
+	}
+	db, err := storage.OpenRepoDB(repoRoot)
+	if err != nil {
+		return map[string]any{"totalEvents": 0}
+	}
+	defer db.Close()
+	stats, err := telemetry.QueryStats(db)
+	if err != nil || stats.TotalEvents == 0 {
+		return map[string]any{"totalEvents": 0}
+	}
+	return map[string]any{
+		"totalEvents":    stats.TotalEvents,
+		"retrievalCount": stats.RetrievalCount,
+	}
+}
+
+func buildInfoLessonsJSON(repoRoot string) map[string]any {
+	result, err := memory.ReadItems(repoRoot)
+	if err != nil {
+		return map[string]any{"count": 0}
+	}
+	typeCounts := make(map[string]int)
+	for _, item := range result.Items {
+		typeCounts[string(item.Type)]++
+	}
+	return map[string]any{
+		"count": len(result.Items),
+		"types": typeCounts,
 	}
 }
 
@@ -166,7 +256,7 @@ func formatInfoSkills(repoRoot string) string {
 	}
 
 	if len(index.Skills) == 0 {
-		return "No skills found.\n"
+		return "No skills found. Run `ca setup` to install skills.\n"
 	}
 
 	var b strings.Builder
@@ -204,18 +294,18 @@ func formatInfoPhase(repoRoot string) string {
 func formatInfoTelemetry(repoRoot string) string {
 	dbPath := filepath.Join(repoRoot, storage.DBPath)
 	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		return "Telemetry: no data yet.\n"
+		return "Telemetry: no data yet. Run `ca setup claude` to install hooks that collect telemetry.\n"
 	}
 
 	db, err := storage.OpenRepoDB(repoRoot)
 	if err != nil {
-		return "Telemetry: no data yet.\n"
+		return "Telemetry: no data yet. Run `ca setup claude` to install hooks that collect telemetry.\n"
 	}
 	defer db.Close()
 
 	stats, err := telemetry.QueryStats(db)
 	if err != nil || stats.TotalEvents == 0 {
-		return "Telemetry: no data yet.\n"
+		return "Telemetry: no data yet. Run `ca setup claude` to install hooks that collect telemetry.\n"
 	}
 
 	var b strings.Builder
@@ -236,12 +326,12 @@ func formatInfoTelemetry(repoRoot string) string {
 func formatInfoLessons(repoRoot string) string {
 	result, err := memory.ReadItems(repoRoot)
 	if err != nil {
-		return "Lessons: 0 (no corpus found)\n"
+		return "Lessons: 0 (no corpus found). Run `ca init` to set up the lesson index.\n"
 	}
 
 	total := len(result.Items)
 	if total == 0 {
-		return "Lessons: 0\n"
+		return "Lessons: 0. Get started with: `ca learn \"<insight>\"`\n"
 	}
 
 	// Count by type

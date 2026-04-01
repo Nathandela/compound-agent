@@ -107,7 +107,7 @@ func indexDocsCmd() *cobra.Command {
 			return nil
 		},
 	}
-	cmd.Flags().BoolVar(&force, "force", false, "force re-index all files")
+	cmd.Flags().BoolVarP(&force, "force", "f", false, "force re-index all files")
 	cmd.Flags().BoolVar(&embed, "embed", false, "embed chunks after indexing")
 	return cmd
 }

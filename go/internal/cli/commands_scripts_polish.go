@@ -36,7 +36,7 @@ func polishCmd() *cobra.Command {
 	cmd.Flags().StringVar(&o.specFile, "spec-file", "", "Path to spec file for audit context (required)")
 	cmd.Flags().StringVar(&o.metaEpic, "meta-epic", "", "Parent meta-epic ID (required)")
 	cmd.Flags().StringVar(&o.reviewers, "reviewers", "claude-sonnet,claude-opus,gemini,codex", "Comma-separated reviewers")
-	cmd.Flags().BoolVar(&o.force, "force", false, "Overwrite existing script")
+	cmd.Flags().BoolVarP(&o.force, "force", "f", false, "Overwrite existing script")
 	return cmd
 }
 

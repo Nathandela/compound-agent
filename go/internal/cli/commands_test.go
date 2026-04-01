@@ -147,7 +147,7 @@ func TestFormatSessionHuman(t *testing.T) {
 
 func TestFormatSessionHumanEmpty(t *testing.T) {
 	got := formatSessionHuman(nil, 5)
-	if got != "No high-severity lessons found.\n" {
+	if got != "No high-severity lessons found. Run `ca learn \"<insight>\"` to capture your first lesson.\n" {
 		t.Errorf("got %q", got)
 	}
 }

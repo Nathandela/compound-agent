@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -53,7 +52,7 @@ func phaseInitSubCmd(getRoot func() string) *cobra.Command {
 			return handlePhaseInit(cmd, getRoot(), args[0], forceInit)
 		},
 	}
-	cmd.Flags().BoolVar(&forceInit, "force", false, "Overwrite existing phase state")
+	cmd.Flags().BoolVarP(&forceInit, "force", "f", false, "Overwrite existing phase state")
 	return cmd
 }
 
@@ -178,7 +177,7 @@ func phaseStatusSubCmd(getRoot func() string) *cobra.Command {
 			return handlePhaseStatus(cmd, getRoot(), jsonOut)
 		},
 	}
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output raw JSON")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
 	return cmd
 }
 
@@ -190,8 +189,9 @@ func handlePhaseStatus(cmd *cobra.Command, root string, jsonOut bool) error {
 			cmd.Println(`{"cookit_active":false}`)
 			return nil
 		}
-		data, _ := json.Marshal(state)
-		cmd.Println(string(data))
+		if err := writeJSON(cmd, state); err != nil {
+			return err
+		}
 		return nil
 	}
 

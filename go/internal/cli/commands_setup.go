@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -33,7 +32,7 @@ func initCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&skipHooks, "skip-hooks", false, "Skip installing Claude Code hooks")
 	cmd.Flags().BoolVar(&skipAgents, "skip-agents", false, "Skip template installation (AGENTS.md, skills, commands, docs)")
 	cmd.Flags().BoolVar(&skipClaude, "skip-claude", false, "Skip Claude Code hooks installation")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root (defaults to git root)")
 	return cmd
 }
@@ -50,8 +49,7 @@ func runInit(cmd *cobra.Command, repoRoot string, skipHooks, skipAgents, jsonOut
 	}
 
 	if jsonOut {
-		printInitResultJSON(cmd, result)
-		return nil
+		return printInitResultJSON(cmd, result)
 	}
 
 	if !isQuiet(cmd) {
@@ -81,7 +79,7 @@ func setupCmd() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&skipHooks, "skip-hooks", false, "Skip installing hooks")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root")
 	return cmd
 }
@@ -97,8 +95,7 @@ func runSetup(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool) erro
 	}
 
 	if jsonOut {
-		printInitResultJSON(cmd, result)
-		return nil
+		return printInitResultJSON(cmd, result)
 	}
 
 	if !isQuiet(cmd) {
@@ -118,8 +115,8 @@ func resolveRoot(repoRoot string) string {
 }
 
 // printInitResultJSON prints the InitResult as JSON (shared by init and setup).
-func printInitResultJSON(cmd *cobra.Command, result *setup.InitResult) {
-	data, _ := json.Marshal(map[string]any{
+func printInitResultJSON(cmd *cobra.Command, result *setup.InitResult) error {
+	return writeJSON(cmd, map[string]any{
 		"success":             result.Success,
 		"hooksInstalled":      result.HooksInstalled,
 		"hooksUpgraded":       result.HooksUpgraded,
@@ -140,7 +137,6 @@ func printInitResultJSON(cmd *cobra.Command, result *setup.InitResult) {
 		"researchUpdated":     result.ResearchUpdated,
 		"templatesPruned":     result.TemplatesPruned,
 	})
-	cmd.Println(string(data))
 }
 
 // printInitResultText prints the text summary for the init command.
@@ -238,7 +234,7 @@ func registerSetupClaudeCmd(parent *cobra.Command) {
 	cmd.Flags().BoolVar(&opts.status, "status", false, "Check integration status")
 	cmd.Flags().BoolVar(&opts.global, "global", false, "Use global ~/.claude/ settings")
 	cmd.Flags().BoolVar(&opts.dryRun, "dry-run", false, "Show what would change without writing")
-	cmd.Flags().BoolVar(&opts.jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().BoolVar(&opts.jsonOut, "json", false, "output as JSON")
 	cmd.Flags().StringVar(&opts.repoRoot, "repo-root", "", "Repository root")
 
 	parent.AddCommand(cmd)
@@ -246,15 +242,13 @@ func registerSetupClaudeCmd(parent *cobra.Command) {
 
 func handleClaudeStatus(cmd *cobra.Command, installed bool, stale bool, duplicated bool, displayPath, settingsPath string, jsonOut bool) error {
 	if jsonOut {
-		data, _ := json.Marshal(map[string]any{
+		return writeJSON(cmd, map[string]any{
 			"settingsFile":   displayPath,
 			"hookInstalled":  installed,
 			"hookStale":      stale,
 			"hookDuplicated": duplicated,
 			"status":         statusLabel(installed, stale, duplicated),
 		})
-		cmd.Println(string(data))
-		return nil
 	}
 
 	cmd.Println("Claude Code Integration Status")
@@ -309,7 +303,7 @@ func handleClaudeDryRun(cmd *cobra.Command, installed bool, needsUpgrade bool, n
 	action := hookAction(installed, needsUpgrade, needsDedupe)
 
 	if jsonOut {
-		data, _ := json.Marshal(map[string]any{
+		return writeJSON(cmd, map[string]any{
 			"dryRun":       true,
 			"location":     displayPath,
 			"action":       action,
@@ -317,8 +311,6 @@ func handleClaudeDryRun(cmd *cobra.Command, installed bool, needsUpgrade bool, n
 			"needsUpgrade": needsUpgrade,
 			"needsDedupe":  needsDedupe,
 		})
-		cmd.Println(string(data))
-		return nil
 	}
 
 	cmd.Println("[dry-run] Claude Code hooks analysis:")
@@ -340,8 +332,7 @@ func handleClaudeDryRun(cmd *cobra.Command, installed bool, needsUpgrade bool, n
 
 func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPath string, installed bool, needsUpgrade bool, needsDedupe bool, binaryPath string, displayPath string, jsonOut bool) error {
 	if installed && !needsUpgrade && !needsDedupe {
-		printClaudeResult(cmd, displayPath, "unchanged", jsonOut)
-		return nil
+		return printClaudeResult(cmd, displayPath, "unchanged", jsonOut)
 	}
 
 	setup.AddAllHooks(settings, binaryPath)
@@ -350,19 +341,16 @@ func handleClaudeInstall(cmd *cobra.Command, settings map[string]any, settingsPa
 	}
 
 	action := hookActionPastTense[hookAction(installed, needsUpgrade, needsDedupe)]
-	printClaudeResult(cmd, displayPath, action, jsonOut)
-	return nil
+	return printClaudeResult(cmd, displayPath, action, jsonOut)
 }
 
-func printClaudeResult(cmd *cobra.Command, displayPath string, action string, jsonOut bool) {
+func printClaudeResult(cmd *cobra.Command, displayPath string, action string, jsonOut bool) error {
 	if jsonOut {
-		data, _ := json.Marshal(map[string]any{
+		return writeJSON(cmd, map[string]any{
 			"installed": true,
 			"location":  displayPath,
 			"action":    action,
 		})
-		cmd.Println(string(data))
-		return
 	}
 
 	messages := map[string]string{
@@ -379,6 +367,7 @@ func printClaudeResult(cmd *cobra.Command, displayPath string, action string, js
 	if action != "unchanged" {
 		cmd.Println("  Hooks: SessionStart, PreCompact, UserPromptSubmit, PostToolUseFailure, PostToolUse, PreToolUse, Stop")
 	}
+	return nil
 }
 
 func handleClaudeUninstall(cmd *cobra.Command, settings map[string]any, settingsPath string, installed bool, displayPath string, jsonOut bool) error {
@@ -394,12 +383,11 @@ func handleClaudeUninstall(cmd *cobra.Command, settings map[string]any, settings
 		if removed {
 			action = "removed"
 		}
-		data, _ := json.Marshal(map[string]any{
+		return writeJSON(cmd, map[string]any{
 			"installed": false,
 			"location":  displayPath,
 			"action":    action,
 		})
-		cmd.Println(string(data))
 	} else {
 		if removed {
 			cmd.Printf("[ok] Compound agent hooks removed from %s\n", displayPath)
@@ -467,13 +455,13 @@ func printDoctorResults(cmd *cobra.Command, checks []doctorCheck) {
 		icon := "[ok]"
 		switch c.Status {
 		case "fail":
-			icon = "[FAIL]"
+			icon = "[fail]"
 			failCount++
 		case "warn":
-			icon = "[WARN]"
+			icon = "[warn]"
 			warnCount++
 		case "info":
-			icon = "[INFO]"
+			icon = "[info]"
 			infoCount++
 		default:
 			passCount++
@@ -511,16 +499,14 @@ func doctorCmd() *cobra.Command {
 			}
 			checks := runDoctorChecks(repoRoot)
 			if jsonOut {
-				data, _ := json.Marshal(map[string]any{"checks": checks})
-				cmd.Println(string(data))
-				return nil
+				return writeJSON(cmd, map[string]any{"checks": checks})
 			}
 			printDoctorResults(cmd, checks)
 			return nil
 		},
 	}
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root")
-	cmd.Flags().BoolVar(&jsonOut, "json", false, "Output as JSON")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
 	return cmd
 }
 
