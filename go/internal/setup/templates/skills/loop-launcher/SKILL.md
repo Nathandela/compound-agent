@@ -102,7 +102,9 @@ Before launching:
 ## Gotchas
 
 ### Critical
-- **Always include `--dangerously-skip-permissions --permission-mode auto` in non-interactive claude invocations.** Without these flags, claude hangs waiting for permission prompts that cannot be displayed when stdout/stderr are redirected. The `ca loop` generator should include these automatically — if a generated script is missing them, this is a bug.
+- **Always include `--dangerously-skip-permissions --permission-mode auto --verbose` in non-interactive claude invocations.** Without `--dangerously-skip-permissions`, claude hangs waiting for permission prompts. Without `--verbose`, `--output-format stream-json` silently fails with exit code 1. The `ca loop` generator should include all three automatically — if a generated script is missing them, this is a bug.
+- **Always use a quoted heredoc (`<<'DELIM'`) for prompt templates containing markdown.** Triple backticks in markdown code blocks are interpreted as bash command substitution in unquoted heredocs (`<<DELIM`). This causes `bash` to spawn and hang silently. Use `<<'DELIM'` and inject variables with `sed` instead.
+- **Never use `npx ca` when the locally-built binary is newer.** The polish loop calls `npx ca loop` to generate inner loop scripts, but `npx` resolves the npm-installed version which may be outdated. Stale templates produce scripts with missing flags and unescaped heredocs. Build and use the local binary directly.
 - **Use comma-separated values for `--epics` and `--reviewers`.** Space-separated arguments are interpreted as subcommands and cause parse errors.
 
 ### CLI Flags for Advisory/Review Fleet

@@ -25,7 +25,7 @@ Things to do and not do when running the Architect skill.
 - **Do NOT log raw queries in telemetry.** Truncate or hash query fields to prevent sensitive data leakage (file paths, code snippets, error traces).
 - **Do NOT add telemetry I/O to the stdin read path in hooks.** Instrument at the hook OUTPUT boundary to avoid exceeding the 30-second stdin timeout (STPA critical hazard).
 - **Do NOT add skill metadata fields without a runtime consumer.** `when-to-use` and `scope` fields are dead metadata if no skill selector exists to consume them. Start with `phase` only.
-- **Do NOT run `claude -p` without `--dangerously-skip-permissions` in automated scripts.** Without this flag, claude will hang waiting for permission prompts that can't be displayed when stdout/stderr are redirected to files. Always include `--dangerously-skip-permissions --permission-mode auto` in any non-interactive claude invocation inside loops.
+- **Do NOT run `claude -p` without `--dangerously-skip-permissions --verbose` in automated scripts.** Without `--dangerously-skip-permissions`, claude hangs waiting for permission prompts. Without `--verbose`, `--output-format stream-json` silently fails with exit 1 (the error goes to stderr which is typically redirected to /dev/null). Always include `--dangerously-skip-permissions --permission-mode auto --verbose` in any non-interactive claude invocation inside loops.
 
 ## Advisory Fleet CLI Flags (Correct Usage)
 
