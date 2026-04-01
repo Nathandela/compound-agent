@@ -18,8 +18,9 @@ import (
 
 // TestSkillIndex_Exactly12Skills verifies that CompileSkillsIndex produces
 // exactly 12 skills, matching the full embedded template set:
-//   agentic, architect, build-great-things, compound, cook-it, plan,
-//   qa-engineer, researcher, review, spec-dev, test-cleaner, work
+//
+//	agentic, architect, build-great-things, compound, cook-it, plan,
+//	qa-engineer, researcher, review, spec-dev, test-cleaner, work
 func TestSkillIndex_Exactly12Skills(t *testing.T) {
 	dir := t.TempDir()
 	skillsDir := filepath.Join(dir, ".claude", "skills", "compound")
