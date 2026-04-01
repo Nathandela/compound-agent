@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"strings"
 	"testing"
 )
@@ -478,6 +477,14 @@ func TestContract_NpmToGoreleaserNamingConsistency(t *testing.T) {
 			if !strings.Contains(content, `"win32":  "windows"`) {
 				t.Errorf("npmdist.go platformMap missing win32 -> windows mapping")
 			}
+		case "darwin":
+			if !strings.Contains(content, `"darwin": "darwin"`) {
+				t.Errorf("npmdist.go platformMap missing darwin -> darwin mapping")
+			}
+		case "linux":
+			if !strings.Contains(content, `"linux":  "linux"`) {
+				t.Errorf("npmdist.go platformMap missing linux -> linux mapping")
+			}
 		}
 	}
 
@@ -548,10 +555,10 @@ func TestContract_RustDaemonExcludesWindows(t *testing.T) {
 	}
 	content := string(data)
 
-	// The build-daemon-all target should NOT have a Windows case
+	// The build-daemon-all target should skip Windows platforms
 	// because the Rust embed daemon is not supported on Windows (non-goal).
 	// Find the build-daemon-all section
-	daemonIdx := strings.Index(content, "build-daemon-all")
+	daemonIdx := strings.Index(content, "build-daemon-all:")
 	if daemonIdx < 0 {
 		t.Skip("build-daemon-all target not found in Makefile")
 	}
@@ -562,8 +569,14 @@ func TestContract_RustDaemonExcludesWindows(t *testing.T) {
 		daemonSection = daemonSection[:nextTarget+1]
 	}
 
-	if strings.Contains(daemonSection, "windows") {
-		t.Error("build-daemon-all should not include Windows targets (embed daemon not supported)")
+	// Windows platforms must be explicitly skipped with continue
+	if !strings.Contains(daemonSection, "windows-*) continue") {
+		t.Error("build-daemon-all must skip Windows platforms with 'windows-*) continue'")
+	}
+
+	// No cargo build triple should map to a Windows target
+	if strings.Contains(daemonSection, "windows-gnu") || strings.Contains(daemonSection, "windows-msvc") {
+		t.Error("build-daemon-all should not have Windows cargo target triples")
 	}
 }
 
@@ -634,6 +647,4 @@ func TestContract_ReleaseWorkflowWindowsArtifacts(t *testing.T) {
 	if !strings.Contains(content, "windows-arm64") {
 		t.Error("release workflow should produce windows-arm64 artifacts")
 	}
-
-	_ = runtime.GOOS // suppress unused import
 }

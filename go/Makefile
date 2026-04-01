@@ -42,6 +42,7 @@ build-daemon:
 build-daemon-all: $(DIST)
 	@for platform in $(PLATFORMS); do \
 		case $$platform in \
+			windows-*) continue ;; \
 			darwin-arm64) triple="aarch64-apple-darwin" ;; \
 			darwin-amd64) triple="x86_64-apple-darwin" ;; \
 			linux-arm64)  triple="aarch64-unknown-linux-gnu" ;; \
