@@ -94,12 +94,12 @@ func TestPolishCommand_UsesNpxCa(t *testing.T) {
 	data, _ := os.ReadFile(outPath)
 	script := string(data)
 
-	// Must use "npx ca" for compound-agent calls, never bare "ca loop" or "command -v ca"
-	if strings.Contains(script, "command -v ca") {
-		t.Error("generated script must not check 'command -v ca' (bare ca); use 'npx ca' instead")
+	// Must prefer local ca binary with npx ca as fallback
+	if !strings.Contains(script, "command -v ca") {
+		t.Error("expected 'command -v ca' check to prefer local binary over npx")
 	}
-	if !strings.Contains(script, "npx ca loop") {
-		t.Error("expected 'npx ca loop' for inner loop generation")
+	if !strings.Contains(script, "npx ca") {
+		t.Error("expected 'npx ca' as fallback when local binary not found")
 	}
 }
 

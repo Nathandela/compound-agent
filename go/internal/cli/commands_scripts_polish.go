@@ -666,11 +666,17 @@ run_inner_loop() {
   epic_csv=$(echo "$POLISH_EPICS" | tr ' ' ',')
 
   if [ "${POLISH_DRY_RUN:-}" = "1" ]; then
-    log "DRY RUN: would run npx ca loop --epics $epic_csv"
+    log "DRY RUN: would run ca loop --epics $epic_csv"
     return 0
   fi
 
-  npx ca loop --epics "$epic_csv" --model "$MODEL" --force -o "$inner_script" 2>"$cycle_dir/ca-loop-gen.stderr" || {
+  # Use the local binary if available (npx may resolve a stale version)
+  local ca_cmd="npx ca"
+  if command -v ca >/dev/null 2>&1; then
+    ca_cmd="ca"
+  fi
+
+  $ca_cmd loop --epics "$epic_csv" --model "$MODEL" --force -o "$inner_script" 2>"$cycle_dir/ca-loop-gen.stderr" || {
     log "ERROR: failed to generate inner loop script"
     return 1
   }

@@ -26,7 +26,7 @@ Each polish cycle runs four steps:
 
 3. **Polish architect**: Reads the synthesized report, explores the codebase, and creates ambitious improvement epics for ALL findings (P0, P1, AND P2) plus its own discoveries. Aims for 3-6 well-structured epics. Polish epics are created independently — they must NOT depend on the meta-epic (which never closes), or the inner loop will deadlock.
 
-4. **Inner loop**: Generates and runs a new infinity loop (`npx ca loop`) to implement the polish epics.
+4. **Inner loop**: Generates and runs a new infinity loop (`ca loop`) to implement the polish epics.
 
 ## Full-Spectrum Priority
 
@@ -43,9 +43,9 @@ Run the infinity loop first, then the polish loop:
 
 ```bash
 # Generate both scripts
-ca loop --epics E1 E2 E3 --reviewers claude-sonnet gemini --force
-ca polish --spec-file docs/specs/my-spec.md --meta-epic my-meta-epic \
-  --reviewers claude-sonnet,claude-opus,gemini --cycles 3 --force
+ca loop --epics "E1,E2,E3" --reviewers "claude-sonnet,gemini" --force
+ca polish --spec-file "docs/specs/my-spec.md" --meta-epic "my-meta-epic" \
+  --reviewers "claude-sonnet,claude-opus,gemini" --cycles 3 --force
 
 # Run in sequence
 bash infinity-loop.sh && bash polish-loop.sh

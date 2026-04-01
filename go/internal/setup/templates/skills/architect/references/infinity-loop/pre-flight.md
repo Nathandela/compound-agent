@@ -16,8 +16,8 @@ Before launching, verify:
 ## Generate the Script
 
 ```bash
-ca loop --epics E1 E2 E3 \
-  --reviewers claude-sonnet claude-opus gemini codex \
+ca loop --epics "E1,E2,E3" \
+  --reviewers "claude-sonnet,claude-opus,gemini,codex" \
   --max-retries 1 \
   --max-review-cycles 3 \
   --force
