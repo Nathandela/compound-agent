@@ -12,8 +12,9 @@ The rest of this document is for maintainers and documents internal development 
 
 ### Prerequisites
 
-- Node.js >= 20.0.0
-- pnpm (recommended over npm/yarn)
+- Go 1.26+
+- CGO enabled (required for SQLite)
+- golangci-lint
 
 ### Installation
 
@@ -22,27 +23,23 @@ The rest of this document is for maintainers and documents internal development 
 git clone https://github.com/Nathandela/compound-agent.git
 cd compound-agent
 
-# Install dependencies
-pnpm install
-
-# Build the project
-pnpm build
+# Build the CLI
+cd go && go build -tags sqlite_fts5 ./cmd/ca
 
 # Run tests
-pnpm test
+cd go && go test -tags sqlite_fts5 ./...
 
-# Download embedding model (required for vector search)
-pnpm download-model
+# Run linter
+cd go && golangci-lint run ./...
 ```
 
 ### Development Commands
 
 ```bash
-pnpm build       # Build with tsup
-pnpm dev         # Watch mode (rebuild on changes)
-pnpm test        # Run all tests
-pnpm test:watch  # Run tests in watch mode
-pnpm lint        # Type checking
+cd go && go build -tags sqlite_fts5 ./cmd/ca   # Build CLI binary
+cd go && go test -tags sqlite_fts5 ./...        # Run all tests
+cd go && go vet -tags sqlite_fts5 ./...         # Static analysis
+cd go && golangci-lint run ./...                 # Lint
 ```
 
 ## Test-Driven Development (TDD)
@@ -66,39 +63,50 @@ This project follows strict TDD. All contributions must adhere to this workflow.
 
 ### What NOT to Do
 
-```typescript
-// BAD: Mocking the thing being tested
-vi.mock('./jsonl.js');
-test('appendLesson works', () => { ... });
-
+```go
 // BAD: Test that passes regardless of implementation
-test('function exists', () => {
-  expect(typeof appendLesson).toBe('function');
-});
+func TestFunctionExists(t *testing.T) {
+    // This tests nothing meaningful
+}
 
+// BAD: Mocking the thing being tested
 // BAD: Writing tests after implementation
 ```
 
 ### What TO Do
 
-```typescript
-// GOOD: Real data, real execution
-test('appendLesson stores lesson and returns it', async () => {
-  const lesson = createQuickLesson({ trigger: 'test', insight: 'test' });
-  const result = await appendLesson(testDir, lesson);
-  const lessons = await readLessons(testDir);
-  expect(lessons.lessons).toContainEqual(result);
-});
+```go
+// GOOD: Table-driven test with real data
+func TestAppendLesson(t *testing.T) {
+    tests := []struct {
+        name    string
+        trigger string
+        insight string
+        wantErr bool
+    }{
+        {"valid lesson", "test trigger", "test insight", false},
+        {"empty trigger", "", "test insight", true},
+    }
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            db := setupTestDB(t)
+            err := AppendLesson(db, tt.trigger, tt.insight)
+            if (err != nil) != tt.wantErr {
+                t.Errorf("AppendLesson() error = %v, wantErr %v", err, tt.wantErr)
+            }
+        })
+    }
+}
 ```
 
 ## Code Standards
 
-### TypeScript
+### Go
 
-- Use ESM modules (`.js` extensions in imports)
-- Type annotations required on all public APIs
-- JSDoc comments on all public functions
-- Use Zod schemas for runtime validation
+- Use `go/internal/` for all unexported packages
+- Doc comments required on all exported functions
+- Use table-driven tests
+- Prefer early returns over deep nesting
 
 ### Code Size Limits
 
@@ -126,13 +134,13 @@ test('appendLesson stores lesson and returns it', async () => {
 
 1. **Run all tests**
    ```bash
-   pnpm test
+   cd go && go test -tags sqlite_fts5 ./...
    ```
    All tests must pass with 100% pass rate.
 
 2. **Run linting**
    ```bash
-   pnpm lint
+   cd go && golangci-lint run ./...
    ```
    Zero violations required.
 
@@ -142,10 +150,9 @@ test('appendLesson stores lesson and returns it', async () => {
 ### PR Checklist
 
 - [ ] Tests written FIRST (TDD)
-- [ ] All tests pass (`pnpm test`)
-- [ ] Lint passes (`pnpm lint`)
-- [ ] Type annotations on public APIs
-- [ ] JSDoc on public functions
+- [ ] All tests pass (`go test -tags sqlite_fts5 ./...`)
+- [ ] Lint passes (`golangci-lint run ./...`)
+- [ ] Doc comments on exported functions
 - [ ] No commented-out code
 - [ ] Functions < 50 lines
 - [ ] Files < 300 lines
@@ -200,25 +207,25 @@ bd sync
 ## Architecture
 
 ```
-src/
-  index.ts          # Public API exports
-  cli.ts            # CLI entry point
-  types.ts          # Zod schemas + TypeScript types
-  storage/
-    jsonl.ts        # JSONL read/write
-    sqlite.ts       # SQLite + FTS5
-  embeddings/
-    nomic.ts        # Transformers.js embedding pipeline (nomic-embed-text-v1.5)
-    download.ts     # Model download logic
-  search/
-    vector.ts       # Cosine similarity search
-    ranking.ts      # Score boosting
-  capture/
-    triggers.ts     # Detection patterns
-    quality.ts      # Quality filter
-  retrieval/
-    session.ts      # Session-start loading
-    plan.ts         # Plan-time retrieval
+go/
+  cmd/ca/              # CLI entrypoint
+  internal/
+    build/             # Build metadata
+    capture/           # Lesson capture
+    cli/               # Cobra command definitions
+    compound/          # Compound synthesis
+    embed/             # Embedding daemon IPC
+    hook/              # Git hook management
+    knowledge/         # Knowledge indexing
+    memory/            # Memory management
+    npmdist/           # npm distribution helpers
+    retrieval/         # Session retrieval
+    search/            # Hybrid search (keyword + vector)
+    setup/             # Template installation
+      templates/       # Embedded skill/agent/command templates
+    storage/           # SQLite + FTS5
+    telemetry/         # Telemetry tracking
+    util/              # Shared utilities
 ```
 
 ## Releasing
@@ -277,11 +284,11 @@ A CI test (`TestPlatformVersionSync`) enforces this at build time.
 
 Pushing a `v*` tag triggers `.github/workflows/release.yml`, which:
 
-1. **Builds Go CLI** (`ca`) for 4 platforms: linux-amd64, linux-arm64, darwin-arm64, darwin-amd64 — with SQLite FTS5 and version/commit embedded via ldflags
+1. **Builds Go CLI** (`ca`) for 4 platforms: linux-amd64, linux-arm64, darwin-arm64, darwin-amd64 -- with SQLite FTS5 and version/commit embedded via ldflags
 2. **Builds Rust daemon** (`ca-embed`) for 3 platforms: linux-amd64, linux-arm64, darwin-arm64 (Intel Macs use Rosetta)
 3. **Creates a GitHub Release** with all binaries and SHA256 checksums
-4. **Publishes 4 platform-specific npm packages** (`@syottos/darwin-arm64`, `@syottos/darwin-x64`, `@syottos/linux-arm64`, `@syottos/linux-x64`) — each containing the `ca` and `ca-embed` binaries
-5. **Publishes the main `compound-agent` npm package** — the shell wrapper that resolves the platform-specific binary at runtime
+4. **Publishes 4 platform-specific npm packages** (`@syottos/darwin-arm64`, `@syottos/darwin-x64`, `@syottos/linux-arm64`, `@syottos/linux-x64`) -- each containing the `ca` and `ca-embed` binaries
+5. **Publishes the main `compound-agent` npm package** -- the shell wrapper that resolves the platform-specific binary at runtime
 
 All npm packages are published with `--provenance` for supply chain security.
 

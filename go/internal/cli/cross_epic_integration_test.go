@@ -14,14 +14,14 @@ import (
 	"github.com/nathandelacretaz/compound-agent/internal/telemetry"
 )
 
-// --- E6-T2: Skill index generation validates 12 skills ---
+// --- E6-T2: Skill index generation validates 13 skills ---
 
-// TestSkillIndex_Exactly12Skills verifies that CompileSkillsIndex produces
-// exactly 12 skills, matching the full embedded template set:
+// TestSkillIndex_Exactly13Skills verifies that CompileSkillsIndex produces
+// exactly 13 skills, matching the full embedded template set:
 //
-//	agentic, architect, build-great-things, compound, cook-it, plan,
-//	qa-engineer, researcher, review, spec-dev, test-cleaner, work
-func TestSkillIndex_Exactly12Skills(t *testing.T) {
+//	agentic, architect, build-great-things, compound, cook-it, loop-launcher,
+//	plan, qa-engineer, researcher, review, spec-dev, test-cleaner, work
+func TestSkillIndex_Exactly13Skills(t *testing.T) {
 	dir := t.TempDir()
 	skillsDir := filepath.Join(dir, ".claude", "skills", "compound")
 	if err := os.MkdirAll(skillsDir, 0o755); err != nil {
@@ -43,12 +43,12 @@ func TestSkillIndex_Exactly12Skills(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(index.Skills) != 12 {
+	if len(index.Skills) != 13 {
 		names := make([]string, len(index.Skills))
 		for i, s := range index.Skills {
 			names[i] = s.Dir
 		}
-		t.Errorf("got %d skills, want 12: %v", len(index.Skills), names)
+		t.Errorf("got %d skills, want 13: %v", len(index.Skills), names)
 	}
 
 	// Every entry must have name and description
@@ -238,7 +238,7 @@ func TestInfoCmd_CrossEpic_AllDataSources(t *testing.T) {
 	}{
 		{"Version", "compound-agent"},
 		{"Hooks", "installed"},
-		{"Skills", "12 skill(s)"}, // see TestSkillIndex_Exactly12Skills for enumeration
+		{"Skills", "13 skill(s)"}, // see TestSkillIndex_Exactly13Skills for enumeration
 		{"Phase", "review"},
 		{"Phase", "cross-epic-test"},
 		{"Telemetry", "user-prompt"},
