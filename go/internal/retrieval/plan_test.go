@@ -1,12 +1,8 @@
-//go:build sqlite_fts5
-
 package retrieval
 
 import (
 	"database/sql"
 	"testing"
-
-	_ "github.com/mattn/go-sqlite3"
 
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
 	"github.com/nathandelacretaz/compound-agent/internal/search"

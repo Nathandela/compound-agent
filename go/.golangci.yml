@@ -1,7 +1,5 @@
 version: "2"
-run:
-  build-tags:
-    - sqlite_fts5
+run: {}
 linters:
   enable:
     - cyclop

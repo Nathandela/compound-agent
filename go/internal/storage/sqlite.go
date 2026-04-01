@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	_ "github.com/mattn/go-sqlite3" // SQLite driver registration
+	_ "modernc.org/sqlite" // Pure-Go SQLite driver (CGO_ENABLED=0)
 )
 
 // SchemaVersion is the current schema version for migration detection.
@@ -106,7 +106,7 @@ func OpenDB(path string) (*sql.DB, error) {
 		// In-memory DBs skip WAL and busy-timeout DSN parameters: WAL is
 		// irrelevant and busy-timeout is unnecessary for single-connection
 		// in-process databases (used only in tests).
-		db, err := sql.Open("sqlite3", path)
+		db, err := sql.Open("sqlite", path)
 		if err != nil {
 			return nil, fmt.Errorf("open: %w", err)
 		}
@@ -131,7 +131,7 @@ func needsRebuild(path string) bool {
 		return false
 	}
 
-	db, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return true
 	}
@@ -190,7 +190,7 @@ func lockedOpenDB(path string) (*sql.DB, error) {
 
 	// Open (or create) the database and apply schema — still under lock.
 	dsn := buildDSN(path, false)
-	db, err := sql.Open("sqlite3", dsn)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open: %w", err)
 	}
@@ -198,7 +198,7 @@ func lockedOpenDB(path string) (*sql.DB, error) {
 }
 
 // buildDSN constructs a SQLite DSN from a path, appending WAL journal mode
-// for on-disk databases. Handles paths that already contain query parameters.
+// for on-disk databases. Uses modernc.org/sqlite _pragma parameter format.
 func buildDSN(path string, isMemory bool) string {
 	if isMemory {
 		return path
@@ -207,5 +207,5 @@ func buildDSN(path string, isMemory bool) string {
 	if strings.Contains(path, "?") {
 		sep = "&"
 	}
-	return path + sep + "_journal_mode=WAL&_busy_timeout=5000"
+	return path + sep + "_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 }

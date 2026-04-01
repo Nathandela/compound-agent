@@ -118,10 +118,10 @@ func OpenKnowledgeDB(path string) (*sql.DB, error) {
 
 	dsn := path
 	if !isMemory {
-		dsn = path + "?_journal_mode=WAL"
+		dsn = path + "?_pragma=journal_mode(WAL)"
 	}
 
-	db, err := sql.Open("sqlite3", dsn)
+	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open: %w", err)
 	}
@@ -149,7 +149,7 @@ func knowledgeNeedsRebuild(path string) bool {
 		return false
 	}
 
-	db, err := sql.Open("sqlite3", path)
+	db, err := sql.Open("sqlite", path)
 	if err != nil {
 		return true
 	}

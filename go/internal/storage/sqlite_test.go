@@ -229,8 +229,8 @@ func TestBuildDSN(t *testing.T) {
 		isMemory bool
 		want     string
 	}{
-		{"test.sqlite", false, "test.sqlite?_journal_mode=WAL&_busy_timeout=5000"},
-		{"test.sqlite?mode=rwc", false, "test.sqlite?mode=rwc&_journal_mode=WAL&_busy_timeout=5000"},
+		{"test.sqlite", false, "test.sqlite?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"},
+		{"test.sqlite?mode=rwc", false, "test.sqlite?mode=rwc&_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"},
 		{":memory:", true, ":memory:"},
 		{"file::memory:?cache=shared", true, "file::memory:?cache=shared"},
 	}
