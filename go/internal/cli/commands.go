@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -104,6 +106,9 @@ func runSearch(cmd *cobra.Command, args []string, limit int) error {
 func executeSearch(db *sql.DB, embedder search.Embedder, query string, limit int, repoRoot string) ([]memory.Item, error) {
 	if embedder != nil {
 		return executeHybridSearch(db, embedder, query, limit, repoRoot)
+	}
+	if runtime.GOOS == "windows" {
+		emitWindowsSearchNotice(repoRoot)
 	}
 	sdb := storage.NewSearchDB(db)
 	items, err := sdb.SearchKeyword(query, limit, "")
@@ -331,6 +336,18 @@ func (a *embedderAdapter) Embed(texts []string) ([][]float64, error) {
 
 // noopClose is a no-op cleanup function for when no embedder was started.
 func noopClose() {}
+
+// emitWindowsSearchNotice prints a one-time notice about keyword-only mode
+// on Windows. Uses a marker file in the cache directory to avoid repeating.
+func emitWindowsSearchNotice(repoRoot string) {
+	marker := filepath.Join(repoRoot, ".claude", ".cache", ".windows-search-notice")
+	if _, err := os.Stat(marker); err == nil {
+		return // already shown
+	}
+	slog.Info("[keyword-only mode: semantic search unavailable on this platform]")
+	_ = os.MkdirAll(filepath.Dir(marker), 0o755)
+	_ = os.WriteFile(marker, []byte("shown"), 0o644)
+}
 
 // getOrStartEmbedder connects to the embed daemon, starting it if needed.
 // Returns (nil, noopClose) if the daemon binary or model files are unavailable.

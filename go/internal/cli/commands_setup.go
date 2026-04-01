@@ -3,7 +3,6 @@ package cli
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 
@@ -550,18 +549,12 @@ func runDoctorChecks(repoRoot string) []doctorCheck {
 		checks = append(checks, doctorCheck{Name: "Beads initialized", Status: "warn", Fix: "Run: bd init"})
 	}
 
-	// 7. WSL2 recommendation on native Windows (under WSL2, GOOS is "linux")
+	// 7. Windows platform notice (under WSL2, GOOS is "linux")
 	if runtime.GOOS == "windows" {
-		status := "warn"
-		fix := "compound-agent requires WSL2 on Windows. See: https://learn.microsoft.com/en-us/windows/wsl/install"
-		if wslAvailable() {
-			status = "info"
-			fix = "WSL2 detected. Run compound-agent inside WSL2 for full support."
-		}
 		checks = append(checks, doctorCheck{
-			Name:   "WSL2 recommended",
-			Status: status,
-			Fix:    fix,
+			Name:   "Windows platform",
+			Status: "info",
+			Fix:    "Vector search requires embed daemon (Unix only); keyword search works natively.",
 		})
 	}
 
@@ -583,12 +576,6 @@ func checkHooks(repoRoot string) doctorCheck {
 		return doctorCheck{Name: "Claude Code hooks installed", Status: "warn", Fix: "Hooks are duplicated. Run: ca setup claude"}
 	}
 	return doctorCheck{Name: "Claude Code hooks installed", Status: "pass"}
-}
-
-// wslAvailable checks whether WSL is installed by looking for wsl.exe.
-func wslAvailable() bool {
-	_, err := exec.LookPath("wsl.exe")
-	return err == nil
 }
 
 // printBeadsStatus reports beads CLI and repo initialization status.

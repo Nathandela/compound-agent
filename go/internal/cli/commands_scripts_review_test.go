@@ -11,7 +11,12 @@ import (
 )
 
 // executeBashSyntaxCheck runs bash -n on a file to verify syntax.
-func executeBashSyntaxCheck(path string) (string, error) {
+// Requires bash to be available (always on Unix; on Windows only with Git Bash).
+func executeBashSyntaxCheck(t *testing.T, path string) (string, error) {
+	t.Helper()
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available on this platform")
+	}
 	cmd := exec.Command("bash", "-n", path)
 	out, err := cmd.CombinedOutput()
 	return string(out), err
@@ -677,7 +682,7 @@ func TestLoopCommand_GeneratedScriptBashSyntax(t *testing.T) {
 			}
 
 			// Run bash -n syntax check on the generated script
-			out, bashErr := executeBashSyntaxCheck(tt.args[2]) // args[2] is the -o path
+			out, bashErr := executeBashSyntaxCheck(t, tt.args[2]) // args[2] is the -o path
 			if bashErr != nil {
 				t.Errorf("bash -n syntax check failed:\n%s\n%v", out, bashErr)
 			}
