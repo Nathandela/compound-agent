@@ -18,6 +18,7 @@ The infinity loop (`ca loop`) generates a standalone bash script that autonomous
 | Review cycles | `--max-review-cycles <n>` | 3 | Max review/fix iterations |
 | Review blocking | `--review-blocking` | false | Fail loop if review not approved |
 | Review model | `--review-model <model>` | claude-opus-4-6[1m] | Model for fix sessions |
+| Compact threshold | `--compact-pct <0-100>` | 0 (Claude default) | Context auto-compaction % (suggested: 50 for 1M context) |
 
 ## Where to Look
 

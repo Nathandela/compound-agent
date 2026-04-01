@@ -142,7 +142,7 @@ This phase is OPT-IN. After Phase 4:
 
 Quick summary of the workflow (details in the skill):
 1. Pre-flight: verify all epics are status=open
-2. Gather parameters via \`AskUserQuestion\` (model, reviewers, review cadence, dry-run)
+2. Gather parameters via \`AskUserQuestion\` (model, reviewers, review cadence, compact-pct, dry-run)
 3. Generate scripts: \`ca loop\` for infinity loop, \`ca polish\` for polish loop
 4. Dry-run: \`LOOP_DRY_RUN=1 bash infinity-loop.sh\`
 5. Launch in screen: \`screen -dmS compound-loop-$(basename $(pwd)) bash infinity-loop.sh\`

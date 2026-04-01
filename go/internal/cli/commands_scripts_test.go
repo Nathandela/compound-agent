@@ -527,3 +527,63 @@ func TestImproveInitSubcommand(t *testing.T) {
 		t.Error("expected at least one .md file to be created")
 	}
 }
+
+func TestLoopCommand_CompactPct(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath, "--compact-pct", "40")
+	if err != nil {
+		t.Fatalf("loop --compact-pct failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+	if !strings.Contains(script, "export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40") {
+		t.Error("expected CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40 in script")
+	}
+}
+
+func TestLoopCommand_CompactPctZeroOmitted(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+	if strings.Contains(script, "CLAUDE_AUTOCOMPACT_PCT_OVERRIDE") {
+		t.Error("expected no CLAUDE_AUTOCOMPACT_PCT_OVERRIDE when --compact-pct is 0")
+	}
+}
+
+func TestImproveCommand_CompactPct(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(improveCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "improve.sh")
+
+	_, err := executeCommand(root, "improve", "-o", outPath, "--compact-pct", "40")
+	if err != nil {
+		t.Fatalf("improve --compact-pct failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+	if !strings.Contains(script, "export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40") {
+		t.Error("expected CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40 in script")
+	}
+}

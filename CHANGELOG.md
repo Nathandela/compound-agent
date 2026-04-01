@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`--compact-pct` flag** for `ca loop`, `ca improve`, and `ca polish`: Sets `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` in generated scripts to trigger context compaction earlier during autonomous workflows. Default 0 (use Claude Code default). Suggested value: 50 for Opus 1M sessions. Only affects generated scripts, not interactive sessions.
+
 ## [2.6.0] - 2026-04-01
 
 ### Added

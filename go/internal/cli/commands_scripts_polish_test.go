@@ -707,3 +707,68 @@ func TestPolishCommand_VisualVerification(t *testing.T) {
 		t.Error("visual verification must include dev server cleanup instruction")
 	}
 }
+
+func TestPolishCommand_CompactPct(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1",
+		"--compact-pct", "40")
+	if err != nil {
+		t.Fatalf("polish --compact-pct failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+	if !strings.Contains(script, "export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40") {
+		t.Error("expected CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40 in script")
+	}
+}
+
+func TestPolishCommand_CompactPctZeroOmitted(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+	if strings.Contains(script, "export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=") {
+		t.Error("expected no export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE when --compact-pct is 0")
+	}
+}
+
+func TestPolishCommand_CompactPctForwardedToInnerLoop(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1",
+		"--compact-pct", "40")
+	if err != nil {
+		t.Fatalf("polish --compact-pct failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+	if !strings.Contains(script, "--compact-pct $CLAUDE_AUTOCOMPACT_PCT_OVERRIDE") {
+		t.Error("expected --compact-pct forwarded to inner ca loop call")
+	}
+}
