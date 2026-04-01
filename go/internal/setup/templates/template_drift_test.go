@@ -36,8 +36,8 @@ func TestPlatformVersionSync(t *testing.T) {
 	if len(matches) == 0 {
 		t.Fatal("no @syottos/* dependencies found in package.json")
 	}
-	if len(matches) != 5 {
-		t.Errorf("expected 5 @syottos/* dependencies, got %d", len(matches))
+	if len(matches) != 6 {
+		t.Errorf("expected 6 @syottos/* dependencies, got %d", len(matches))
 	}
 
 	for _, m := range matches {

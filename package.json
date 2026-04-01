@@ -55,7 +55,8 @@
     "@syottos/darwin-x64": "2.6.0",
     "@syottos/linux-arm64": "2.6.0",
     "@syottos/linux-x64": "2.6.0",
-    "@syottos/win32-x64": "2.6.0"
+    "@syottos/win32-x64": "2.6.0",
+    "@syottos/win32-arm64": "2.6.0"
   },
   "author": "Nathan Delacrétaz",
   "license": "MIT",

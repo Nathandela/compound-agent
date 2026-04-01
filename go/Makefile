@@ -5,7 +5,7 @@ LDFLAGS   := -s -w -X github.com/nathandelacretaz/compound-agent/internal/build.
              -X github.com/nathandelacretaz/compound-agent/internal/build.Commit=$(COMMIT)
 RUST_DIR  := ../rust/embed-daemon
 
-PLATFORMS := darwin-arm64 darwin-amd64 linux-arm64 linux-amd64 windows-amd64
+PLATFORMS := darwin-arm64 darwin-amd64 linux-arm64 linux-amd64 windows-amd64 windows-arm64
 
 .PHONY: build build-release build-all build-daemon build-daemon-all test test-integration lint clean
 

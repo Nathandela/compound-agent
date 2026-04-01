@@ -63,6 +63,16 @@ func TestGetPlatformKey_Win32X64(t *testing.T) {
 	}
 }
 
+func TestGetPlatformKey_Win32Arm64(t *testing.T) {
+	got, err := GetPlatformKey("win32", "arm64")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "windows-arm64" {
+		t.Errorf("got %q, want %q", got, "windows-arm64")
+	}
+}
+
 func TestGetPlatformKey_UnsupportedArchIA32(t *testing.T) {
 	_, err := GetPlatformKey("linux", "ia32")
 	if err == nil {
@@ -262,6 +272,7 @@ func TestPackageJSON_HasOptionalDependencies(t *testing.T) {
 		"@syottos/linux-arm64",
 		"@syottos/linux-x64",
 		"@syottos/win32-x64",
+		"@syottos/win32-arm64",
 	}
 	for _, name := range expected {
 		v, ok := pkg.OptionalDependencies[name]

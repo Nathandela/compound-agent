@@ -28,6 +28,7 @@ const PLATFORMS = [
   { npm: "linux-arm64",  goreleaser: "linux-arm64",  embedGoreleaser: "linux-arm64",  os: "linux",  cpu: "arm64" },
   { npm: "linux-x64",    goreleaser: "linux-amd64",  embedGoreleaser: "linux-amd64",  os: "linux",  cpu: "x64" },
   { npm: "win32-x64",    goreleaser: "windows-amd64", embedGoreleaser: null, os: "win32", cpu: "x64", ext: ".exe" },
+  { npm: "win32-arm64",  goreleaser: "windows-arm64", embedGoreleaser: null, os: "win32", cpu: "arm64", ext: ".exe" },
 ];
 
 function main() {

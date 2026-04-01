@@ -21,7 +21,7 @@ function getPlatformKey(platform, arch) {
   const a = ARCH_MAP[arch];
   if (!p || !a) {
     throw new Error(
-      `Unsupported platform: ${platform}-${arch}. Supported: darwin-amd64, darwin-arm64, linux-amd64, linux-arm64, windows-amd64`
+      `Unsupported platform: ${platform}-${arch}. Supported: darwin-amd64, darwin-arm64, linux-amd64, linux-arm64, windows-amd64, windows-arm64`
     );
   }
   return `${p}-${a}`;
