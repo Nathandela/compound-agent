@@ -12,6 +12,7 @@ import (
 var platformMap = map[string]string{
 	"darwin": "darwin",
 	"linux":  "linux",
+	"win32":  "windows",
 }
 
 var archMap = map[string]string{

@@ -8,6 +8,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// stillActive is the Windows exit code meaning a process has not yet exited.
+const stillActive uint32 = 259
+
 // flockExclusive acquires a blocking exclusive lock using Windows LockFileEx.
 func flockExclusive(f *os.File) error {
 	ol := new(windows.Overlapped)
@@ -41,6 +44,5 @@ func processAlive(proc *os.Process) bool {
 	if err := windows.GetExitCodeProcess(h, &exitCode); err != nil {
 		return false
 	}
-	// STILL_ACTIVE (259) means the process has not exited yet.
-	return exitCode == 259
+	return exitCode == stillActive
 }

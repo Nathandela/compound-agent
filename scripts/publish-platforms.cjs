@@ -9,7 +9,7 @@
 //     ca-darwin-arm64
 //     ca-linux-amd64
 //     ca-linux-arm64
-//     ca-embed-darwin-amd64
+//     ca-windows-amd64.exe
 //     ca-embed-darwin-arm64
 //     ca-embed-linux-amd64
 //     ca-embed-linux-arm64
@@ -27,6 +27,7 @@ const PLATFORMS = [
   { npm: "darwin-x64",   goreleaser: "darwin-amd64", embedGoreleaser: "darwin-arm64", os: "darwin", cpu: "x64" },
   { npm: "linux-arm64",  goreleaser: "linux-arm64",  embedGoreleaser: "linux-arm64",  os: "linux",  cpu: "arm64" },
   { npm: "linux-x64",    goreleaser: "linux-amd64",  embedGoreleaser: "linux-amd64",  os: "linux",  cpu: "x64" },
+  { npm: "win32-x64",    goreleaser: "windows-amd64", embedGoreleaser: null, os: "win32", cpu: "x64", ext: ".exe" },
 ];
 
 function main() {
@@ -49,22 +50,27 @@ function main() {
       fs.mkdirSync(tmpBin, { recursive: true });
 
       // Copy and rename binaries
-      const caSrc = path.join(binDir, `ca-${platform.goreleaser}`);
-      const embedSrc = path.join(binDir, `ca-embed-${platform.embedGoreleaser}`);
+      const ext = platform.ext || "";
+      const caSrc = path.join(binDir, `ca-${platform.goreleaser}${ext}`);
 
       if (!fs.existsSync(caSrc)) {
         console.error(`[publish-platforms] Missing: ${caSrc}`);
         process.exit(1);
       }
-      if (!fs.existsSync(embedSrc)) {
-        console.error(`[publish-platforms] Missing: ${embedSrc}`);
-        process.exit(1);
-      }
 
-      fs.copyFileSync(caSrc, path.join(tmpBin, "ca"));
-      fs.copyFileSync(embedSrc, path.join(tmpBin, "ca-embed"));
-      fs.chmodSync(path.join(tmpBin, "ca"), 0o755);
-      fs.chmodSync(path.join(tmpBin, "ca-embed"), 0o755);
+      fs.copyFileSync(caSrc, path.join(tmpBin, `ca${ext}`));
+      fs.chmodSync(path.join(tmpBin, `ca${ext}`), 0o755);
+
+      // Embed daemon is optional (not available on Windows).
+      if (platform.embedGoreleaser) {
+        const embedSrc = path.join(binDir, `ca-embed-${platform.embedGoreleaser}`);
+        if (!fs.existsSync(embedSrc)) {
+          console.error(`[publish-platforms] Missing: ${embedSrc}`);
+          process.exit(1);
+        }
+        fs.copyFileSync(embedSrc, path.join(tmpBin, "ca-embed"));
+        fs.chmodSync(path.join(tmpBin, "ca-embed"), 0o755);
+      }
 
       // Write package.json
       const platformPkg = {

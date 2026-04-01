@@ -800,7 +800,7 @@ func loopScriptPromptBuilder(bt string) string { //nolint:funlen // bash templat
 	fmt.Fprintf(&b, "HUMAN_REQUIRED: <reason>\n\n")
 	fmt.Fprintf(&b, "Example: HUMAN_REQUIRED: Need AWS credentials configured in .env\n\n")
 	fmt.Fprintf(&b, "## Memory Safety Rules\n")
-	fmt.Fprintf(&b, "- For Go work, use \\%sgo test -tags sqlite_fts5 ./...\\%s in the go/ directory.\n", bt, bt)
+	fmt.Fprintf(&b, "- For Go work, use \\%sgo test ./...\\%s in the go/ directory.\n", bt, bt)
 	fmt.Fprintf(&b, "- NEVER run embedding tests unless the epic modifies embedding code.\n")
 	fmt.Fprintf(&b, "- Between test runs, wait for all child processes to exit before starting another.\n\n")
 	fmt.Fprintf(&b, "## Rules\n")

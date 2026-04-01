@@ -53,10 +53,13 @@ func TestGetPlatformKey_LinuxX64(t *testing.T) {
 	}
 }
 
-func TestGetPlatformKey_UnsupportedPlatformWin32(t *testing.T) {
-	_, err := GetPlatformKey("win32", "x64")
-	if err == nil {
-		t.Fatal("expected error for win32, got nil")
+func TestGetPlatformKey_Win32X64(t *testing.T) {
+	got, err := GetPlatformKey("win32", "x64")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got != "windows-amd64" {
+		t.Fatalf("expected windows-amd64, got %s", got)
 	}
 }
 
@@ -199,9 +202,9 @@ func TestPackageJSON_HasBinEntries(t *testing.T) {
 
 func TestPackageJSON_OSRestrictions(t *testing.T) {
 	pkg := loadPackageJSON(t)
-	want := map[string]bool{"darwin": true, "linux": true}
-	if len(pkg.OS) != 2 {
-		t.Errorf("os field has %d entries, want 2", len(pkg.OS))
+	want := map[string]bool{"darwin": true, "linux": true, "win32": true}
+	if len(pkg.OS) != 3 {
+		t.Errorf("os field has %d entries, want 3", len(pkg.OS))
 	}
 	for _, o := range pkg.OS {
 		if !want[o] {
@@ -258,6 +261,7 @@ func TestPackageJSON_HasOptionalDependencies(t *testing.T) {
 		"@syottos/darwin-x64",
 		"@syottos/linux-arm64",
 		"@syottos/linux-x64",
+		"@syottos/win32-x64",
 	}
 	for _, name := range expected {
 		v, ok := pkg.OptionalDependencies[name]

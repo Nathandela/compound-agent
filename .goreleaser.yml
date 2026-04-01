@@ -9,11 +9,13 @@ builds:
     main: ./cmd/ca
     binary: ca
     env:
-      - CGO_ENABLED=1
-    goos: [darwin, linux]
+      - CGO_ENABLED=0
+    goos: [darwin, linux, windows]
     goarch: [amd64, arm64]
-    flags:
-      - -tags=sqlite_fts5
+    ignore:
+      - goos: windows
+        goarch: arm64
+    # Effective targets: darwin-amd64, darwin-arm64, linux-amd64, linux-arm64, windows-amd64
     ldflags:
       - -s -w
       - -X github.com/nathandelacretaz/compound-agent/internal/build.Version={{.Version}}

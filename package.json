@@ -21,7 +21,8 @@
   ],
   "os": [
     "darwin",
-    "linux"
+    "linux",
+    "win32"
   ],
   "cpu": [
     "x64",
@@ -53,7 +54,8 @@
     "@syottos/darwin-arm64": "2.6.0",
     "@syottos/darwin-x64": "2.6.0",
     "@syottos/linux-arm64": "2.6.0",
-    "@syottos/linux-x64": "2.6.0"
+    "@syottos/linux-x64": "2.6.0",
+    "@syottos/win32-x64": "2.6.0"
   },
   "author": "Nathan Delacrétaz",
   "license": "MIT",

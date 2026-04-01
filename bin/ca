@@ -19,9 +19,10 @@ const require = createRequire(import.meta.url);
 
 function resolvePlatformBinary() {
   const pkg = `@syottos/${process.platform}-${process.arch}`;
+  const ext = process.platform === "win32" ? ".exe" : "";
   try {
     const pkgDir = dirname(require.resolve(`${pkg}/package.json`));
-    const bin = resolve(pkgDir, "bin", "ca");
+    const bin = resolve(pkgDir, "bin", `ca${ext}`);
     if (existsSync(bin)) return bin;
   } catch {
     // Platform package not installed
@@ -30,11 +31,12 @@ function resolvePlatformBinary() {
 }
 
 function findBinary() {
+  const ext = process.platform === "win32" ? ".exe" : "";
   const candidates = [
     process.env.CA_BINARY_PATH,
     resolvePlatformBinary(),
-    resolve(__dirname, "ca-binary"),
-    resolve(__dirname, "..", "go", "dist", "ca"),
+    resolve(__dirname, `ca-binary${ext}`),
+    resolve(__dirname, "..", "go", "dist", `ca${ext}`),
   ].filter(Boolean);
 
   return candidates.find((p) => existsSync(p)) || null;

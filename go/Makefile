@@ -1,4 +1,3 @@
-TAGS      := sqlite_fts5
 DIST      := dist
 VERSION   := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
 COMMIT    := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
@@ -6,30 +5,30 @@ LDFLAGS   := -s -w -X github.com/nathandelacretaz/compound-agent/internal/build.
              -X github.com/nathandelacretaz/compound-agent/internal/build.Commit=$(COMMIT)
 RUST_DIR  := ../rust/embed-daemon
 
-PLATFORMS := darwin-arm64 darwin-amd64 linux-arm64 linux-amd64
+PLATFORMS := darwin-arm64 darwin-amd64 linux-arm64 linux-amd64 windows-amd64
 
 .PHONY: build build-release build-all build-daemon build-daemon-all test test-integration lint clean
 
 # Build for local platform (development).
 build:
-	go build -tags "$(TAGS)" -o ca ./cmd/ca
+	go build -o ca ./cmd/ca
 
 # Build for local platform with version injection and stripped symbols.
 build-release:
-	go build -tags "$(TAGS)" -ldflags '$(LDFLAGS)' -o $(DIST)/ca ./cmd/ca
+	go build -ldflags '$(LDFLAGS)' -o $(DIST)/ca ./cmd/ca
 
 # Cross-compile Go binary for all platforms.
-# Uses CGO_ENABLED=1 because go-sqlite3 requires cgo.
-# A C cross-compiler (CC) must be available for non-native targets.
-# For native-only builds, use build-release instead.
+# Pure Go (CGO_ENABLED=0) — no C cross-compiler needed.
 build-all: $(DIST)
 	@for platform in $(PLATFORMS); do \
 		os=$${platform%%-*}; \
 		arch=$${platform##*-}; \
-		echo "Building ca-$${platform}..."; \
-		CGO_ENABLED=1 GOOS=$$os GOARCH=$$arch \
-			go build -tags "$(TAGS)" -ldflags '$(LDFLAGS)' \
-			-o $(DIST)/ca-$$platform ./cmd/ca || exit 1; \
+		ext=""; \
+		if [ "$$os" = "windows" ]; then ext=".exe"; fi; \
+		echo "Building ca-$${platform}$${ext}..."; \
+		CGO_ENABLED=0 GOOS=$$os GOARCH=$$arch \
+			go build -ldflags '$(LDFLAGS)' \
+			-o $(DIST)/ca-$$platform$$ext ./cmd/ca || exit 1; \
 	done
 
 # Build Rust embed-daemon for local platform.
@@ -54,13 +53,13 @@ build-daemon-all: $(DIST)
 	done
 
 test:
-	go test -tags "$(TAGS)" ./...
+	go test ./...
 
 test-integration:
-	go test -tags "$(TAGS) integration" ./...
+	go test -tags integration ./...
 
 lint:
-	go vet -tags "$(TAGS)" ./...
+	go vet ./...
 
 clean:
 	rm -rf $(DIST) ca

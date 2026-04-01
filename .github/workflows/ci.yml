@@ -38,7 +38,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
       - uses: actions/checkout@v4
 
@@ -48,11 +48,11 @@ jobs:
 
       - name: Run tests
         working-directory: go
-        run: go test -tags sqlite_fts5 ./...
+        run: go test ./...
 
       - name: Run vet
         working-directory: go
-        run: go vet -tags sqlite_fts5 ./...
+        run: go vet ./...
 
   go-build:
     name: Go Build (${{ matrix.goos }}-${{ matrix.goarch }})
@@ -63,19 +63,18 @@ jobs:
           - runner: ubuntu-latest
             goos: linux
             goarch: amd64
-            cc: gcc
           - runner: ubuntu-24.04-arm
             goos: linux
             goarch: arm64
-            cc: gcc
           - runner: macos-latest
             goos: darwin
             goarch: arm64
-            cc: clang
           - runner: macos-latest
             goos: darwin
             goarch: amd64
-            cc: clang
+          - runner: windows-latest
+            goos: windows
+            goarch: amd64
     steps:
       - uses: actions/checkout@v4
 
@@ -85,22 +84,24 @@ jobs:
 
       - name: Build
         working-directory: go
+        shell: bash
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: "1"
-          CC: ${{ matrix.cc }}
+          CGO_ENABLED: "0"
         run: |
-          go build -tags sqlite_fts5 \
+          EXT=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then EXT=".exe"; fi
+          go build \
             -ldflags="-s -w -X github.com/nathandelacretaz/compound-agent/internal/build.Version=ci-${{ github.sha }}" \
-            -o dist/ca-${{ matrix.goos }}-${{ matrix.goarch }} \
+            -o "dist/ca-${{ matrix.goos }}-${{ matrix.goarch }}${EXT}" \
             ./cmd/ca
 
       - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
           name: ca-${{ matrix.goos }}-${{ matrix.goarch }}
-          path: go/dist/ca-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: go/dist/ca-${{ matrix.goos }}-${{ matrix.goarch }}*
 
   rust-build:
     name: Rust Embed Daemon (${{ matrix.artifact }})

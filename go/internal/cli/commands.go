@@ -4,6 +4,7 @@ package cli
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -344,7 +345,7 @@ func emitWindowsSearchNotice(repoRoot string) {
 	if _, err := os.Stat(marker); err == nil {
 		return // already shown
 	}
-	slog.Info("[keyword-only mode: semantic search unavailable on this platform]")
+	fmt.Fprintln(os.Stderr, "[keyword-only mode: semantic search unavailable on this platform]")
 	_ = os.MkdirAll(filepath.Dir(marker), 0o755)
 	_ = os.WriteFile(marker, []byte("shown"), 0o644)
 }
@@ -372,7 +373,9 @@ func getOrStartEmbedder(repoRoot string) (search.Embedder, func()) {
 
 	client, err = embed.EnsureDaemon(repoRoot, modelPath, tokenizerPath)
 	if err != nil {
-		slog.Warn("embed daemon failed, falling back to keyword search", "error", err)
+		if !errors.Is(err, embed.ErrNotSupported) {
+			slog.Warn("embed daemon failed, falling back to keyword search", "error", err)
+		}
 		return nil, noopClose
 	}
 	return &embedderAdapter{client: client}, func() { client.Close() }

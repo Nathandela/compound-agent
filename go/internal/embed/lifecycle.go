@@ -1,6 +1,7 @@
 package embed
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -11,6 +12,11 @@ import (
 	"strings"
 	"time"
 )
+
+// ErrNotSupported is returned when the embed daemon cannot run on the current platform.
+// On Windows, the daemon requires Unix domain sockets which are unavailable.
+// Callers should fall back to keyword-only search.
+var ErrNotSupported = errors.New("embed daemon not supported on this platform")
 
 const (
 	daemonBinary  = "ca-embed"

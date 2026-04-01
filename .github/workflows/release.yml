@@ -18,23 +18,23 @@ jobs:
           - runner: ubuntu-latest
             goos: linux
             goarch: amd64
-            cc: gcc
             artifact: ca-linux-amd64
           - runner: ubuntu-24.04-arm
             goos: linux
             goarch: arm64
-            cc: gcc
             artifact: ca-linux-arm64
           - runner: macos-latest
             goos: darwin
             goarch: arm64
-            cc: clang
             artifact: ca-darwin-arm64
           - runner: macos-latest
             goos: darwin
             goarch: amd64
-            cc: clang
             artifact: ca-darwin-amd64
+          - runner: windows-latest
+            goos: windows
+            goarch: amd64
+            artifact: ca-windows-amd64
     steps:
       - uses: actions/checkout@v4
 
@@ -44,24 +44,26 @@ jobs:
 
       - name: Build
         working-directory: go
+        shell: bash
         env:
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: "1"
-          CC: ${{ matrix.cc }}
+          CGO_ENABLED: "0"
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           COMMIT="${GITHUB_SHA::7}"
-          go build -tags sqlite_fts5 \
+          EXT=""
+          if [ "${{ matrix.goos }}" = "windows" ]; then EXT=".exe"; fi
+          go build \
             -ldflags="-s -w -X github.com/nathandelacretaz/compound-agent/internal/build.Version=${VERSION} -X github.com/nathandelacretaz/compound-agent/internal/build.Commit=${COMMIT}" \
-            -o "../dist/${{ matrix.artifact }}" \
+            -o "../dist/${{ matrix.artifact }}${EXT}" \
             ./cmd/ca
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: dist/${{ matrix.artifact }}
+          path: dist/${{ matrix.artifact }}*
 
   build-rust:
     name: Build Rust Daemon (${{ matrix.artifact }})
@@ -146,9 +148,9 @@ jobs:
       - name: Download release binaries
         run: |
           mkdir -p release-bins
-          for P in darwin-amd64 darwin-arm64 linux-amd64 linux-arm64; do
+          for P in darwin-amd64 darwin-arm64 linux-amd64 linux-arm64 windows-amd64; do
             gh release download "${GITHUB_REF_NAME}" \
-              --pattern "ca-${P}" \
+              --pattern "ca-${P}*" \
               --dir release-bins
           done
           # Rust embed daemon: 3 platforms (no x86_64 macOS — Intel uses Rosetta)

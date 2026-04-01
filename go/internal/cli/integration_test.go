@@ -41,7 +41,7 @@ func TestMain(m *testing.M) {
 	}
 
 	binaryPath = filepath.Join(tmpDir, "ca")
-	cmd := exec.Command("go", "build", "-tags", "sqlite_fts5", "-o", binaryPath, "./cmd/ca")
+	cmd := exec.Command("go", "build", "-o", binaryPath, "./cmd/ca")
 	cmd.Dir = goRoot
 	cmd.Stdout = os.Stderr
 	cmd.Stderr = os.Stderr

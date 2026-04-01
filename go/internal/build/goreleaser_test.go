@@ -39,11 +39,17 @@ func TestGoreleaserPlatformsMatchBuild(t *testing.T) {
 		t.Fatal("no goarch values found in .goreleaser.yml")
 	}
 
-	// Build cross-product of goos x goarch -> "os-arch" format.
+	// Parse ignore directives from goreleaser config.
+	ignoreSet := extractIgnoredPlatforms(content)
+
+	// Build cross-product of goos x goarch -> "os-arch" format, minus ignores.
 	var configPlatforms []string
 	for _, os := range goosValues {
 		for _, arch := range goarchValues {
-			configPlatforms = append(configPlatforms, os+"-"+arch)
+			platform := os + "-" + arch
+			if !ignoreSet[platform] {
+				configPlatforms = append(configPlatforms, platform)
+			}
 		}
 	}
 	sort.Strings(configPlatforms)
@@ -106,6 +112,49 @@ func TestGoreleaserBinaryName(t *testing.T) {
 	if !strings.Contains(content, "binary: ca") && !strings.Contains(content, "binary: \"ca\"") {
 		t.Error(".goreleaser.yml must set binary name to \"ca\"")
 	}
+}
+
+// extractIgnoredPlatforms parses goreleaser ignore directives (goos+goarch pairs)
+// and returns a set of "os-arch" strings to exclude from the cross-product.
+func extractIgnoredPlatforms(content string) map[string]bool {
+	result := make(map[string]bool)
+	lines := strings.Split(content, "\n")
+	for i := 0; i < len(lines); i++ {
+		trimmed := strings.TrimSpace(lines[i])
+		if trimmed != "ignore:" {
+			continue
+		}
+		// Parse entries under ignore: until indentation returns to same level.
+		for j := i + 1; j < len(lines); j++ {
+			line := lines[j]
+			if len(line) == 0 {
+				continue
+			}
+			// Stop when we hit a line at same/lower indent that isn't part of ignore.
+			stripped := strings.TrimSpace(line)
+			if stripped == "" {
+				continue
+			}
+			// Detect indent level — ignore entries are indented more than "ignore:".
+			indent := len(line) - len(strings.TrimLeft(line, " "))
+			if indent <= 4 && !strings.HasPrefix(stripped, "-") && !strings.HasPrefix(stripped, "goos:") && !strings.HasPrefix(stripped, "goarch:") {
+				break
+			}
+			if strings.HasPrefix(stripped, "- goos:") {
+				goos := strings.TrimSpace(strings.TrimPrefix(stripped, "- goos:"))
+				if j+1 < len(lines) {
+					nextLine := strings.TrimSpace(lines[j+1])
+					if strings.HasPrefix(nextLine, "goarch:") {
+						goarch := strings.TrimSpace(strings.TrimPrefix(nextLine, "goarch:"))
+						result[goos+"-"+goarch] = true
+						j++ // skip the goarch line
+					}
+				}
+			}
+		}
+		break
+	}
+	return result
 }
 
 // extractBracketList finds a YAML line like "key: [val1, val2]" and returns

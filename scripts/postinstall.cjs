@@ -12,7 +12,7 @@ const path = require("path");
 const { execFileSync } = require("child_process");
 const { createHash } = require("crypto");
 
-const PLATFORM_MAP = { darwin: "darwin", linux: "linux" };
+const PLATFORM_MAP = { darwin: "darwin", linux: "linux", win32: "windows" };
 const ARCH_MAP = { x64: "amd64", arm64: "arm64" };
 const REPO = "Nathandela/compound-agent";
 
@@ -21,7 +21,7 @@ function getPlatformKey(platform, arch) {
   const a = ARCH_MAP[arch];
   if (!p || !a) {
     throw new Error(
-      `Unsupported platform: ${platform}-${arch}. Supported: darwin-amd64, darwin-arm64, linux-amd64, linux-arm64`
+      `Unsupported platform: ${platform}-${arch}. Supported: darwin-amd64, darwin-arm64, linux-amd64, linux-arm64, windows-amd64`
     );
   }
   return `${p}-${a}`;
@@ -51,12 +51,13 @@ function verifyChecksum(filePath, artifactName, checksumsPath) {
 }
 
 function shouldSkipDownload(binDir, expectedVersion) {
-  const caPath = path.join(binDir, "ca-binary");
+  const isWindows = require("os").platform() === "win32";
+  const caPath = path.join(binDir, isWindows ? "ca-binary.exe" : "ca-binary");
   const embedPath = path.join(binDir, "ca-embed");
 
-  if (!fs.existsSync(caPath) || !fs.existsSync(embedPath)) {
-    return false;
-  }
+  if (!fs.existsSync(caPath)) return false;
+  // ca-embed is not available on Windows — only require it on Unix
+  if (!isWindows && !fs.existsSync(embedPath)) return false;
 
   try {
     const output = execFileSync(caPath, ["version"], { stdio: "pipe", encoding: "utf-8" });
@@ -133,16 +134,21 @@ async function downloadBinary(binDir, url, destName, label) {
 }
 
 function cleanupBinaries(binDir) {
-  for (const name of ["ca-binary", "ca-binary.tmp", "ca-embed", "ca-embed.tmp", "checksums.txt"]) {
+  for (const name of [
+    "ca-binary", "ca-binary.tmp", "ca-binary.exe", "ca-binary.exe.tmp",
+    "ca-embed", "ca-embed.tmp", "checksums.txt",
+  ]) {
     try { fs.unlinkSync(path.join(binDir, name)); } catch { /* ignore */ }
   }
 }
 
 function platformPackageInstalled() {
-  const pkg = `@syottos/${require("os").platform()}-${require("os").arch()}`;
+  const platform = require("os").platform();
+  const pkg = `@syottos/${platform}-${require("os").arch()}`;
+  const ext = platform === "win32" ? ".exe" : "";
   try {
     const pkgDir = path.dirname(require.resolve(`${pkg}/package.json`));
-    return fs.existsSync(path.join(pkgDir, "bin", "ca"));
+    return fs.existsSync(path.join(pkgDir, "bin", `ca${ext}`));
   } catch {
     return false;
   }
@@ -187,20 +193,34 @@ async function main() {
     const checksumsPath = path.join(binDir, "checksums.txt");
     await downloadFile(`${baseUrl}/checksums.txt`, checksumsPath);
 
-    // Download both binaries in parallel (to .tmp names)
-    const caArtifact = `ca-${platformKey}`;
-    // No x86_64 macOS embed build (ort-sys limitation) — use arm64 via Rosetta
-    const embedKey = platformKey === "darwin-amd64" ? "darwin-arm64" : platformKey;
-    const embedArtifact = `ca-embed-${embedKey}`;
+    // Download binaries in parallel (to .tmp names)
+    const isWindows = require("os").platform() === "win32";
+    const caExt = isWindows ? ".exe" : "";
+    const caArtifact = `ca-${platformKey}${caExt}`;
 
-    await Promise.all([
-      downloadBinary(binDir, `${baseUrl}/${caArtifact}`, "ca-binary", "CLI binary"),
-      downloadBinary(binDir, `${baseUrl}/${embedArtifact}`, "ca-embed", "Embed daemon"),
-    ]);
+    const downloads = [
+      downloadBinary(binDir, `${baseUrl}/${caArtifact}`, `ca-binary${caExt}`, "CLI binary"),
+    ];
+
+    // ca-embed is not available on Windows
+    let embedArtifact = null;
+    if (!isWindows) {
+      // No x86_64 macOS embed build (ort-sys limitation) — use arm64 via Rosetta
+      const embedKey = platformKey === "darwin-amd64" ? "darwin-arm64" : platformKey;
+      embedArtifact = `ca-embed-${embedKey}`;
+      downloads.push(
+        downloadBinary(binDir, `${baseUrl}/${embedArtifact}`, "ca-embed", "Embed daemon"),
+      );
+    }
+
+    await Promise.all(downloads);
 
     // Verify checksums against .tmp files
-    const caOk = verifyChecksum(path.join(binDir, "ca-binary.tmp"), caArtifact, checksumsPath);
-    const embedOk = verifyChecksum(path.join(binDir, "ca-embed.tmp"), embedArtifact, checksumsPath);
+    const caOk = verifyChecksum(path.join(binDir, `ca-binary${caExt}.tmp`), caArtifact, checksumsPath);
+    let embedOk = true;
+    if (embedArtifact) {
+      embedOk = verifyChecksum(path.join(binDir, "ca-embed.tmp"), embedArtifact, checksumsPath);
+    }
 
     if (!caOk || !embedOk) {
       const failed = [];
@@ -214,14 +234,17 @@ async function main() {
     console.log("[compound-agent] Checksums verified");
 
     // Checksums passed — rename .tmp to final names and set executable
-    fs.renameSync(path.join(binDir, "ca-binary.tmp"), path.join(binDir, "ca-binary"));
-    fs.chmodSync(path.join(binDir, "ca-binary"), 0o755);
-    fs.renameSync(path.join(binDir, "ca-embed.tmp"), path.join(binDir, "ca-embed"));
-    fs.chmodSync(path.join(binDir, "ca-embed"), 0o755);
+    const caFinal = path.join(binDir, `ca-binary${caExt}`);
+    fs.renameSync(path.join(binDir, `ca-binary${caExt}.tmp`), caFinal);
+    fs.chmodSync(caFinal, 0o755);
+    if (embedArtifact) {
+      fs.renameSync(path.join(binDir, "ca-embed.tmp"), path.join(binDir, "ca-embed"));
+      fs.chmodSync(path.join(binDir, "ca-embed"), 0o755);
+    }
 
     // Functional verification (P1-2 fix: use execFileSync)
     try {
-      execFileSync(path.join(binDir, "ca-binary"), ["version"], { stdio: "pipe" });
+      execFileSync(caFinal, ["version"], { stdio: "pipe" });
       console.log("[compound-agent] Functional check passed");
     } catch {
       cleanupBinaries(binDir);

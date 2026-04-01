@@ -323,9 +323,9 @@ func TestLoopCommand_GoTestUsesTagsSqliteFts5(t *testing.T) {
 	data, _ := os.ReadFile(outPath)
 	script := string(data)
 
-	// go test references must include -tags sqlite_fts5
-	if strings.Contains(script, "go test ./...") && !strings.Contains(script, "go test -tags sqlite_fts5 ./...") {
-		t.Error("generated loop script uses 'go test ./...' without -tags sqlite_fts5")
+	// go test references must NOT include obsolete -tags sqlite_fts5
+	if strings.Contains(script, "-tags sqlite_fts5") {
+		t.Error("generated loop script references obsolete -tags sqlite_fts5 (modernc.org/sqlite needs no build tags)")
 	}
 	// Should not reference pnpm test commands (stale TS leftovers)
 	if strings.Contains(script, "pnpm test:unit") {

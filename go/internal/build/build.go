@@ -14,5 +14,6 @@ func Platforms() []string {
 		"darwin-amd64",
 		"linux-arm64",
 		"linux-amd64",
+		"windows-amd64",
 	}
 }
