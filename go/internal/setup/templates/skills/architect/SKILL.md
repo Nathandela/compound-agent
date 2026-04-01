@@ -132,122 +132,31 @@ After creating all domain epics, create a final **Integration Verification (IV) 
 **Goal**: Configure and launch the infinity loop on the materialized epics.
 
 This phase is OPT-IN. After Phase 4:
-- If the user's starting prompt mentioned loop/launch intent: proceed directly to step 1.
+- If the user's starting prompt mentioned loop/launch intent: proceed directly.
 - Otherwise: use \`AskUserQuestion\` to ask if they want to launch the infinity loop.
 - If declined: stop here. The architect's job is done.
 
 **Gate 4** (launch consent received):
 
-1. **Pre-flight check** -- verify ALL materialized epic beads are status=open:
-   For each epic ID from Phase 4, run \`bd show <id> --json\` and check the status field.
-   - "open" -> ready to process
-   - "in_progress" -> STOP, another session may already be working on it
-   - "closed" -> STOP, epic was already completed
-   Report which epics have unexpected status. Do not proceed unless all are open.
+**Read \`loop-launcher/SKILL.md\` now.** It contains the complete reference for script generation, launch procedures, monitoring, pipeline chaining, CLI flag syntax, and critical gotchas. Follow it step by step.
 
-2. **Gather parameters** via \`AskUserQuestion\`:
-   - Model (default: claude-opus-4-6[1m])
-   - Reviewer fleet (claude-sonnet, claude-opus, gemini, codex)
-   - Review cadence: every N epics or end-only? (default: 0, end-only)
-   - Max review cycles (default: 3)
-   - Max retries on failure (default: 1)
-   - Dry-run first? (default: yes)
-   See \`architect/references/infinity-loop/README.md\` for the full parameter reference.
-   Read specific files as needed:
-   - Pre-flight and launch: \`infinity-loop/pre-flight.md\`
-   - Memory tuning: \`infinity-loop/memory-safety.md\`
-   - Review fleet config: \`infinity-loop/review-fleet.md\`
-
-3. **Generate script** (produces \`./infinity-loop.sh\`):
-   \`\`\`bash
-   ca loop --epics <id1> <id2> ... \\
-     --model <model> \\
-     --reviewers <reviewer1> <reviewer2> ... \\
-     --review-every <N> --max-review-cycles <N> \\
-     --max-retries <N> \\
-     --force
-   \`\`\`
-
-4. **Dry-run** (unless user declined in step 2):
-   \`\`\`bash
-   LOOP_DRY_RUN=1 ./infinity-loop.sh
-   \`\`\`
-   Review output, then use \`AskUserQuestion\`: "Dry-run complete. Proceed with live launch?"
-
-5. **Launch in background**:
-   Verify screen is available: \`command -v screen\`. If not, use \`nohup ./infinity-loop.sh > loop-output.log 2>&1 &\` as fallback.
-   Use a unique session name to avoid collisions when multiple loops run on the same host:
-   \`\`\`bash
-   LOOP_SESSION="compound-loop-$(basename "$PWD")"
-   screen -dmS "$LOOP_SESSION" ./infinity-loop.sh
-   mkdir -p .beads && echo "$LOOP_SESSION" > .beads/loop-session-name
-   \`\`\`
-   Verify: \`screen -ls | grep "$LOOP_SESSION"\`
-
-6. **Report monitoring commands** to the user:
-   - Live watch: \`ca watch\`
-   - Status: \`cat agent_logs/.loop-status.json\`
-   - Attach: \`screen -r "$(cat .beads/loop-session-name)"\`
-   - Execution log: \`cat agent_logs/loop-execution.jsonl\`
-   - For ongoing health monitoring, see the 30-minute probe protocol in the reference guide.
-
-7. **Generate polish loop** (optional, if user wants post-implementation quality polishing):
-   Ask the user if they want a polish phase after the infinity loop completes. If yes:
-   \`\`\`bash
-   ca polish --spec-file <spec-path> --meta-epic <meta-epic-id> \
-     --reviewers <reviewer1,reviewer2,...> \
-     --cycles <N> --model <model> --force
-   \`\`\`
-   This generates \`./polish-loop.sh\` which runs N cycles of: audit fleet -> polish architect -> inner infinity loop.
-   The polish loop addresses ALL priority levels (P0 critical through P2 nice-to-have).
-   See \`architect/references/polish-loop/README.md\` for the full parameter reference.
-
-   To run both loops in sequence, create a pipeline script:
-   \`\`\`bash
-   bash infinity-loop.sh && bash polish-loop.sh
-   \`\`\`
-
-See \`architect/references/infinity-loop/README.md\` for full reference. For troubleshooting, read \`infinity-loop/troubleshooting.md\`.
+Quick summary of the workflow (details in the skill):
+1. Pre-flight: verify all epics are status=open
+2. Gather parameters via \`AskUserQuestion\` (model, reviewers, review cadence, dry-run)
+3. Generate scripts: \`ca loop\` for infinity loop, \`ca polish\` for polish loop
+4. Dry-run: \`LOOP_DRY_RUN=1 bash infinity-loop.sh\`
+5. Launch in screen: \`screen -dmS compound-loop-$(basename $(pwd)) bash infinity-loop.sh\`
+6. Report monitoring commands to user
 
 ### Phase 6: Polish (Opt-in, post-loop)
 
-After the infinity loop completes, ask the user via \`AskUserQuestion\`: "The implementation loop is complete. Would you like to run the polish loop for iterative quality refinement?" If declined, stop here.
+After the infinity loop completes, ask the user if they want polish cycles. If yes, follow the polish section in \`loop-launcher/SKILL.md\`.
 
-**Gate 5**: User confirms polish loop activation and cycle count N.
-
-1. **Gather parameters**:
-   - Number of cycles (\`--cycles N\`) -- user must specify upfront, no default
-   - Reviewer fleet (\`--reviewers\`) -- which model CLIs to use for audit
-   - Model for polish architect sessions (\`--model\`, default: \`claude-opus-4-6[1m]\`)
-   - Spec file path (\`--spec\`) for reviewer context
-
-2. **Generate polish script**:
-   \`\`\`bash
-   ca polish --cycles <N> \\
-     --meta-epic <meta-epic-id> \\
-     --spec docs/specs/<name>.md \\
-     --reviewers <reviewer1>,<reviewer2>,... \\
-     --model <model> \\
-     --force
-   \`\`\`
-
-3. **Dry-run**: \`POLISH_DRY_RUN=1 ./polish-loop.sh\` -- validates configuration without spawning sessions.
-
-4. **Launch**: \`screen -dmS compound-polish ./polish-loop.sh\`
-
-5. **Report monitoring commands** to the user:
-   - Status: \`cat agent_logs/.polish-status.json\`
-   - Cycle reports: \`ls agent_logs/polish-cycle-*/\`
-   - Attach: \`screen -r compound-polish\`
-
-Each polish cycle executes three steps:
-- **Audit**: All configured reviewers evaluate the full implementation against the \`build-great-things\` pre-ship checklist (34 quality items + 12 laziness anti-patterns). This is a holistic craft review, not a diff review.
-- **Polish Architect**: A Claude Opus[1M] session reads the synthesized audit report, groups findings into improvement epics, creates beads, and wires inter-epic dependencies (never to the meta-epic).
-- **Inner Loop**: A fresh \`ca loop\` runs the cook-it pipeline for each improvement epic.
-
-The loop runs exactly N times. No early exit. Read \`build-great-things/SKILL.md\` for the full quality checklist that drives the audit.
-
-See \`architect/references/polish-loop/README.md\` for the full parameter reference.
+Chain both loops via a pipeline script so polish runs automatically after the infinity loop:
+\`\`\`bash
+bash infinity-loop.sh && bash polish-loop.sh
+\`\`\`
+Always launch the pipeline in a screen session.
 
 ## Memory Integration
 - \`ca search\` before starting each phase

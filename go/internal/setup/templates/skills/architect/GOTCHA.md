@@ -4,6 +4,7 @@ Things to do and not do when running the Architect skill.
 
 ## DO
 
+- **Always launch loops in a screen session.** Never run infinity or polish loops in the foreground. Use `screen -dmS compound-loop-projectname bash v3-pipeline.sh`. This prevents session loss on disconnect and allows monitoring via `screen -r`.
 - **Chain infinity loop + polish loop via pipeline script.** The polish loop is a separate script, not triggered by the infinity loop. Use `v3-pipeline.sh` or `bash infinity-loop.sh && bash polish-loop.sh` to chain them automatically.
 - **Use comma-separated values for `--epics` and `--reviewers` flags.** The `ca loop` CLI expects comma-separated strings, not space-separated positional arguments.
 - **Run from the `go/` directory** (or wherever `go.mod` lives). `ca loop` and `ca polish` won't find the module otherwise.
@@ -24,3 +25,58 @@ Things to do and not do when running the Architect skill.
 - **Do NOT log raw queries in telemetry.** Truncate or hash query fields to prevent sensitive data leakage (file paths, code snippets, error traces).
 - **Do NOT add telemetry I/O to the stdin read path in hooks.** Instrument at the hook OUTPUT boundary to avoid exceeding the 30-second stdin timeout (STPA critical hazard).
 - **Do NOT add skill metadata fields without a runtime consumer.** `when-to-use` and `scope` fields are dead metadata if no skill selector exists to consume them. Start with `phase` only.
+- **Do NOT run `claude -p` without `--dangerously-skip-permissions` in automated scripts.** Without this flag, claude will hang waiting for permission prompts that can't be displayed when stdout/stderr are redirected to files. Always include `--dangerously-skip-permissions --permission-mode auto` in any non-interactive claude invocation inside loops.
+
+## Advisory Fleet CLI Flags (Correct Usage)
+
+When spawning external model CLIs for advisory fleet or review phases:
+
+| CLI | Non-interactive mode | Model flag | Example |
+|-----|---------------------|------------|---------|
+| `claude` | `-p "prompt"` | `--model <id>` | `claude -p "Review this spec" --model claude-sonnet-4-6` |
+| `gemini` | `-p "prompt"` | `-m <model>` | `gemini -p "Review this spec"` |
+| `codex` | `codex exec "prompt"` | (auto) | `codex exec "Review this spec"` |
+
+Stdin piping works for all three: `cat file.md | claude -p "Review this"`.
+
+## Pipeline Patterns
+
+### Chain infinity + polish (recommended)
+```bash
+cd go
+cat > v3-pipeline.sh << 'SCRIPT'
+#!/bin/bash
+set -e
+trap 'echo "[pipeline] FAILED at line $LINENO" >&2' ERR
+cd "$(dirname "$0")"
+bash infinity-loop.sh
+bash polish-loop.sh
+SCRIPT
+screen -dmS compound-loop-$(basename $(pwd)) bash v3-pipeline.sh
+```
+
+### Generate scripts
+```bash
+cd go
+ca loop --epics "id1,id2,id3" --model "claude-opus-4-6[1m]" \
+  --reviewers "claude-sonnet,claude-opus,gemini,codex" \
+  --review-every 1 --max-review-cycles 3 --max-retries 1 --force
+
+ca polish --spec-file "../docs/specs/your-spec.md" \
+  --meta-epic "meta-id" --reviewers "claude-sonnet,claude-opus,gemini,codex" \
+  --cycles 2 --model "claude-opus-4-6[1m]" --force
+```
+
+### Monitor
+```bash
+screen -r compound-loop-projectname   # Attach to session
+ca watch                               # Live trace tail
+cat agent_logs/.loop-status.json       # Current status
+cat agent_logs/loop-execution.jsonl    # Execution history
+```
+
+### Dry-run
+```bash
+LOOP_DRY_RUN=1 bash infinity-loop.sh     # Validate without spawning
+POLISH_DRY_RUN=1 bash polish-loop.sh     # Same for polish
+```
