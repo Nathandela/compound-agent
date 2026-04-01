@@ -75,6 +75,9 @@ jobs:
           - runner: windows-latest
             goos: windows
             goarch: amd64
+          - runner: windows-latest
+            goos: windows
+            goarch: arm64
     steps:
       - uses: actions/checkout@v4
 
