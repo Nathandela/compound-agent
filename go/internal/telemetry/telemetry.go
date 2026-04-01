@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -85,7 +86,9 @@ func LogEvent(db *sql.DB, ev Event) error {
 	metadataJSON := "{}"
 	if ev.Metadata != nil {
 		b, err := json.Marshal(ev.Metadata)
-		if err == nil {
+		if err != nil {
+			slog.Debug("telemetry metadata marshal failed", "hook", ev.HookName, "error", err)
+		} else {
 			metadataJSON = string(b)
 		}
 	}
@@ -99,20 +102,12 @@ func LogEvent(db *sql.DB, ev Event) error {
 }
 
 // PruneEvents deletes the oldest rows when total count exceeds maxRows.
+// Uses a single atomic DELETE to avoid count-delete race under concurrency.
 // Returns the number of rows deleted.
 func PruneEvents(db *sql.DB, maxRows int64) (int64, error) {
-	var count int64
-	if err := db.QueryRow("SELECT COUNT(*) FROM telemetry").Scan(&count); err != nil {
-		return 0, err
-	}
-	if count <= maxRows {
-		return 0, nil
-	}
-
-	toDelete := count - maxRows
 	res, err := db.Exec(
-		`DELETE FROM telemetry WHERE id IN (SELECT id FROM telemetry ORDER BY id ASC LIMIT ?)`,
-		toDelete,
+		`DELETE FROM telemetry WHERE id NOT IN (SELECT id FROM telemetry ORDER BY id DESC LIMIT ?)`,
+		maxRows,
 	)
 	if err != nil {
 		return 0, err

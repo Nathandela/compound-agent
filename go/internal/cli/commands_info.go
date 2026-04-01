@@ -317,11 +317,20 @@ func formatInfoTelemetry(repoRoot string) string {
 	fmt.Fprintf(&b, "Total events: %d\n", stats.TotalEvents)
 	fmt.Fprintf(&b, "Retrievals: %d\n", stats.RetrievalCount)
 	if len(stats.HookStats) > 0 {
-		b.WriteString("\n")
-		fmt.Fprintf(&b, "%-25s %8s %10s\n", "Hook", "Count", "Avg (ms)")
-		fmt.Fprintf(&b, "%s\n", strings.Repeat("-", 47))
+		// Compute column width from longest hook name
+		nameWidth := len("Hook")
 		for _, hs := range stats.HookStats {
-			fmt.Fprintf(&b, "%-25s %8d %10.1f\n", hs.HookName, hs.Count, hs.AvgDurationMs)
+			if len(hs.HookName) > nameWidth {
+				nameWidth = len(hs.HookName)
+			}
+		}
+		nameWidth += 2 // padding
+
+		b.WriteString("\n")
+		fmt.Fprintf(&b, "%-*s %8s %10s\n", nameWidth, "Hook", "Count", "Avg (ms)")
+		fmt.Fprintf(&b, "%s\n", strings.Repeat("-", nameWidth+20))
+		for _, hs := range stats.HookStats {
+			fmt.Fprintf(&b, "%-*s %8d %10.1f\n", nameWidth, hs.HookName, hs.Count, hs.AvgDurationMs)
 		}
 	}
 	return b.String()

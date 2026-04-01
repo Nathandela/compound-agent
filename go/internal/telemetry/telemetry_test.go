@@ -213,6 +213,47 @@ func TestPruneEvents_OverLimit(t *testing.T) {
 	}
 }
 
+func TestPruneEvents_Atomic(t *testing.T) {
+	t.Parallel()
+	db := openTestDB(t)
+	defer db.Close()
+
+	// Insert 20 rows
+	for i := 0; i < 20; i++ {
+		ev := Event{EventType: EventHookExecution, HookName: "test"}
+		if err := LogEvent(db, ev); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Prune to 10 — should delete exactly 10 oldest
+	pruned, err := PruneEvents(db, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pruned != 10 {
+		t.Errorf("pruned = %d, want 10", pruned)
+	}
+
+	// Verify exactly 10 remain and they are the newest
+	var count int
+	if err := db.QueryRow("SELECT COUNT(*) FROM telemetry").Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 10 {
+		t.Errorf("remaining = %d, want 10", count)
+	}
+
+	// The remaining rows should have ids 11-20 (newest)
+	var minID int
+	if err := db.QueryRow("SELECT MIN(id) FROM telemetry").Scan(&minID); err != nil {
+		t.Fatal(err)
+	}
+	if minID != 11 {
+		t.Errorf("min remaining id = %d, want 11", minID)
+	}
+}
+
 func TestQueryStats(t *testing.T) {
 	t.Parallel()
 	db := openTestDB(t)

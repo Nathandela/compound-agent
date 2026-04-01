@@ -9,14 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- **`--compact-pct` flag** for `ca loop`, `ca improve`, and `ca polish`: Sets `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` in generated scripts to trigger context compaction earlier during autonomous workflows. Default 0 (use Claude Code default). Suggested value: 50 for Opus 1M sessions. Only affects generated scripts, not interactive sessions.
-
 ## [2.6.0] - 2026-04-01
 
 ### Added
 
+- **`--compact-pct` flag** for `ca loop`, `ca improve`, and `ca polish`: Sets `CLAUDE_AUTOCOMPACT_PCT_OVERRIDE` in generated scripts to trigger context compaction earlier during autonomous workflows. Default 0 (use Claude Code default). Suggested value: 50 for Opus 1M sessions. Only affects generated scripts, not interactive sessions. Validates range 0-100.
 - **Windows Native Support**: Native Windows binaries (amd64 + arm64) distributed via npm. Pure-Go SQLite driver eliminates CGO requirement. Real `LockFileEx`/`UnlockFileEx` file locking, `OpenProcess`/`GetExitCodeProcess` process detection, and `cmd /c start` URL opening with command injection prevention. Search gracefully degrades to keyword-only FTS5 (embed daemon is Unix-only). CI matrix includes `windows-latest`.
 - **Self-Explaining System (`ca info`)** (Epic 4): New CLI command displaying comprehensive system health — version, hooks, skills, phase state, telemetry, and lesson corpus stats. 13 tests.
 - **Skill Phase Metadata** (Epic 3): Structured `phase` field in YAML frontmatter of all SKILL.md files with pre-compiled `skills_index.json` for fast runtime skill lookup. Phase guard uses `ResolveSkillPath` for phase-aware routing.

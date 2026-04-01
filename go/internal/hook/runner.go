@@ -93,9 +93,15 @@ func RunHookWithTelemetry(hookName string, stdin io.Reader, stdout io.Writer, db
 		outcome = telemetry.OutcomeError
 	}
 
+	phase := ""
+	if state := GetPhaseState(util.GetRepoRoot()); state != nil {
+		phase = state.CurrentPhase
+	}
+
 	ev := telemetry.Event{
 		EventType:  telemetry.EventHookExecution,
 		HookName:   hookName,
+		Phase:      phase,
 		DurationMs: durationMs,
 		Outcome:    outcome,
 	}

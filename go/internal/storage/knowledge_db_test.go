@@ -42,6 +42,27 @@ func TestOpenKnowledgeDB_InMemory(t *testing.T) {
 	}
 }
 
+func TestOpenKnowledgeDB_FileBusyTimeout(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	dbPath := dir + "/knowledge.sqlite"
+
+	db, err := OpenKnowledgeDB(dbPath)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+
+	// Verify busy_timeout is set to 5000ms
+	var timeout int
+	if err := db.QueryRow("PRAGMA busy_timeout").Scan(&timeout); err != nil {
+		t.Fatalf("query busy_timeout: %v", err)
+	}
+	if timeout != 5000 {
+		t.Errorf("busy_timeout = %d, want 5000", timeout)
+	}
+}
+
 func TestUpsertAndReadChunks(t *testing.T) {
 	db := openTestKnowledgeDB(t)
 	kdb := NewKnowledgeDB(db)

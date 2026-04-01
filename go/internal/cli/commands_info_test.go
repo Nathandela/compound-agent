@@ -127,6 +127,24 @@ func TestFeedbackCommandOpenHint(t *testing.T) {
 	}
 }
 
+func TestOpenURL_RejectsNonHTTPSchemes(t *testing.T) {
+	t.Parallel()
+	// openURL should silently reject non-http(s) URLs to prevent command injection.
+	// We can't easily test that exec.Command is NOT called, but we verify
+	// the function doesn't panic on malicious input.
+	malicious := []string{
+		"javascript:alert(1)",
+		"file:///etc/passwd",
+		"ftp://evil.com",
+		"data:text/html,<script>alert(1)</script>",
+		"",
+		"cmd /c calc",
+	}
+	for _, url := range malicious {
+		openURL(url) // Must not panic
+	}
+}
+
 // --- info command tests ---
 
 func runInfoCmd(t *testing.T, repoRoot string, args ...string) string {

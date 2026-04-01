@@ -16,9 +16,9 @@ This directory contains coding standards and best practices for the Compound Age
 For this project (Go CLI tool), the most relevant areas are:
 
 - Package design and `internal/` layout
-- Database queries (parameterized SQL via go-sqlite3)
+- Database queries (parameterized SQL via modernc.org/sqlite)
 - Error handling (explicit error returns, no panics in library code)
-- Testing (`go test` with build tags, table-driven tests, TDD)
+- Testing (`go test`, table-driven tests, TDD)
 
 ## Related Documentation
 

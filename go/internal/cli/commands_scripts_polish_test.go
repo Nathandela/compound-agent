@@ -708,6 +708,32 @@ func TestPolishCommand_VisualVerification(t *testing.T) {
 	}
 }
 
+func TestPolishCommand_CompactPctValidation(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{"negative", "-1"},
+		{"over100", "101"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			root := &cobra.Command{Use: "ca"}
+			root.AddCommand(polishCmd())
+			dir := t.TempDir()
+			outPath := filepath.Join(dir, "polish.sh")
+			_, err := executeCommand(root, "polish", "-o", outPath,
+				"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1",
+				"--compact-pct", tt.value)
+			if err == nil {
+				t.Errorf("--compact-pct %s: expected error", tt.value)
+			}
+		})
+	}
+}
+
 func TestPolishCommand_CompactPct(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}

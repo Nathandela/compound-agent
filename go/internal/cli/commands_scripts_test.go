@@ -568,6 +568,62 @@ func TestLoopCommand_CompactPctZeroOmitted(t *testing.T) {
 	}
 }
 
+func TestLoopCommand_CompactPctValidation(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name    string
+		value   string
+		wantErr bool
+	}{
+		{"negative", "-1", true},
+		{"over100", "101", true},
+		{"zero", "0", false},
+		{"valid50", "50", false},
+		{"valid100", "100", false},
+		{"boundary1", "1", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			root := &cobra.Command{Use: "ca"}
+			root.AddCommand(loopCmd())
+			dir := t.TempDir()
+			outPath := filepath.Join(dir, "loop.sh")
+			_, err := executeCommand(root, "loop", "-o", outPath, "--compact-pct", tt.value)
+			if tt.wantErr && err == nil {
+				t.Errorf("--compact-pct %s: expected error, got nil", tt.value)
+			}
+			if !tt.wantErr && err != nil {
+				t.Errorf("--compact-pct %s: unexpected error: %v", tt.value, err)
+			}
+		})
+	}
+}
+
+func TestImproveCommand_CompactPctValidation(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{"negative", "-5"},
+		{"over100", "200"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			root := &cobra.Command{Use: "ca"}
+			root.AddCommand(improveCmd())
+			dir := t.TempDir()
+			outPath := filepath.Join(dir, "improve.sh")
+			_, err := executeCommand(root, "improve", "-o", outPath, "--compact-pct", tt.value)
+			if err == nil {
+				t.Errorf("--compact-pct %s: expected error", tt.value)
+			}
+		})
+	}
+}
+
 func TestImproveCommand_CompactPct(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}

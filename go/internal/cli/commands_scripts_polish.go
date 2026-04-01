@@ -42,6 +42,9 @@ func polishCmd() *cobra.Command {
 }
 
 func runPolish(cmd *cobra.Command, o *polishCmdOptions) error {
+	if o.compactPct < 0 || o.compactPct > 100 {
+		return fmt.Errorf("--compact-pct must be 0-100, got %d", o.compactPct)
+	}
 	if o.specFile == "" {
 		return fmt.Errorf("--spec-file is required")
 	}

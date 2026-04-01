@@ -102,6 +102,8 @@ func (k *KnowledgeDB) Close() error {
 }
 
 // OpenKnowledgeDB opens or creates a knowledge SQLite database.
+// For on-disk databases, uses flock serialization during rebuild to prevent
+// concurrent processes from racing on schema recreation.
 func OpenKnowledgeDB(path string) (*sql.DB, error) {
 	isMemory := path == ":memory:"
 
@@ -110,32 +112,57 @@ func OpenKnowledgeDB(path string) (*sql.DB, error) {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, fmt.Errorf("create dir: %w", err)
 		}
+		return lockedOpenKnowledgeDB(path)
+	}
 
-		if knowledgeNeedsRebuild(path) {
-			os.Remove(path)
+	db, err := sql.Open("sqlite", path)
+	if err != nil {
+		return nil, fmt.Errorf("open: %w", err)
+	}
+	return initKnowledgeSchema(db)
+}
+
+// lockedOpenKnowledgeDB acquires a blocking flock for the rebuild cycle,
+// mirroring lockedOpenDB for the lessons database.
+func lockedOpenKnowledgeDB(path string) (*sql.DB, error) {
+	lockPath := path + ".lock"
+	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return nil, fmt.Errorf("open lock file: %w", err)
+	}
+	defer f.Close()
+
+	if err := flockExclusive(f); err != nil {
+		return nil, fmt.Errorf("flock: %w", err)
+	}
+	defer func() { _ = flockUnlock(f) }()
+
+	if knowledgeNeedsRebuild(path) {
+		for _, suffix := range []string{"", "-wal", "-shm"} {
+			if err := os.Remove(path + suffix); err != nil && !os.IsNotExist(err) {
+				return nil, fmt.Errorf("remove stale knowledge db %s: %w", path+suffix, err)
+			}
 		}
 	}
 
-	dsn := path
-	if !isMemory {
-		dsn = path + "?_pragma=journal_mode(WAL)"
-	}
-
+	dsn := path + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
 	db, err := sql.Open("sqlite", dsn)
 	if err != nil {
 		return nil, fmt.Errorf("open: %w", err)
 	}
+	return initKnowledgeSchema(db)
+}
 
+// initKnowledgeSchema applies the knowledge DDL and sets the version.
+func initKnowledgeSchema(db *sql.DB) (*sql.DB, error) {
 	if _, err := db.Exec(knowledgeSchemaDDL); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("create schema: %w", err)
 	}
-
 	if _, err := db.Exec(fmt.Sprintf("PRAGMA user_version = %d", KnowledgeSchemaVersion)); err != nil {
 		db.Close()
 		return nil, fmt.Errorf("set version: %w", err)
 	}
-
 	return db, nil
 }
 

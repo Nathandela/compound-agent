@@ -64,6 +64,9 @@ func improveCmd() *cobra.Command {
 
 // runImprove implements the RunE body for the improve command.
 func runImprove(cmd *cobra.Command, output string, maxIters, budget int, model string, force bool, topics string, compactPct int) error {
+	if compactPct < 0 || compactPct > 100 {
+		return fmt.Errorf("--compact-pct must be 0-100, got %d", compactPct)
+	}
 	if !force {
 		if _, err := os.Stat(output); err == nil {
 			return fmt.Errorf("file %s already exists (use --force to overwrite)", output)
@@ -329,6 +332,9 @@ func loopCmd() *cobra.Command {
 }
 
 func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
+	if o.compactPct < 0 || o.compactPct > 100 {
+		return fmt.Errorf("--compact-pct must be 0-100, got %d", o.compactPct)
+	}
 	output := o.output
 	if output == "" {
 		output = "infinity-loop.sh"

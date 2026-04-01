@@ -323,28 +323,27 @@ func TestDoctorCommand(t *testing.T) {
 	}
 }
 
-func TestDoctorWSL2Check(t *testing.T) {
+func TestDoctorWindowsPlatformCheck(t *testing.T) {
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude", "lessons"), 0755)
 	os.WriteFile(filepath.Join(dir, ".claude", "lessons", "index.jsonl"), []byte{}, 0644)
 
 	checks := runDoctorChecks(dir)
 
-	hasWSL2Check := false
+	hasWindowsCheck := false
 	for _, c := range checks {
-		if c.Name == "WSL2 recommended" {
-			hasWSL2Check = true
-			// On Windows: "warn" (no WSL) or "info" (WSL detected)
-			if c.Status != "warn" && c.Status != "info" {
-				t.Errorf("WSL2 check should be warn or info, got %s", c.Status)
+		if c.Name == "Windows platform" {
+			hasWindowsCheck = true
+			if c.Status != "info" {
+				t.Errorf("Windows platform check should be info, got %s", c.Status)
 			}
 		}
 	}
 
-	if runtime.GOOS == "windows" && !hasWSL2Check {
-		t.Error("expected WSL2 recommendation on Windows")
+	if runtime.GOOS == "windows" && !hasWindowsCheck {
+		t.Error("expected Windows platform check on Windows")
 	}
-	if runtime.GOOS != "windows" && hasWSL2Check {
-		t.Error("WSL2 check should not appear on non-Windows platforms")
+	if runtime.GOOS != "windows" && hasWindowsCheck {
+		t.Error("Windows platform check should not appear on non-Windows platforms")
 	}
 }

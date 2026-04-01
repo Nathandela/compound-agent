@@ -1,3 +1,5 @@
+# NOTE: This config is syntax-checked in CI (goreleaser check) but NOT used
+# for production releases. Releases are built by .github/workflows/release.yml.
 version: 2
 
 project_name: compound-agent
