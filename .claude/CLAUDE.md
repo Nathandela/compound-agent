@@ -113,7 +113,7 @@ Every implementation MUST follow this subagent sequence:
 ## Quality Gates
 
 ```bash
-cd go && go test -tags sqlite_fts5 ./...   # 100% pass rate
+cd go && go test ./...                     # 100% pass rate
 cd go && golangci-lint run ./...            # Zero violations
 ```
 
@@ -156,7 +156,7 @@ cd go && golangci-lint run ./...            # Zero violations
 Every release MUST follow these steps. Skipping any step ships broken binaries to users.
 
 ```bash
-[ ] 1. cd go && go test -tags sqlite_fts5 ./...   # Quality gates pass
+[ ] 1. cd go && go test ./...                      # Quality gates pass
 [ ] 2. cd go && golangci-lint run ./...            # Zero lint violations
 [ ] 3. Bump "version" in package.json              # e.g. "2.5.0"
 [ ] 4. Bump ALL 4 "@syottos/*" in optionalDependencies to SAME version
@@ -175,9 +175,9 @@ Every release MUST follow these steps. Skipping any step ships broken binaries t
 |-----------|------------|
 | Language | Go |
 | Package Manager | Go modules (+ pnpm for npm wrapper) |
-| Build | go build with CGO + sqlite_fts5 tag |
+| Build | go build with CGO_ENABLED=0 (pure Go) |
 | Testing | go test + table-driven tests |
-| Storage | mattn/go-sqlite3 + FTS5 |
+| Storage | modernc.org/sqlite + FTS5 (pure Go, no CGO) |
 | Embeddings | ca-embed (Rust daemon via IPC) |
 | CLI | Cobra |
 | Release | GoReleaser |
@@ -230,9 +230,9 @@ go/                             (Go source)
 ## Build & Test Commands
 
 ```bash
-cd go && go build -tags sqlite_fts5 ./cmd/ca   # Build CLI binary
-cd go && go test -tags sqlite_fts5 ./...        # Full test suite
-cd go && go vet -tags sqlite_fts5 ./...         # Static analysis
+cd go && go build ./cmd/ca                       # Build CLI binary
+cd go && go test ./...                           # Full test suite
+cd go && go vet ./...                            # Static analysis
 cd go && golangci-lint run ./...                 # Lint
 make -C go build                                 # Build via Makefile
 make -C go test                                  # Test via Makefile
