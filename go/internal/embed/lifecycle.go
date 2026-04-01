@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -159,23 +160,29 @@ func startDaemon(socketPath, modelPath, tokenizerPath string) error {
 }
 
 // findDaemonBinary looks for the ca-embed binary near the Go binary or in PATH.
+// On Windows, appends .exe to the binary name.
 func findDaemonBinary() (string, error) {
+	name := daemonBinary
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+
 	self, err := os.Executable()
 	if err == nil {
-		candidate := filepath.Join(filepath.Dir(self), daemonBinary)
+		candidate := filepath.Join(filepath.Dir(self), name)
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate, nil
 		}
 	}
 
 	for _, dir := range filepath.SplitList(os.Getenv("PATH")) {
-		candidate := filepath.Join(dir, daemonBinary)
+		candidate := filepath.Join(dir, name)
 		if _, err := os.Stat(candidate); err == nil {
 			return candidate, nil
 		}
 	}
 
-	return "", fmt.Errorf("%s not found in PATH or next to binary", daemonBinary)
+	return "", fmt.Errorf("%s not found in PATH or next to binary", name)
 }
 
 // FindModelFiles searches known locations for the ONNX model and tokenizer.

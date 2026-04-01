@@ -2,26 +2,45 @@
 
 package embed
 
-import "os"
+import (
+	"os"
 
-// flockExclusive is a no-op on Windows; the embedding daemon uses Unix
-// sockets which are unavailable on native Windows anyway.
+	"golang.org/x/sys/windows"
+)
+
+// flockExclusive acquires a blocking exclusive lock using Windows LockFileEx.
 func flockExclusive(f *os.File) error {
-	return nil
+	ol := new(windows.Overlapped)
+	return windows.LockFileEx(
+		windows.Handle(f.Fd()),
+		windows.LOCKFILE_EXCLUSIVE_LOCK,
+		0, 1, 0, ol,
+	)
 }
 
-// flockUnlock is a no-op on Windows.
+// flockUnlock releases the file lock using Windows UnlockFileEx.
 func flockUnlock(f *os.File) error {
-	return nil
+	ol := new(windows.Overlapped)
+	return windows.UnlockFileEx(
+		windows.Handle(f.Fd()),
+		0, 1, 0, ol,
+	)
 }
 
 // processAlive checks if a process with the given PID is still running.
-// On Windows, FindProcess always succeeds, so we attempt a zero-signal
-// equivalent — but since the daemon requires Unix sockets, this path
-// is effectively unreachable on native Windows.
+// Uses OpenProcess with PROCESS_QUERY_LIMITED_INFORMATION and GetExitCodeProcess
+// to determine if the process is still active.
 func processAlive(proc *os.Process) bool {
-	// On Windows, os.FindProcess always succeeds. We release the handle
-	// immediately; the caller treats a false return as "not running".
-	_ = proc.Release()
-	return false
+	h, err := windows.OpenProcess(windows.PROCESS_QUERY_LIMITED_INFORMATION, false, uint32(proc.Pid))
+	if err != nil {
+		return false
+	}
+	defer windows.CloseHandle(h)
+
+	var exitCode uint32
+	if err := windows.GetExitCodeProcess(h, &exitCode); err != nil {
+		return false
+	}
+	// STILL_ACTIVE (259) means the process has not exited yet.
+	return exitCode == 259
 }

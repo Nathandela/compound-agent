@@ -73,17 +73,21 @@ func feedbackCmd() *cobra.Command {
 	return cmd
 }
 
-func openURL(url string) {
-	var cmd string
+func openURL(rawURL string) {
+	// Validate URL scheme to prevent command injection (P0 security).
+	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
+		return
+	}
 	switch runtime.GOOS {
 	case "darwin":
-		cmd = "open"
+		_ = exec.Command("open", rawURL).Start()
 	case "windows":
-		cmd = "start"
+		// On Windows, use 'cmd /c start "" <url>' — the empty "" is the window title
+		// parameter required by 'start' when the URL contains special characters.
+		_ = exec.Command("cmd", "/c", "start", "", rawURL).Start()
 	default:
-		cmd = "xdg-open"
+		_ = exec.Command("xdg-open", rawURL).Start()
 	}
-	_ = exec.Command(cmd, url).Start()
 }
 
 // infoCmd creates the "info" command. If testRepoRoot is non-empty, it uses that

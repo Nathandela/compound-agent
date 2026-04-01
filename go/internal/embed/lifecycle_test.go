@@ -19,9 +19,10 @@ func TestSocketPath(t *testing.T) {
 }
 
 func TestPIDPath(t *testing.T) {
-	sock := "/tmp/test.sock"
+	dir := t.TempDir()
+	sock := filepath.Join(dir, "test.sock")
 	got := PIDPath(sock)
-	want := "/tmp/test.sock.pid"
+	want := sock + ".pid"
 	if got != want {
 		t.Errorf("PIDPath = %v, want %v", got, want)
 	}
@@ -63,9 +64,10 @@ func TestDaemonBinaryName(t *testing.T) {
 }
 
 func TestLockPath(t *testing.T) {
-	sock := "/tmp/test.sock"
+	dir := t.TempDir()
+	sock := filepath.Join(dir, "test.sock")
 	got := LockPath(sock)
-	want := "/tmp/test.sock.lock"
+	want := sock + ".lock"
 	if got != want {
 		t.Errorf("LockPath = %v, want %v", got, want)
 	}
