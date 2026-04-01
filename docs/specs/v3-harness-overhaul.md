@@ -21,7 +21,7 @@ Compound-agent's memory substrate and phase methodology are strong foundations, 
 ### Event-Driven Requirements
 
 - **REQ-E1**: WHEN a hook fires, THEN the system SHALL log a telemetry event containing `{hook_name, timestamp, duration_ms, outcome}` to the telemetry SQLite table.
-- **REQ-E2**: WHEN `ca explain` is invoked, THEN the system SHALL output a structured overview of installed hooks, skills, phase workflow, and data flow.
+- **REQ-E2**: WHEN `ca info` (or its alias `ca explain`) is invoked, THEN the system SHALL output a structured overview of installed hooks, skills, phase workflow, and data flow.
 - **REQ-E3**: WHEN `ca doctor` detects a native Windows environment, THEN the system SHALL recommend WSL2 installation (warn if WSL not found, info if WSL detected).
 - **REQ-E4**: WHEN a lesson is retrieved by a hook, THEN the system SHALL log `{lesson_id, query_hash, score, hook_name}` to the telemetry SQLite table.
 

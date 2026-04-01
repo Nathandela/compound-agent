@@ -91,8 +91,9 @@ func openURL(url string) {
 func infoCmd(testRepoRoot string) *cobra.Command {
 	var jsonOut bool
 	cmd := &cobra.Command{
-		Use:   "info",
-		Short: "Show a structured overview of hooks, skills, phases, telemetry, and lessons",
+		Use:     "info",
+		Aliases: []string{"explain"},
+		Short:   "Show a structured overview of hooks, skills, phases, telemetry, and lessons",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			root := testRepoRoot
 			if root == "" {

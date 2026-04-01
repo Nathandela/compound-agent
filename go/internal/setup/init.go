@@ -212,6 +212,7 @@ func EnsureGitignore(repoRoot string) error {
 .ca-phase-state.json
 .ca-failure-state.json
 .ca-read-state.json
+.ca-hints-shown
 skills/compound/skills_index.json
 `
 

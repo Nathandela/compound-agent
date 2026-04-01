@@ -2,9 +2,12 @@ package cli
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/nathandelacretaz/compound-agent/internal/setup"
 	"github.com/spf13/cobra"
 )
 
@@ -185,5 +188,40 @@ func TestEmptyStateMessages_HaveGuidance(t *testing.T) {
 				t.Errorf("empty-state message should include actionable guidance, got: %q", tt.output)
 			}
 		})
+	}
+}
+
+// --- REQ-O2: First-session workflow hint ---
+
+func TestLoadSession_ShowsHintOnFirstSession(t *testing.T) {
+	dir := t.TempDir()
+	claudeDir := filepath.Join(dir, ".claude")
+	os.MkdirAll(filepath.Join(claudeDir, "lessons"), 0755)
+	os.WriteFile(filepath.Join(claudeDir, "lessons", "index.jsonl"), []byte{}, 0644)
+	os.WriteFile(filepath.Join(claudeDir, "compound-agent.json"), []byte(`{"hints": true}`), 0644)
+
+	if !setup.ShouldShowHint(dir) {
+		t.Fatal("precondition: hint should be showable before first session")
+	}
+}
+
+func TestLoadSession_HintNotShownAfterMarker(t *testing.T) {
+	dir := t.TempDir()
+	claudeDir := filepath.Join(dir, ".claude")
+	os.MkdirAll(claudeDir, 0755)
+	os.WriteFile(filepath.Join(claudeDir, "compound-agent.json"), []byte(`{"hints": true}`), 0644)
+
+	_ = setup.MarkHintShown(dir)
+
+	if setup.ShouldShowHint(dir) {
+		t.Error("hint should not show after marker is created")
+	}
+}
+
+func TestLoadSession_HintNotShownWhenDisabled(t *testing.T) {
+	dir := t.TempDir()
+
+	if setup.ShouldShowHint(dir) {
+		t.Error("hint should not show when config is missing")
 	}
 }

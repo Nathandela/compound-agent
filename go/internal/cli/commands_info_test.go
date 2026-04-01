@@ -380,6 +380,22 @@ func TestInfoCmd_IsRegistered(t *testing.T) {
 	}
 }
 
+func TestExplainAlias(t *testing.T) {
+	dir := t.TempDir()
+
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(infoCmd(dir))
+
+	out, err := executeCommand(root, "explain")
+	if err != nil {
+		t.Fatalf("explain alias failed: %v\nOutput: %s", err, out)
+	}
+
+	if !strings.Contains(out, "Version") {
+		t.Errorf("explain alias should produce info output, got: %s", out)
+	}
+}
+
 // addAllHooksForInfoTest creates a hook config that HasAllHooks recognizes.
 func addAllHooksForInfoTest(settings map[string]any) {
 	hooks := map[string]any{}

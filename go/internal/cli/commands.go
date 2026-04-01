@@ -14,6 +14,7 @@ import (
 	"github.com/nathandelacretaz/compound-agent/internal/memory"
 	"github.com/nathandelacretaz/compound-agent/internal/retrieval"
 	"github.com/nathandelacretaz/compound-agent/internal/search"
+	"github.com/nathandelacretaz/compound-agent/internal/setup"
 	"github.com/nathandelacretaz/compound-agent/internal/storage"
 	"github.com/nathandelacretaz/compound-agent/internal/util"
 	"github.com/spf13/cobra"
@@ -219,6 +220,10 @@ func loadSessionCmd() *cobra.Command {
 				cmd.Println(out)
 			} else {
 				cmd.Print(formatSessionHuman(lessons, totalCount))
+				if setup.ShouldShowHint(repoRoot) {
+					cmd.Printf("\n%s", setup.WorkflowHint())
+					_ = setup.MarkHintShown(repoRoot)
+				}
 			}
 			return nil
 		},
