@@ -81,14 +81,14 @@ rust/
 ## Build, Test, Run Commands
 
 ```bash
-# Build CLI binary (CGO required for SQLite)
-cd go && go build -tags sqlite_fts5 ./cmd/ca
+# Build CLI binary
+cd go && go build ./cmd/ca
 
 # Run full test suite
-cd go && go test -tags sqlite_fts5 ./...
+cd go && go test ./...
 
 # Static analysis
-cd go && go vet -tags sqlite_fts5 ./...
+cd go && go vet ./...
 
 # Lint (golangci-lint v2)
 cd go && golangci-lint run ./...
@@ -103,14 +103,12 @@ make -C go test
 ### Build Requirements
 
 - Go 1.26+
-- CGO enabled (for `mattn/go-sqlite3`)
-- Build tag: `sqlite_fts5`
 
 ### Dependencies (minimal)
 
 | Dependency | Purpose |
 |------------|---------|
-| `github.com/mattn/go-sqlite3` | SQLite driver with FTS5 support (CGO) |
+| `modernc.org/sqlite` | Pure-Go SQLite driver with FTS5 (no CGO) |
 | `github.com/spf13/cobra` | CLI framework |
 
 ### CLI Usage
@@ -244,7 +242,7 @@ db.QueryRow(fmt.Sprintf("SELECT * FROM lessons WHERE id = '%s'", id))
    - Use function parameters, not globals
 
 6. **DO NOT commit without running tests**
-   - `go test -tags sqlite_fts5 ./...` must pass before commit
+   - `go test ./...` must pass before commit
    - `golangci-lint run ./...` must pass before commit
 
 7. **DO NOT add heavyweight dependencies**
@@ -259,7 +257,6 @@ db.QueryRow(fmt.Sprintf("SELECT * FROM lessons WHERE id = '%s'", id))
 
 - Tests colocated with source files (`*_test.go`)
 - Table-driven tests with subtests (`t.Run`)
-- Build tag `sqlite_fts5` required for all test commands
 - 100% pass rate required
 - No mocking of business logic
 - Property-based tests where appropriate

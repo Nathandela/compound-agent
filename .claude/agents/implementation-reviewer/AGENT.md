@@ -21,7 +21,7 @@ You are the FINAL INDEPENDENT CODE REVIEWER with ultimate authority to accept or
 
 ### 1. ALL Tests Pass
 ```bash
-cd go && go test -tags sqlite_fts5 ./...
+cd go && go test ./...
 ```
 - [ ] 100% pass rate (no failures)
 - [ ] No skipped tests
@@ -63,7 +63,7 @@ cd go && golangci-lint run ./...
 
 ## Your Review Process
 
-1. **Run All Tests**: `cd go && go test -tags sqlite_fts5 ./...`
+1. **Run All Tests**: `cd go && go test ./...`
 2. **Check Code Quality**: `cd go && golangci-lint run ./...`
 3. **Review Exports**: All exported symbols documented?
 4. **Review Documentation**: Doc comments on public functions?

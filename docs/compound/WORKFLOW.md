@@ -40,7 +40,7 @@ Execute implementation through agent teams using TDD.
 
 Multi-agent code review with severity classification.
 
-- Run quality gates: `cd go && go test -tags sqlite_fts5 ./... && golangci-lint run ./...`
+- Run quality gates: `cd go && go test ./... && golangci-lint run ./...`
 - Spawn specialized reviewers (security, architecture, performance, etc.)
 - Classify findings as P0 (blocks merge) / P1/P2/P3
 - Fix all P0/P1 findings before proceeding

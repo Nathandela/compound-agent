@@ -515,9 +515,9 @@ User: /compound:compound
 |-----------|------------|-------|
 | Language | Go | Migrated from prior Node.js implementation |
 | Package Manager | Go modules (+ pnpm for npm wrapper) | Migrated |
-| Build | go build with CGO + sqlite_fts5 tag | Migrated |
+| Build | go build with CGO_ENABLED=0 (pure Go) | Migrated |
 | Testing | go test + table-driven tests | Migrated |
-| Storage | mattn/go-sqlite3 + FTS5 | Migrated |
+| Storage | modernc.org/sqlite + FTS5 (pure Go, no CGO) | Migrated |
 | Embeddings | ca-embed (Rust daemon via IPC) | Migrated |
 | CLI | Cobra | Migrated |
 | Schema | Go structs + JSON tags | Migrated |

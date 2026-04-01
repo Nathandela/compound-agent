@@ -17,11 +17,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Windows Native Support**: Native Windows binaries (amd64 + arm64) distributed via npm. Pure-Go SQLite driver eliminates CGO requirement. Real `LockFileEx`/`UnlockFileEx` file locking, `OpenProcess`/`GetExitCodeProcess` process detection, and `cmd /c start` URL opening with command injection prevention. Search gracefully degrades to keyword-only FTS5 (embed daemon is Unix-only). CI matrix includes `windows-latest`.
 - **Self-Explaining System (`ca info`)** (Epic 4): New CLI command displaying comprehensive system health — version, hooks, skills, phase state, telemetry, and lesson corpus stats. 13 tests.
 - **Skill Phase Metadata** (Epic 3): Structured `phase` field in YAML frontmatter of all SKILL.md files with pre-compiled `skills_index.json` for fast runtime skill lookup. Phase guard uses `ResolveSkillPath` for phase-aware routing.
 - **Telemetry Foundation** (Epic 2): Schema v7 with telemetry table, `ca health` command, file-based lock for concurrent access, and hook execution instrumentation.
 - **V3.0 Harness Overhaul Specification**: Spec and advisory brief for upcoming harness overhaul.
 - **GOTCHA.md for architect skill**: Documented common pitfalls for architect workflows.
+
+### Changed
+
+- **SQLite driver**: Replaced `mattn/go-sqlite3` (CGO) with `modernc.org/sqlite` (pure Go). Enables `CGO_ENABLED=0` builds and Windows cross-compilation. DSN format uses `_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)`. FTS5 included by default — no build tags required.
+- **Build pipeline**: All builds now use `CGO_ENABLED=0`. Removed `-tags sqlite_fts5` from Makefile, CI, GoReleaser, and lint config. Added `windows-amd64` and `windows-arm64` targets to GoReleaser, CI matrix, and Makefile.
+- **npm distribution**: Added `@syottos/win32-x64` and `@syottos/win32-arm64` platform packages. Updated `bin/ca` wrapper, `postinstall.cjs`, and `publish-platforms.cjs` for `.exe` handling and embed daemon exclusion on Windows.
 
 ### Fixed
 
@@ -29,10 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Screen session name collisions**: Unique session names using `compound-loop-$(basename $(pwd))` pattern to avoid host-level collisions (PR #10).
 - **6 golangci-lint violations**: gofmt alignment in map literals, extracted `checkHooks`/`printDoctorResults` helpers to reduce cyclop/funlen, handled `flockUnlock` error return.
 - **Review findings**: Multiple rounds of P0-P3 fixes from external reviewers across Epics 1-4.
+- **Command injection in `openURL`**: Windows `cmd /c start` now validates URL scheme (`http://`/`https://` only) and uses `exec.Command` argument splitting to prevent shell metacharacter injection.
 
 ### Dependencies
 
-- **go-sqlite3**: 1.14.37 to 1.14.38 — bounds check elimination in hot paths, missing constraint op types (PR #11).
+- **modernc.org/sqlite**: v1.48.0 — pure-Go SQLite driver replacing mattn/go-sqlite3 (CGO). Enables Windows native builds.
+- **golang.org/x/sys**: v0.42.0 — Windows `LockFileEx`/`UnlockFileEx` and process APIs.
 - **thiserror**: 1.0.69 to 2.0.18 in Rust embed daemon — major version bump with no-std support and improved diagnostics (PR #8).
 - **tokenizers**: 0.21.4 to 0.22.2 in Rust embed daemon — PyO3 0.26, faster vocab loading, GIL-free (PR #7).
 

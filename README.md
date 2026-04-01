@@ -241,18 +241,14 @@ npx ca setup
 
 ### Windows Users
 
-Compound-agent requires WSL2 on Windows. Native Windows is not supported due to CGO and Unix socket dependencies.
+Compound-agent runs natively on Windows (amd64 and arm64). Install and use it the same way as on macOS/Linux:
 
 ```bash
-# Install WSL2 (PowerShell as admin)
-wsl --install
-
-# Then install and run compound-agent inside WSL2
 pnpm add -D compound-agent
 npx ca setup
 ```
 
-Run `ca doctor` inside WSL2 to verify your environment.
+**Note**: The embedding daemon (`ca-embed`) is not available on Windows. Search automatically falls back to keyword-only mode (FTS5). All other features work identically. WSL2 users get full functionality including vector search.
 
 ## CLI Reference
 
@@ -396,9 +392,9 @@ A: The loop works and has been used to ship real projects, including compound-ag
 ## Development
 
 ```bash
-cd go && go build -tags sqlite_fts5 ./cmd/ca   # Build CLI binary
-cd go && go test -tags sqlite_fts5 ./...        # Full test suite
-cd go && go vet -tags sqlite_fts5 ./...         # Static analysis
+cd go && go build ./cmd/ca   # Build CLI binary
+cd go && go test ./...       # Full test suite
+cd go && go vet ./...        # Static analysis
 ```
 
 ## Technology Stack
@@ -407,9 +403,9 @@ cd go && go vet -tags sqlite_fts5 ./...         # Static analysis
 |-----------|------------|
 | Language | Go |
 | Package Manager | Go modules (+ pnpm for npm wrapper) |
-| Build | go build with CGO + sqlite_fts5 tag |
+| Build | go build with CGO_ENABLED=0 (pure Go) |
 | Testing | go test + table-driven tests |
-| Storage | mattn/go-sqlite3 + FTS5 |
+| Storage | modernc.org/sqlite + FTS5 (pure Go, no CGO) |
 | Embeddings | ca-embed (Rust daemon via IPC) |
 | CLI | Cobra |
 | Release | GoReleaser |

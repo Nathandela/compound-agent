@@ -13,7 +13,6 @@ The rest of this document is for maintainers and documents internal development 
 ### Prerequisites
 
 - Go 1.26+
-- CGO enabled (required for SQLite)
 - golangci-lint
 
 ### Installation
@@ -24,10 +23,10 @@ git clone https://github.com/Nathandela/compound-agent.git
 cd compound-agent
 
 # Build the CLI
-cd go && go build -tags sqlite_fts5 ./cmd/ca
+cd go && go build ./cmd/ca
 
 # Run tests
-cd go && go test -tags sqlite_fts5 ./...
+cd go && go test ./...
 
 # Run linter
 cd go && golangci-lint run ./...
@@ -36,9 +35,9 @@ cd go && golangci-lint run ./...
 ### Development Commands
 
 ```bash
-cd go && go build -tags sqlite_fts5 ./cmd/ca   # Build CLI binary
-cd go && go test -tags sqlite_fts5 ./...        # Run all tests
-cd go && go vet -tags sqlite_fts5 ./...         # Static analysis
+cd go && go build ./cmd/ca   # Build CLI binary
+cd go && go test ./...        # Run all tests
+cd go && go vet ./...         # Static analysis
 cd go && golangci-lint run ./...                 # Lint
 ```
 
@@ -134,7 +133,7 @@ func TestAppendLesson(t *testing.T) {
 
 1. **Run all tests**
    ```bash
-   cd go && go test -tags sqlite_fts5 ./...
+   cd go && go test ./...
    ```
    All tests must pass with 100% pass rate.
 
@@ -150,7 +149,7 @@ func TestAppendLesson(t *testing.T) {
 ### PR Checklist
 
 - [ ] Tests written FIRST (TDD)
-- [ ] All tests pass (`go test -tags sqlite_fts5 ./...`)
+- [ ] All tests pass (`go test ./...`)
 - [ ] Lint passes (`golangci-lint run ./...`)
 - [ ] Doc comments on exported functions
 - [ ] No commented-out code
@@ -237,9 +236,9 @@ Releases are fully automated via GitHub Actions. Pushing a version tag triggers 
 Before tagging a release, ensure quality gates pass locally:
 
 ```bash
-cd go && go test -tags sqlite_fts5 ./...    # All tests pass
+cd go && go test ./...    # All tests pass
 cd go && golangci-lint run ./...             # Zero lint violations
-cd go && go build -tags sqlite_fts5 ./cmd/ca # Binary builds
+cd go && go build ./cmd/ca # Binary builds
 ```
 
 ### How to Release
@@ -247,7 +246,7 @@ cd go && go build -tags sqlite_fts5 ./cmd/ca # Binary builds
 ```bash
 # 1. Update version in package.json
 #    - "version" field
-#    - ALL 4 entries in "optionalDependencies" (@syottos/*)
+#    - ALL 6 entries in "optionalDependencies" (@syottos/*)
 #    Both MUST match. See "Critical: Version Sync" below.
 
 # 2. Move [Unreleased] entries in CHANGELOG.md under a new version header
@@ -266,14 +265,16 @@ git push && git push --tags
 The `optionalDependencies` in `package.json` MUST match the `version` field. The release workflow publishes `@syottos/*` platform packages at the same version, then publishes the main `compound-agent` package. If optionalDependencies point to an older version, users get stale Go binaries with outdated templates -- new skills, updated references, and bug fixes silently missing.
 
 ```jsonc
-// package.json -- both versions MUST be identical
+// package.json -- all versions MUST be identical
 {
-  "version": "2.4.1",              // <-- this
+  "version": "2.6.0",              // <-- this
   "optionalDependencies": {
-    "@syottos/darwin-arm64": "2.4.1",  // <-- must match
-    "@syottos/darwin-x64": "2.4.1",
-    "@syottos/linux-arm64": "2.4.1",
-    "@syottos/linux-x64": "2.4.1"
+    "@syottos/darwin-arm64": "2.6.0",  // <-- must match
+    "@syottos/darwin-x64": "2.6.0",
+    "@syottos/linux-arm64": "2.6.0",
+    "@syottos/linux-x64": "2.6.0",
+    "@syottos/win32-x64": "2.6.0",
+    "@syottos/win32-arm64": "2.6.0"
   }
 }
 ```
@@ -284,10 +285,10 @@ A CI test (`TestPlatformVersionSync`) enforces this at build time.
 
 Pushing a `v*` tag triggers `.github/workflows/release.yml`, which:
 
-1. **Builds Go CLI** (`ca`) for 4 platforms: linux-amd64, linux-arm64, darwin-arm64, darwin-amd64 -- with SQLite FTS5 and version/commit embedded via ldflags
-2. **Builds Rust daemon** (`ca-embed`) for 3 platforms: linux-amd64, linux-arm64, darwin-arm64 (Intel Macs use Rosetta)
+1. **Builds Go CLI** (`ca`) for 6 platforms: linux-amd64, linux-arm64, darwin-arm64, darwin-amd64, windows-amd64, windows-arm64 -- with CGO_ENABLED=0 and version/commit embedded via ldflags
+2. **Builds Rust daemon** (`ca-embed`) for 3 platforms: linux-amd64, linux-arm64, darwin-arm64 (Intel Macs use Rosetta; not available on Windows)
 3. **Creates a GitHub Release** with all binaries and SHA256 checksums
-4. **Publishes 4 platform-specific npm packages** (`@syottos/darwin-arm64`, `@syottos/darwin-x64`, `@syottos/linux-arm64`, `@syottos/linux-x64`) -- each containing the `ca` and `ca-embed` binaries
+4. **Publishes 6 platform-specific npm packages** (`@syottos/darwin-arm64`, `@syottos/darwin-x64`, `@syottos/linux-arm64`, `@syottos/linux-x64`, `@syottos/win32-x64`, `@syottos/win32-arm64`) -- each containing the `ca` binary (and `ca-embed` on Unix platforms)
 5. **Publishes the main `compound-agent` npm package** -- the shell wrapper that resolves the platform-specific binary at runtime
 
 All npm packages are published with `--provenance` for supply chain security.

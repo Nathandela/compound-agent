@@ -159,7 +159,7 @@ Every release MUST follow these steps. Skipping any step ships broken binaries t
 [ ] 1. cd go && go test ./...                      # Quality gates pass
 [ ] 2. cd go && golangci-lint run ./...            # Zero lint violations
 [ ] 3. Bump "version" in package.json              # e.g. "2.5.0"
-[ ] 4. Bump ALL 4 "@syottos/*" in optionalDependencies to SAME version
+[ ] 4. Bump ALL 6 "@syottos/*" in optionalDependencies to SAME version
 [ ] 5. Move [Unreleased] CHANGELOG entries under new version header
 [ ] 6. git add package.json CHANGELOG.md && git commit
 [ ] 7. git tag v2.5.0 && git push && git push --tags

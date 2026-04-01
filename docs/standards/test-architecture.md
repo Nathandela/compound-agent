@@ -27,29 +27,17 @@ go/internal/
 └── ...
 ```
 
-## Build Tags
-
-SQLite tests require the `sqlite_fts5` build tag:
-
-```bash
-go test -tags sqlite_fts5 ./...
-```
-
-The `Makefile` wraps this: `make test`.
-
 ## Running Tests
 
 | Command | Purpose | When to Use |
 |---------|---------|-------------|
-| `make test` | Full suite with FTS5 tag | Before committing |
-| `go test -tags sqlite_fts5 ./internal/capture/...` | Single package | Rapid iteration |
-| `go test -tags sqlite_fts5 -run TestName ./internal/...` | Single test | Debugging |
-| `go test -tags sqlite_fts5 -race ./...` | Race detector | CI, concurrency work |
-| `go test -tags sqlite_fts5 -count=1 ./...` | No cache | Verify flaky tests |
+| `make test` | Full suite | Before committing |
+| `go test ./internal/capture/...` | Single package | Rapid iteration |
+| `go test -run TestName ./internal/...` | Single test | Debugging |
+| `go test -race ./...` | Race detector | CI, concurrency work |
+| `go test -count=1 ./...` | No cache | Verify flaky tests |
 
 ## Known Limitations
-
-**CGO dependency**: The `go-sqlite3` driver requires CGO. Ensure `CGO_ENABLED=1` (default on native builds). Cross-compilation requires a C cross-compiler.
 
 **Embedding daemon**: Integration tests for the embed package depend on the `ca-embed` Rust daemon binary. These tests skip gracefully when the daemon is unavailable.
 
@@ -60,10 +48,10 @@ The `Makefile` wraps this: `make test`.
 | Gate | Command | Purpose | When to Run |
 |------|---------|---------|-------------|
 | Unit + Integration | `make test` | All tests; embed tests skip if daemon unavailable | Every PR, local dev |
-| Race Detection | `go test -tags sqlite_fts5 -race ./...` | Detect data races | CI only |
+| Race Detection | `go test -race ./...` | Detect data races | CI only |
 
 **Local Development:**
-- Use `go test -tags sqlite_fts5 ./internal/<package>/...` for rapid iteration
+- Use `go test ./internal/<package>/...` for rapid iteration
 - Run `make test` before committing
 
 **Release is blocked until both gates pass.**
