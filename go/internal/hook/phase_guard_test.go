@@ -17,6 +17,7 @@ func writePhaseState(t *testing.T, dir string, state PhaseState) {
 }
 
 func TestProcessPhaseGuard_NonEditTool(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,
@@ -35,6 +36,7 @@ func TestProcessPhaseGuard_NonEditTool(t *testing.T) {
 }
 
 func TestProcessPhaseGuard_SkillNotRead(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,
@@ -56,6 +58,7 @@ func TestProcessPhaseGuard_SkillNotRead(t *testing.T) {
 }
 
 func TestProcessPhaseGuard_SkillAlreadyRead(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,
@@ -74,6 +77,7 @@ func TestProcessPhaseGuard_SkillAlreadyRead(t *testing.T) {
 }
 
 func TestProcessPhaseGuard_NoStateFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	result := ProcessPhaseGuard(dir, "Edit", map[string]interface{}{})
 	if result.SpecificOutput != nil {
@@ -82,6 +86,7 @@ func TestProcessPhaseGuard_NoStateFile(t *testing.T) {
 }
 
 func TestProcessPhaseGuard_Inactive(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: false,

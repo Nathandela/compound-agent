@@ -20,6 +20,7 @@ func executeBashSyntaxCheck(path string) (string, error) {
 // --- CLI flag tests ---
 
 func TestLoopCommand_WithReviewers(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -66,6 +67,7 @@ func TestLoopCommand_WithReviewers(t *testing.T) {
 }
 
 func TestLoopCommand_WithImprove(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -102,6 +104,7 @@ func TestLoopCommand_WithImprove(t *testing.T) {
 }
 
 func TestLoopCommand_InvalidReviewer(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -120,6 +123,7 @@ func TestLoopCommand_InvalidReviewer(t *testing.T) {
 }
 
 func TestLoopCommand_NoReviewWithoutFlag(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -143,6 +147,7 @@ func TestLoopCommand_NoReviewWithoutFlag(t *testing.T) {
 }
 
 func TestLoopCommand_NoImproveWithoutFlag(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -166,6 +171,7 @@ func TestLoopCommand_NoImproveWithoutFlag(t *testing.T) {
 }
 
 func TestLoopCommand_ReviewerShellInjection(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -191,6 +197,7 @@ func TestLoopCommand_ReviewerShellInjection(t *testing.T) {
 }
 
 func TestLoopCommand_AllReviewersValid(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -213,6 +220,7 @@ func TestLoopCommand_AllReviewersValid(t *testing.T) {
 }
 
 func TestLoopCommand_ReviewAndImprove(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -242,6 +250,7 @@ func TestLoopCommand_ReviewAndImprove(t *testing.T) {
 // --- Review template unit tests ---
 
 func TestLoopScriptReviewConfig_SetsVariables(t *testing.T) {
+	t.Parallel()
 	config := loopScriptReviewConfig(loopReviewOptions{
 		reviewers:       []string{"claude-sonnet", "gemini"},
 		maxReviewCycles: 5,
@@ -268,6 +277,7 @@ func TestLoopScriptReviewConfig_SetsVariables(t *testing.T) {
 }
 
 func TestLoopScriptReviewerDetection_ChecksCLIs(t *testing.T) {
+	t.Parallel()
 	detection := loopScriptReviewerDetection()
 
 	if !strings.Contains(detection, "command -v claude") {
@@ -288,6 +298,7 @@ func TestLoopScriptReviewerDetection_ChecksCLIs(t *testing.T) {
 }
 
 func TestLoopScriptSessionIdManagement_UsesUuidgen(t *testing.T) {
+	t.Parallel()
 	mgmt := loopScriptSessionIDManagement()
 
 	if !strings.Contains(mgmt, "uuidgen") {
@@ -302,6 +313,7 @@ func TestLoopScriptSessionIdManagement_UsesUuidgen(t *testing.T) {
 }
 
 func TestLoopScriptReviewPrompt_ContainsMarkers(t *testing.T) {
+	t.Parallel()
 	prompt := loopScriptReviewPrompt()
 
 	if !strings.Contains(prompt, "REVIEW_APPROVED") {
@@ -316,6 +328,7 @@ func TestLoopScriptReviewPrompt_ContainsMarkers(t *testing.T) {
 }
 
 func TestLoopScriptSpawnReviewers_SupportsAllModels(t *testing.T) {
+	t.Parallel()
 	spawner := loopScriptSpawnReviewers()
 
 	if !strings.Contains(spawner, "--session-id") {
@@ -336,6 +349,7 @@ func TestLoopScriptSpawnReviewers_SupportsAllModels(t *testing.T) {
 }
 
 func TestLoopScriptImplementerPhase_ContainsFixesMarker(t *testing.T) {
+	t.Parallel()
 	impl := loopScriptImplementerPhase()
 
 	if !strings.Contains(impl, "FIXES_APPLIED") {
@@ -350,6 +364,7 @@ func TestLoopScriptImplementerPhase_ContainsFixesMarker(t *testing.T) {
 }
 
 func TestLoopScriptReviewLoop_FullCycleLogic(t *testing.T) {
+	t.Parallel()
 	loop := loopScriptReviewLoop()
 
 	if !strings.Contains(loop, "run_review_phase") {
@@ -376,6 +391,7 @@ func TestLoopScriptReviewLoop_FullCycleLogic(t *testing.T) {
 }
 
 func TestLoopScriptImprovePhase_ContainsAllSections(t *testing.T) {
+	t.Parallel()
 	phase := loopScriptImprovePhase(loopImproveOptions{
 		maxIters:   7,
 		timeBudget: 1800,
@@ -411,6 +427,7 @@ func TestLoopScriptImprovePhase_ContainsAllSections(t *testing.T) {
 }
 
 func TestValidateReviewers_AcceptsValid(t *testing.T) {
+	t.Parallel()
 	for _, name := range []string{"claude-sonnet", "claude-opus", "gemini", "codex"} {
 		if err := validateReviewers([]string{name}); err != nil {
 			t.Errorf("expected %q to be valid, got: %v", name, err)
@@ -419,6 +436,7 @@ func TestValidateReviewers_AcceptsValid(t *testing.T) {
 }
 
 func TestValidateReviewers_RejectsInvalid(t *testing.T) {
+	t.Parallel()
 	err := validateReviewers([]string{"claude-sonnet", "invalid"})
 	if err == nil {
 		t.Error("expected error for invalid reviewer")
@@ -429,6 +447,7 @@ func TestValidateReviewers_RejectsInvalid(t *testing.T) {
 }
 
 func TestLoopScriptReviewLoop_AnchoredApproval(t *testing.T) {
+	t.Parallel()
 	loop := loopScriptReviewLoop()
 
 	// Must use anchored grep for REVIEW_APPROVED
@@ -444,6 +463,7 @@ func TestLoopScriptReviewLoop_AnchoredApproval(t *testing.T) {
 // --- Bug fix regression tests ---
 
 func TestLoopCommand_DefinesLogFunction(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -470,6 +490,7 @@ func TestLoopCommand_DefinesLogFunction(t *testing.T) {
 }
 
 func TestLoopCommand_ReviewPeriodicCallSite(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -503,6 +524,7 @@ func TestLoopCommand_ReviewPeriodicCallSite(t *testing.T) {
 }
 
 func TestLoopCommand_ReviewEndOnlyCallSite(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -530,6 +552,7 @@ func TestLoopCommand_ReviewEndOnlyCallSite(t *testing.T) {
 }
 
 func TestLoopCommand_ImproveUsesFailedCount(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -554,6 +577,7 @@ func TestLoopCommand_ImproveUsesFailedCount(t *testing.T) {
 }
 
 func TestLoopCommand_UsesTwoScopeLogging(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -583,6 +607,7 @@ func TestLoopCommand_UsesTwoScopeLogging(t *testing.T) {
 }
 
 func TestLoopScriptReviewTriggers_Periodic(t *testing.T) {
+	t.Parallel()
 	init, periodic, final := loopScriptReviewTriggers(3)
 
 	if !strings.Contains(init, "REVIEW_BASE_SHA") {
@@ -603,6 +628,7 @@ func TestLoopScriptReviewTriggers_Periodic(t *testing.T) {
 }
 
 func TestLoopScriptReviewTriggers_EndOnly(t *testing.T) {
+	t.Parallel()
 	init, periodic, final := loopScriptReviewTriggers(0)
 
 	if !strings.Contains(init, "REVIEW_BASE_SHA") {
@@ -623,6 +649,7 @@ func TestLoopScriptReviewTriggers_EndOnly(t *testing.T) {
 }
 
 func TestLoopCommand_GeneratedScriptBashSyntax(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -659,6 +686,7 @@ func TestLoopCommand_GeneratedScriptBashSyntax(t *testing.T) {
 }
 
 func TestLoopScriptReviewConfig_NonBlocking(t *testing.T) {
+	t.Parallel()
 	config := loopScriptReviewConfig(loopReviewOptions{
 		reviewers:       []string{"gemini"},
 		maxReviewCycles: 3,
@@ -675,6 +703,7 @@ func TestLoopScriptReviewConfig_NonBlocking(t *testing.T) {
 // --- Parity tests: verify Go generator matches production infinity-loop.sh ---
 
 func TestLoopCommand_CrashHandler(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -704,6 +733,7 @@ func TestLoopCommand_CrashHandler(t *testing.T) {
 }
 
 func TestLoopCommand_MemoryWatchdog(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -735,6 +765,7 @@ func TestLoopCommand_MemoryWatchdog(t *testing.T) {
 }
 
 func TestLoopCommand_RepoScopedOrphanCleanup(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -762,6 +793,7 @@ func TestLoopCommand_RepoScopedOrphanCleanup(t *testing.T) {
 }
 
 func TestLoopCommand_DependencyChecking(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -790,6 +822,7 @@ func TestLoopCommand_DependencyChecking(t *testing.T) {
 }
 
 func TestLoopCommand_DualFileMarkerDetection(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -824,6 +857,7 @@ func TestLoopCommand_DualFileMarkerDetection(t *testing.T) {
 }
 
 func TestLoopCommand_GitStatusCheckAfterEpic(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -847,6 +881,7 @@ func TestLoopCommand_GitStatusCheckAfterEpic(t *testing.T) {
 }
 
 func TestLoopCommand_GitPushAtEnd(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -870,6 +905,7 @@ func TestLoopCommand_GitPushAtEnd(t *testing.T) {
 }
 
 func TestLoopCommand_CLIPrerequisites(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -896,6 +932,7 @@ func TestLoopCommand_CLIPrerequisites(t *testing.T) {
 }
 
 func TestLoopCommand_ReviewerAvailabilitySummary(t *testing.T) {
+	t.Parallel()
 	detection := loopScriptReviewerDetection()
 
 	if !strings.Contains(detection, "Configured reviewers:") {
@@ -907,6 +944,7 @@ func TestLoopCommand_ReviewerAvailabilitySummary(t *testing.T) {
 }
 
 func TestLoopCommand_ExtractTextPython3Fallback(t *testing.T) {
+	t.Parallel()
 	helpers := loopScriptHelpers()
 
 	if !strings.Contains(helpers, "python3 -c") {
@@ -918,6 +956,7 @@ func TestLoopCommand_ExtractTextPython3Fallback(t *testing.T) {
 }
 
 func TestLoopCommand_StderrCapture(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -943,6 +982,7 @@ func TestLoopCommand_StderrCapture(t *testing.T) {
 // --- Structural ordering tests: verify injection points are correct ---
 
 func TestLoopCommand_ReviewTriggersBeforeExit(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -981,6 +1021,7 @@ func TestLoopCommand_ReviewTriggersBeforeExit(t *testing.T) {
 }
 
 func TestLoopCommand_ImprovePhaseBeforeExit(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -1010,6 +1051,7 @@ func TestLoopCommand_ImprovePhaseBeforeExit(t *testing.T) {
 }
 
 func TestLoopCommand_ReviewInitBeforeWhile(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -1040,6 +1082,7 @@ func TestLoopCommand_ReviewInitBeforeWhile(t *testing.T) {
 }
 
 func TestLoopCommand_PeriodicTriggerInsideSuccessBranch(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -1072,6 +1115,7 @@ func TestLoopCommand_PeriodicTriggerInsideSuccessBranch(t *testing.T) {
 }
 
 func TestLoopCommand_ImproveUsesPipeExtractText(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -1093,6 +1137,7 @@ func TestLoopCommand_ImproveUsesPipeExtractText(t *testing.T) {
 }
 
 func TestLoopCommand_RejectsExtraPositionalArgs(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 

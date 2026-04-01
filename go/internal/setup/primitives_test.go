@@ -9,6 +9,7 @@ import (
 )
 
 func TestInstallAgentTemplates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// First install creates files
@@ -47,6 +48,7 @@ func TestInstallAgentTemplates(t *testing.T) {
 }
 
 func TestInstallWorkflowCommands(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	n, u, err := InstallWorkflowCommands(dir)
@@ -78,6 +80,7 @@ func TestInstallWorkflowCommands(t *testing.T) {
 }
 
 func TestInstallPhaseSkills(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	n, u, err := InstallPhaseSkills(dir, StackInfo{})
@@ -114,6 +117,7 @@ func TestInstallPhaseSkills(t *testing.T) {
 }
 
 func TestInstallAgentRoleSkills(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	n, u, err := InstallAgentRoleSkills(dir)
@@ -144,6 +148,7 @@ func TestInstallAgentRoleSkills(t *testing.T) {
 }
 
 func TestInstallDocTemplates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	n, u, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
@@ -181,6 +186,7 @@ func TestInstallDocTemplates(t *testing.T) {
 }
 
 func TestInstallResearchDocs(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	n, u, err := InstallResearchDocs(dir)
@@ -224,6 +230,7 @@ func TestInstallResearchDocs(t *testing.T) {
 }
 
 func TestInstallResearchDocs_UpdatesStaleContent(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// First install
@@ -249,6 +256,7 @@ func TestInstallResearchDocs_UpdatesStaleContent(t *testing.T) {
 }
 
 func TestUpdateAgentsMd(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Creates new AGENTS.md when it doesn't exist
@@ -276,6 +284,7 @@ func TestUpdateAgentsMd(t *testing.T) {
 }
 
 func TestUpdateAgentsMdAppends(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	agentsPath := filepath.Join(dir, "AGENTS.md")
 
@@ -300,6 +309,7 @@ func TestUpdateAgentsMdAppends(t *testing.T) {
 }
 
 func TestEnsureClaudeMdReference(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 
@@ -325,6 +335,7 @@ func TestEnsureClaudeMdReference(t *testing.T) {
 }
 
 func TestEnsureClaudeMdReferenceAppends(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	claudeMd := filepath.Join(dir, ".claude", "CLAUDE.md")
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
@@ -348,6 +359,7 @@ func TestEnsureClaudeMdReferenceAppends(t *testing.T) {
 }
 
 func TestCreatePluginManifest(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)
@@ -389,6 +401,7 @@ func TestCreatePluginManifest(t *testing.T) {
 }
 
 func TestInstallAgentTemplates_UpdatesStaleContent(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// First install
@@ -437,6 +450,7 @@ func TestInstallAgentTemplates_UpdatesStaleContent(t *testing.T) {
 }
 
 func TestInstallWorkflowCommands_UpdatesStaleContent(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	created, _, err := InstallWorkflowCommands(dir)
@@ -468,6 +482,7 @@ func TestInstallWorkflowCommands_UpdatesStaleContent(t *testing.T) {
 }
 
 func TestInstallPhaseSkills_UpdatesStaleContent(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	created, _, err := InstallPhaseSkills(dir, StackInfo{})
@@ -502,6 +517,7 @@ func TestInstallPhaseSkills_UpdatesStaleContent(t *testing.T) {
 }
 
 func TestInstallPhaseSkills_SubstitutesQualityGates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stack := StackInfo{
 		TestCmd:  "go test ./...",
@@ -541,6 +557,7 @@ func TestInstallPhaseSkills_SubstitutesQualityGates(t *testing.T) {
 }
 
 func TestInstallDocTemplates_SubstitutesQualityGates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stack := StackInfo{
 		TestCmd:  "cargo test",
@@ -574,6 +591,7 @@ func TestInstallDocTemplates_SubstitutesQualityGates(t *testing.T) {
 }
 
 func TestInstallPhaseSkills_StackChangeUpdatesContent(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Install with Node/npm stack
@@ -631,6 +649,7 @@ func TestInstallPhaseSkills_StackChangeUpdatesContent(t *testing.T) {
 }
 
 func TestInstallAgentRoleSkills_UpdatesStaleContent(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	created, _, err := InstallAgentRoleSkills(dir)
@@ -657,6 +676,7 @@ func TestInstallAgentRoleSkills_UpdatesStaleContent(t *testing.T) {
 }
 
 func TestInstallDocTemplates_UpdatesStaleContent(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	created, _, err := InstallDocTemplates(dir, "1.0.0", StackInfo{})
@@ -688,6 +708,7 @@ func TestInstallDocTemplates_UpdatesStaleContent(t *testing.T) {
 }
 
 func TestInstallDocTemplates_DateChangeNotStale(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Install
@@ -724,6 +745,7 @@ func TestInstallDocTemplates_DateChangeNotStale(t *testing.T) {
 }
 
 func TestInstallDocTemplates_VersionChangeUpdates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Install with version 1.0.0
@@ -756,6 +778,7 @@ func TestInstallDocTemplates_VersionChangeUpdates(t *testing.T) {
 }
 
 func TestPruneStaleTemplates_RemovesExtraFiles(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Install all templates first
@@ -794,6 +817,7 @@ func TestPruneStaleTemplates_RemovesExtraFiles(t *testing.T) {
 }
 
 func TestPruneStaleTemplates_PreservesCurrentFiles(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Install all templates
@@ -828,6 +852,7 @@ func TestPruneStaleTemplates_PreservesCurrentFiles(t *testing.T) {
 }
 
 func TestPruneStaleTemplates_RemovesStaleSkillDirs(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Install phase skills
@@ -859,6 +884,7 @@ func TestPruneStaleTemplates_RemovesStaleSkillDirs(t *testing.T) {
 }
 
 func TestPruneStaleTemplates_RemovesStalePhaseReferenceEntries(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Install phase skills and references.
@@ -903,6 +929,7 @@ func TestPruneStaleTemplates_RemovesStalePhaseReferenceEntries(t *testing.T) {
 }
 
 func TestPruneStaleTemplates_RemovesStaleRoleDirs(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Install role skills
@@ -933,6 +960,7 @@ func TestPruneStaleTemplates_RemovesStaleRoleDirs(t *testing.T) {
 }
 
 func TestPruneStaleTemplates_RemovesStaleAgentRoleReferenceEntries(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Install agent role skills and references.
@@ -983,6 +1011,7 @@ func TestPruneStaleTemplates_RemovesStaleAgentRoleReferenceEntries(t *testing.T)
 }
 
 func TestPruneStaleTemplates_RemovesStaleResearchFiles(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Install research docs first
@@ -1028,6 +1057,7 @@ func TestPruneStaleTemplates_RemovesStaleResearchFiles(t *testing.T) {
 }
 
 func TestPruneStaleTemplates_NonExistentDirs(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// Prune on a repo with no managed dirs should succeed with 0
@@ -1041,6 +1071,7 @@ func TestPruneStaleTemplates_NonExistentDirs(t *testing.T) {
 }
 
 func TestCreatePluginManifest_UpdatesStaleVersion(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".claude"), 0755); err != nil {
 		t.Fatalf("mkdir: %v", err)

@@ -1,11 +1,13 @@
 package hook
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 )
 
 func TestProcessReadTracker_NonReadTool(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,
@@ -26,6 +28,7 @@ func TestProcessReadTracker_NonReadTool(t *testing.T) {
 }
 
 func TestProcessReadTracker_SkillFileRead(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,
@@ -38,7 +41,7 @@ func TestProcessReadTracker_SkillFileRead(t *testing.T) {
 	})
 
 	ProcessReadTracker(dir, "Read", map[string]interface{}{
-		"file_path": "/Users/dev/project/.claude/skills/compound/work/SKILL.md",
+		"file_path": filepath.Join(dir, ".claude/skills/compound/work/SKILL.md"),
 	})
 
 	state := GetPhaseState(dir)
@@ -51,6 +54,7 @@ func TestProcessReadTracker_SkillFileRead(t *testing.T) {
 }
 
 func TestProcessReadTracker_Deduplication(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,
@@ -73,6 +77,7 @@ func TestProcessReadTracker_Deduplication(t *testing.T) {
 }
 
 func TestProcessReadTracker_NonSkillFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,
@@ -85,7 +90,7 @@ func TestProcessReadTracker_NonSkillFile(t *testing.T) {
 	})
 
 	ProcessReadTracker(dir, "Read", map[string]interface{}{
-		"file_path": "/Users/dev/project/src/main.go",
+		"file_path": filepath.Join(dir, "src/main.go"),
 	})
 
 	state := GetPhaseState(dir)
@@ -95,6 +100,7 @@ func TestProcessReadTracker_NonSkillFile(t *testing.T) {
 }
 
 func TestProcessReadTracker_BackslashNormalization(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,
@@ -120,6 +126,7 @@ func TestProcessReadTracker_BackslashNormalization(t *testing.T) {
 }
 
 func TestProcessReadTracker_Inactive(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: false,

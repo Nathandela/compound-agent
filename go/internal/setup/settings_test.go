@@ -9,6 +9,7 @@ import (
 )
 
 func TestReadClaudeSettings_NonExistent(t *testing.T) {
+	t.Parallel()
 	settings, err := ReadClaudeSettings("/nonexistent/path/settings.json")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -19,6 +20,7 @@ func TestReadClaudeSettings_NonExistent(t *testing.T) {
 }
 
 func TestReadClaudeSettings_ValidJSON(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
 	os.WriteFile(path, []byte(`{"key": "value"}`), 0644)
@@ -33,6 +35,7 @@ func TestReadClaudeSettings_ValidJSON(t *testing.T) {
 }
 
 func TestWriteClaudeSettings_Atomic(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "settings.json")
 
@@ -56,6 +59,7 @@ func TestWriteClaudeSettings_Atomic(t *testing.T) {
 }
 
 func TestWriteClaudeSettings_CreatesDirectory(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "sub", "dir", "settings.json")
 
@@ -70,6 +74,7 @@ func TestWriteClaudeSettings_CreatesDirectory(t *testing.T) {
 }
 
 func TestAddAllHooks(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	AddAllHooks(settings, "")
 
@@ -90,6 +95,7 @@ func TestAddAllHooks(t *testing.T) {
 }
 
 func TestAddAllHooks_Idempotent(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	AddAllHooks(settings, "")
 	AddAllHooks(settings, "")
@@ -103,6 +109,7 @@ func TestAddAllHooks_Idempotent(t *testing.T) {
 }
 
 func TestAddAllHooks_DedupesExistingCompoundHooks(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	AddAllHooks(settings, "")
 
@@ -128,6 +135,7 @@ func TestAddAllHooks_DedupesExistingCompoundHooks(t *testing.T) {
 }
 
 func TestAddAllHooks_DedupePreservesUnrelatedHooks(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	AddAllHooks(settings, "")
 
@@ -149,6 +157,7 @@ func TestAddAllHooks_DedupePreservesUnrelatedHooks(t *testing.T) {
 }
 
 func TestAddAllHooks_WithBinaryPath(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	AddAllHooks(settings, "/usr/local/bin/ca")
 
@@ -169,6 +178,7 @@ func TestAddAllHooks_WithBinaryPath(t *testing.T) {
 }
 
 func TestHasAllHooks_Empty(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	if HasAllHooks(settings) {
 		t.Error("expected false for empty settings")
@@ -176,6 +186,7 @@ func TestHasAllHooks_Empty(t *testing.T) {
 }
 
 func TestHasAllHooks_Complete(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	AddAllHooks(settings, "")
 
@@ -185,6 +196,7 @@ func TestHasAllHooks_Complete(t *testing.T) {
 }
 
 func TestRemoveAllHooks(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	AddAllHooks(settings, "")
 
@@ -199,6 +211,7 @@ func TestRemoveAllHooks(t *testing.T) {
 }
 
 func TestRemoveAllHooks_NoHooks(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	removed := RemoveAllHooks(settings)
 	if removed {
@@ -207,6 +220,7 @@ func TestRemoveAllHooks_NoHooks(t *testing.T) {
 }
 
 func TestMakeHookCommand_ShellEscapesBinaryPath(t *testing.T) {
+	t.Parallel()
 	// Paths with spaces must be escaped to prevent shell injection
 	cmd := makeHookCommand("/path/with spaces/ca", "user-prompt")
 	if cmd != "'/path/with spaces/ca' hooks run user-prompt 2>/dev/null || true" {
@@ -215,6 +229,7 @@ func TestMakeHookCommand_ShellEscapesBinaryPath(t *testing.T) {
 }
 
 func TestMakePrimeCommand_ShellEscapesBinaryPath(t *testing.T) {
+	t.Parallel()
 	cmd := makePrimeCommand("/path/with spaces/ca")
 	if cmd != "'/path/with spaces/ca' prime 2>/dev/null || true" {
 		t.Errorf("expected escaped path, got: %s", cmd)
@@ -222,6 +237,7 @@ func TestMakePrimeCommand_ShellEscapesBinaryPath(t *testing.T) {
 }
 
 func TestMakeHookCommand_NoEscape_EmptyBinaryPath(t *testing.T) {
+	t.Parallel()
 	cmd := makeHookCommand("", "user-prompt")
 	if cmd != "npx ca hooks run user-prompt 2>/dev/null || true" {
 		t.Errorf("expected npx fallback, got: %s", cmd)
@@ -229,6 +245,7 @@ func TestMakeHookCommand_NoEscape_EmptyBinaryPath(t *testing.T) {
 }
 
 func TestAddAllHooks_UpgradesNpxToBinaryPath(t *testing.T) {
+	t.Parallel()
 	// Simulate hooks installed with npx fallback
 	settings := map[string]any{}
 	AddAllHooks(settings, "")
@@ -254,8 +271,9 @@ func TestAddAllHooks_UpgradesNpxToBinaryPath(t *testing.T) {
 }
 
 func TestAddAllHooks_WithSpacesInPath(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
-	AddAllHooks(settings, "/Users/My User/bin/ca")
+	AddAllHooks(settings, "/opt/My App/bin/ca")
 
 	hooks := settings["hooks"].(map[string]any)
 	sessionStart := hooks["SessionStart"].([]any)
@@ -265,12 +283,13 @@ func TestAddAllHooks_WithSpacesInPath(t *testing.T) {
 	cmd := hook["command"].(string)
 
 	// Must be shell-escaped
-	if cmd != "'/Users/My User/bin/ca' prime 2>/dev/null || true" {
+	if cmd != "'/opt/My App/bin/ca' prime 2>/dev/null || true" {
 		t.Errorf("expected shell-escaped path, got: %s", cmd)
 	}
 }
 
 func TestHooksNeedUpgrade_NpxWithBinary(t *testing.T) {
+	t.Parallel()
 	// Hooks installed with npx, binary now available → needs upgrade
 	settings := map[string]any{}
 	AddAllHooks(settings, "") // Install with npx fallback
@@ -281,6 +300,7 @@ func TestHooksNeedUpgrade_NpxWithBinary(t *testing.T) {
 }
 
 func TestHooksNeedUpgrade_AlreadyBinary(t *testing.T) {
+	t.Parallel()
 	// Hooks already use binary path → no upgrade needed
 	settings := map[string]any{}
 	AddAllHooks(settings, "/usr/local/bin/ca")
@@ -291,6 +311,7 @@ func TestHooksNeedUpgrade_AlreadyBinary(t *testing.T) {
 }
 
 func TestHooksNeedUpgrade_NoBinaryPath(t *testing.T) {
+	t.Parallel()
 	// No binary available → can't upgrade, return false
 	settings := map[string]any{}
 	AddAllHooks(settings, "")
@@ -301,6 +322,7 @@ func TestHooksNeedUpgrade_NoBinaryPath(t *testing.T) {
 }
 
 func TestHooksNeedUpgrade_NoHooks(t *testing.T) {
+	t.Parallel()
 	// No hooks at all → nothing to upgrade
 	settings := map[string]any{}
 
@@ -310,6 +332,7 @@ func TestHooksNeedUpgrade_NoHooks(t *testing.T) {
 }
 
 func TestHooksNeedDedupe_NoDuplicates(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	AddAllHooks(settings, "")
 
@@ -319,6 +342,7 @@ func TestHooksNeedDedupe_NoDuplicates(t *testing.T) {
 }
 
 func TestHooksNeedDedupe_WithDuplicates(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	AddAllHooks(settings, "")
 
@@ -331,6 +355,7 @@ func TestHooksNeedDedupe_WithDuplicates(t *testing.T) {
 }
 
 func TestHooksNeedUpgrade_MixedHooks(t *testing.T) {
+	t.Parallel()
 	// Some hooks are npx, some are binary (shouldn't happen but test boundary)
 	settings := map[string]any{}
 	AddAllHooks(settings, "") // All npx
@@ -350,6 +375,7 @@ func TestHooksNeedUpgrade_MixedHooks(t *testing.T) {
 }
 
 func TestAddAllHooks_DedupePreservesExistingBinaryCommandWithoutBinaryPath(t *testing.T) {
+	t.Parallel()
 	settings := map[string]any{}
 	AddAllHooks(settings, "/usr/local/bin/ca")
 

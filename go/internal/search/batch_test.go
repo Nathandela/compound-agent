@@ -20,6 +20,7 @@ func (t *trackingEmbedder) Embed(texts []string) ([][]float64, error) {
 }
 
 func TestEmbedBatched_ChunksLargeBatches(t *testing.T) {
+	t.Parallel()
 	te := &trackingEmbedder{}
 
 	// 150 texts should produce 3 batches: 64 + 64 + 22
@@ -44,6 +45,7 @@ func TestEmbedBatched_ChunksLargeBatches(t *testing.T) {
 }
 
 func TestEmbedBatched_SmallBatch(t *testing.T) {
+	t.Parallel()
 	te := &trackingEmbedder{}
 
 	texts := []string{"a", "b", "c"}
@@ -60,6 +62,7 @@ func TestEmbedBatched_SmallBatch(t *testing.T) {
 }
 
 func TestEmbedBatched_Empty(t *testing.T) {
+	t.Parallel()
 	te := &trackingEmbedder{}
 
 	vecs, err := embedBatched(te, nil)
@@ -75,6 +78,7 @@ func TestEmbedBatched_Empty(t *testing.T) {
 }
 
 func TestEmbedBatched_ExactBatchSize(t *testing.T) {
+	t.Parallel()
 	te := &trackingEmbedder{}
 
 	texts := make([]string, 64)

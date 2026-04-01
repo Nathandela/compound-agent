@@ -10,6 +10,7 @@ import (
 // TestConcurrentTelemetryLogging verifies that 10 parallel goroutines can log
 // telemetry events simultaneously without SQLITE_LOCKED errors.
 func TestConcurrentTelemetryLogging(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	dbPath := dir + "/lessons.sqlite"
 
@@ -69,6 +70,7 @@ func TestConcurrentTelemetryLogging(t *testing.T) {
 // TestConcurrentTelemetryLogging_MixedEventTypes verifies concurrent writes
 // with different event types don't cause lock errors.
 func TestConcurrentTelemetryLogging_MixedEventTypes(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	dbPath := dir + "/lessons.sqlite"
 

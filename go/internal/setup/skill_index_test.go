@@ -10,6 +10,7 @@ import (
 // TestCompileSkillsIndex_ProducesValidJSON verifies that CompileSkillsIndex
 // writes a valid JSON file with entries for all skills.
 func TestCompileSkillsIndex(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	skillsDir := filepath.Join(dir, ".claude", "skills", "compound")
 	os.MkdirAll(skillsDir, 0o755)
@@ -55,6 +56,7 @@ func TestCompileSkillsIndex(t *testing.T) {
 // TestCompileSkillsIndex_PhaseFieldsCorrect verifies that skills with a phase
 // in their frontmatter have the correct phase in the index.
 func TestCompileSkillsIndex_PhaseFieldsCorrect(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	skillsDir := filepath.Join(dir, ".claude", "skills", "compound")
 	os.MkdirAll(skillsDir, 0o755)
@@ -116,6 +118,7 @@ func TestCompileSkillsIndex_PhaseFieldsCorrect(t *testing.T) {
 // TestCompileSkillsIndex_HasNameAndDescription verifies each index entry
 // has non-empty name and description fields.
 func TestCompileSkillsIndex_HasNameAndDescription(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	skillsDir := filepath.Join(dir, ".claude", "skills", "compound")
 	os.MkdirAll(skillsDir, 0o755)

@@ -388,12 +388,12 @@ func handleClaudeUninstall(cmd *cobra.Command, settings map[string]any, settings
 			"location":  displayPath,
 			"action":    action,
 		})
+	}
+
+	if removed {
+		cmd.Printf("[ok] Compound agent hooks removed from %s\n", displayPath)
 	} else {
-		if removed {
-			cmd.Printf("[ok] Compound agent hooks removed from %s\n", displayPath)
-		} else {
-			cmd.Println("[info] No compound agent hooks to remove")
-		}
+		cmd.Println("[info] No compound agent hooks to remove")
 	}
 	return nil
 }

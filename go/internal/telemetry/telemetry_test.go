@@ -18,6 +18,7 @@ func openTestDB(t *testing.T) *sql.DB {
 }
 
 func TestHashQuery(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		query string
@@ -51,6 +52,7 @@ func TestHashQuery(t *testing.T) {
 }
 
 func TestLogEvent(t *testing.T) {
+	t.Parallel()
 	db := openTestDB(t)
 	defer db.Close()
 
@@ -95,6 +97,7 @@ func TestLogEvent(t *testing.T) {
 }
 
 func TestLogEvent_OutcomeMapping(t *testing.T) {
+	t.Parallel()
 	db := openTestDB(t)
 	defer db.Close()
 
@@ -134,6 +137,7 @@ func TestLogEvent_OutcomeMapping(t *testing.T) {
 }
 
 func TestLogEvent_TimestampIsSet(t *testing.T) {
+	t.Parallel()
 	db := openTestDB(t)
 	defer db.Close()
 
@@ -157,6 +161,7 @@ func TestLogEvent_TimestampIsSet(t *testing.T) {
 }
 
 func TestPruneEvents_UnderLimit(t *testing.T) {
+	t.Parallel()
 	db := openTestDB(t)
 	defer db.Close()
 
@@ -178,6 +183,7 @@ func TestPruneEvents_UnderLimit(t *testing.T) {
 }
 
 func TestPruneEvents_OverLimit(t *testing.T) {
+	t.Parallel()
 	db := openTestDB(t)
 	defer db.Close()
 
@@ -208,6 +214,7 @@ func TestPruneEvents_OverLimit(t *testing.T) {
 }
 
 func TestQueryStats(t *testing.T) {
+	t.Parallel()
 	db := openTestDB(t)
 	defer db.Close()
 
@@ -257,6 +264,7 @@ func TestQueryStats(t *testing.T) {
 }
 
 func TestQueryStats_Empty(t *testing.T) {
+	t.Parallel()
 	db := openTestDB(t)
 	defer db.Close()
 

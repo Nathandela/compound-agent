@@ -10,6 +10,7 @@ import (
 )
 
 func TestImproveCommand_GeneratesScript(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(improveCmd())
 
@@ -39,6 +40,7 @@ func TestImproveCommand_GeneratesScript(t *testing.T) {
 }
 
 func TestImproveCommand_ForceOverwrite(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(improveCmd())
 
@@ -58,6 +60,7 @@ func TestImproveCommand_ForceOverwrite(t *testing.T) {
 }
 
 func TestLoopCommand_GeneratesScript(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -87,6 +90,7 @@ func TestLoopCommand_GeneratesScript(t *testing.T) {
 }
 
 func TestLoopCommand_WithEpics(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -106,6 +110,7 @@ func TestLoopCommand_WithEpics(t *testing.T) {
 }
 
 func TestWatchCommand_NoTraceFile(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(watchCmd())
 
@@ -123,6 +128,7 @@ func TestWatchCommand_NoTraceFile(t *testing.T) {
 }
 
 func TestWatchCommand_ReadsTraceFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	logDir := filepath.Join(dir, "agent_logs")
 	os.MkdirAll(logDir, 0755)
@@ -148,6 +154,7 @@ func TestWatchCommand_ReadsTraceFile(t *testing.T) {
 }
 
 func TestAuditCommand_BasicRun(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude", "lessons"), 0755)
 	os.WriteFile(filepath.Join(dir, ".claude", "lessons", "index.jsonl"), []byte{}, 0644)
@@ -166,6 +173,7 @@ func TestAuditCommand_BasicRun(t *testing.T) {
 }
 
 func TestAuditCommand_JSON(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude", "lessons"), 0755)
 	os.WriteFile(filepath.Join(dir, ".claude", "lessons", "index.jsonl"), []byte{}, 0644)
@@ -184,6 +192,7 @@ func TestAuditCommand_JSON(t *testing.T) {
 }
 
 func TestImproveCommand_ShellInjection(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(improveCmd())
 
@@ -209,6 +218,7 @@ func TestImproveCommand_ShellInjection(t *testing.T) {
 }
 
 func TestLoopCommand_ShellInjection(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -234,6 +244,7 @@ func TestLoopCommand_ShellInjection(t *testing.T) {
 }
 
 func TestImproveCommand_NoVerifyRemoved(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(improveCmd())
 
@@ -254,6 +265,7 @@ func TestImproveCommand_NoVerifyRemoved(t *testing.T) {
 }
 
 func TestFindTraceForEpic_PathTraversal(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	logDir := filepath.Join(dir, "agent_logs")
 	os.MkdirAll(logDir, 0755)
@@ -272,6 +284,7 @@ func TestFindTraceForEpic_PathTraversal(t *testing.T) {
 }
 
 func TestImproveCommand_UsesGitStashNotCheckout(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(improveCmd())
 
@@ -295,6 +308,7 @@ func TestImproveCommand_UsesGitStashNotCheckout(t *testing.T) {
 }
 
 func TestLoopCommand_GoTestUsesTagsSqliteFts5(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -323,6 +337,7 @@ func TestLoopCommand_GoTestUsesTagsSqliteFts5(t *testing.T) {
 }
 
 func TestLoopCommand_NoStaleTypeScriptRefs(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -343,6 +358,7 @@ func TestLoopCommand_NoStaleTypeScriptRefs(t *testing.T) {
 }
 
 func TestLoopCommand_StaleWatchdogPresent(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -388,6 +404,7 @@ func TestLoopCommand_StaleWatchdogPresent(t *testing.T) {
 }
 
 func TestLoopCommand_StaleWatchdogOnlyCountsAfterOutput(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -410,6 +427,7 @@ func TestLoopCommand_StaleWatchdogOnlyCountsAfterOutput(t *testing.T) {
 }
 
 func TestLoopCommand_StaleWatchdogInCrashHandler(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -444,6 +462,7 @@ func TestLoopCommand_StaleWatchdogInCrashHandler(t *testing.T) {
 }
 
 func TestLoopCommand_StaleWatchdogDetection(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -465,6 +484,7 @@ func TestLoopCommand_StaleWatchdogDetection(t *testing.T) {
 }
 
 func TestLoopCommand_ZeroWorkExitCode(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
 
@@ -490,6 +510,7 @@ func TestLoopCommand_ZeroWorkExitCode(t *testing.T) {
 }
 
 func TestImproveInitSubcommand(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(improveCmd())
 

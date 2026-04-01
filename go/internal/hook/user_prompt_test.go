@@ -6,6 +6,7 @@ import (
 )
 
 func TestProcessUserPrompt_CorrectionPatterns(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		prompt string
 		want   bool
@@ -39,6 +40,7 @@ func TestProcessUserPrompt_CorrectionPatterns(t *testing.T) {
 }
 
 func TestProcessUserPrompt_PlanningHighConfidence(t *testing.T) {
+	t.Parallel()
 	tests := []string{
 		"which approach should we take?",
 		"decide between A and B",
@@ -61,6 +63,7 @@ func TestProcessUserPrompt_PlanningHighConfidence(t *testing.T) {
 }
 
 func TestProcessUserPrompt_PlanningLowConfidence(t *testing.T) {
+	t.Parallel()
 	// Single low-confidence keyword: no match
 	result := ProcessUserPrompt("implement the feature")
 	data, _ := json.Marshal(result)
@@ -80,6 +83,7 @@ func TestProcessUserPrompt_PlanningLowConfidence(t *testing.T) {
 }
 
 func TestProcessUserPrompt_CorrectionPriority(t *testing.T) {
+	t.Parallel()
 	// When both correction and planning match, correction wins
 	result := ProcessUserPrompt("actually, decide on the approach")
 	if result.SpecificOutput == nil {
@@ -91,6 +95,7 @@ func TestProcessUserPrompt_CorrectionPriority(t *testing.T) {
 }
 
 func TestProcessUserPrompt_EmptyPrompt(t *testing.T) {
+	t.Parallel()
 	result := ProcessUserPrompt("")
 	if result.SpecificOutput != nil {
 		t.Error("empty prompt should produce no output")
@@ -98,6 +103,7 @@ func TestProcessUserPrompt_EmptyPrompt(t *testing.T) {
 }
 
 func TestProcessUserPrompt_OutputFormat(t *testing.T) {
+	t.Parallel()
 	result := ProcessUserPrompt("actually fix this")
 	if result.SpecificOutput == nil {
 		t.Fatal("expected hook output")

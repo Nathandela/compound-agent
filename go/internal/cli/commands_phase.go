@@ -189,10 +189,7 @@ func handlePhaseStatus(cmd *cobra.Command, root string, jsonOut bool) error {
 			cmd.Println(`{"cookit_active":false}`)
 			return nil
 		}
-		if err := writeJSON(cmd, state); err != nil {
-			return err
-		}
-		return nil
+		return writeJSON(cmd, state)
 	}
 
 	if state == nil {

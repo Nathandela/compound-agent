@@ -95,6 +95,7 @@ func setupTestDB(t *testing.T, items []memory.Item) *sql.DB {
 // --- Vector tests ---
 
 func TestVector_EmptyDB(t *testing.T) {
+	t.Parallel()
 	db := setupTestDB(t, nil)
 	defer db.Close()
 
@@ -109,6 +110,7 @@ func TestVector_EmptyDB(t *testing.T) {
 }
 
 func TestVector_ReturnsSortedByScore(t *testing.T) {
+	t.Parallel()
 	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "go error", Insight: "handle errors", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 		{ID: "L002", Type: memory.TypeLesson, Trigger: "rust error", Insight: "use Result type", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
@@ -148,6 +150,7 @@ func TestVector_ReturnsSortedByScore(t *testing.T) {
 }
 
 func TestVector_UsesCachedEmbeddings(t *testing.T) {
+	t.Parallel()
 	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "trigger1", Insight: "insight1", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 	}
@@ -180,6 +183,7 @@ func TestVector_UsesCachedEmbeddings(t *testing.T) {
 }
 
 func TestVector_SkipsInvalidatedItems(t *testing.T) {
+	t.Parallel()
 	inv := "2025-06-01T00:00:00Z"
 	reason := "outdated"
 	items := []memory.Item{
@@ -204,6 +208,7 @@ func TestVector_SkipsInvalidatedItems(t *testing.T) {
 }
 
 func TestVector_RespectsLimit(t *testing.T) {
+	t.Parallel()
 	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "a", Insight: "a", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 		{ID: "L002", Type: memory.TypeLesson, Trigger: "b", Insight: "b", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
@@ -225,6 +230,7 @@ func TestVector_RespectsLimit(t *testing.T) {
 // --- FindSimilarLessons tests ---
 
 func TestFindSimilarLessons_FiltersByThreshold(t *testing.T) {
+	t.Parallel()
 	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "t1", Insight: "very similar insight", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 		{ID: "L002", Type: memory.TypeLesson, Trigger: "t2", Insight: "completely different", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
@@ -252,6 +258,7 @@ func TestFindSimilarLessons_FiltersByThreshold(t *testing.T) {
 }
 
 func TestFindSimilarLessons_ExcludesSpecifiedID(t *testing.T) {
+	t.Parallel()
 	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "t1", Insight: "insight A", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 		{ID: "L002", Type: memory.TypeLesson, Trigger: "t2", Insight: "insight B", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
@@ -280,6 +287,7 @@ func TestFindSimilarLessons_ExcludesSpecifiedID(t *testing.T) {
 }
 
 func TestVector_IncludesCCTPatterns(t *testing.T) {
+	t.Parallel()
 	// Vector should also score CCT patterns from cct-patterns.jsonl
 	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "go error", Insight: "handle errors", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
@@ -331,6 +339,7 @@ func TestVector_IncludesCCTPatterns(t *testing.T) {
 }
 
 func TestVector_NoCCTFile(t *testing.T) {
+	t.Parallel()
 	// Vector should work fine when cct-patterns.jsonl doesn't exist
 	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "test", Insight: "test", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
@@ -350,6 +359,7 @@ func TestVector_NoCCTFile(t *testing.T) {
 }
 
 func TestFindSimilarLessons_EmptyDB(t *testing.T) {
+	t.Parallel()
 	db := setupTestDB(t, nil)
 	defer db.Close()
 
@@ -364,6 +374,7 @@ func TestFindSimilarLessons_EmptyDB(t *testing.T) {
 }
 
 func TestFindSimilarLessons_UsesPreloadedItems(t *testing.T) {
+	t.Parallel()
 	// DB has no items, but preloaded items are provided — should use them
 	db := setupTestDB(t, nil)
 	defer db.Close()

@@ -10,6 +10,7 @@ import (
 )
 
 func TestPolishCommand_GeneratesScript(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -41,6 +42,7 @@ func TestPolishCommand_GeneratesScript(t *testing.T) {
 }
 
 func TestPolishCommand_ForceOverwrite(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -62,6 +64,7 @@ func TestPolishCommand_ForceOverwrite(t *testing.T) {
 }
 
 func TestPolishCommand_RefusesOverwriteWithoutForce(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -78,6 +81,7 @@ func TestPolishCommand_RefusesOverwriteWithoutForce(t *testing.T) {
 }
 
 func TestPolishCommand_UsesNpxCa(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -104,6 +108,7 @@ func TestPolishCommand_UsesNpxCa(t *testing.T) {
 }
 
 func TestPolishCommand_PermissionModeAuto(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -126,6 +131,7 @@ func TestPolishCommand_PermissionModeAuto(t *testing.T) {
 }
 
 func TestPolishCommand_FullSpectrumPriority(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -175,6 +181,7 @@ func TestPolishCommand_FullSpectrumPriority(t *testing.T) {
 }
 
 func TestPolishCommand_AuditCoversFullSpectrum(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -214,6 +221,7 @@ func TestPolishCommand_AuditCoversFullSpectrum(t *testing.T) {
 }
 
 func TestPolishCommand_ShellInjection(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -241,6 +249,7 @@ func TestPolishCommand_ShellInjection(t *testing.T) {
 }
 
 func TestPolishCommand_ShellInjection_SpecFile(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -264,6 +273,7 @@ func TestPolishCommand_ShellInjection_SpecFile(t *testing.T) {
 }
 
 func TestPolishCommand_ShellInjection_MetaEpic(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -287,6 +297,7 @@ func TestPolishCommand_ShellInjection_MetaEpic(t *testing.T) {
 }
 
 func TestPolishCommand_WithReviewers(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -313,6 +324,7 @@ func TestPolishCommand_WithReviewers(t *testing.T) {
 }
 
 func TestPolishCommand_InvalidReviewerRejected(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -329,6 +341,7 @@ func TestPolishCommand_InvalidReviewerRejected(t *testing.T) {
 }
 
 func TestPolishCommand_RequiresSpecFile(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -342,6 +355,7 @@ func TestPolishCommand_RequiresSpecFile(t *testing.T) {
 }
 
 func TestPolishCommand_RequiresMetaEpic(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -355,6 +369,7 @@ func TestPolishCommand_RequiresMetaEpic(t *testing.T) {
 }
 
 func TestPolishCommand_CyclesFlag(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -378,6 +393,7 @@ func TestPolishCommand_CyclesFlag(t *testing.T) {
 }
 
 func TestPolishCommand_StructuralCorrectness(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -416,6 +432,7 @@ func TestPolishCommand_StructuralCorrectness(t *testing.T) {
 }
 
 func TestPolishCommand_NamingConsistency(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -443,6 +460,7 @@ func TestPolishCommand_NamingConsistency(t *testing.T) {
 }
 
 func TestPolishCommand_ArchitectNoMetaEpicDependency(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -481,6 +499,7 @@ func TestPolishCommand_ArchitectNoMetaEpicDependency(t *testing.T) {
 }
 
 func TestPolishCommand_InnerLoopCapturesExitCode(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -523,6 +542,7 @@ func TestPolishCommand_InnerLoopCapturesExitCode(t *testing.T) {
 }
 
 func TestPolishCommand_InnerLoopCallGuarded(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -554,6 +574,7 @@ func TestPolishCommand_InnerLoopCallGuarded(t *testing.T) {
 }
 
 func TestPolishCommand_ReviewerModelQuoting(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -577,6 +598,7 @@ func TestPolishCommand_ReviewerModelQuoting(t *testing.T) {
 }
 
 func TestPolishCommand_PIDTracking(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -603,6 +625,7 @@ func TestPolishCommand_PIDTracking(t *testing.T) {
 }
 
 func TestPolishCommand_ReviewerHealthCheck(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 
@@ -626,6 +649,7 @@ func TestPolishCommand_ReviewerHealthCheck(t *testing.T) {
 }
 
 func TestPolishCommand_VisualVerification(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(polishCmd())
 

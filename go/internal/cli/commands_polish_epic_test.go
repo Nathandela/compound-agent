@@ -14,6 +14,7 @@ import (
 // --- Task 1: Doctor prefix casing ---
 
 func TestDoctorResults_LowercasePrefixes(t *testing.T) {
+	t.Parallel()
 	checks := []doctorCheck{
 		{Name: "test pass", Status: "pass"},
 		{Name: "test fail", Status: "fail", Fix: "fix it"},
@@ -61,6 +62,7 @@ func TestDoctorResults_LowercasePrefixes(t *testing.T) {
 // --- Task 2: --json flag on ca info ---
 
 func TestInfoCmd_JSONFlag(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	output := runInfoCmd(t, dir, "--json")
 
@@ -80,6 +82,7 @@ func TestInfoCmd_JSONFlag(t *testing.T) {
 // --- Task 3: writeJSON error handling ---
 
 func TestWriteJSON_ReturnsError(t *testing.T) {
+	t.Parallel()
 	// writeJSON should return an error for unmarshalable values.
 	// A channel is not JSON-marshalable.
 	cmd := &cobra.Command{Use: "test"}
@@ -93,6 +96,7 @@ func TestWriteJSON_ReturnsError(t *testing.T) {
 }
 
 func TestReportError_ReturnsWriteJSONError(t *testing.T) {
+	t.Parallel()
 	// reportError with jsonOut=true should propagate writeJSON error for valid data,
 	// but the main contract is it always returns a non-nil error for the message.
 	cmd := &cobra.Command{Use: "test"}
@@ -112,6 +116,7 @@ func TestReportError_ReturnsWriteJSONError(t *testing.T) {
 // --- Task 4: --json help text consistency ---
 
 func TestJSONFlagHelpText_Lowercase(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	registerInfoCommands(root)
 	registerSetupCommands(root)
@@ -145,6 +150,7 @@ func checkCmdFlags(cmd *cobra.Command, violations *[]string) {
 // --- Task 5: --force short form ---
 
 func TestForceFlag_HasShortForm(t *testing.T) {
+	t.Parallel()
 	cmds := map[string]*cobra.Command{
 		"improve": improveCmd(),
 		"loop":    loopCmd(),
@@ -166,6 +172,7 @@ func TestForceFlag_HasShortForm(t *testing.T) {
 // --- Task 6: Empty-state messages ---
 
 func TestEmptyStateMessages_HaveGuidance(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		output string
@@ -194,6 +201,7 @@ func TestEmptyStateMessages_HaveGuidance(t *testing.T) {
 // --- REQ-O2: First-session workflow hint ---
 
 func TestLoadSession_ShowsHintOnFirstSession(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	claudeDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(filepath.Join(claudeDir, "lessons"), 0755)
@@ -206,6 +214,7 @@ func TestLoadSession_ShowsHintOnFirstSession(t *testing.T) {
 }
 
 func TestLoadSession_HintNotShownAfterMarker(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	claudeDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(claudeDir, 0755)
@@ -219,6 +228,7 @@ func TestLoadSession_HintNotShownAfterMarker(t *testing.T) {
 }
 
 func TestLoadSession_HintNotShownWhenDisabled(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	if setup.ShouldShowHint(dir) {

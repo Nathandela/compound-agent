@@ -27,6 +27,7 @@ func makeRankItem(severity *memory.Severity, confirmed bool, created string) mem
 }
 
 func TestSeverityBoost(t *testing.T) {
+	t.Parallel()
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	tests := []struct {
@@ -52,6 +53,7 @@ func TestSeverityBoost(t *testing.T) {
 }
 
 func TestRecencyBoostFn(t *testing.T) {
+	t.Parallel()
 	recent := time.Now().UTC().Format(time.RFC3339)
 	old := time.Now().UTC().AddDate(0, 0, -60).Format(time.RFC3339)
 
@@ -77,6 +79,7 @@ func TestRecencyBoostFn(t *testing.T) {
 }
 
 func TestConfirmationBoostFn(t *testing.T) {
+	t.Parallel()
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	tests := []struct {
@@ -100,6 +103,7 @@ func TestConfirmationBoostFn(t *testing.T) {
 }
 
 func TestCalculateScore_CappedBoost(t *testing.T) {
+	t.Parallel()
 	// high severity (1.5) * recent (1.2) * confirmed (1.3) = 2.34
 	// capped at 1.8, so score = 0.9 * 1.8 = 1.62
 	recent := time.Now().UTC().Format(time.RFC3339)
@@ -112,6 +116,7 @@ func TestCalculateScore_CappedBoost(t *testing.T) {
 }
 
 func TestCalculateScore_NoBoosts(t *testing.T) {
+	t.Parallel()
 	// nil severity (1.0) * old (1.0) * unconfirmed (1.0) = 1.0
 	// score unchanged
 	old := time.Now().UTC().AddDate(0, 0, -60).Format(time.RFC3339)
@@ -124,6 +129,7 @@ func TestCalculateScore_NoBoosts(t *testing.T) {
 }
 
 func TestRankItems_SortedDescending(t *testing.T) {
+	t.Parallel()
 	now := time.Now().UTC().Format(time.RFC3339)
 	old := time.Now().UTC().AddDate(0, 0, -60).Format(time.RFC3339)
 
@@ -153,6 +159,7 @@ func TestRankItems_SortedDescending(t *testing.T) {
 }
 
 func TestRankItems_Empty(t *testing.T) {
+	t.Parallel()
 	ranked := RankItems(nil)
 	if len(ranked) != 0 {
 		t.Errorf("RankItems(nil) returned %d items, want 0", len(ranked))

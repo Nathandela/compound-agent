@@ -9,6 +9,7 @@ import (
 )
 
 func TestReadStdin_ValidJSON(t *testing.T) {
+	t.Parallel()
 	input := `{"tool_name":"Bash","tool_input":{"command":"ls"}}`
 	r := io.NopCloser(bytes.NewBufferString(input))
 	got, err := ReadStdinFrom(r, 30*time.Second, 1<<20)
@@ -21,6 +22,7 @@ func TestReadStdin_ValidJSON(t *testing.T) {
 }
 
 func TestReadStdin_Empty(t *testing.T) {
+	t.Parallel()
 	r := io.NopCloser(bytes.NewBufferString(""))
 	got, err := ReadStdinFrom(r, 30*time.Second, 1<<20)
 	if err != nil {
@@ -32,6 +34,7 @@ func TestReadStdin_Empty(t *testing.T) {
 }
 
 func TestReadStdin_ExceedsMaxBytes(t *testing.T) {
+	t.Parallel()
 	input := "x" + string(make([]byte, 100))
 	r := io.NopCloser(bytes.NewBufferString(input))
 	_, err := ReadStdinFrom(r, 30*time.Second, 50)
@@ -41,6 +44,7 @@ func TestReadStdin_ExceedsMaxBytes(t *testing.T) {
 }
 
 func TestReadStdin_Timeout(t *testing.T) {
+	t.Parallel()
 	// Use a reader that blocks forever
 	pr, _ := io.Pipe()
 	_, err := ReadStdinFrom(pr, 10*time.Millisecond, 1<<20)
@@ -50,6 +54,7 @@ func TestReadStdin_Timeout(t *testing.T) {
 }
 
 func TestReadStdin_TimeoutClosesInternalPipe(t *testing.T) {
+	t.Parallel()
 	// Verify that on timeout, the internal pipe is closed so that a
 	// copy goroutine in the write phase is unblocked. We use a slow
 	// reader that produces data, ensuring io.Copy enters the write phase
@@ -97,6 +102,7 @@ func (r *trickleReader) callCount() int32 {
 }
 
 func TestReadStdin_ExactlyMaxBytes(t *testing.T) {
+	t.Parallel()
 	input := string(make([]byte, 50))
 	r := io.NopCloser(bytes.NewBufferString(input))
 	got, err := ReadStdinFrom(r, 30*time.Second, 50)
@@ -109,6 +115,7 @@ func TestReadStdin_ExactlyMaxBytes(t *testing.T) {
 }
 
 func TestReadStdin_IncrementalLimit(t *testing.T) {
+	t.Parallel()
 	// R3: Verify the reader stops reading after maxBytes+1 bytes,
 	// not after reading the entire stream into memory.
 	maxBytes := 1024

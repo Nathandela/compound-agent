@@ -8,6 +8,7 @@ import (
 )
 
 func TestInitRepo_CreatesDirectories(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	// Create a .git dir to simulate a repo
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
@@ -49,6 +50,7 @@ func TestInitRepo_CreatesDirectories(t *testing.T) {
 }
 
 func TestInitRepo_Idempotent(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 
@@ -75,6 +77,7 @@ func TestInitRepo_Idempotent(t *testing.T) {
 }
 
 func TestInitRepo_InstallsHooks(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 
@@ -100,6 +103,7 @@ func TestInitRepo_InstallsHooks(t *testing.T) {
 }
 
 func TestInitRepo_InstallsTemplates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 
@@ -164,6 +168,7 @@ func TestInitRepo_InstallsTemplates(t *testing.T) {
 }
 
 func TestEnsureGitignore(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	if err := EnsureGitignore(dir); err != nil {
@@ -199,6 +204,7 @@ func TestEnsureGitignore(t *testing.T) {
 }
 
 func TestEnsureGitignore_Idempotent(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// First call creates the file
@@ -221,6 +227,7 @@ func TestEnsureGitignore_Idempotent(t *testing.T) {
 }
 
 func TestEnsureGitignore_AppendsToExisting(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	gitignoreDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(gitignoreDir, 0755)
@@ -247,6 +254,7 @@ func TestEnsureGitignore_AppendsToExisting(t *testing.T) {
 }
 
 func TestInitRepo_UpgradesStaleHooks(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
 		t.Fatalf("mkdir .git: %v", err)
@@ -307,6 +315,7 @@ func TestInitRepo_UpgradesStaleHooks(t *testing.T) {
 }
 
 func TestInitRepo_UpdatesStalePlugin(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
 		t.Fatalf("mkdir .git: %v", err)
@@ -335,6 +344,7 @@ func TestInitRepo_UpdatesStalePlugin(t *testing.T) {
 }
 
 func TestInitRepo_DedupesDuplicateHooks(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
 		t.Fatalf("mkdir .git: %v", err)
@@ -384,6 +394,7 @@ func TestInitRepo_DedupesDuplicateHooks(t *testing.T) {
 }
 
 func TestInitRepo_UpdatesStaleTemplates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
 		t.Fatalf("mkdir .git: %v", err)
@@ -429,6 +440,7 @@ func TestInitRepo_UpdatesStaleTemplates(t *testing.T) {
 }
 
 func TestInitRepo_PrunesStaleTemplates(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	if err := os.MkdirAll(filepath.Join(dir, ".git"), 0755); err != nil {
 		t.Fatalf("mkdir .git: %v", err)
@@ -472,6 +484,7 @@ func TestInitRepo_PrunesStaleTemplates(t *testing.T) {
 }
 
 func TestInitRepo_DirsCreatedAccurate(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
 

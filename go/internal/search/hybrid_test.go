@@ -27,6 +27,7 @@ func approxEqual(a, b, eps float64) bool {
 func floatPtr(f float64) *float64 { return &f }
 
 func TestMergeHybridScores_EmptyInputs(t *testing.T) {
+	t.Parallel()
 	result := MergeHybridScores(nil, nil, nil)
 	if result != nil {
 		t.Fatalf("expected nil, got %v", result)
@@ -39,6 +40,7 @@ func TestMergeHybridScores_EmptyInputs(t *testing.T) {
 }
 
 func TestMergeHybridScores_VectorOnly(t *testing.T) {
+	t.Parallel()
 	vec := []ScoredItem{
 		{Item: makeHybridItem("L001"), Score: 0.9},
 		{Item: makeHybridItem("L002"), Score: 0.6},
@@ -63,6 +65,7 @@ func TestMergeHybridScores_VectorOnly(t *testing.T) {
 }
 
 func TestMergeHybridScores_KeywordOnly(t *testing.T) {
+	t.Parallel()
 	kw := []ScoredItem{
 		{Item: makeHybridItem("L010"), Score: 0.8},
 		{Item: makeHybridItem("L011"), Score: 0.5},
@@ -83,6 +86,7 @@ func TestMergeHybridScores_KeywordOnly(t *testing.T) {
 }
 
 func TestMergeHybridScores_OverlappingItems(t *testing.T) {
+	t.Parallel()
 	vec := []ScoredItem{
 		{Item: makeHybridItem("L001"), Score: 0.9},
 		{Item: makeHybridItem("L002"), Score: 0.4},
@@ -118,6 +122,7 @@ func TestMergeHybridScores_OverlappingItems(t *testing.T) {
 }
 
 func TestMergeHybridScores_MinScoreFilters(t *testing.T) {
+	t.Parallel()
 	vec := []ScoredItem{
 		{Item: makeHybridItem("L001"), Score: 0.9},
 		{Item: makeHybridItem("L002"), Score: 0.3},
@@ -139,6 +144,7 @@ func TestMergeHybridScores_MinScoreFilters(t *testing.T) {
 }
 
 func TestMergeHybridScores_LimitTruncates(t *testing.T) {
+	t.Parallel()
 	vec := []ScoredItem{
 		{Item: makeHybridItem("L001"), Score: 0.9},
 		{Item: makeHybridItem("L002"), Score: 0.7},
@@ -159,6 +165,7 @@ func TestMergeHybridScores_LimitTruncates(t *testing.T) {
 }
 
 func TestMergeHybridScores_CustomWeights(t *testing.T) {
+	t.Parallel()
 	vec := []ScoredItem{
 		{Item: makeHybridItem("L001"), Score: 0.8},
 	}
@@ -182,6 +189,7 @@ func TestMergeHybridScores_CustomWeights(t *testing.T) {
 }
 
 func TestMergeHybridScores_SortedDescending(t *testing.T) {
+	t.Parallel()
 	vec := []ScoredItem{
 		{Item: makeHybridItem("L001"), Score: 0.3},
 		{Item: makeHybridItem("L002"), Score: 0.9},
@@ -211,6 +219,7 @@ func TestMergeHybridScores_SortedDescending(t *testing.T) {
 }
 
 func TestMergeHybridScores_ZeroTotalWeight(t *testing.T) {
+	t.Parallel()
 	vec := []ScoredItem{
 		{Item: makeHybridItem("L001"), Score: 0.9},
 	}

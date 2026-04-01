@@ -26,6 +26,7 @@ func executeCommand(root *cobra.Command, args ...string) (string, error) {
 }
 
 func TestAboutCommand(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(aboutCmd())
 
@@ -43,6 +44,7 @@ func TestAboutCommand(t *testing.T) {
 }
 
 func TestFeedbackCommand(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(feedbackCmd())
 
@@ -63,6 +65,7 @@ func TestFeedbackCommand(t *testing.T) {
 }
 
 func TestVersionCommand(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(versionCmd())
 
@@ -78,6 +81,7 @@ func TestVersionCommand(t *testing.T) {
 }
 
 func TestAboutCommandUsesBuildVersion(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(aboutCmd())
 
@@ -92,6 +96,7 @@ func TestAboutCommandUsesBuildVersion(t *testing.T) {
 }
 
 func TestVersionCommandIsRegistered(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	registerInfoCommands(root)
 
@@ -108,6 +113,7 @@ func TestVersionCommandIsRegistered(t *testing.T) {
 }
 
 func TestFeedbackCommandOpenHint(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(feedbackCmd())
 
@@ -141,6 +147,7 @@ func runInfoCmd(t *testing.T, repoRoot string, args ...string) string {
 }
 
 func TestInfoCmd_VersionSection(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	output := runInfoCmd(t, dir)
 
@@ -156,6 +163,7 @@ func TestInfoCmd_VersionSection(t *testing.T) {
 }
 
 func TestInfoCmd_HooksInstalled(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	settingsDir := filepath.Join(dir, ".claude")
@@ -180,6 +188,7 @@ func TestInfoCmd_HooksInstalled(t *testing.T) {
 }
 
 func TestInfoCmd_NoHooksInstalled(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	output := runInfoCmd(t, dir)
@@ -192,6 +201,7 @@ func TestInfoCmd_NoHooksInstalled(t *testing.T) {
 }
 
 func TestInfoCmd_SkillsFromIndex(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	skillsDir := filepath.Join(dir, ".claude", "skills", "compound")
@@ -216,6 +226,7 @@ func TestInfoCmd_SkillsFromIndex(t *testing.T) {
 }
 
 func TestInfoCmd_NoSkillsIndex(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	output := runInfoCmd(t, dir)
@@ -228,6 +239,7 @@ func TestInfoCmd_NoSkillsIndex(t *testing.T) {
 }
 
 func TestInfoCmd_PhaseStateActive(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	claudeDir := filepath.Join(dir, ".claude")
@@ -261,6 +273,7 @@ func TestInfoCmd_PhaseStateActive(t *testing.T) {
 }
 
 func TestInfoCmd_NoPhaseState(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	output := runInfoCmd(t, dir)
@@ -273,6 +286,7 @@ func TestInfoCmd_NoPhaseState(t *testing.T) {
 }
 
 func TestInfoCmd_TelemetryWithData(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	cacheDir := filepath.Join(dir, ".claude", ".cache")
@@ -305,6 +319,7 @@ func TestInfoCmd_TelemetryWithData(t *testing.T) {
 }
 
 func TestInfoCmd_TelemetryEmpty(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	output := runInfoCmd(t, dir)
@@ -317,6 +332,7 @@ func TestInfoCmd_TelemetryEmpty(t *testing.T) {
 }
 
 func TestInfoCmd_LessonCorpusStats(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	lessonsDir := filepath.Join(dir, ".claude", "lessons")
@@ -341,6 +357,7 @@ func TestInfoCmd_LessonCorpusStats(t *testing.T) {
 }
 
 func TestInfoCmd_NoLessons(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	output := runInfoCmd(t, dir)
@@ -353,6 +370,7 @@ func TestInfoCmd_NoLessons(t *testing.T) {
 }
 
 func TestInfoCmd_AllSixSections(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	output := runInfoCmd(t, dir)
 
@@ -365,6 +383,7 @@ func TestInfoCmd_AllSixSections(t *testing.T) {
 }
 
 func TestInfoCmd_IsRegistered(t *testing.T) {
+	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	registerInfoCommands(root)
 
@@ -381,6 +400,7 @@ func TestInfoCmd_IsRegistered(t *testing.T) {
 }
 
 func TestExplainAlias(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	root := &cobra.Command{Use: "ca"}

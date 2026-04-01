@@ -73,6 +73,7 @@ func setupTestDB(t *testing.T, items []memory.Item) *sql.DB {
 // --- isSpecific tests ---
 
 func TestIsSpecific_TooShort(t *testing.T) {
+	t.Parallel()
 	specific, reason := isSpecific("Use pnpm")
 	if specific {
 		t.Error("expected specific=false for short insight")
@@ -83,6 +84,7 @@ func TestIsSpecific_TooShort(t *testing.T) {
 }
 
 func TestIsSpecific_VagueWriteBetter(t *testing.T) {
+	t.Parallel()
 	specific, reason := isSpecific("Remember to write better code next time")
 	if specific {
 		t.Error("expected specific=false for 'write better' pattern")
@@ -93,6 +95,7 @@ func TestIsSpecific_VagueWriteBetter(t *testing.T) {
 }
 
 func TestIsSpecific_VagueBeCareful(t *testing.T) {
+	t.Parallel()
 	specific, reason := isSpecific("Be careful when making changes to the database")
 	if specific {
 		t.Error("expected specific=false for 'be careful' pattern")
@@ -103,6 +106,7 @@ func TestIsSpecific_VagueBeCareful(t *testing.T) {
 }
 
 func TestIsSpecific_VagueRememberTo(t *testing.T) {
+	t.Parallel()
 	specific, reason := isSpecific("Remember to check your work before committing")
 	if specific {
 		t.Error("expected specific=false for 'remember to' pattern")
@@ -113,6 +117,7 @@ func TestIsSpecific_VagueRememberTo(t *testing.T) {
 }
 
 func TestIsSpecific_VagueMakeSure(t *testing.T) {
+	t.Parallel()
 	specific, reason := isSpecific("Make sure to double check everything before deploying")
 	if specific {
 		t.Error("expected specific=false for 'make sure' pattern")
@@ -123,6 +128,7 @@ func TestIsSpecific_VagueMakeSure(t *testing.T) {
 }
 
 func TestIsSpecific_VagueTryTo(t *testing.T) {
+	t.Parallel()
 	specific, reason := isSpecific("Try to be more careful next time")
 	if specific {
 		t.Error("expected specific=false for 'try to' pattern")
@@ -133,6 +139,7 @@ func TestIsSpecific_VagueTryTo(t *testing.T) {
 }
 
 func TestIsSpecific_VagueDoubleCheck(t *testing.T) {
+	t.Parallel()
 	specific, reason := isSpecific("Always double check your configuration files")
 	if specific {
 		t.Error("expected specific=false for 'double check' pattern")
@@ -143,6 +150,7 @@ func TestIsSpecific_VagueDoubleCheck(t *testing.T) {
 }
 
 func TestIsSpecific_GenericAlways(t *testing.T) {
+	t.Parallel()
 	specific, reason := isSpecific("Always test your code")
 	if specific {
 		t.Error("expected specific=false for generic 'always' imperative")
@@ -153,6 +161,7 @@ func TestIsSpecific_GenericAlways(t *testing.T) {
 }
 
 func TestIsSpecific_GenericNever(t *testing.T) {
+	t.Parallel()
 	specific, reason := isSpecific("Never forget to review")
 	if specific {
 		t.Error("expected specific=false for generic 'never' imperative")
@@ -163,6 +172,7 @@ func TestIsSpecific_GenericNever(t *testing.T) {
 }
 
 func TestIsSpecific_ValidSpecificInsight(t *testing.T) {
+	t.Parallel()
 	specific, reason := isSpecific("Use Polars instead of pandas for files over 100MB")
 	if !specific {
 		t.Errorf("expected specific=true for valid insight, got reason=%q", reason)
@@ -173,6 +183,7 @@ func TestIsSpecific_ValidSpecificInsight(t *testing.T) {
 }
 
 func TestIsSpecific_ValidTechnicalGuidance(t *testing.T) {
+	t.Parallel()
 	specific, reason := isSpecific("In this codebase, run pnpm test before committing")
 	if !specific {
 		t.Errorf("expected specific=true, got reason=%q", reason)
@@ -183,6 +194,7 @@ func TestIsSpecific_ValidTechnicalGuidance(t *testing.T) {
 }
 
 func TestIsSpecific_VaguePatternsAreCaseInsensitive(t *testing.T) {
+	t.Parallel()
 	specific, _ := isSpecific("WRITE BETTER tests when working on critical modules")
 	if specific {
 		t.Error("expected specific=false for uppercase 'WRITE BETTER' pattern")
@@ -192,6 +204,7 @@ func TestIsSpecific_VaguePatternsAreCaseInsensitive(t *testing.T) {
 // --- isActionable tests ---
 
 func TestIsActionable_UseInsteadOf(t *testing.T) {
+	t.Parallel()
 	actionable, reason := isActionable("Use Polars instead of pandas for large datasets")
 	if !actionable {
 		t.Errorf("expected actionable=true for 'use X instead of Y', got reason=%q", reason)
@@ -202,6 +215,7 @@ func TestIsActionable_UseInsteadOf(t *testing.T) {
 }
 
 func TestIsActionable_PreferOver(t *testing.T) {
+	t.Parallel()
 	actionable, _ := isActionable("Prefer async functions over callbacks in this codebase")
 	if !actionable {
 		t.Error("expected actionable=true for 'prefer X over Y'")
@@ -209,6 +223,7 @@ func TestIsActionable_PreferOver(t *testing.T) {
 }
 
 func TestIsActionable_PreferTo(t *testing.T) {
+	t.Parallel()
 	actionable, _ := isActionable("Prefer Polars to pandas for data processing")
 	if !actionable {
 		t.Error("expected actionable=true for 'prefer X to Y'")
@@ -216,6 +231,7 @@ func TestIsActionable_PreferTo(t *testing.T) {
 }
 
 func TestIsActionable_AlwaysWhen(t *testing.T) {
+	t.Parallel()
 	actionable, _ := isActionable("Always validate input when accepting user data")
 	if !actionable {
 		t.Error("expected actionable=true for 'always X when Y'")
@@ -223,6 +239,7 @@ func TestIsActionable_AlwaysWhen(t *testing.T) {
 }
 
 func TestIsActionable_NeverWithout(t *testing.T) {
+	t.Parallel()
 	actionable, _ := isActionable("Never deploy without running the full test suite")
 	if !actionable {
 		t.Error("expected actionable=true for 'never X without Y'")
@@ -230,6 +247,7 @@ func TestIsActionable_NeverWithout(t *testing.T) {
 }
 
 func TestIsActionable_AvoidUsing(t *testing.T) {
+	t.Parallel()
 	actionable, _ := isActionable("Avoid using any type in this TypeScript codebase")
 	if !actionable {
 		t.Error("expected actionable=true for 'avoid using X'")
@@ -237,6 +255,7 @@ func TestIsActionable_AvoidUsing(t *testing.T) {
 }
 
 func TestIsActionable_Avoid(t *testing.T) {
+	t.Parallel()
 	actionable, _ := isActionable("Avoid globals in production code")
 	if !actionable {
 		t.Error("expected actionable=true for 'avoid X'")
@@ -244,6 +263,7 @@ func TestIsActionable_Avoid(t *testing.T) {
 }
 
 func TestIsActionable_CheckBefore(t *testing.T) {
+	t.Parallel()
 	actionable, _ := isActionable("Check the migration status before running database queries")
 	if !actionable {
 		t.Error("expected actionable=true for 'check X before Y'")
@@ -251,6 +271,7 @@ func TestIsActionable_CheckBefore(t *testing.T) {
 }
 
 func TestIsActionable_ImperativeRun(t *testing.T) {
+	t.Parallel()
 	actionable, _ := isActionable("Run pnpm lint before committing to catch style issues")
 	if !actionable {
 		t.Error("expected actionable=true for imperative 'run'")
@@ -258,6 +279,7 @@ func TestIsActionable_ImperativeRun(t *testing.T) {
 }
 
 func TestIsActionable_ImperativeInstall(t *testing.T) {
+	t.Parallel()
 	actionable, _ := isActionable("Install the pre-commit hook for automatic linting")
 	if !actionable {
 		t.Error("expected actionable=true for imperative 'install'")
@@ -265,6 +287,7 @@ func TestIsActionable_ImperativeInstall(t *testing.T) {
 }
 
 func TestIsActionable_PureObservation(t *testing.T) {
+	t.Parallel()
 	actionable, reason := isActionable("The database connection sometimes fails on cold starts")
 	if actionable {
 		t.Error("expected actionable=false for pure observation")
@@ -275,6 +298,7 @@ func TestIsActionable_PureObservation(t *testing.T) {
 }
 
 func TestIsActionable_Question(t *testing.T) {
+	t.Parallel()
 	actionable, _ := isActionable("Why does this test fail intermittently on CI")
 	if actionable {
 		t.Error("expected actionable=false for question")
@@ -282,6 +306,7 @@ func TestIsActionable_Question(t *testing.T) {
 }
 
 func TestIsActionable_StatementWithoutAction(t *testing.T) {
+	t.Parallel()
 	actionable, _ := isActionable("The configuration file is located in the root directory")
 	if actionable {
 		t.Error("expected actionable=false for statement without action")
@@ -291,6 +316,7 @@ func TestIsActionable_StatementWithoutAction(t *testing.T) {
 // --- isNovel tests ---
 
 func TestIsNovel_NilEmbedder(t *testing.T) {
+	t.Parallel()
 	result := isNovel("", "Some insight text here", nil, DuplicateThreshold)
 	if !result.Novel {
 		t.Error("expected novel=true when embedder is nil")
@@ -298,6 +324,7 @@ func TestIsNovel_NilEmbedder(t *testing.T) {
 }
 
 func TestIsNovel_EmbedderError(t *testing.T) {
+	t.Parallel()
 	embedder := &mockEmbedder{err: errors.New("model unavailable")}
 	result := isNovel("", "Some insight text here", embedder, DuplicateThreshold)
 	if !result.Novel {
@@ -306,6 +333,7 @@ func TestIsNovel_EmbedderError(t *testing.T) {
 }
 
 func TestIsNovel_NoDuplicateFound(t *testing.T) {
+	t.Parallel()
 	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "trigger", Insight: "completely different insight", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 	}
@@ -325,6 +353,7 @@ func TestIsNovel_NoDuplicateFound(t *testing.T) {
 }
 
 func TestIsNovel_DuplicateAboveThreshold(t *testing.T) {
+	t.Parallel()
 	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "trigger", Insight: "Use Polars for large files", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
 	}
@@ -350,6 +379,7 @@ func TestIsNovel_DuplicateAboveThreshold(t *testing.T) {
 }
 
 func TestIsNovel_ExactlyAtThreshold(t *testing.T) {
+	t.Parallel()
 	// Similarity == 0.98 should be flagged as a duplicate (>= threshold).
 	// Construct two unit vectors with cosine similarity = 0.98:
 	// v1 = (1, 0, 0, 0), v2 = (cos(theta), sin(theta), 0, 0) where cos(theta) = 0.98
@@ -372,6 +402,7 @@ func TestIsNovel_ExactlyAtThreshold(t *testing.T) {
 }
 
 func TestIsNovel_JustBelowThreshold(t *testing.T) {
+	t.Parallel()
 	// Similarity = 0.979 should NOT be flagged as a duplicate (< 0.98).
 	theta := math.Acos(0.979)
 	items := []memory.Item{
@@ -392,6 +423,7 @@ func TestIsNovel_JustBelowThreshold(t *testing.T) {
 }
 
 func TestIsNovel_EllipsisOnlyWhenTruncated(t *testing.T) {
+	t.Parallel()
 	// Short insight text should NOT have trailing ellipsis
 	items := []memory.Item{
 		{ID: "L001", Type: memory.TypeLesson, Trigger: "trigger", Insight: "short", Tags: []string{}, Source: memory.SourceManual, Created: "2025-01-01T00:00:00Z"},
@@ -417,6 +449,7 @@ func TestIsNovel_EllipsisOnlyWhenTruncated(t *testing.T) {
 }
 
 func TestIsNovel_EllipsisWhenTruncated(t *testing.T) {
+	t.Parallel()
 	// Long insight text SHOULD have trailing ellipsis
 	longInsight := "This is a very long insight text that definitely exceeds fifty characters in length"
 	items := []memory.Item{
@@ -440,6 +473,7 @@ func TestIsNovel_EllipsisWhenTruncated(t *testing.T) {
 }
 
 func TestIsNovel_EmptyDB(t *testing.T) {
+	t.Parallel()
 	db := setupTestDB(t, nil)
 	defer db.Close()
 
@@ -456,6 +490,7 @@ func TestIsNovel_EmptyDB(t *testing.T) {
 // --- ShouldPropose tests ---
 
 func TestShouldPropose_NonSpecificRejected(t *testing.T) {
+	t.Parallel()
 	embedder := &mockEmbedder{vectors: map[string][]float64{}}
 	shouldPropose, reason := ShouldPropose("", "Be careful with the database connections", embedder)
 	if shouldPropose {
@@ -467,6 +502,7 @@ func TestShouldPropose_NonSpecificRejected(t *testing.T) {
 }
 
 func TestShouldPropose_TooShortRejected(t *testing.T) {
+	t.Parallel()
 	embedder := &mockEmbedder{vectors: map[string][]float64{}}
 	shouldPropose, reason := ShouldPropose("", "Use pnpm", embedder)
 	if shouldPropose {
@@ -478,6 +514,7 @@ func TestShouldPropose_TooShortRejected(t *testing.T) {
 }
 
 func TestShouldPropose_NilEmbedderPasses(t *testing.T) {
+	t.Parallel()
 	// Specific + nil embedder (novel=true by default)
 	shouldPropose, reason := ShouldPropose("", "Use Polars instead of pandas for files over 100MB", nil)
 	if !shouldPropose {
@@ -486,6 +523,7 @@ func TestShouldPropose_NilEmbedderPasses(t *testing.T) {
 }
 
 func TestShouldPropose_RejectsNonActionable(t *testing.T) {
+	t.Parallel()
 	// An insight that is specific but not actionable should be rejected
 	shouldPropose, reason := ShouldPropose(t.TempDir(), "the system has many components and layers", nil)
 	if shouldPropose {
@@ -497,6 +535,7 @@ func TestShouldPropose_RejectsNonActionable(t *testing.T) {
 }
 
 func TestShouldPropose_AcceptsActionable(t *testing.T) {
+	t.Parallel()
 	// An insight that is specific AND actionable should pass
 	shouldPropose, _ := ShouldPropose(t.TempDir(), "Use parameterized queries instead of string interpolation for SQL", nil)
 	if !shouldPropose {
@@ -505,6 +544,7 @@ func TestShouldPropose_AcceptsActionable(t *testing.T) {
 }
 
 func TestShouldPropose_BothPassAccepted(t *testing.T) {
+	t.Parallel()
 	// No DB items, so novel=true. Specific insight.
 	embedder := &mockEmbedder{vectors: map[string][]float64{
 		"Use Polars instead of pandas for files over 100MB": {1.0, 0.0, 0.0, 0.0},

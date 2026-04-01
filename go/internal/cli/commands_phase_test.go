@@ -9,6 +9,7 @@ import (
 )
 
 func TestPhaseCheckInit(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 
@@ -44,6 +45,7 @@ func TestPhaseCheckInit(t *testing.T) {
 }
 
 func TestPhaseCheckStatus(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 
@@ -72,6 +74,7 @@ func TestPhaseCheckStatus(t *testing.T) {
 }
 
 func TestPhaseCheckStatusJSON(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 
@@ -98,6 +101,7 @@ func TestPhaseCheckStatusJSON(t *testing.T) {
 }
 
 func TestPhaseCheckStart(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 
@@ -130,6 +134,7 @@ func TestPhaseCheckStart(t *testing.T) {
 }
 
 func TestPhaseCheckGate(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 
@@ -154,6 +159,7 @@ func TestPhaseCheckGate(t *testing.T) {
 }
 
 func TestPhaseCheckClean(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 
@@ -182,6 +188,7 @@ func TestPhaseCheckClean(t *testing.T) {
 }
 
 func TestPhaseCheckInvalidPhase(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 
@@ -202,6 +209,7 @@ func TestPhaseCheckInvalidPhase(t *testing.T) {
 }
 
 func TestInstallBeadsCmd(t *testing.T) {
+	t.Parallel()
 	cmd := installBeadsCmd()
 	out := new(strings.Builder)
 	cmd.SetOut(out)
@@ -218,6 +226,7 @@ func TestInstallBeadsCmd(t *testing.T) {
 }
 
 func TestPhaseCheckInitGuardsActiveState(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 
@@ -257,6 +266,7 @@ func TestPhaseCheckInitGuardsActiveState(t *testing.T) {
 }
 
 func TestPhaseCheckStartResetsGatesAndSkills(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
 
@@ -291,6 +301,7 @@ func TestPhaseCheckStartResetsGatesAndSkills(t *testing.T) {
 }
 
 func TestRulesCmd(t *testing.T) {
+	t.Parallel()
 	cmd := rulesCmd()
 	out := new(strings.Builder)
 	cmd.SetOut(out)

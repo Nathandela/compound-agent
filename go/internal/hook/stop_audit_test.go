@@ -6,6 +6,7 @@ import (
 )
 
 func TestProcessStopAudit_NoState(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	result := ProcessStopAudit(dir, false)
 	if result.Continue != nil {
@@ -14,6 +15,7 @@ func TestProcessStopAudit_NoState(t *testing.T) {
 }
 
 func TestProcessStopAudit_StopHookActive(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,
@@ -32,6 +34,7 @@ func TestProcessStopAudit_StopHookActive(t *testing.T) {
 }
 
 func TestProcessStopAudit_Inactive(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: false,
@@ -50,6 +53,7 @@ func TestProcessStopAudit_Inactive(t *testing.T) {
 }
 
 func TestProcessStopAudit_GatePassed(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,
@@ -68,6 +72,7 @@ func TestProcessStopAudit_GatePassed(t *testing.T) {
 }
 
 func TestProcessStopAudit_Phase1NoGate(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,
@@ -86,6 +91,7 @@ func TestProcessStopAudit_Phase1NoGate(t *testing.T) {
 }
 
 func TestProcessStopAudit_BlocksOnTransitionEvidence(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	// Phase 2 (plan), gate not passed, but has read phase 3 skill (transition evidence)
 	writePhaseState(t, dir, PhaseState{
@@ -108,6 +114,7 @@ func TestProcessStopAudit_BlocksOnTransitionEvidence(t *testing.T) {
 }
 
 func TestProcessStopAudit_AllowsWithoutTransitionEvidence(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	// Phase 2, gate not passed, no transition evidence
 	writePhaseState(t, dir, PhaseState{
@@ -127,6 +134,7 @@ func TestProcessStopAudit_AllowsWithoutTransitionEvidence(t *testing.T) {
 }
 
 func TestProcessStopAudit_Phase5AlwaysRequiresGate(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	writePhaseState(t, dir, PhaseState{
 		CookitActive: true,

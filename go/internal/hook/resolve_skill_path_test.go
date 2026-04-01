@@ -9,6 +9,7 @@ import (
 )
 
 func TestResolveSkillPath(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name  string
 		phase string
@@ -33,6 +34,7 @@ func TestResolveSkillPath(t *testing.T) {
 }
 
 func TestIsValidSkillPhase(t *testing.T) {
+	t.Parallel()
 	valid := []string{"spec-dev", "plan", "work", "review", "compound", "architect"}
 	for _, phase := range valid {
 		if !IsValidSkillPhase(phase) {
@@ -51,6 +53,7 @@ func TestIsValidSkillPhase(t *testing.T) {
 // TestProcessPhaseGuard_UsesResolveSkillPath verifies that phase-guard now
 // resolves skill paths via ResolveSkillPath, accepting both old and new paths.
 func TestProcessPhaseGuard_UsesResolveSkillPath(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	// State with a skill read using the canonical path
@@ -73,6 +76,7 @@ func TestProcessPhaseGuard_UsesResolveSkillPath(t *testing.T) {
 // TestProcessPhaseGuard_ArchitectPhase verifies phase-guard works for the
 // architect phase (which is not a cook-it phase but a valid skill phase).
 func TestProcessPhaseGuard_ArchitectPhase(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stateDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(stateDir, 0o755)
@@ -99,6 +103,7 @@ func TestProcessPhaseGuard_ArchitectPhase(t *testing.T) {
 // TestProcessPhaseGuard_ArchitectPhase_NotRead verifies phase-guard warns
 // when architect skill hasn't been read yet.
 func TestProcessPhaseGuard_ArchitectPhase_NotRead(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stateDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(stateDir, 0o755)

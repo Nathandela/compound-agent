@@ -7,6 +7,7 @@ import (
 )
 
 func TestDetectStack_Go(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module example.com/foo\n"), 0644)
 
@@ -23,6 +24,7 @@ func TestDetectStack_Go(t *testing.T) {
 }
 
 func TestDetectStack_Rust(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "Cargo.toml"), []byte("[package]\n"), 0644)
 
@@ -36,6 +38,7 @@ func TestDetectStack_Rust(t *testing.T) {
 }
 
 func TestDetectStack_Python(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "pyproject.toml"), []byte("[project]\n"), 0644)
 
@@ -52,6 +55,7 @@ func TestDetectStack_Python(t *testing.T) {
 }
 
 func TestDetectStack_PythonSetupPy(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "setup.py"), []byte("from setuptools import setup\n"), 0644)
 
@@ -62,6 +66,7 @@ func TestDetectStack_PythonSetupPy(t *testing.T) {
 }
 
 func TestDetectStack_NodePnpm(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}\n"), 0644)
 	os.WriteFile(filepath.Join(dir, "pnpm-lock.yaml"), []byte("lockfileVersion: 9\n"), 0644)
@@ -79,6 +84,7 @@ func TestDetectStack_NodePnpm(t *testing.T) {
 }
 
 func TestDetectStack_NodeYarn(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}\n"), 0644)
 	os.WriteFile(filepath.Join(dir, "yarn.lock"), []byte("# yarn lockfile\n"), 0644)
@@ -93,6 +99,7 @@ func TestDetectStack_NodeYarn(t *testing.T) {
 }
 
 func TestDetectStack_NodeBun(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}\n"), 0644)
 	os.WriteFile(filepath.Join(dir, "bun.lock"), []byte("# bun lockfile\n"), 0644)
@@ -107,6 +114,7 @@ func TestDetectStack_NodeBun(t *testing.T) {
 }
 
 func TestDetectStack_NodeBunBinaryLockfile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}\n"), 0644)
 	os.WriteFile(filepath.Join(dir, "bun.lockb"), []byte{0x00}, 0644)
@@ -121,6 +129,7 @@ func TestDetectStack_NodeBunBinaryLockfile(t *testing.T) {
 }
 
 func TestDetectStack_NodeNpm(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}\n"), 0644)
 	os.WriteFile(filepath.Join(dir, "package-lock.json"), []byte("{}\n"), 0644)
@@ -135,6 +144,7 @@ func TestDetectStack_NodeNpm(t *testing.T) {
 }
 
 func TestDetectStack_NodeNpmNoLockfile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "package.json"), []byte("{}\n"), 0644)
 
@@ -146,6 +156,7 @@ func TestDetectStack_NodeNpmNoLockfile(t *testing.T) {
 }
 
 func TestDetectStack_Unknown(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	info := DetectStack(dir)
@@ -161,6 +172,7 @@ func TestDetectStack_Unknown(t *testing.T) {
 }
 
 func TestDetectStack_PriorityGoOverNode(t *testing.T) {
+	t.Parallel()
 	// When both go.mod and package.json exist (monorepo), prefer Go
 	// since Go is the primary language marker
 	dir := t.TempDir()
@@ -174,6 +186,7 @@ func TestDetectStack_PriorityGoOverNode(t *testing.T) {
 }
 
 func TestDetectStack_MakefileOnly(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "Makefile"), []byte("test:\n\techo test\n"), 0644)
 
@@ -190,6 +203,7 @@ func TestDetectStack_MakefileOnly(t *testing.T) {
 }
 
 func TestDetectStack_DirectoryNotFile(t *testing.T) {
+	t.Parallel()
 	// A directory named go.mod should not be detected as a Go project
 	dir := t.TempDir()
 	os.MkdirAll(filepath.Join(dir, "go.mod"), 0755)

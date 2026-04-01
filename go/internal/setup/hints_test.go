@@ -7,6 +7,7 @@ import (
 )
 
 func TestReadHintsEnabled_True(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	claudeDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(claudeDir, 0755)
@@ -18,6 +19,7 @@ func TestReadHintsEnabled_True(t *testing.T) {
 }
 
 func TestReadHintsEnabled_False(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	claudeDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(claudeDir, 0755)
@@ -29,6 +31,7 @@ func TestReadHintsEnabled_False(t *testing.T) {
 }
 
 func TestReadHintsEnabled_NoFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	if ReadHintsEnabled(dir) {
@@ -37,6 +40,7 @@ func TestReadHintsEnabled_NoFile(t *testing.T) {
 }
 
 func TestReadHintsEnabled_NoHintsKey(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	claudeDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(claudeDir, 0755)
@@ -48,6 +52,7 @@ func TestReadHintsEnabled_NoHintsKey(t *testing.T) {
 }
 
 func TestShouldShowHint_FirstSession(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	claudeDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(claudeDir, 0755)
@@ -59,6 +64,7 @@ func TestShouldShowHint_FirstSession(t *testing.T) {
 }
 
 func TestShouldShowHint_AlreadyShown(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	claudeDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(claudeDir, 0755)
@@ -74,6 +80,7 @@ func TestShouldShowHint_AlreadyShown(t *testing.T) {
 }
 
 func TestShouldShowHint_HintsDisabled(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 
 	if ShouldShowHint(dir) {
@@ -82,6 +89,7 @@ func TestShouldShowHint_HintsDisabled(t *testing.T) {
 }
 
 func TestMarkHintShown_CreatesMarker(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	claudeDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(claudeDir, 0755)
@@ -97,6 +105,7 @@ func TestMarkHintShown_CreatesMarker(t *testing.T) {
 }
 
 func TestWorkflowHintText(t *testing.T) {
+	t.Parallel()
 	hint := WorkflowHint()
 	if hint == "" {
 		t.Error("expected non-empty workflow hint")

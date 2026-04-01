@@ -9,6 +9,7 @@ import (
 )
 
 func TestGetPhaseState_NoFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	got := GetPhaseState(dir)
 	if got != nil {
@@ -17,6 +18,7 @@ func TestGetPhaseState_NoFile(t *testing.T) {
 }
 
 func TestGetPhaseState_ValidState(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stateDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(stateDir, 0o755)
@@ -46,6 +48,7 @@ func TestGetPhaseState_ValidState(t *testing.T) {
 }
 
 func TestGetPhaseState_CorruptedJSON(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stateDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(stateDir, 0o755)
@@ -58,6 +61,7 @@ func TestGetPhaseState_CorruptedJSON(t *testing.T) {
 }
 
 func TestGetPhaseState_StaleState(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stateDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(stateDir, 0o755)
@@ -81,6 +85,7 @@ func TestGetPhaseState_StaleState(t *testing.T) {
 }
 
 func TestGetPhaseState_InactiveState(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stateDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(stateDir, 0o755)
@@ -107,6 +112,7 @@ func TestGetPhaseState_InactiveState(t *testing.T) {
 }
 
 func TestGetPhaseState_LegacyLfgActive(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stateDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(stateDir, 0o755)
@@ -125,6 +131,7 @@ func TestGetPhaseState_LegacyLfgActive(t *testing.T) {
 }
 
 func TestUpdatePhaseState(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stateDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(stateDir, 0o755)
@@ -158,6 +165,7 @@ func TestUpdatePhaseState(t *testing.T) {
 }
 
 func TestWritePhaseState(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	stateDir := filepath.Join(dir, ".claude")
 	os.MkdirAll(stateDir, 0o755)
@@ -189,6 +197,7 @@ func TestWritePhaseState(t *testing.T) {
 }
 
 func TestPhaseStatePath(t *testing.T) {
+	t.Parallel()
 	got := PhaseStatePath("/some/repo")
 	want := filepath.Join("/some/repo", ".claude", ".ca-phase-state.json")
 	if got != want {
@@ -197,6 +206,7 @@ func TestPhaseStatePath(t *testing.T) {
 }
 
 func TestIsValidPhase(t *testing.T) {
+	t.Parallel()
 	for _, p := range Phases {
 		if !IsValidPhase(p) {
 			t.Errorf("IsValidPhase(%q) = false, want true", p)
@@ -208,6 +218,7 @@ func TestIsValidPhase(t *testing.T) {
 }
 
 func TestIsValidGate(t *testing.T) {
+	t.Parallel()
 	for _, g := range Gates {
 		if !IsValidGate(g) {
 			t.Errorf("IsValidGate(%q) = false, want true", g)
@@ -219,6 +230,7 @@ func TestIsValidGate(t *testing.T) {
 }
 
 func TestPhaseIndex(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		phase string
 		want  int
@@ -241,6 +253,7 @@ func TestPhaseIndex(t *testing.T) {
 }
 
 func TestCleanPhaseStateIfFinal(t *testing.T) {
+	t.Parallel()
 	t.Run("cleans when final gate present", func(t *testing.T) {
 		dir := t.TempDir()
 		stateDir := filepath.Join(dir, ".claude")
@@ -294,6 +307,7 @@ func TestCleanPhaseStateIfFinal(t *testing.T) {
 }
 
 func TestExpectedGateForPhase(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		index int
 		want  string

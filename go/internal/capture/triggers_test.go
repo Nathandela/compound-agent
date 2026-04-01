@@ -11,6 +11,7 @@ import (
 // --- DetectUserCorrection ---
 
 func TestDetectUserCorrection_NilForEmptyMessages(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{},
 		Context:  memory.Context{Tool: "", Intent: ""},
@@ -21,6 +22,7 @@ func TestDetectUserCorrection_NilForEmptyMessages(t *testing.T) {
 }
 
 func TestDetectUserCorrection_NilForSingleMessage(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"No, that is wrong"},
 		Context:  memory.Context{Tool: "edit", Intent: "test"},
@@ -31,6 +33,7 @@ func TestDetectUserCorrection_NilForSingleMessage(t *testing.T) {
 }
 
 func TestDetectUserCorrection_DetectsNoPattern(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"can you fix this bug?", "No, not that file - the other one"},
 		Context:  memory.Context{Tool: "edit", Intent: "bug fix"},
@@ -44,6 +47,7 @@ func TestDetectUserCorrection_DetectsNoPattern(t *testing.T) {
 }
 
 func TestDetectUserCorrection_DetectsWrongPattern(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"update the config", "That is wrong, I meant the dev config"},
 		Context:  memory.Context{Tool: "edit", Intent: "config update"},
@@ -54,6 +58,7 @@ func TestDetectUserCorrection_DetectsWrongPattern(t *testing.T) {
 }
 
 func TestDetectUserCorrection_DetectsActuallyPattern(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"add a new function", "Actually, it should be a method on the class"},
 		Context:  memory.Context{Tool: "write", Intent: "add feature"},
@@ -64,6 +69,7 @@ func TestDetectUserCorrection_DetectsActuallyPattern(t *testing.T) {
 }
 
 func TestDetectUserCorrection_DetectsNotThatPattern(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"run the tests", "Not that command, use pnpm test"},
 		Context:  memory.Context{Tool: "bash", Intent: "testing"},
@@ -74,6 +80,7 @@ func TestDetectUserCorrection_DetectsNotThatPattern(t *testing.T) {
 }
 
 func TestDetectUserCorrection_DetectsIMeantPattern(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"open the file", "I meant the TypeScript version, not JavaScript"},
 		Context:  memory.Context{Tool: "read", Intent: "view file"},
@@ -84,6 +91,7 @@ func TestDetectUserCorrection_DetectsIMeantPattern(t *testing.T) {
 }
 
 func TestDetectUserCorrection_NilForNormalConversation(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"can you add a test?", "Yes, I will add a test for this function"},
 		Context:  memory.Context{Tool: "write", Intent: "testing"},
@@ -94,6 +102,7 @@ func TestDetectUserCorrection_NilForNormalConversation(t *testing.T) {
 }
 
 func TestDetectUserCorrection_IncludesContext(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"edit the config", "No, that is the wrong file"},
 		Context:  memory.Context{Tool: "edit", Intent: "config update"},
@@ -110,6 +119,7 @@ func TestDetectUserCorrection_IncludesContext(t *testing.T) {
 }
 
 func TestDetectUserCorrection_ExtractsCorrectionMessage(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"add logging", "No, that is too verbose, use debug level"},
 		Context:  memory.Context{Tool: "edit", Intent: "logging"},
@@ -123,6 +133,7 @@ func TestDetectUserCorrection_ExtractsCorrectionMessage(t *testing.T) {
 }
 
 func TestDetectUserCorrection_IsCaseInsensitive(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"update the API", "ACTUALLY we need to update the tests first"},
 		Context:  memory.Context{Tool: "edit", Intent: "api update"},
@@ -133,6 +144,7 @@ func TestDetectUserCorrection_IsCaseInsensitive(t *testing.T) {
 }
 
 func TestDetectUserCorrection_SkipsEmptyMessages(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"first message", "", "No, that is wrong"},
 		Context:  memory.Context{Tool: "edit", Intent: "test"},
@@ -146,6 +158,7 @@ func TestDetectUserCorrection_SkipsEmptyMessages(t *testing.T) {
 }
 
 func TestDetectUserCorrection_TriggerFormat(t *testing.T) {
+	t.Parallel()
 	result := DetectUserCorrection(CorrectionSignal{
 		Messages: []string{"do something", "No, wrong approach"},
 		Context:  memory.Context{Tool: "edit", Intent: "refactoring"},
@@ -162,6 +175,7 @@ func TestDetectUserCorrection_TriggerFormat(t *testing.T) {
 // --- DetectSelfCorrection ---
 
 func TestDetectSelfCorrection_NilForEmptyHistory(t *testing.T) {
+	t.Parallel()
 	result := DetectSelfCorrection(EditHistory{Edits: []EditEntry{}})
 	if result != nil {
 		t.Fatal("expected nil for empty history")
@@ -169,6 +183,7 @@ func TestDetectSelfCorrection_NilForEmptyHistory(t *testing.T) {
 }
 
 func TestDetectSelfCorrection_NilForSingleEdit(t *testing.T) {
+	t.Parallel()
 	result := DetectSelfCorrection(EditHistory{
 		Edits: []EditEntry{
 			{File: "src/app.ts", Success: true, Timestamp: time.Now().UnixMilli()},
@@ -180,6 +195,7 @@ func TestDetectSelfCorrection_NilForSingleEdit(t *testing.T) {
 }
 
 func TestDetectSelfCorrection_NilForTwoEdits(t *testing.T) {
+	t.Parallel()
 	result := DetectSelfCorrection(EditHistory{
 		Edits: []EditEntry{
 			{File: "src/app.ts", Success: true, Timestamp: time.Now().UnixMilli() - 2000},
@@ -192,6 +208,7 @@ func TestDetectSelfCorrection_NilForTwoEdits(t *testing.T) {
 }
 
 func TestDetectSelfCorrection_DetectsSuccessFailSuccessPattern(t *testing.T) {
+	t.Parallel()
 	result := DetectSelfCorrection(EditHistory{
 		Edits: []EditEntry{
 			{File: "src/app.ts", Success: true, Timestamp: time.Now().UnixMilli() - 3000},
@@ -208,6 +225,7 @@ func TestDetectSelfCorrection_DetectsSuccessFailSuccessPattern(t *testing.T) {
 }
 
 func TestDetectSelfCorrection_NilForAllSuccessful(t *testing.T) {
+	t.Parallel()
 	result := DetectSelfCorrection(EditHistory{
 		Edits: []EditEntry{
 			{File: "src/app.ts", Success: true, Timestamp: time.Now().UnixMilli() - 2000},
@@ -221,6 +239,7 @@ func TestDetectSelfCorrection_NilForAllSuccessful(t *testing.T) {
 }
 
 func TestDetectSelfCorrection_NilForDifferentFiles(t *testing.T) {
+	t.Parallel()
 	result := DetectSelfCorrection(EditHistory{
 		Edits: []EditEntry{
 			{File: "src/app.ts", Success: true, Timestamp: time.Now().UnixMilli() - 3000},
@@ -234,6 +253,7 @@ func TestDetectSelfCorrection_NilForDifferentFiles(t *testing.T) {
 }
 
 func TestDetectSelfCorrection_TriggerFormat(t *testing.T) {
+	t.Parallel()
 	result := DetectSelfCorrection(EditHistory{
 		Edits: []EditEntry{
 			{File: "src/utils/helper.ts", Success: true, Timestamp: time.Now().UnixMilli() - 3000},
@@ -253,6 +273,7 @@ func TestDetectSelfCorrection_TriggerFormat(t *testing.T) {
 // --- DetectTestFailure ---
 
 func TestDetectTestFailure_NilForPassingTests(t *testing.T) {
+	t.Parallel()
 	result := DetectTestFailure(TestResult{
 		Passed:   true,
 		Output:   "All tests passed",
@@ -264,6 +285,7 @@ func TestDetectTestFailure_NilForPassingTests(t *testing.T) {
 }
 
 func TestDetectTestFailure_DetectsFailingTest(t *testing.T) {
+	t.Parallel()
 	result := DetectTestFailure(TestResult{
 		Passed:   false,
 		Output:   "FAIL src/app.test.ts\n  Expected 1 but got 2",
@@ -275,6 +297,7 @@ func TestDetectTestFailure_DetectsFailingTest(t *testing.T) {
 }
 
 func TestDetectTestFailure_IncludesTestFile(t *testing.T) {
+	t.Parallel()
 	result := DetectTestFailure(TestResult{
 		Passed:   false,
 		Output:   "TypeError: undefined is not a function",
@@ -289,6 +312,7 @@ func TestDetectTestFailure_IncludesTestFile(t *testing.T) {
 }
 
 func TestDetectTestFailure_IncludesErrorOutput(t *testing.T) {
+	t.Parallel()
 	result := DetectTestFailure(TestResult{
 		Passed:   false,
 		Output:   "AssertionError: expected true to be false",
@@ -303,6 +327,7 @@ func TestDetectTestFailure_IncludesErrorOutput(t *testing.T) {
 }
 
 func TestDetectTestFailure_ExtractsFirstErrorLine(t *testing.T) {
+	t.Parallel()
 	result := DetectTestFailure(TestResult{
 		Passed:   false,
 		Output:   "FAIL src/app.test.ts\nExpected 1 but got 2\nStack trace here",
@@ -318,6 +343,7 @@ func TestDetectTestFailure_ExtractsFirstErrorLine(t *testing.T) {
 }
 
 func TestDetectTestFailure_FallsBackToFirstLine(t *testing.T) {
+	t.Parallel()
 	result := DetectTestFailure(TestResult{
 		Passed:   false,
 		Output:   "Some unexpected output\nAnother line",
@@ -332,6 +358,7 @@ func TestDetectTestFailure_FallsBackToFirstLine(t *testing.T) {
 }
 
 func TestDetectTestFailure_HandlesEmptyOutput(t *testing.T) {
+	t.Parallel()
 	result := DetectTestFailure(TestResult{
 		Passed:   false,
 		Output:   "",
@@ -347,6 +374,7 @@ func TestDetectTestFailure_HandlesEmptyOutput(t *testing.T) {
 }
 
 func TestDetectTestFailure_HandlesWhitespaceOnlyOutput(t *testing.T) {
+	t.Parallel()
 	result := DetectTestFailure(TestResult{
 		Passed:   false,
 		Output:   "   \n   \n   ",
@@ -362,6 +390,7 @@ func TestDetectTestFailure_HandlesWhitespaceOnlyOutput(t *testing.T) {
 }
 
 func TestDetectTestFailure_TruncatesLongErrorLine(t *testing.T) {
+	t.Parallel()
 	longLine := "Error: " + strings.Repeat("x", 200)
 	result := DetectTestFailure(TestResult{
 		Passed:   false,
@@ -382,6 +411,7 @@ func TestDetectTestFailure_TruncatesLongErrorLine(t *testing.T) {
 // --- InferItemType ---
 
 func TestInferItemType_PatternUseInsteadOf(t *testing.T) {
+	t.Parallel()
 	got := InferItemType("Use Polars instead of pandas for large datasets")
 	if got != memory.TypePattern {
 		t.Errorf("expected %q, got %q", memory.TypePattern, got)
@@ -389,6 +419,7 @@ func TestInferItemType_PatternUseInsteadOf(t *testing.T) {
 }
 
 func TestInferItemType_PatternPreferOver(t *testing.T) {
+	t.Parallel()
 	got := InferItemType("Prefer async functions over callbacks in this codebase")
 	if got != memory.TypePattern {
 		t.Errorf("expected %q, got %q", memory.TypePattern, got)
@@ -396,6 +427,7 @@ func TestInferItemType_PatternPreferOver(t *testing.T) {
 }
 
 func TestInferItemType_PatternPreferTo(t *testing.T) {
+	t.Parallel()
 	got := InferItemType("Prefer pnpm to npm for this project")
 	if got != memory.TypePattern {
 		t.Errorf("expected %q, got %q", memory.TypePattern, got)
@@ -403,6 +435,7 @@ func TestInferItemType_PatternPreferTo(t *testing.T) {
 }
 
 func TestInferItemType_SolutionWhen(t *testing.T) {
+	t.Parallel()
 	got := InferItemType("When the database connection fails, restart the pool")
 	if got != memory.TypeSolution {
 		t.Errorf("expected %q, got %q", memory.TypeSolution, got)
@@ -410,6 +443,7 @@ func TestInferItemType_SolutionWhen(t *testing.T) {
 }
 
 func TestInferItemType_SolutionIfThen(t *testing.T) {
+	t.Parallel()
 	got := InferItemType("If tests fail with ENOENT, check that fixtures exist")
 	if got != memory.TypeSolution {
 		t.Errorf("expected %q, got %q", memory.TypeSolution, got)
@@ -417,6 +451,7 @@ func TestInferItemType_SolutionIfThen(t *testing.T) {
 }
 
 func TestInferItemType_SolutionIfComma(t *testing.T) {
+	t.Parallel()
 	got := InferItemType("If the build breaks, clear the cache first")
 	if got != memory.TypeSolution {
 		t.Errorf("expected %q, got %q", memory.TypeSolution, got)
@@ -424,6 +459,7 @@ func TestInferItemType_SolutionIfComma(t *testing.T) {
 }
 
 func TestInferItemType_SolutionToFix(t *testing.T) {
+	t.Parallel()
 	got := InferItemType("To fix the import error, add the .js extension")
 	if got != memory.TypeSolution {
 		t.Errorf("expected %q, got %q", memory.TypeSolution, got)
@@ -431,6 +467,7 @@ func TestInferItemType_SolutionToFix(t *testing.T) {
 }
 
 func TestInferItemType_PreferenceAlways(t *testing.T) {
+	t.Parallel()
 	got := InferItemType("Always run pnpm lint before committing code changes")
 	if got != memory.TypePreference {
 		t.Errorf("expected %q, got %q", memory.TypePreference, got)
@@ -438,6 +475,7 @@ func TestInferItemType_PreferenceAlways(t *testing.T) {
 }
 
 func TestInferItemType_PreferenceNever(t *testing.T) {
+	t.Parallel()
 	got := InferItemType("Never deploy without running the full test suite first")
 	if got != memory.TypePreference {
 		t.Errorf("expected %q, got %q", memory.TypePreference, got)
@@ -445,6 +483,7 @@ func TestInferItemType_PreferenceNever(t *testing.T) {
 }
 
 func TestInferItemType_LessonDefault(t *testing.T) {
+	t.Parallel()
 	got := InferItemType("The database sometimes has connection issues in development")
 	if got != memory.TypeLesson {
 		t.Errorf("expected %q, got %q", memory.TypeLesson, got)
@@ -452,6 +491,7 @@ func TestInferItemType_LessonDefault(t *testing.T) {
 }
 
 func TestInferItemType_LessonGenericStatement(t *testing.T) {
+	t.Parallel()
 	got := InferItemType("This project uses TypeScript with strict mode enabled")
 	if got != memory.TypeLesson {
 		t.Errorf("expected %q, got %q", memory.TypeLesson, got)
@@ -459,6 +499,7 @@ func TestInferItemType_LessonGenericStatement(t *testing.T) {
 }
 
 func TestInferItemType_CaseInsensitive(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input    string
 		expected memory.ItemType
@@ -476,6 +517,7 @@ func TestInferItemType_CaseInsensitive(t *testing.T) {
 }
 
 func TestInferItemType_PatternBeforeSolution(t *testing.T) {
+	t.Parallel()
 	// "use X instead of Y" matches pattern, even though "when" could match solution.
 	// Pattern has higher priority.
 	got := InferItemType("When possible, use goroutines instead of threads")
