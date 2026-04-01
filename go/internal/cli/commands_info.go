@@ -94,6 +94,7 @@ func openURL(rawURL string) {
 // path directly (used in tests); otherwise it detects the repo root.
 func infoCmd(testRepoRoot string) *cobra.Command {
 	var jsonOut bool
+	var openFlag bool
 	cmd := &cobra.Command{
 		Use:     "info",
 		Aliases: []string{"explain"},
@@ -107,10 +108,18 @@ func infoCmd(testRepoRoot string) *cobra.Command {
 				return writeJSON(cmd, buildInfoJSON(root))
 			}
 			cmd.Print(buildInfoOutput(root))
+
+			if openFlag {
+				openURL(repoURL)
+				cmd.Println("Opening in browser...")
+			} else {
+				cmd.Println("Run `ca info --open` to open in your browser.")
+			}
 			return nil
 		},
 	}
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
+	cmd.Flags().BoolVar(&openFlag, "open", false, "Open the repository page in your browser (ignored when --json is set)")
 	return cmd
 }
 

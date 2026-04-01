@@ -178,6 +178,57 @@ func TestRunHook_TelemetryOutcome(t *testing.T) {
 	}
 }
 
+func TestRunHookWithTelemetry_ParseErrorLogsErrorOutcome(t *testing.T) {
+	t.Parallel()
+	db, err := storage.OpenDB(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	// Send invalid JSON to user-prompt hook
+	var out bytes.Buffer
+	stdin := io.NopCloser(strings.NewReader("not valid json"))
+	code := RunHookWithTelemetry("user-prompt", stdin, &out, db)
+
+	// Exit code should still be 0 (graceful degradation for Claude Code)
+	if code != 0 {
+		t.Errorf("got exit code %d, want 0 (graceful degradation)", code)
+	}
+
+	// But telemetry outcome should be error, not success
+	var success int
+	if err := db.QueryRow("SELECT success FROM telemetry WHERE hook_name = 'user-prompt'").Scan(&success); err != nil {
+		t.Fatal(err)
+	}
+	if success != 0 {
+		t.Errorf("parse failure should log error outcome (success=0), got success=%d", success)
+	}
+}
+
+func TestRunHookWithTelemetry_ValidInputLogsSuccess(t *testing.T) {
+	t.Parallel()
+	db, err := storage.OpenDB(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	// Send valid JSON to user-prompt hook
+	var out bytes.Buffer
+	stdin := io.NopCloser(strings.NewReader(`{"prompt":"hello"}`))
+	RunHookWithTelemetry("user-prompt", stdin, &out, db)
+
+	// Valid input should log success outcome
+	var success int
+	if err := db.QueryRow("SELECT success FROM telemetry WHERE hook_name = 'user-prompt'").Scan(&success); err != nil {
+		t.Fatal(err)
+	}
+	if success != 1 {
+		t.Errorf("valid input should log success outcome (success=1), got success=%d", success)
+	}
+}
+
 func TestRunHook_AllHooksLogTelemetry(t *testing.T) {
 	hooks := []struct {
 		name  string

@@ -54,16 +54,25 @@ func writeHookOutput(stdout io.Writer, result interface{}) {
 // RunHook dispatches to the appropriate hook handler.
 // Returns exit code (0 = success, 1 = error).
 func RunHook(hookName string, stdin io.Reader, stdout io.Writer) int {
+	code, _ := runHookCore(hookName, stdin, stdout)
+	return code
+}
+
+// runHookCore handles dispatch and output writing.
+// Returns exit code and whether an internal error occurred (for telemetry).
+// Internal errors return exit code 0 for graceful degradation but hadError=true
+// so telemetry can accurately record the failure.
+func runHookCore(hookName string, stdin io.Reader, stdout io.Writer) (exitCode int, hadError bool) {
 	if hookName == "" {
 		fmt.Fprintln(os.Stderr, "Usage: ca hooks run <hook>")
-		return 1
+		return 1, true
 	}
 
 	// pre-commit is a git hook (not a Claude Code hook) — output plain text.
 	// Returns before the defer below; safe because fmt.Fprintln cannot panic.
 	if hookName == "pre-commit" {
 		fmt.Fprintln(stdout, preCommitMessage)
-		return 0
+		return 0, false
 	}
 
 	// All Claude Code hooks catch errors and output {} on failure.
@@ -71,25 +80,29 @@ func RunHook(hookName string, stdin io.Reader, stdout io.Writer) int {
 		if r := recover(); r != nil {
 			slog.Error("hook panic", "hook", hookName, "error", r)
 			writeHookOutput(stdout, map[string]interface{}{})
+			// Intentional: panics degrade gracefully to exit 0 (Claude Code compatibility)
+			// but hadError=true ensures telemetry records the failure accurately.
+			exitCode = 0
+			hadError = true
 		}
 	}()
 
-	result, code := dispatchHook(hookName, stdin)
+	result, code, intErr := dispatchHook(hookName, stdin)
 	if result != nil {
 		writeHookOutput(stdout, result)
 	}
-	return code
+	return code, intErr
 }
 
 // RunHookWithTelemetry runs a hook and logs a telemetry event to db.
 // Telemetry is recorded at the output boundary, after dispatch completes.
 func RunHookWithTelemetry(hookName string, stdin io.Reader, stdout io.Writer, db *sql.DB) int {
 	start := time.Now()
-	code := RunHook(hookName, stdin, stdout)
+	code, hadError := runHookCore(hookName, stdin, stdout)
 	durationMs := time.Since(start).Milliseconds()
 
 	outcome := telemetry.OutcomeSuccess
-	if code != 0 {
+	if code != 0 || hadError {
 		outcome = telemetry.OutcomeError
 	}
 
@@ -117,7 +130,9 @@ func RunHookWithTelemetry(hookName string, stdin io.Reader, stdout io.Writer, db
 }
 
 // dispatchHook routes to the correct hook handler and returns the result to serialize.
-func dispatchHook(hookName string, stdin io.Reader) (interface{}, int) {
+// The third return value indicates whether an internal error occurred (parse failure, etc.)
+// that was gracefully handled (exit code 0) but should be tracked in telemetry.
+func dispatchHook(hookName string, stdin io.Reader) (interface{}, int, bool) {
 	switch hookName {
 	case "user-prompt":
 		return dispatchUserPrompt(stdin, hookName)
@@ -135,31 +150,31 @@ func dispatchHook(hookName string, stdin io.Reader) (interface{}, int) {
 				"Unknown hook: %s. Valid hooks: user-prompt, post-tool-failure, post-tool-success, post-read (or read-tracker), phase-guard, phase-audit (or stop-audit), pre-commit (git only)",
 				hookName,
 			),
-		}, 1
+		}, 1, true
 	}
 }
 
-func dispatchUserPrompt(stdin io.Reader, hookName string) (interface{}, int) {
+func dispatchUserPrompt(stdin io.Reader, hookName string) (interface{}, int, bool) {
 	input, err := parseHookInput(stdin)
 	if err != nil {
-		return handleErrorResult(hookName, err), 0
+		return handleErrorResult(hookName, err), 0, true
 	}
 	var data struct {
 		Prompt string `json:"prompt"`
 	}
 	if err = json.Unmarshal([]byte(input.raw), &data); err != nil {
-		return handleErrorResult(hookName, err), 0
+		return handleErrorResult(hookName, err), 0, true
 	}
 	if data.Prompt == "" {
-		return map[string]interface{}{}, 0
+		return map[string]interface{}{}, 0, false
 	}
-	return ProcessUserPrompt(data.Prompt), 0
+	return ProcessUserPrompt(data.Prompt), 0, false
 }
 
-func dispatchToolFailure(stdin io.Reader, hookName string) (interface{}, int) {
+func dispatchToolFailure(stdin io.Reader, hookName string) (interface{}, int, bool) {
 	input, err := parseHookInput(stdin)
 	if err != nil {
-		return handleErrorResult(hookName, err), 0
+		return handleErrorResult(hookName, err), 0, true
 	}
 	var data struct {
 		ToolName   string                 `json:"tool_name"`
@@ -167,10 +182,10 @@ func dispatchToolFailure(stdin io.Reader, hookName string) (interface{}, int) {
 		ToolOutput string                 `json:"tool_output"`
 	}
 	if err = json.Unmarshal([]byte(input.raw), &data); err != nil {
-		return handleErrorResult(hookName, err), 0
+		return handleErrorResult(hookName, err), 0, true
 	}
 	if data.ToolName == "" {
-		return map[string]interface{}{}, 0
+		return map[string]interface{}{}, 0, false
 	}
 	if data.ToolInput == nil {
 		data.ToolInput = map[string]interface{}{}
@@ -178,7 +193,7 @@ func dispatchToolFailure(stdin io.Reader, hookName string) (interface{}, int) {
 	repoRoot := util.GetRepoRoot()
 	stateDir := filepath.Join(repoRoot, ".claude")
 	searchFn := makeLessonSearchFunc(repoRoot, hookName)
-	return ProcessToolFailureWithSearch(data.ToolName, data.ToolInput, data.ToolOutput, stateDir, searchFn), 0
+	return ProcessToolFailureWithSearch(data.ToolName, data.ToolInput, data.ToolOutput, stateDir, searchFn), 0, false
 }
 
 // makeLessonSearchFunc creates a LessonSearchFunc backed by FTS5 keyword search.
@@ -227,51 +242,54 @@ func makeLessonSearchFunc(repoRoot string, hookName string) LessonSearchFunc {
 	}
 }
 
-func dispatchToolSuccess(stdin io.Reader) (interface{}, int) {
-	_, _ = parseHookInput(stdin) // consume stdin
+func dispatchToolSuccess(stdin io.Reader) (interface{}, int, bool) {
+	_, err := parseHookInput(stdin) // consume stdin
+	if err != nil {
+		return handleErrorResult("post-tool-success", err), 0, true
+	}
 	stateDir := filepath.Join(util.GetRepoRoot(), ".claude")
 	ProcessToolSuccess(stateDir)
-	return map[string]interface{}{}, 0
+	return map[string]interface{}{}, 0, false
 }
 
-func dispatchPhaseGuard(stdin io.Reader, hookName string) (interface{}, int) {
+func dispatchPhaseGuard(stdin io.Reader, hookName string) (interface{}, int, bool) {
 	input, err := parseHookInput(stdin)
 	if err != nil {
-		return handleErrorResult(hookName, err), 0
+		return handleErrorResult(hookName, err), 0, true
 	}
 	var data struct {
 		ToolName  string                 `json:"tool_name"`
 		ToolInput map[string]interface{} `json:"tool_input"`
 	}
 	if err = json.Unmarshal([]byte(input.raw), &data); err != nil {
-		return handleErrorResult(hookName, err), 0
+		return handleErrorResult(hookName, err), 0, true
 	}
 	if data.ToolName == "" {
-		return map[string]interface{}{}, 0
+		return map[string]interface{}{}, 0, false
 	}
 	if data.ToolInput == nil {
 		data.ToolInput = map[string]interface{}{}
 	}
 	repoRoot := util.GetRepoRoot()
 	if hookName == "phase-guard" {
-		return ProcessPhaseGuard(repoRoot, data.ToolName, data.ToolInput), 0
+		return ProcessPhaseGuard(repoRoot, data.ToolName, data.ToolInput), 0, false
 	}
 	ProcessReadTracker(repoRoot, data.ToolName, data.ToolInput)
-	return map[string]interface{}{}, 0
+	return map[string]interface{}{}, 0, false
 }
 
-func dispatchStopAudit(stdin io.Reader, hookName string) (interface{}, int) {
+func dispatchStopAudit(stdin io.Reader, hookName string) (interface{}, int, bool) {
 	input, err := parseHookInput(stdin)
 	if err != nil {
-		return handleErrorResult(hookName, err), 0
+		return handleErrorResult(hookName, err), 0, true
 	}
 	var data struct {
 		StopHookActive bool `json:"stop_hook_active"`
 	}
 	if err = json.Unmarshal([]byte(input.raw), &data); err != nil {
-		return handleErrorResult(hookName, err), 0
+		return handleErrorResult(hookName, err), 0, true
 	}
-	return ProcessStopAudit(util.GetRepoRoot(), data.StopHookActive), 0
+	return ProcessStopAudit(util.GetRepoRoot(), data.StopHookActive), 0, false
 }
 
 // handleErrorResult logs the error at debug level and returns an empty JSON object.

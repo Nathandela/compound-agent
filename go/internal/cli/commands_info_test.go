@@ -434,6 +434,32 @@ func TestExplainAlias(t *testing.T) {
 	}
 }
 
+func TestInfoCmd_OpenFlagRegistered(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	cmd := infoCmd(dir)
+	// Verify --open flag is registered without invoking the command
+	// (invoking with --open would actually open a browser on macOS).
+	f := cmd.Flags().Lookup("open")
+	if f == nil {
+		t.Fatal("expected --open flag to be registered on info command")
+	}
+	if f.DefValue != "false" {
+		t.Errorf("--open default should be false, got %q", f.DefValue)
+	}
+}
+
+func TestInfoCmd_OpenHintWithoutFlag(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	output := runInfoCmd(t, dir)
+	if !strings.Contains(output, "ca info --open") {
+		t.Errorf("expected hint about --open flag, got: %s", output)
+	}
+}
+
 // addAllHooksForInfoTest creates a hook config that HasAllHooks recognizes.
 func addAllHooksForInfoTest(settings map[string]any) {
 	hooks := map[string]any{}
