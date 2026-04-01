@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -97,26 +98,15 @@ func createV6DB(t *testing.T, path string) {
 }
 
 func fmtLessonID(i int) string {
-	return "L" + padInt(i, 4)
+	return fmt.Sprintf("L%04d", i)
 }
 
 func fmtTrigger(i int) string {
-	return "test trigger " + padInt(i, 4)
+	return fmt.Sprintf("test trigger %04d", i)
 }
 
 func fmtInsight(i int) string {
-	return "test insight " + padInt(i, 4)
-}
-
-func padInt(n, width int) string {
-	s := ""
-	for v := n; v > 0; v /= 10 {
-		s = string(rune('0'+v%10)) + s
-	}
-	for len(s) < width {
-		s = "0" + s
-	}
-	return s
+	return fmt.Sprintf("test insight %04d", i)
 }
 
 // TestMigration_V6toV7_DetectsVersionMismatch verifies that a v6 DB triggers rebuild.

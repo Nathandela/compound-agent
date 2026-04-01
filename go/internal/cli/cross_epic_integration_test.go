@@ -17,7 +17,9 @@ import (
 // --- E6-T2: Skill index generation validates 12 skills ---
 
 // TestSkillIndex_Exactly12Skills verifies that CompileSkillsIndex produces
-// exactly 12 skills, matching the full embedded template set.
+// exactly 12 skills, matching the full embedded template set:
+//   agentic, architect, build-great-things, compound, cook-it, plan,
+//   qa-engineer, researcher, review, spec-dev, test-cleaner, work
 func TestSkillIndex_Exactly12Skills(t *testing.T) {
 	dir := t.TempDir()
 	skillsDir := filepath.Join(dir, ".claude", "skills", "compound")
@@ -235,7 +237,7 @@ func TestInfoCmd_CrossEpic_AllDataSources(t *testing.T) {
 	}{
 		{"Version", "compound-agent"},
 		{"Hooks", "installed"},
-		{"Skills", "12 skill(s)"},
+		{"Skills", "12 skill(s)"}, // see TestSkillIndex_Exactly12Skills for enumeration
 		{"Phase", "review"},
 		{"Phase", "cross-epic-test"},
 		{"Telemetry", "user-prompt"},
