@@ -39,8 +39,9 @@ Use this decision tree to find the right reference file:
 ```bash
 ca loop --force
 LOOP_DRY_RUN=1 ./infinity-loop.sh
-LOOP_SESSION="compound-loop-$(basename $(pwd))"
+LOOP_SESSION="compound-loop-$(basename "$PWD")"
 screen -dmS "$LOOP_SESSION" ./infinity-loop.sh
+mkdir -p .beads && echo "$LOOP_SESSION" > .beads/loop-session-name
 ```
 
 ### Full review fleet

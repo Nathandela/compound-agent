@@ -44,9 +44,9 @@ It DOES print the epic ordering, dependency checks, and reviewer detection so yo
 
 **Preferred -- screen** (use a unique session name to avoid collisions):
 ```bash
-LOOP_SESSION="compound-loop-$(basename $(pwd))"
+LOOP_SESSION="compound-loop-$(basename "$PWD")"
 screen -dmS "$LOOP_SESSION" ./infinity-loop.sh
-echo "$LOOP_SESSION" > .beads/loop-session-name
+mkdir -p .beads && echo "$LOOP_SESSION" > .beads/loop-session-name
 screen -ls | grep "$LOOP_SESSION"   # Verify launch
 ```
 
@@ -66,8 +66,8 @@ echo $!   # Save PID for later
 | `cat agent_logs/.loop-status.json` | Current loop state |
 | `wc -l agent_logs/loop-execution.jsonl` | Count completed epics |
 | `grep '"result":"failed"' agent_logs/loop-execution.jsonl` | Find failures |
-| `screen -r $(cat .beads/loop-session-name)` | Attach to running loop (Ctrl-A D to detach) |
-| `screen -S $(cat .beads/loop-session-name) -X quit` | Kill the loop |
+| `screen -r "$(cat .beads/loop-session-name)"` | Attach to running loop (Ctrl-A D to detach) |
+| `screen -S "$(cat .beads/loop-session-name)" -X quit` | Kill the loop |
 
 ## 30-Minute Probe Protocol
 
