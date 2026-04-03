@@ -117,6 +117,8 @@ Full pre-flight checklist with monitoring protocol: `architect/references/infini
 
 ## Monitoring
 
+### Quick Reference
+
 | Command | What it shows |
 |---------|---------------|
 | `screen -r "$(cat .beads/loop-session-name)"` | Attach to live session (Ctrl-A D to detach) |
@@ -125,6 +127,71 @@ Full pre-flight checklist with monitoring protocol: `architect/references/infini
 | `cat agent_logs/loop-execution.jsonl` | Completed epics with durations |
 | `ls agent_logs/polish-cycle-*/` | Polish cycle reports and audit findings |
 | `screen -S "$(cat .beads/loop-session-name)" -X quit` | Kill the loop |
+
+### Post-Launch Verification
+
+After launching a loop in screen, verify it started by running a background Bash command (`run_in_background: true`):
+
+```bash
+sleep 60 && echo "--- Loop health check ---" && cat agent_logs/.loop-status.json 2>/dev/null || echo "No status file yet" && screen -ls 2>/dev/null | grep compound-loop || echo "No screen session found"
+```
+
+When the result comes back: if `.loop-status.json` shows `"status":"running"` and screen lists the session, report success to the user. If not, check for crash details or missing screen session and report the issue.
+
+### Health Check Protocol
+
+When the user asks about loop progress, follow this protocol to build a structured overview.
+
+**Step 1 — Gather data** (use parallel subagents for speed):
+- Read `agent_logs/.loop-status.json` — current epic, attempt number, status
+- Read `agent_logs/loop-execution.jsonl` — all completed epics with result, duration
+- Run `bd show <epic-id>` for each epic to get titles and statuses
+- Run `git log --oneline -5` to see recent commit activity
+- For polish loops: also read `agent_logs/.polish-status.json` and list `agent_logs/polish-cycle-*/`
+
+**Step 2 — Detect stalls**:
+- If `.loop-status.json` shows `"status":"running"`, check when it was last modified:
+  - macOS: `stat -f '%m' agent_logs/.loop-status.json`
+  - Linux: `stat -c '%Y' agent_logs/.loop-status.json`
+- If last modified > 5 minutes ago: read the last 20 lines of the active trace (`tail -20 "$(readlink agent_logs/.latest)"`), wait 15 seconds, read again. If output is identical, flag as potentially stalled.
+- If status is `"crashed"`: report crash details (exit code, line number, timestamp) immediately.
+- Verify screen session is alive: `screen -ls | grep compound-loop`
+
+**Step 3 — Build the overview**:
+
+Present a structured report like this:
+
+```
+[one-line summary: "X of Y epics done, currently working on Z"]
+
+| # | Epic | Status | Duration |
+|---|------|--------|----------|
+| 1 | Epic title from beads | Closed | ~8 min |
+| 2 | Another epic | Running | started HH:MM UTC |
+| 3 | Upcoming epic | Open | -- |
+
+[total runtime, average per completed epic, ETA for remaining epics]
+[any anomalies: failures, retries, human_required, stalls]
+```
+
+- **Closed epics**: duration from `loop-execution.jsonl` (convert seconds to human-readable)
+- **Running epic**: "started HH:MM UTC" from `.loop-status.json` timestamp
+- **Open epics**: "--"
+- **Pace**: total elapsed, average per epic, rough ETA for remaining
+- **Anomalies**: flag failures, retries (attempt > 1), human_required markers, or stalled sessions
+
+### Log File Map
+
+| Path | Content | When to read |
+|------|---------|-------------|
+| `agent_logs/.loop-status.json` | Current epic, attempt, status | Always -- primary status |
+| `agent_logs/loop-execution.jsonl` | Completed epics with result, duration | Always -- progress history |
+| `agent_logs/.latest` | Symlink to active trace file | Stall detection |
+| `agent_logs/trace_<id>-<ts>.jsonl` | Raw stream-json per session | Deep debugging only |
+| `agent_logs/loop_<id>-<ts>.log` | Extracted assistant text per session | Investigating a specific epic |
+| `agent_logs/memory_<id>-<ts>.log` | Memory watchdog readings | Suspecting OOM |
+| `agent_logs/.polish-status.json` | Polish loop cycle/status | During polish loops |
+| `agent_logs/polish-cycle-<N>/` | Per-cycle audit findings and reports | Polish loop review |
 
 ## Gotchas
 

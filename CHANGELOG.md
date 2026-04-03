@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Loop monitoring protocol**: Loop-launcher skill now includes a structured health check protocol (post-launch verification, stall detection, progress table with ETA), plus a log file map for all `agent_logs/` artifacts.
+
 ## [2.6.1] - 2026-04-03
 
 ### Added
