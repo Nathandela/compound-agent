@@ -28,8 +28,21 @@ var Phases = []string{"spec-dev", "plan", "work", "review", "compound"}
 var Gates = []string{"post-plan", "gate-3", "gate-4", "final"}
 
 // phaseIndex maps phase name to 1-based index.
+// Includes both cook-it phases (1-5) and standalone phases like architect (6).
 var phaseIndexMap = map[string]int{
 	"spec-dev": 1, "plan": 2, "work": 3, "review": 4, "compound": 5,
+	"architect": 6,
+}
+
+// maxPhaseIndex returns the highest phase index in the map.
+func maxPhaseIndex() int {
+	max := 0
+	for _, idx := range phaseIndexMap {
+		if idx > max {
+			max = idx
+		}
+	}
+	return max
 }
 
 // PhaseStatePath returns the filesystem path for the phase state file.
@@ -85,7 +98,7 @@ func migratePhaseState(raw map[string]interface{}) {
 // validatePhaseState checks required fields, initializes nil slices, and enforces TTL.
 // Returns false if the state is invalid or stale, cleaning up stale files as a side effect.
 func validatePhaseState(state *PhaseState, repoRoot string) bool {
-	if state.PhaseIndex < 1 || state.PhaseIndex > 5 {
+	if state.PhaseIndex < 1 || state.PhaseIndex > maxPhaseIndex() {
 		return false
 	}
 	if state.StartedAt == "" {

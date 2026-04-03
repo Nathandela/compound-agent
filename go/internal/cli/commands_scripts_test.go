@@ -109,6 +109,26 @@ func TestLoopCommand_WithEpics(t *testing.T) {
 	}
 }
 
+func TestLoopCommand_CleansStalePhaseState(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath, "--force")
+	if err != nil {
+		t.Fatalf("loop failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+	if !strings.Contains(script, "ca phase-check clean") {
+		t.Error("generated script must clean stale phase state before each epic")
+	}
+}
+
 func TestWatchCommand_NoTraceFile(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}

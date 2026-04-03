@@ -29,8 +29,8 @@ func ProcessPhaseGuard(repoRoot, toolName string, toolInput map[string]interface
 		SpecificOutput: &SpecificOutput{
 			HookEventName: "PreToolUse",
 			AdditionalContext: fmt.Sprintf(
-				"PHASE GUARD WARNING: You are in cook-it phase %d/5 (%s) but have NOT read the skill file yet. Read %s before continuing.",
-				state.PhaseIndex, state.CurrentPhase, expectedSkillPath,
+				"PHASE GUARD WARNING: You are in phase %s (index %d) but have NOT read the skill file yet. Read %s before continuing.",
+				state.CurrentPhase, state.PhaseIndex, expectedSkillPath,
 			),
 		},
 	}

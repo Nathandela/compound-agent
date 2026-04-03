@@ -300,6 +300,78 @@ func TestPhaseCheckStartResetsGatesAndSkills(t *testing.T) {
 	}
 }
 
+func TestPhaseCheckInitArchitect(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+
+	cmd := phaseCheckCmd()
+	out := new(strings.Builder)
+	cmd.SetOut(out)
+	cmd.SetArgs([]string{"init", "meta-epic-1", "--phase", "architect", "--repo-root", dir})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("execute: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ".claude", ".ca-phase-state.json"))
+	if err != nil {
+		t.Fatalf("read state: %v", err)
+	}
+
+	var state map[string]interface{}
+	json.Unmarshal(data, &state)
+
+	if state["current_phase"] != "architect" {
+		t.Errorf("current_phase = %v, want architect", state["current_phase"])
+	}
+	if state["phase_index"] != float64(6) {
+		t.Errorf("phase_index = %v, want 6", state["phase_index"])
+	}
+	if state["epic_id"] != "meta-epic-1" {
+		t.Errorf("epic_id = %v, want meta-epic-1", state["epic_id"])
+	}
+}
+
+func TestPhaseCheckInitInvalidPhase(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+
+	cmd := phaseCheckCmd()
+	cmd.SetOut(new(strings.Builder))
+	cmd.SetErr(new(strings.Builder))
+	cmd.SetArgs([]string{"init", "epic-x", "--phase", "bogus", "--repo-root", dir})
+	err := cmd.Execute()
+	if err == nil {
+		t.Error("expected error for invalid --phase value")
+	}
+}
+
+func TestPhaseCheckStartArchitect(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+
+	// Init as architect first
+	initCmd := phaseCheckCmd()
+	initCmd.SetOut(new(strings.Builder))
+	initCmd.SetArgs([]string{"init", "meta-epic-2", "--phase", "architect", "--repo-root", dir})
+	initCmd.Execute()
+
+	// Start architect phase (should succeed)
+	cmd := phaseCheckCmd()
+	out := new(strings.Builder)
+	cmd.SetOut(out)
+	cmd.SetArgs([]string{"start", "architect", "--repo-root", dir})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("start architect: %v", err)
+	}
+
+	if !strings.Contains(out.String(), "architect") {
+		t.Errorf("expected architect in output, got: %s", out.String())
+	}
+}
+
 func TestRulesCmd(t *testing.T) {
 	t.Parallel()
 	cmd := rulesCmd()

@@ -44,20 +44,26 @@ func phaseCheckCmd() *cobra.Command {
 // phaseInitSubCmd creates the "init <epic-id>" subcommand.
 func phaseInitSubCmd(getRoot func() string) *cobra.Command {
 	var forceInit bool
+	var phase string
 	cmd := &cobra.Command{
 		Use:   "init <epic-id>",
 		Short: "Initialize phase state for an epic",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return handlePhaseInit(cmd, getRoot(), args[0], forceInit)
+			return handlePhaseInit(cmd, getRoot(), args[0], forceInit, phase)
 		},
 	}
 	cmd.Flags().BoolVarP(&forceInit, "force", "f", false, "Overwrite existing phase state")
+	cmd.Flags().StringVar(&phase, "phase", "spec-dev", "Starting phase (spec-dev or architect)")
 	return cmd
 }
 
 // handlePhaseInit initializes phase state for an epic.
-func handlePhaseInit(cmd *cobra.Command, root, epicID string, force bool) error {
+func handlePhaseInit(cmd *cobra.Command, root, epicID string, force bool, phase string) error {
+	if !hook.IsValidSkillPhase(phase) {
+		return fmt.Errorf("invalid phase %q. Valid: %v", phase, hook.ValidSkillPhases)
+	}
+
 	if err := os.MkdirAll(filepath.Join(root, ".claude"), 0755); err != nil {
 		return fmt.Errorf("create .claude dir: %w", err)
 	}
@@ -68,11 +74,12 @@ func handlePhaseInit(cmd *cobra.Command, root, epicID string, force bool) error 
 		}
 	}
 
+	idx := hook.PhaseIndexOf(phase)
 	state := &hook.PhaseState{
 		CookitActive: true,
 		EpicID:       epicID,
-		CurrentPhase: "spec-dev",
-		PhaseIndex:   1,
+		CurrentPhase: phase,
+		PhaseIndex:   idx,
 		SkillsRead:   []string{},
 		GatesPassed:  []string{},
 		StartedAt:    time.Now().UTC().Format(time.RFC3339),
@@ -80,7 +87,7 @@ func handlePhaseInit(cmd *cobra.Command, root, epicID string, force bool) error 
 	if err := hook.WritePhaseState(root, state); err != nil {
 		return fmt.Errorf("write state: %w", err)
 	}
-	cmd.Printf("Phase state initialized for %s. Current phase: spec-dev (1/5).\n", epicID)
+	cmd.Printf("Phase state initialized for %s. Current phase: %s (%d).\n", epicID, phase, idx)
 	return nil
 }
 
@@ -98,8 +105,8 @@ func phaseStartSubCmd(getRoot func() string) *cobra.Command {
 
 // handlePhaseStart starts or resumes a phase.
 func handlePhaseStart(cmd *cobra.Command, root, phase string) error {
-	if !hook.IsValidPhase(phase) {
-		return fmt.Errorf("invalid phase: %q. Valid phases: %v", phase, hook.Phases)
+	if !hook.IsValidSkillPhase(phase) {
+		return fmt.Errorf("invalid phase: %q. Valid phases: %v", phase, hook.ValidSkillPhases)
 	}
 	state := hook.GetPhaseState(root)
 	if state == nil {
@@ -112,7 +119,7 @@ func handlePhaseStart(cmd *cobra.Command, root, phase string) error {
 	if err := hook.WritePhaseState(root, state); err != nil {
 		return fmt.Errorf("write state: %w", err)
 	}
-	cmd.Printf("Phase updated: %s (%d/5).\n", state.CurrentPhase, state.PhaseIndex)
+	cmd.Printf("Phase updated: %s (%d).\n", state.CurrentPhase, state.PhaseIndex)
 	return nil
 }
 
@@ -199,7 +206,7 @@ func handlePhaseStatus(cmd *cobra.Command, root string, jsonOut bool) error {
 
 	cmd.Println("Active cook-it Session")
 	cmd.Printf("  Epic: %s\n", state.EpicID)
-	cmd.Printf("  Phase: %s (%d/5)\n", state.CurrentPhase, state.PhaseIndex)
+	cmd.Printf("  Phase: %s (%d)\n", state.CurrentPhase, state.PhaseIndex)
 	skills := "(none)"
 	if len(state.SkillsRead) > 0 {
 		skills = fmt.Sprintf("%v", state.SkillsRead)

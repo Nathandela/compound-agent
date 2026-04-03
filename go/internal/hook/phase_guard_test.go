@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -82,6 +83,47 @@ func TestProcessPhaseGuard_NoStateFile(t *testing.T) {
 	result := ProcessPhaseGuard(dir, "Edit", map[string]interface{}{})
 	if result.SpecificOutput != nil {
 		t.Error("should return empty when no state file")
+	}
+}
+
+func TestProcessPhaseGuard_ArchitectPhaseSkillNotRead(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writePhaseState(t, dir, PhaseState{
+		CookitActive: true,
+		EpicID:       "meta-epic",
+		CurrentPhase: "architect",
+		PhaseIndex:   6,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	})
+
+	result := ProcessPhaseGuard(dir, "Edit", map[string]interface{}{})
+	if result.SpecificOutput == nil {
+		t.Fatal("expected warning when architect skill not read")
+	}
+	if !strings.Contains(result.SpecificOutput.AdditionalContext, "architect") {
+		t.Error("warning should mention architect phase")
+	}
+}
+
+func TestProcessPhaseGuard_ArchitectPhaseSkillRead(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writePhaseState(t, dir, PhaseState{
+		CookitActive: true,
+		EpicID:       "meta-epic",
+		CurrentPhase: "architect",
+		PhaseIndex:   6,
+		SkillsRead:   []string{".claude/skills/compound/architect/SKILL.md"},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	})
+
+	result := ProcessPhaseGuard(dir, "Write", map[string]interface{}{})
+	if result.SpecificOutput != nil {
+		t.Error("should allow write when architect skill has been read")
 	}
 }
 

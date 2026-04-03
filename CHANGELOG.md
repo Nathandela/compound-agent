@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-04-03
+
+### Added
+
+- **Architect phase state support**: Phase system now recognizes `architect` as phase index 6. `ca phase-check init <id> --phase architect` initializes architect-specific state, enabling phase guard and read tracker during architect sessions.
+- **Loop script stale state cleanup**: Generated infinity loop scripts now run `ca phase-check clean` before each epic, preventing leftover architect or previous-epic state from blocking cook-it initialization.
+
+### Fixed
+
+- **Architect Phase 5 skipping loop-launcher skill**: Replaced inline "Quick summary" in architect SKILL.md Phase 5 with mandatory delegation to `/compound:launch-loop` command, which enforces reading loop-launcher/SKILL.md before generating scripts.
+- **Stale TypeScript binary detection**: Loop-launcher pre-flight now verifies `ca loop --help` shows Cobra output and `ca polish --help` succeeds, catching stale TypeScript CLI binaries before they cause model validation or missing command errors.
+- **Phase status display**: `ca phase-check status` no longer hardcodes `/5` denominator, correctly displaying architect phase index.
+- **Phase guard message**: Warning no longer hardcodes `phase N/5` format, now shows phase name and index.
+
 ## [2.6.0] - 2026-04-01
 
 ### Added

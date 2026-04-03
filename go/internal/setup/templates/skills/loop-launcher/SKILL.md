@@ -103,13 +103,15 @@ Use readable names: `compound-loop-projectname`, `polish-loop-projectname-cycle2
 ## Pre-Flight
 
 Before launching:
-1. Verify all epics are status=open: `bd show <id>` for each
-2. Verify `claude` CLI is available and authenticated
-3. Verify `bd` CLI is available
-4. Sync beads: `bd dolt push`
-5. Dry-run infinity loop: `LOOP_DRY_RUN=1 bash infinity-loop.sh`
-6. Dry-run polish loop: `POLISH_DRY_RUN=1 bash polish-loop.sh`
-7. Verify screen is available: `command -v screen`
+1. **Verify `ca` is the Go binary** (not the old TypeScript CLI): run `ca loop --help` and confirm it shows Cobra-style output (`Usage: ca loop [flags]`). If you see `Usage: ca [options] [command]` (Commander.js format), the binary is stale — reinstall with `npm install compound-agent@latest` or use the local Go build at `go/dist/ca`.
+2. Verify `ca polish --help` succeeds (command exists). If it fails, same stale binary issue.
+3. Verify all epics are status=open: `bd show <id>` for each
+4. Verify `claude` CLI is available and authenticated
+5. Verify `bd` CLI is available
+6. Sync beads: `bd dolt push`
+7. Dry-run infinity loop: `LOOP_DRY_RUN=1 bash infinity-loop.sh`
+8. Dry-run polish loop: `POLISH_DRY_RUN=1 bash polish-loop.sh`
+9. Verify screen is available: `command -v screen`
 
 Full pre-flight checklist with monitoring protocol: `architect/references/infinity-loop/pre-flight.md`.
 

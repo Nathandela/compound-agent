@@ -973,6 +973,9 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
 
     log "Attempt $ATTEMPT/$((MAX_RETRIES + 1)) for $EPIC_ID (log: $LOGFILE)"
 
+    # Clean stale phase state from previous epic or architect session
+    ca phase-check clean 2>/dev/null || true
+
     if [ -n "${LOOP_DRY_RUN:-}" ]; then
       log "[DRY RUN] Would run claude session for $EPIC_ID"
       SUCCESS=true

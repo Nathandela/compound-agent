@@ -306,6 +306,52 @@ func TestCleanPhaseStateIfFinal(t *testing.T) {
 	})
 }
 
+func TestPhaseIndex_Architect(t *testing.T) {
+	t.Parallel()
+	got := PhaseIndexOf("architect")
+	if got != 6 {
+		t.Errorf("PhaseIndexOf(architect) = %d, want 6", got)
+	}
+}
+
+func TestGetPhaseState_ArchitectPhase(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	stateDir := filepath.Join(dir, ".claude")
+	os.MkdirAll(stateDir, 0o755)
+
+	state := PhaseState{
+		CookitActive: true,
+		EpicID:       "meta-epic-123",
+		CurrentPhase: "architect",
+		PhaseIndex:   6,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	}
+	data, _ := json.Marshal(state)
+	os.WriteFile(filepath.Join(stateDir, ".ca-phase-state.json"), data, 0o644)
+
+	got := GetPhaseState(dir)
+	if got == nil {
+		t.Fatal("expected non-nil state for architect phase (index 6)")
+	}
+	if got.CurrentPhase != "architect" {
+		t.Errorf("got phase %q, want architect", got.CurrentPhase)
+	}
+	if got.PhaseIndex != 6 {
+		t.Errorf("got phase_index %d, want 6", got.PhaseIndex)
+	}
+}
+
+func TestMaxPhaseIndex(t *testing.T) {
+	t.Parallel()
+	max := maxPhaseIndex()
+	if max < 6 {
+		t.Errorf("maxPhaseIndex() = %d, want >= 6 (must include architect)", max)
+	}
+}
+
 func TestExpectedGateForPhase(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
@@ -317,6 +363,7 @@ func TestExpectedGateForPhase(t *testing.T) {
 		{3, "gate-3"},
 		{4, "gate-4"},
 		{5, "final"},
+		{6, ""},
 	}
 	for _, tt := range tests {
 		got := ExpectedGateForPhase(tt.index)

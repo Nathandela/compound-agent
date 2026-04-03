@@ -138,25 +138,11 @@ This phase is OPT-IN. After Phase 4:
 
 **Gate 4** (launch consent received):
 
-**Read \`loop-launcher/SKILL.md\` now.** It contains the complete reference for script generation, launch procedures, monitoring, pipeline chaining, CLI flag syntax, and critical gotchas. Follow it step by step.
-
-Quick summary of the workflow (details in the skill):
-1. Pre-flight: verify all epics are status=open
-2. Gather parameters via \`AskUserQuestion\` (model, reviewers, review cadence, compact-pct, dry-run)
-3. Generate scripts: \`ca loop\` for infinity loop, \`ca polish\` for polish loop
-4. Dry-run: \`LOOP_DRY_RUN=1 bash infinity-loop.sh\`
-5. Launch in screen: \`screen -dmS compound-loop-$(basename $(pwd)) bash infinity-loop.sh\`
-6. Report monitoring commands to user
+**Invoke \`/compound:launch-loop\` now.** Do NOT attempt to run \`ca loop\` or \`ca polish\` directly. The launch-loop command enforces mandatory skill reading, authorization gates, CLI flag syntax, and critical gotchas. It is the ONLY supported entry point for loop launching.
 
 ### Phase 6: Polish (Opt-in, post-loop)
 
-After the infinity loop completes, ask the user if they want polish cycles. If yes, follow the polish section in \`loop-launcher/SKILL.md\`.
-
-Chain both loops via a pipeline script so polish runs automatically after the infinity loop:
-\`\`\`bash
-bash infinity-loop.sh && bash polish-loop.sh
-\`\`\`
-Always launch the pipeline in a screen session.
+After the infinity loop completes, ask the user if they want polish cycles. If yes, invoke \`/compound:launch-loop\` again with polish intent. It handles both infinity and polish loop configuration.
 
 ## Memory Integration
 - \`ca search\` before starting each phase
