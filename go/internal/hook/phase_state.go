@@ -36,13 +36,13 @@ var phaseIndexMap = map[string]int{
 
 // maxPhaseIndex returns the highest phase index in the map.
 func maxPhaseIndex() int {
-	max := 0
+	highest := 0
 	for _, idx := range phaseIndexMap {
-		if idx > max {
-			max = idx
+		if idx > highest {
+			highest = idx
 		}
 	}
-	return max
+	return highest
 }
 
 // PhaseStatePath returns the filesystem path for the phase state file.

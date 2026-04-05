@@ -346,9 +346,9 @@ func TestGetPhaseState_ArchitectPhase(t *testing.T) {
 
 func TestMaxPhaseIndex(t *testing.T) {
 	t.Parallel()
-	max := maxPhaseIndex()
-	if max < 6 {
-		t.Errorf("maxPhaseIndex() = %d, want >= 6 (must include architect)", max)
+	highest := maxPhaseIndex()
+	if highest < 6 {
+		t.Errorf("maxPhaseIndex() = %d, want >= 6 (must include architect)", highest)
 	}
 }
 
