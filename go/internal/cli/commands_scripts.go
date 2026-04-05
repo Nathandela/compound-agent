@@ -675,29 +675,28 @@ print('' if v is None else v)
 `
 }
 
-// loopScriptEpicSelector returns the check_deps_closed and get_next_epic bash functions.
+// loopScriptEpicSelector returns the check_deps_closed, get_blocking_dep, and get_next_epic bash functions.
 func loopScriptEpicSelector() string { //nolint:funlen // bash template string
 	return `# --- Epic Selector ---
 
-# check_deps_closed() - Verify all depends_on for an epic are closed
-# Returns 0 if all deps closed (or no deps), 1 if any dep is open
-check_deps_closed() {
+# get_blocking_dep() - Return the first open dependency ID for an epic
+# Prints the blocking dep ID to stdout, or empty if all deps closed.
+get_blocking_dep() {
   local epic_id="$1"
   local deps_json
   deps_json=$(bd show "$epic_id" --json 2>/dev/null || echo "")
   if [ -z "$deps_json" ]; then
-    return 0
+    return
   fi
-  local blocking_dep
   if [ "$HAS_JQ" = true ]; then
-    blocking_dep=$(echo "$deps_json" | jq -r '
+    echo "$deps_json" | jq -r '
       if type == "array" then .[0] else . end |
       (.depends_on // .dependencies // []) |
       map(select(.status != "closed")) |
       .[0].id // empty
-    ' 2>/dev/null || echo "")
+    ' 2>/dev/null || true
   else
-    blocking_dep=$(echo "$deps_json" | python3 -c "
+    echo "$deps_json" | python3 -c "
 import sys, json
 data = json.load(sys.stdin)
 if isinstance(data, list):
@@ -708,8 +707,16 @@ for d in deps:
     if s != 'closed':
         print(d.get('id', d) if isinstance(d, dict) else d)
         break
-" 2>/dev/null || echo "")
+" 2>/dev/null || true
   fi
+}
+
+# check_deps_closed() - Verify all depends_on for an epic are closed
+# Returns 0 if all deps closed (or no deps), 1 if any dep is open
+check_deps_closed() {
+  local epic_id="$1"
+  local blocking_dep
+  blocking_dep=$(get_blocking_dep "$epic_id")
   if [ -n "$blocking_dep" ]; then
     log "Skip $epic_id: blocked by dependency $blocking_dep (not closed)"
     return 1
@@ -719,6 +726,7 @@ for d in deps:
 
 get_next_epic() {
   if [ -n "$EPIC_IDS" ]; then
+    # First pass: find an unblocked, open epic from the target list
     for epic_id in $EPIC_IDS; do
       case " $PROCESSED " in (*" $epic_id "*) continue ;; esac
       local status
@@ -729,6 +737,30 @@ get_next_epic() {
         return 0
       fi
     done
+
+    # Second pass: if all remaining epics are blocked, try to resolve blockers.
+    # This handles beads injected at runtime (e.g. by an external system) that
+    # are not in EPIC_IDS but block an epic that is.
+    for epic_id in $EPIC_IDS; do
+      case " $PROCESSED " in (*" $epic_id "*) continue ;; esac
+      local status
+      status=$(bd show "$epic_id" --json 2>/dev/null | parse_json '.status' 2>/dev/null || echo "")
+      if [ "$status" = "open" ]; then
+        local blocker
+        blocker=$(get_blocking_dep "$epic_id")
+        if [ -n "$blocker" ]; then
+          case " $PROCESSED " in (*" $blocker "*) continue ;; esac
+          local blocker_status
+          blocker_status=$(bd show "$blocker" --json 2>/dev/null | parse_json '.status' 2>/dev/null || echo "")
+          if [ "$blocker_status" = "open" ]; then
+            log "Resolving blocker $blocker for $epic_id"
+            echo "$blocker"
+            return 0
+          fi
+        fi
+      fi
+    done
+
     return 1
   else
     local epic_id
