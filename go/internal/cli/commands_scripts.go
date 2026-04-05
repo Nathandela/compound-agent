@@ -345,20 +345,9 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 		}
 	}
 
-	opts := loopGenerateOptions{maxRetries: o.maxRetries, model: o.model, epics: o.epics, compactPct: o.compactPct}
-
-	if o.reviewers != "" {
-		reviewerList := strings.Split(o.reviewers, ",")
-		if err := validateReviewers(reviewerList); err != nil {
-			return err
-		}
-		opts.review = &loopReviewOptions{
-			reviewers: reviewerList, maxReviewCycles: o.maxReviewCycles,
-			reviewBlocking: o.reviewBlocking, reviewModel: o.reviewModel, reviewEvery: o.reviewEvery,
-		}
-	}
-	if o.improve {
-		opts.improve = &loopImproveOptions{maxIters: o.improveMaxIters, timeBudget: o.improveTimeBudget}
+	opts, err := buildLoopOptions(o)
+	if err != nil {
+		return err
 	}
 
 	script := generateLoopScript(opts)
@@ -372,6 +361,24 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 	cmd.Printf("[ok] Generated infinity loop script: %s\n", output)
 	cmd.Println("Run it with: bash " + output)
 	return nil
+}
+
+func buildLoopOptions(o *loopCmdOptions) (loopGenerateOptions, error) {
+	opts := loopGenerateOptions{maxRetries: o.maxRetries, model: o.model, epics: o.epics, compactPct: o.compactPct}
+	if o.reviewers != "" {
+		reviewerList := strings.Split(o.reviewers, ",")
+		if err := validateReviewers(reviewerList); err != nil {
+			return opts, err
+		}
+		opts.review = &loopReviewOptions{
+			reviewers: reviewerList, maxReviewCycles: o.maxReviewCycles,
+			reviewBlocking: o.reviewBlocking, reviewModel: o.reviewModel, reviewEvery: o.reviewEvery,
+		}
+	}
+	if o.improve {
+		opts.improve = &loopImproveOptions{maxIters: o.improveMaxIters, timeBudget: o.improveTimeBudget}
+	}
+	return opts, nil
 }
 
 // loopGenerateOptions holds all options for generating the loop script.
