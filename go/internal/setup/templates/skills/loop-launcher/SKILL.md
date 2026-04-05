@@ -221,3 +221,12 @@ Stdin piping works for all three: `cat file.md | claude -p "Review this"`.
 - The polish loop is a separate script — chain via pipeline script, not `&&` in the terminal
 - Do not use `gemini --print`, `codex --print`, or `claude --print` — wrong flags
 - Do not use `claude -m sonnet` — use `claude --model claude-sonnet-4-6`
+
+## Windows Users
+
+All sections above assume Unix/macOS. Windows users should read the `references/windows/` directory:
+
+- **`windows-wsl2.md`** — Recommended path. Run loops unmodified inside WSL2 with tmux for session management. Covers both infinity and polish loops.
+- **`infinity-loop.ps1`** — Native PowerShell reference template. Static translation of the bash infinity loop for users who cannot use WSL2. Runs in foreground only (no screen/tmux equivalent). See the Known Limitations header in the file for gaps.
+
+The `references/windows/` directory is ONLY relevant for Windows users. Unix/macOS users can ignore it entirely.

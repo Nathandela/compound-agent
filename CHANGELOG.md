@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Loop monitoring protocol**: Loop-launcher skill now includes a structured health check protocol (post-launch verification, stall detection, progress table with ETA), plus a log file map for all `agent_logs/` artifacts.
+- **Windows loop support references**: WSL2+tmux setup guide (recommended path) and native PowerShell infinity-loop reference template under `loop-launcher/references/windows/`. PS1 template is a structural translation of the bash infinity loop with documented Windows gaps.
 
 ## [2.6.1] - 2026-04-03
 
