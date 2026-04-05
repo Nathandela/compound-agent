@@ -14,4 +14,4 @@ For each pair, classify as one of:
 - **Contradiction**: Conflicting advice — flag for human review
 - **Complementary**: Related but distinct — propose related links, keep both
 
-Output a structured action plan with specific `npx ca` commands to execute.
+Output a structured action plan with specific `ca` commands to execute.

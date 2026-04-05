@@ -107,7 +107,9 @@ func TestOpenDB_FileLockOnRebuild_Windows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _ = db1.Exec("PRAGMA user_version = 1")
+	if _, err := db1.Exec("PRAGMA user_version = 1"); err != nil {
+		t.Fatal(err)
+	}
 	db1.Close()
 
 	db2, err := OpenDB(dbPath)
@@ -143,7 +145,9 @@ func TestOpenDB_ConcurrentRebuild_Windows(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, _ = db1.Exec("PRAGMA user_version = 1")
+	if _, err := db1.Exec("PRAGMA user_version = 1"); err != nil {
+		t.Fatal(err)
+	}
 	db1.Close()
 
 	// Hold the lock file exclusively, simulating a concurrent process.

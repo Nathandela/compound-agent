@@ -151,7 +151,7 @@ ca loop
 ca loop --reviewers claude-sonnet --review-every 3
 
 # Target specific epics
-ca loop --epics beads-abc beads-def beads-ghi --max-retries 2
+ca loop --epics "beads-abc,beads-def,beads-ghi" --max-retries 2
 
 # Run it
 ./infinity-loop.sh
@@ -235,7 +235,7 @@ npx ca setup
 
 ### Requirements
 
-- Node.js >= 20 (for `npx` wrapper — the CLI itself is a Go binary)
+- Node.js >= 18 (for `npx` wrapper — the CLI itself is a Go binary)
 - ~278MB disk space for the embedding model (one-time download, shared across projects)
 - Embedding runs via `ca-embed` Rust daemon (nomic-embed-text-v1.5 ONNX)
 
@@ -302,7 +302,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | Command | Description |
 |---------|-------------|
 | `ca loop` | Generate infinity loop script for autonomous epic processing |
-| `ca loop --epics <ids...>` | Target specific epic IDs |
+| `ca loop --epics "id1,id2,id3"` | Target specific epic IDs (comma-separated) |
 | `ca loop -o <path>` | Custom output path (default: `./infinity-loop.sh`) |
 | `ca loop --max-retries <n>` | Max retries per epic on failure (default: 1) |
 | `ca loop --force` | Overwrite existing script |
@@ -310,7 +310,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca loop --review-every <n>` | Review every N completed epics (0 = end-only, default: 0) |
 | `ca loop --max-review-cycles <n>` | Max review/fix iterations (default: 3) |
 | `ca loop --review-blocking` | Fail loop if review not approved after max cycles |
-| `ca loop --review-model <model>` | Model for implementer fix sessions (default: claude-opus-4-6) |
+| `ca loop --review-model <model>` | Model for implementer fix sessions (default: claude-opus-4-6[1m]) |
 | `ca improve` | Generate improvement loop script from `improve/*.md` programs |
 | `ca improve --topics <names...>` | Run only specific topics |
 | `ca improve --max-iters <n>` | Max iterations per topic (default: 5) |
@@ -322,6 +322,16 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca watch --epic <id>` | Watch a specific epic trace |
 | `ca watch --improve` | Watch improvement loop traces |
 | `ca watch --no-follow` | Print existing trace and exit (no live tail) |
+| `ca polish` | Generate polish loop script for iterative refinement |
+| `ca polish --spec-file <path>` | Specify the spec file for polish review |
+| `ca polish --reviewers <names>` | Comma-separated reviewer models |
+| `ca polish --cycles <n>` | Number of polish cycles (default: 1) |
+| `ca polish --force` | Overwrite existing script |
+| `ca info` | Show project status, phase, and telemetry summary |
+| `ca info --open` | Open project dashboard in browser |
+| `ca info --json` | Output as JSON |
+| `ca health` | Check project health and dependencies |
+| `ca feedback` | Submit feedback about compound-agent |
 
 ### Knowledge
 

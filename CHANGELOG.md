@@ -13,6 +13,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Loop monitoring protocol**: Loop-launcher skill now includes a structured health check protocol (post-launch verification, stall detection, progress table with ETA), plus a log file map for all `agent_logs/` artifacts.
 - **Windows loop support references**: WSL2+tmux setup guide (recommended path) and native PowerShell infinity-loop reference template under `loop-launcher/references/windows/`. PS1 template is a structural translation of the bash infinity loop with documented Windows gaps.
+- **CLI documentation**: Added `ca info`, `ca health`, `ca polish`, `ca feedback` commands to CLI_REFERENCE.md, README, and shipped docs quick reference.
+
+### Fixed
+
+- **P0: `--epics` syntax in docs**: CLI_REFERENCE.md and epic-ordering.md incorrectly showed space-separated `--epics` syntax; fixed to comma-separated (`--epics "id1,id2,id3"`).
+- **P0: Duplicate `setupTestRepo`**: Renamed duplicate function in `integration_test.go` to `setupEmptyTestRepo` to prevent build bomb with integration tag.
+- **PruneEvents performance**: Added row count guard — telemetry pruning now skips the full-table DELETE when table has fewer rows than the threshold.
+- **Lesson search DB reuse**: `makeLessonSearchFunc` now reuses the caller's DB handle instead of opening a new connection per search call.
+- **`openURL` error handling**: Browser open command errors are now logged to stderr instead of silently discarded.
+- **`outcomeToSuccess` default**: Unknown telemetry outcomes now map to failure (0) instead of success (1).
+- **Phase state atomic writes**: `WritePhaseState` now uses temp+rename pattern to prevent JSON corruption on crash.
+- **`knowledgeNeedsRebuild` locking**: Added `busy_timeout` pragma to prevent indefinite blocking when another process holds the write lock.
+- **`HydrateChunks` performance**: Replaced O(n^2) string concatenation with `strings.Builder` for IN-clause placeholders.
+- **`formatInfoPhase` display**: Fixed "phase 6/5" display in architect mode by clamping total to actual phase index.
+- **`lockedOpenKnowledgeDB` DSN**: Now uses shared `buildDSN()` instead of hardcoded DSN string.
+- **Redundant TOCTOU check**: Removed redundant `os.Stat` before `OpenRepoDB` in info command.
+- **WSL2 guide**: Fixed credential helper backslash escaping, updated to modern Git path, added Claude Code auth step and `bd` prerequisite.
+- **PS1 template**: Fixed 6-backtick comment, `Get-Command` resolution, crash handler variable, symlink HardLink fallback, added `-Encoding utf8`, optimized JSONL extraction with `switch -File`.
+- **SKILL.md monitoring**: Fixed `readlink` basename path, replaced hardcoded session names with `.beads/loop-session-name`, added epoch delta calculation example and ETA disclaimer.
+- **Stale docs**: Removed orphaned TypeScript-era CHANGELOG entries, fixed `npx ca` references in lessons-reviewer, removed stale TS path in lint-classifier, updated GOTCHA.md Windows statement.
+- **README alignment**: Fixed `--review-model` default, Node.js version (>=18), `--epics` variadic notation.
+- **Test improvements**: Removed duplicate `TestOpenDB_SchemaVersionIs7`, added error checking to PRAGMA test calls, added `testing.Short()` guard to telemetry overhead test (threshold raised to 100ms), added `t.Parallel()` to 13 storage tests, fixed `writePhaseState` test helper error handling.
+- **`publish-platforms.cjs`**: Fixed Buffer-to-string coercion in error output handling.
 
 ## [2.6.1] - 2026-04-03
 
@@ -249,38 +272,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Weekly npm token health check**: Scheduled workflow verifies `NPM_TOKEN` validity every Monday.
 - **Platform publish script**: `scripts/publish-platforms.cjs` handles creating and publishing `@syottos/*` packages during releases. Idempotent — safe to re-run.
-
-## [Unreleased]
-
-### Changed
-
-- **Replace node-llama-cpp with Transformers.js**: Swap EmbeddingGemma-300M (node-llama-cpp, 431MB RSS) for nomic-embed-text-v1.5 (@huggingface/transformers, 23MB RSS) — 95% memory reduction (E5b).
-- **Remove all node-llama-cpp residue**: Update setup templates, doctor diagnostics, comments, and vitest config to reference Transformers.js and onnxruntime-node instead of node-llama-cpp (E5c).
-- **Gemini adapter is now opt-in**: `installGeminiAdapter()` no longer runs automatically during setup. Users enable it explicitly via `npx ca setup gemini` (sets `gemini: true` in `compound-agent.json`). Use `npx ca setup gemini --disable` / `cleanGeminiCompoundFiles()` for clean removal.
-- **Stale cleanup refactored**: Removed hardcoded deprecation lists from upgrade logic, replaced with `cleanStaleArtifacts()` pattern that declaratively defines what to remove.
-
-### Added
-
-- **Research-specialist shipped agent**: New general-purpose research subagent (`research-specialist.md`) shipped via `npx ca init`. Has full tool access (Read, Write, Edit, Bash, Glob, Grep, WebSearch, WebFetch) so it can conduct deep PhD-level research, write survey papers, run experiments, and validate claims with code. Referenced by the `get-a-phd` workflow for parallel research execution.
-- **`model-info.ts` module**: Extracted embedding model metadata (name, repo, dimensions, file) into a standalone module with zero native imports, decoupling the import graph so that CLI entry points no longer transitively load `node-llama-cpp` or `better-sqlite3` at parse time.
-- **Architect decomposition spec**: Added specification for embedding memory pressure remediation (`embedding-memory-pressure-remediation.md`).
-- **Hypothesis validation protocol**: Added to spec-dev skill — specs can now define falsifiable hypotheses with validation criteria.
-- **`cleanStaleArtifacts` and `cleanStaleGeminiArtifacts`**: New setup utilities that remove deprecated files and directories during upgrades instead of relying on hardcoded deprecation lists.
-- **LinkedIn architecture diagrams**: Integrated visual architecture diagrams into README (`docs/assets/`).
-- **Independent reviews**: Added Opus and Sonnet independent review documents for embedding memory pressure analysis.
-- **Embedding memory pressure investigation**: Added root-cause analysis, measurement data, and proposal documents in `docs/research/`.
-
-### Fixed
-
-- **Managed repo artifact upgrades**: `ca setup` now reconciles existing managed compound-agent files during upgrades instead of only creating missing files, so already-initialized repos receive updated templates and metadata.
-- **Retired managed template cleanup**: Setup upgrades now remove stale files and directories that are no longer shipped from managed `compound/` directories under `.claude/commands/`, `.claude/skills/`, `.claude/agents/`, and `docs/`.
-- **Nested phase reference cleanup**: Setup upgrades now prune retired nested files and directories inside phase skill `references/` trees, preventing removed or renamed reference docs from lingering after reruns.
-- **Embedding memory pressure remediation**: Lazy-load native modules (@huggingface/transformers (onnxruntime-node), better-sqlite3) behind dynamic `import()`, reducing CLI cold-start RSS. Singleton embedding model uses explicit `dispose()`. Added RSS measurement script and integration tests for memory lifecycle.
-- **Review phase resilience**: Fixed jq stdin pipe handling, added auth health checks, and improved error isolation in loop review templates.
-- **Quality-filter-before-storage test ordering**: Resolved flaky test ordering in compound skill tests.
-- **Merged worktree review findings**: Addressed Opus/Sonnet review findings for worktree merges (loop-review-templates, stale-cleanup tests).
-- **Knowledge index integration tests**: Fixed test configuration for embedding integration tests in vitest workspace.
-
 
 ## [1.8.0] - 2026-03-15
 

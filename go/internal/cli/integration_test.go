@@ -69,8 +69,8 @@ func runCA(t *testing.T, repoDir string, args ...string) (string, error) {
 	return string(out), err
 }
 
-// setupTestRepo creates a temp directory with .claude/lessons/ structure.
-func setupTestRepo(t *testing.T) string {
+// setupEmptyTestRepo creates a temp directory with .claude/lessons/ structure.
+func setupEmptyTestRepo(t *testing.T) string {
 	t.Helper()
 	dir := t.TempDir()
 	lessonsDir := filepath.Join(dir, ".claude", "lessons")
@@ -144,7 +144,7 @@ func TestE2E_HelpOutput(t *testing.T) {
 }
 
 func TestE2E_LearnAndSearch(t *testing.T) {
-	repo := setupTestRepo(t)
+	repo := setupEmptyTestRepo(t)
 
 	// Learn a lesson via CLI
 	out, err := runCA(t, repo, "learn", "Always validate user input before processing")
@@ -172,7 +172,7 @@ func TestE2E_LearnAndSearch(t *testing.T) {
 }
 
 func TestE2E_ListEmpty(t *testing.T) {
-	repo := setupTestRepo(t)
+	repo := setupEmptyTestRepo(t)
 
 	out, err := runCA(t, repo, "list")
 	if err != nil {
@@ -184,7 +184,7 @@ func TestE2E_ListEmpty(t *testing.T) {
 }
 
 func TestE2E_ListWithLessons(t *testing.T) {
-	repo := setupTestRepo(t)
+	repo := setupEmptyTestRepo(t)
 	writeTestLessons(t, repo, []map[string]any{
 		makeLesson("L001", "Check error returns in Go"),
 		makeLesson("L002", "Use context for cancellation"),
@@ -206,7 +206,7 @@ func TestE2E_ListWithLessons(t *testing.T) {
 }
 
 func TestE2E_LoadSession(t *testing.T) {
-	repo := setupTestRepo(t)
+	repo := setupEmptyTestRepo(t)
 	writeTestLessons(t, repo, []map[string]any{
 		makeLesson("L001", "Never use string concat for SQL queries", withSeverity("high")),
 		makeLesson("L002", "Low severity item", withSeverity("low")),
@@ -236,7 +236,7 @@ func TestE2E_LoadSession(t *testing.T) {
 }
 
 func TestE2E_LoadSessionJSON(t *testing.T) {
-	repo := setupTestRepo(t)
+	repo := setupEmptyTestRepo(t)
 	writeTestLessons(t, repo, []map[string]any{
 		makeLesson("L001", "Always handle errors", withSeverity("high")),
 	})
@@ -263,7 +263,7 @@ func TestE2E_LoadSessionJSON(t *testing.T) {
 }
 
 func TestE2E_PrimeHookCommandWritesToStdout(t *testing.T) {
-	repo := setupTestRepo(t)
+	repo := setupEmptyTestRepo(t)
 	cmd := exec.Command("sh", "-c", fmt.Sprintf("'%s' prime 2>/dev/null || true", binaryPath))
 	cmd.Dir = repo
 	cmd.Env = append(os.Environ(), "COMPOUND_AGENT_ROOT="+repo)
@@ -283,7 +283,7 @@ func TestE2E_PrimeHookCommandWritesToStdout(t *testing.T) {
 }
 
 func TestE2E_MigrateFromTS_DryRun(t *testing.T) {
-	repo := setupTestRepo(t)
+	repo := setupEmptyTestRepo(t)
 	writeTestLessons(t, repo, []map[string]any{
 		makeLesson("L001", "Test lesson for migration"),
 		makeLesson("L002", "Another test lesson"),
@@ -345,7 +345,7 @@ func TestE2E_MigrateFromTS_DryRun(t *testing.T) {
 }
 
 func TestE2E_MigrateFromTS_Execute(t *testing.T) {
-	repo := setupTestRepo(t)
+	repo := setupEmptyTestRepo(t)
 	writeTestLessons(t, repo, []map[string]any{
 		makeLesson("L001", "Migration test lesson"),
 	})
@@ -393,7 +393,7 @@ func TestE2E_MigrateFromTS_Execute(t *testing.T) {
 }
 
 func TestE2E_LearnWithTags(t *testing.T) {
-	repo := setupTestRepo(t)
+	repo := setupEmptyTestRepo(t)
 
 	out, err := runCA(t, repo, "learn", "Use structured logging", "--tags", "logging,observability", "--severity", "high")
 	if err != nil {
@@ -417,7 +417,7 @@ func TestE2E_LearnWithTags(t *testing.T) {
 }
 
 func TestE2E_ShowLesson(t *testing.T) {
-	repo := setupTestRepo(t)
+	repo := setupEmptyTestRepo(t)
 
 	// Learn a lesson, capture the ID from output
 	out, err := runCA(t, repo, "learn", "Always close database connections")
@@ -452,7 +452,7 @@ func TestE2E_ShowLesson(t *testing.T) {
 }
 
 func TestE2E_DeleteLesson(t *testing.T) {
-	repo := setupTestRepo(t)
+	repo := setupEmptyTestRepo(t)
 	writeTestLessons(t, repo, []map[string]any{
 		makeLesson("L001", "Lesson to delete"),
 		makeLesson("L002", "Lesson to keep"),

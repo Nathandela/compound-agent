@@ -12,9 +12,16 @@ import (
 func writePhaseState(t *testing.T, dir string, state PhaseState) {
 	t.Helper()
 	stateDir := filepath.Join(dir, ".claude")
-	os.MkdirAll(stateDir, 0o755)
-	data, _ := json.Marshal(state)
-	os.WriteFile(filepath.Join(stateDir, ".ca-phase-state.json"), data, 0o644)
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	data, err := json.Marshal(state)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(stateDir, ".ca-phase-state.json"), data, 0o644); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func TestProcessPhaseGuard_NonEditTool(t *testing.T) {

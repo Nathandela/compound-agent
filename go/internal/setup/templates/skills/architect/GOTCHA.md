@@ -13,7 +13,7 @@ Things to do and not do when running the Architect skill. For loop-specific gotc
 - **Dry-run first** with `LOOP_DRY_RUN=1 bash infinity-loop.sh` and `POLISH_DRY_RUN=1 bash polish-loop.sh`. Validates configuration without spawning Claude sessions.
 - **Use readable screen session names.** Prefer `compound-loop-projectname` over hashes. Makes `screen -ls` output scannable.
 - **Persist session name** to `.beads/loop-session-name` so monitoring commands can find it.
-- **Run `bd dolt push` before launching.** Ensures beads state is synced before autonomous sessions modify it.
+- **Run `bd sync` before launching.** Ensures beads state is synced before autonomous sessions modify it.
 
 ## DO NOT
 
@@ -26,7 +26,7 @@ Things to do and not do when running the Architect skill. For loop-specific gotc
 - **Do NOT use `codex --print`.** Use `codex exec "prompt"` for non-interactive mode.
 - **Do NOT route skill activation on conversation content strings.** This is a prompt injection surface. Route on `{phase, hook_event}` tuples instead.
 - **Do NOT use JSONL for telemetry when SQLite is already in the stack.** SQLite avoids a second data store, supports aggregation queries natively, and eliminates log rotation logic.
-- **Do NOT add native Windows support without CI.** Document WSL2 instead.
+- **Windows support is available via WSL2 (recommended) and native PowerShell (reference template).** CI runs on Windows. The embedding daemon is Unix-only; Windows falls back to keyword-only search.
 - **Do NOT log raw queries in telemetry.** Truncate or hash query fields to prevent sensitive data leakage.
 - **Do NOT add telemetry I/O to the stdin read path in hooks.** Instrument at the hook OUTPUT boundary to avoid the 30-second stdin timeout.
 - **Do NOT add skill metadata fields without a runtime consumer.** Start with `phase` only.

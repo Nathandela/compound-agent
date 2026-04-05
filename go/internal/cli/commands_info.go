@@ -60,8 +60,11 @@ func feedbackCmd() *cobra.Command {
 			cmd.Printf("Repository:             %s\n", repoURL)
 
 			if openFlag {
-				openURL(discussionsURL)
-				cmd.Println("Opening in browser...")
+				if err := openURL(discussionsURL); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not open browser: %v\n", err)
+				} else {
+					cmd.Println("Opening in browser...")
+				}
 			} else {
 				cmd.Println()
 				cmd.Println("Run `ca feedback --open` to open in your browser.")
@@ -73,21 +76,26 @@ func feedbackCmd() *cobra.Command {
 	return cmd
 }
 
-func openURL(rawURL string) {
+func openURL(rawURL string) error {
 	// Validate URL scheme to prevent command injection (P0 security).
 	if !strings.HasPrefix(rawURL, "http://") && !strings.HasPrefix(rawURL, "https://") {
-		return
+		return fmt.Errorf("unsupported URL scheme: %s", rawURL)
 	}
+	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "darwin":
-		_ = exec.Command("open", rawURL).Start()
+		cmd = exec.Command("open", rawURL)
 	case "windows":
 		// On Windows, use 'cmd /c start "" <url>' — the empty "" is the window title
 		// parameter required by 'start' when the URL contains special characters.
-		_ = exec.Command("cmd", "/c", "start", "", rawURL).Start()
+		cmd = exec.Command("cmd", "/c", "start", "", rawURL)
 	default:
-		_ = exec.Command("xdg-open", rawURL).Start()
+		cmd = exec.Command("xdg-open", rawURL)
 	}
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to open browser: %w", err)
+	}
+	return nil
 }
 
 // infoCmd creates the "info" command. If testRepoRoot is non-empty, it uses that
@@ -110,8 +118,11 @@ func infoCmd(testRepoRoot string) *cobra.Command {
 			cmd.Print(buildInfoOutput(root))
 
 			if openFlag {
-				openURL(repoURL)
-				cmd.Println("Opening in browser...")
+				if err := openURL(repoURL); err != nil {
+					fmt.Fprintf(os.Stderr, "Warning: could not open browser: %v\n", err)
+				} else {
+					cmd.Println("Opening in browser...")
+				}
 			} else {
 				cmd.Println("Run `ca info --open` to open in your browser.")
 			}
@@ -173,10 +184,6 @@ func buildInfoPhaseJSON(repoRoot string) map[string]any {
 }
 
 func buildInfoTelemetryJSON(repoRoot string) map[string]any {
-	dbPath := filepath.Join(repoRoot, storage.DBPath)
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		return map[string]any{"totalEvents": 0}
-	}
 	db, err := storage.OpenRepoDB(repoRoot)
 	if err != nil {
 		return map[string]any{"totalEvents": 0}
@@ -293,7 +300,11 @@ func formatInfoPhase(repoRoot string) string {
 	}
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "Active workflow: %s (phase %d/%d)\n", state.CurrentPhase, state.PhaseIndex, len(hook.Phases))
+	totalPhases := len(hook.Phases)
+	if state.PhaseIndex > totalPhases {
+		totalPhases = state.PhaseIndex
+	}
+	fmt.Fprintf(&b, "Active workflow: %s (phase %d/%d)\n", state.CurrentPhase, state.PhaseIndex, totalPhases)
 	fmt.Fprintf(&b, "  Epic: %s\n", state.EpicID)
 	if len(state.SkillsRead) > 0 {
 		fmt.Fprintf(&b, "  Skills read: %s\n", strings.Join(state.SkillsRead, ", "))
@@ -306,11 +317,6 @@ func formatInfoPhase(repoRoot string) string {
 
 // formatInfoTelemetry returns the telemetry section content.
 func formatInfoTelemetry(repoRoot string) string {
-	dbPath := filepath.Join(repoRoot, storage.DBPath)
-	if _, err := os.Stat(dbPath); os.IsNotExist(err) {
-		return "Telemetry: no data yet. Run `ca setup claude` to install hooks that collect telemetry.\n"
-	}
-
 	db, err := storage.OpenRepoDB(repoRoot)
 	if err != nil {
 		return "Telemetry: no data yet. Run `ca setup claude` to install hooks that collect telemetry.\n"

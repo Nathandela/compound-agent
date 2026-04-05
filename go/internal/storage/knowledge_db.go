@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // KnowledgeSchemaVersion is the current knowledge schema version for migration detection.
@@ -145,8 +146,7 @@ func lockedOpenKnowledgeDB(path string) (*sql.DB, error) {
 		}
 	}
 
-	dsn := path + "?_pragma=journal_mode(WAL)&_pragma=busy_timeout(5000)"
-	db, err := sql.Open("sqlite", dsn)
+	db, err := sql.Open("sqlite", buildDSN(path, false))
 	if err != nil {
 		return nil, fmt.Errorf("open: %w", err)
 	}
@@ -176,7 +176,7 @@ func knowledgeNeedsRebuild(path string) bool {
 		return false
 	}
 
-	db, err := sql.Open("sqlite", path)
+	db, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)")
 	if err != nil {
 		return true
 	}
@@ -487,18 +487,18 @@ func (k *KnowledgeDB) HydrateChunks(ids []string) []KnowledgeChunk {
 	}
 
 	// Build parameterized query
-	placeholders := ""
+	var b strings.Builder
 	args := make([]interface{}, len(ids))
 	for i, id := range ids {
 		if i > 0 {
-			placeholders += ","
+			b.WriteByte(',')
 		}
-		placeholders += "?"
+		b.WriteByte('?')
 		args[i] = id
 	}
 
 	rows, err := k.db.Query(
-		"SELECT id, file_path, start_line, end_line, content_hash, text, model, updated_at FROM chunks WHERE id IN ("+placeholders+")",
+		"SELECT id, file_path, start_line, end_line, content_hash, text, model, updated_at FROM chunks WHERE id IN ("+b.String()+")",
 		args...,
 	)
 	if err != nil {

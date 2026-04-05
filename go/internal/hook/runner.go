@@ -54,7 +54,7 @@ func writeHookOutput(stdout io.Writer, result interface{}) {
 // RunHook dispatches to the appropriate hook handler.
 // Returns exit code (0 = success, 1 = error).
 func RunHook(hookName string, stdin io.Reader, stdout io.Writer) int {
-	code, _ := runHookCore(hookName, stdin, stdout)
+	code, _ := runHookCore(hookName, stdin, stdout, nil)
 	return code
 }
 
@@ -62,7 +62,8 @@ func RunHook(hookName string, stdin io.Reader, stdout io.Writer) int {
 // Returns exit code and whether an internal error occurred (for telemetry).
 // Internal errors return exit code 0 for graceful degradation but hadError=true
 // so telemetry can accurately record the failure.
-func runHookCore(hookName string, stdin io.Reader, stdout io.Writer) (exitCode int, hadError bool) {
+// If db is non-nil, it is reused for lesson search instead of opening a new connection.
+func runHookCore(hookName string, stdin io.Reader, stdout io.Writer, db *sql.DB) (exitCode int, hadError bool) {
 	if hookName == "" {
 		fmt.Fprintln(os.Stderr, "Usage: ca hooks run <hook>")
 		return 1, true
@@ -87,7 +88,7 @@ func runHookCore(hookName string, stdin io.Reader, stdout io.Writer) (exitCode i
 		}
 	}()
 
-	result, code, intErr := dispatchHook(hookName, stdin)
+	result, code, intErr := dispatchHook(hookName, stdin, db)
 	if result != nil {
 		writeHookOutput(stdout, result)
 	}
@@ -98,7 +99,7 @@ func runHookCore(hookName string, stdin io.Reader, stdout io.Writer) (exitCode i
 // Telemetry is recorded at the output boundary, after dispatch completes.
 func RunHookWithTelemetry(hookName string, stdin io.Reader, stdout io.Writer, db *sql.DB) int {
 	start := time.Now()
-	code, hadError := runHookCore(hookName, stdin, stdout)
+	code, hadError := runHookCore(hookName, stdin, stdout, db)
 	durationMs := time.Since(start).Milliseconds()
 
 	outcome := telemetry.OutcomeSuccess
@@ -122,8 +123,12 @@ func RunHookWithTelemetry(hookName string, stdin io.Reader, stdout io.Writer, db
 		slog.Debug("telemetry write failed", "hook", hookName, "error", err)
 	}
 
-	if _, err := telemetry.PruneEvents(db, telemetry.MaxRows); err != nil {
-		slog.Debug("telemetry prune failed", "error", err)
+	// Only prune when table exceeds threshold (avoid full-table scan on small tables)
+	var count int64
+	if err := db.QueryRow("SELECT COUNT(*) FROM telemetry").Scan(&count); err == nil && count > telemetry.MaxRows {
+		if _, err := telemetry.PruneEvents(db, telemetry.MaxRows); err != nil {
+			slog.Debug("telemetry prune failed", "error", err)
+		}
 	}
 
 	return code
@@ -132,12 +137,13 @@ func RunHookWithTelemetry(hookName string, stdin io.Reader, stdout io.Writer, db
 // dispatchHook routes to the correct hook handler and returns the result to serialize.
 // The third return value indicates whether an internal error occurred (parse failure, etc.)
 // that was gracefully handled (exit code 0) but should be tracked in telemetry.
-func dispatchHook(hookName string, stdin io.Reader) (interface{}, int, bool) {
+// db may be nil; when non-nil it is reused for lesson search.
+func dispatchHook(hookName string, stdin io.Reader, db *sql.DB) (interface{}, int, bool) {
 	switch hookName {
 	case "user-prompt":
 		return dispatchUserPrompt(stdin, hookName)
 	case "post-tool-failure":
-		return dispatchToolFailure(stdin, hookName)
+		return dispatchToolFailure(stdin, hookName, db)
 	case "post-tool-success":
 		return dispatchToolSuccess(stdin)
 	case "phase-guard", "post-read", "read-tracker":
@@ -171,7 +177,7 @@ func dispatchUserPrompt(stdin io.Reader, hookName string) (interface{}, int, boo
 	return ProcessUserPrompt(data.Prompt), 0, false
 }
 
-func dispatchToolFailure(stdin io.Reader, hookName string) (interface{}, int, bool) {
+func dispatchToolFailure(stdin io.Reader, hookName string, db *sql.DB) (interface{}, int, bool) {
 	input, err := parseHookInput(stdin)
 	if err != nil {
 		return handleErrorResult(hookName, err), 0, true
@@ -192,22 +198,28 @@ func dispatchToolFailure(stdin io.Reader, hookName string) (interface{}, int, bo
 	}
 	repoRoot := util.GetRepoRoot()
 	stateDir := filepath.Join(repoRoot, ".claude")
-	searchFn := makeLessonSearchFunc(repoRoot, hookName)
+	searchFn := makeLessonSearchFunc(db, repoRoot, hookName)
 	return ProcessToolFailureWithSearch(data.ToolName, data.ToolInput, data.ToolOutput, stateDir, searchFn), 0, false
 }
 
 // makeLessonSearchFunc creates a LessonSearchFunc backed by FTS5 keyword search.
 // Uses OR between tokens for broad matching. hookName identifies the calling
 // hook for telemetry attribution.
-func makeLessonSearchFunc(repoRoot string, hookName string) LessonSearchFunc {
+// If db is non-nil it is reused; otherwise a new connection is opened per call.
+func makeLessonSearchFunc(db *sql.DB, repoRoot string, hookName string) LessonSearchFunc {
 	return func(ctx context.Context, tokens []string, limit int) ([]LessonMatch, error) {
-		db, err := storage.OpenRepoDB(repoRoot)
-		if err != nil {
-			return nil, err
+		ownDB := db == nil
+		searchDB := db
+		if ownDB {
+			var err error
+			searchDB, err = storage.OpenRepoDB(repoRoot)
+			if err != nil {
+				return nil, err
+			}
+			defer searchDB.Close()
 		}
-		defer db.Close()
 
-		sdb := storage.NewSearchDB(db)
+		sdb := storage.NewSearchDB(searchDB)
 		scored, err := sdb.SearchKeywordScoredORContext(ctx, tokens, limit, memory.TypeLesson)
 		if err != nil {
 			return nil, err
@@ -218,7 +230,7 @@ func makeLessonSearchFunc(repoRoot string, hookName string) LessonSearchFunc {
 		query := strings.Join(tokens, " ")
 		qh := telemetry.HashQuery(query)
 		for _, s := range scored {
-			_ = telemetry.LogEvent(db, telemetry.Event{
+			_ = telemetry.LogEvent(searchDB, telemetry.Event{
 				EventType: telemetry.EventLessonRetrieval,
 				HookName:  hookName,
 				QueryHash: qh,

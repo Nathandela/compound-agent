@@ -6,6 +6,7 @@ import (
 )
 
 func TestOpenDB_InMemory(t *testing.T) {
+	t.Parallel()
 	db, err := OpenDB(":memory:")
 	if err != nil {
 		t.Fatalf("OpenDB: %v", err)
@@ -18,6 +19,7 @@ func TestOpenDB_InMemory(t *testing.T) {
 }
 
 func TestOpenDB_SchemaCreated(t *testing.T) {
+	t.Parallel()
 	db, err := OpenDB(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -45,6 +47,7 @@ func TestOpenDB_SchemaCreated(t *testing.T) {
 }
 
 func TestOpenDB_WALMode(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	dbPath := dir + "/test.sqlite"
 
@@ -65,6 +68,7 @@ func TestOpenDB_WALMode(t *testing.T) {
 }
 
 func TestOpenDB_SchemaVersion(t *testing.T) {
+	t.Parallel()
 	db, err := OpenDB(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -82,6 +86,7 @@ func TestOpenDB_SchemaVersion(t *testing.T) {
 }
 
 func TestOpenDB_ColumnNames(t *testing.T) {
+	t.Parallel()
 	db, err := OpenDB(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -131,6 +136,7 @@ func TestOpenDB_ColumnNames(t *testing.T) {
 }
 
 func TestOpenDB_Indexes(t *testing.T) {
+	t.Parallel()
 	db, err := OpenDB(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -154,6 +160,7 @@ func TestOpenDB_Indexes(t *testing.T) {
 }
 
 func TestOpenDB_Triggers(t *testing.T) {
+	t.Parallel()
 	db, err := OpenDB(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -176,6 +183,7 @@ func TestOpenDB_Triggers(t *testing.T) {
 }
 
 func TestOpenDB_InsertAndQuery(t *testing.T) {
+	t.Parallel()
 	db, err := OpenDB(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -199,6 +207,7 @@ func TestOpenDB_InsertAndQuery(t *testing.T) {
 }
 
 func TestOpenDB_FTS5Works(t *testing.T) {
+	t.Parallel()
 	db, err := OpenDB(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -224,6 +233,7 @@ func TestOpenDB_FTS5Works(t *testing.T) {
 }
 
 func TestBuildDSN(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		path     string
 		isMemory bool
@@ -243,6 +253,7 @@ func TestBuildDSN(t *testing.T) {
 }
 
 func TestOpenDB_TelemetryTable(t *testing.T) {
+	t.Parallel()
 	db, err := OpenDB(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -291,6 +302,7 @@ func TestOpenDB_TelemetryTable(t *testing.T) {
 }
 
 func TestOpenDB_TelemetryInsert(t *testing.T) {
+	t.Parallel()
 	db, err := OpenDB(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -318,6 +330,7 @@ func TestOpenDB_TelemetryInsert(t *testing.T) {
 }
 
 func TestOpenDB_TelemetryIndex(t *testing.T) {
+	t.Parallel()
 	db, err := OpenDB(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -338,24 +351,8 @@ func TestOpenDB_TelemetryIndex(t *testing.T) {
 	}
 }
 
-func TestOpenDB_SchemaVersionIs7(t *testing.T) {
-	db, err := OpenDB(":memory:")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	var version int
-	err = db.QueryRow("PRAGMA user_version").Scan(&version)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 7 {
-		t.Errorf("schema version = %d, want 7", version)
-	}
-}
-
 func TestOpenDB_VersionMismatch_Rebuild(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	dbPath := dir + "/test.sqlite"
 
@@ -365,7 +362,9 @@ func TestOpenDB_VersionMismatch_Rebuild(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Set wrong version
-	db1.Exec("PRAGMA user_version = 1")
+	if _, err := db1.Exec("PRAGMA user_version = 1"); err != nil {
+		t.Fatal(err)
+	}
 	db1.Close()
 
 	// Reopen - should rebuild

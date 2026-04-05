@@ -21,6 +21,13 @@
    curl -fsSL https://claude.ai/install.sh | bash
    ```
 
+   Verify and authenticate:
+   ```bash
+   claude --version    # Verify installation
+   claude              # First run triggers interactive login
+   # Or set API key: export ANTHROPIC_API_KEY="sk-ant-..."
+   ```
+
 4. **Other tools** inside WSL2:
    ```bash
    # Node.js (for npx, bd)
@@ -28,6 +35,8 @@
    sudo apt install -y nodejs
    # jq (optional, python3 fallback works)
    sudo apt install -y jq
+   # beads (bd) -- required for epic tracking
+   npm install -g beads
    # compound-agent
    npm install -g compound-agent
    ```
@@ -43,7 +52,7 @@
    ```
    For HTTPS, configure the Git credential helper to share with Windows:
    ```bash
-   git config --global credential.helper "/mnt/c/Program\ Files/Git/mingw64/bin/git-credential-manager.exe"
+   git config --global credential.helper "/mnt/c/Program Files/Git/bin/git-credential-manager.exe"
    ```
 
 ## Filesystem Layout
@@ -101,6 +110,11 @@ mkdir -p .beads && echo "$LOOP_SESSION" > .beads/loop-session-name
 ```powershell
 # [PowerShell] Launch directly from Windows
 wsl -d Ubuntu -- bash -c 'cd ~/projects/my-app && tmux new-session -d -s compound-loop "bash infinity-loop.sh"'
+```
+
+Note: this shortcut does not save the session name to `.beads/loop-session-name`. To enable the monitoring commands below, run from WSL2:
+```bash
+echo "compound-loop" > .beads/loop-session-name
 ```
 
 ## Session Management

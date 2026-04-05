@@ -108,7 +108,7 @@ ca reviewer list           # List enabled reviewers
 
 ```bash
 ca loop                    # Generate infinity loop script for autonomous processing
-ca loop --epics epic-1 epic-2
+ca loop --epics "epic-1,epic-2"
 ca loop --output my-loop.sh
 ca loop --max-retries 5
 ca loop --model claude-opus-4-6[1m]
@@ -136,6 +136,38 @@ ca watch                             # Tail live trace from latest loop session
 ca watch --epic <id>                 # Watch a specific epic trace
 ca watch --improve                   # Watch improvement loop traces
 ca watch --no-follow                 # Print existing trace and exit
+```
+
+## Info command
+
+```bash
+ca info                    # Show project status, phase, and telemetry summary
+ca info --open             # Open project dashboard in browser
+ca info --json             # Output as JSON
+```
+
+## Health command
+
+```bash
+ca health                  # Check project health and dependencies
+```
+
+## Polish command
+
+```bash
+ca polish                  # Generate polish loop script for iterative refinement
+ca polish --spec-file "docs/specs/my-spec.md"
+ca polish --meta-epic "meta-epic-id"
+ca polish --reviewers "claude-sonnet,claude-opus,gemini,codex"
+ca polish --cycles 2
+ca polish --model claude-opus-4-6[1m]
+ca polish --force          # Overwrite existing script
+```
+
+## Feedback command
+
+```bash
+ca feedback                # Submit feedback about compound-agent
 ```
 
 ## Health, audit, and verification commands

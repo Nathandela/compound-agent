@@ -153,13 +153,18 @@ func UpdatePhaseState(repoRoot string, partial map[string]interface{}) error {
 	return os.WriteFile(PhaseStatePath(repoRoot), data, 0o644)
 }
 
-// WritePhaseState writes the phase state to disk.
+// WritePhaseState writes the phase state to disk atomically via temp+rename.
 func WritePhaseState(repoRoot string, state *PhaseState) error {
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(PhaseStatePath(repoRoot), data, 0o644)
+	path := PhaseStatePath(repoRoot)
+	tmpPath := path + ".tmp"
+	if err := os.WriteFile(tmpPath, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, path)
 }
 
 // IsValidPhase returns true if s is a recognized phase name.

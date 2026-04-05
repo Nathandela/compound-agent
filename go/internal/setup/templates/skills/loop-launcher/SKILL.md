@@ -133,7 +133,10 @@ Full pre-flight checklist with monitoring protocol: `architect/references/infini
 After launching a loop in screen, verify it started by running a background Bash command (`run_in_background: true`):
 
 ```bash
-sleep 60 && echo "--- Loop health check ---" && cat agent_logs/.loop-status.json 2>/dev/null || echo "No status file yet" && screen -ls 2>/dev/null | grep compound-loop || echo "No screen session found"
+# Check 1: status file
+sleep 60 && cat agent_logs/.loop-status.json 2>/dev/null || echo "No status file yet"
+# Check 2: screen session
+screen -ls 2>/dev/null | grep "$(cat .beads/loop-session-name 2>/dev/null || echo compound-loop)" || echo "No screen session found"
 ```
 
 When the result comes back: if `.loop-status.json` shows `"status":"running"` and screen lists the session, report success to the user. If not, check for crash details or missing screen session and report the issue.
@@ -153,9 +156,10 @@ When the user asks about loop progress, follow this protocol to build a structur
 - If `.loop-status.json` shows `"status":"running"`, check when it was last modified:
   - macOS: `stat -f '%m' agent_logs/.loop-status.json`
   - Linux: `stat -c '%Y' agent_logs/.loop-status.json`
-- If last modified > 5 minutes ago: read the last 20 lines of the active trace (`tail -20 "$(readlink agent_logs/.latest)"`), wait 15 seconds, read again. If output is identical, flag as potentially stalled.
+- Calculate the delta: `DELTA=$(( $(date +%s) - $(stat -f '%m' agent_logs/.loop-status.json) ))` (macOS) or `DELTA=$(( $(date +%s) - $(stat -c '%Y' agent_logs/.loop-status.json) ))` (Linux). If `$DELTA > 300`, proceed with stall check below.
+- If last modified > 5 minutes ago: read the last 20 lines of the active trace (`tail -20 "agent_logs/$(readlink agent_logs/.latest)"`), wait 15 seconds, read again. If output is identical, flag as potentially stalled.
 - If status is `"crashed"`: report crash details (exit code, line number, timestamp) immediately.
-- Verify screen session is alive: `screen -ls | grep compound-loop`
+- Verify screen session is alive: `screen -ls | grep "$(cat .beads/loop-session-name)"`
 
 **Step 3 — Build the overview**:
 
@@ -173,6 +177,8 @@ Present a structured report like this:
 [total runtime, average per completed epic, ETA for remaining epics]
 [any anomalies: failures, retries, human_required, stalls]
 ```
+
+**Note on ETA**: The loop does not persist a target epic count. To calculate "X of Y", query `bd list --type=epic --status=open` for remaining epics and count completed entries in `loop-execution.jsonl`. ETAs are rough estimates — epic duration varies with complexity, retries, and memory pressure.
 
 - **Closed epics**: duration from `loop-execution.jsonl` (convert seconds to human-readable)
 - **Running epic**: "started HH:MM UTC" from `.loop-status.json` timestamp

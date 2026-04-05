@@ -69,12 +69,13 @@ func HashQuery(query string) string {
 }
 
 // outcomeToSuccess maps an Outcome to the success boolean column value.
+// Explicitly lists success outcomes; unknown outcomes default to failure.
 func outcomeToSuccess(o Outcome) int {
 	switch o {
-	case OutcomeError, OutcomeTimeout:
-		return 0
-	default:
+	case OutcomeSuccess, OutcomeEmpty:
 		return 1
+	default:
+		return 0
 	}
 }
 

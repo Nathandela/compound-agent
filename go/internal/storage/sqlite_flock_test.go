@@ -18,7 +18,9 @@ func TestOpenDB_FileLockOnRebuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db1.Exec("PRAGMA user_version = 1")
+	if _, err := db1.Exec("PRAGMA user_version = 1"); err != nil {
+		t.Fatal(err)
+	}
 	db1.Close()
 
 	// After OpenDB completes, flock is released (file may still exist on disk)
@@ -51,7 +53,9 @@ func TestOpenDB_ConcurrentRebuild(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	db1.Exec("PRAGMA user_version = 1")
+	if _, err := db1.Exec("PRAGMA user_version = 1"); err != nil {
+		t.Fatal(err)
+	}
 	db1.Close()
 
 	// Simulate lock held by another process using flock

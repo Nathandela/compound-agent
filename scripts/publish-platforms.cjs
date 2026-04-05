@@ -108,8 +108,8 @@ function main() {
         console.log(`[publish-platforms] ${pkgName}@${version} already published, skipping`);
         continue;
       }
-      // execFileSync puts stderr on the error object's output
-      const stderr = err.output ? err.output.filter(Boolean).join("") : err.message;
+      // execFileSync puts stderr on the error object's output (as Buffers)
+      const stderr = err.output ? err.output.filter(Boolean).map(b => b.toString()).join("") : err.message;
       if (stderr.includes("Cannot publish over previously published version")) {
         console.log(`[publish-platforms] ${pkgName}@${version} already published, skipping`);
         continue;

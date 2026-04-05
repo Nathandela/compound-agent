@@ -45,7 +45,7 @@ An insight is **LINTABLE** if and only if:
 
 **Example 1** -- LINTABLE, HIGH
 > "Use isModelAvailable() instead of isModelUsable() in hot paths"
-- Reasoning: Named function substitution. Can detect `isModelUsable(` via regex in `src/**/*.ts`.
+- Reasoning: Named function substitution. Can detect `isModelUsable(` via regex in the project source files.
 - VERDICT: LINTABLE | CONFIDENCE: HIGH | CHECK_TYPE: file-pattern
 
 **Example 2** -- LINTABLE, HIGH
@@ -109,7 +109,7 @@ CHECK_TYPE must be one of: `file-pattern`, `file-size`, `script` (Class A -- map
 
 ## Linter Detection
 
-Before creating Class B tasks, detect the project's linter. Use the `detectLinter()` function from `src/lint/detect.ts` if available, or check the repo root for config files (first match wins):
+Before creating Class B tasks, detect the project's linter. Check the repo root for config files (first match wins):
 
 1. `eslint.config.*` / `.eslintrc.*` -> eslint
 2. `ruff.toml` / `.ruff.toml` / `pyproject.toml` with `[tool.ruff]` -> ruff

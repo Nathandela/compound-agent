@@ -42,6 +42,8 @@ $PSNativeCommandUseErrorActionPreference = $true
 $MAX_RETRIES = 1
 $MODEL = "claude-opus-4-6[1m]"
 $EPIC_IDS = ""  # Space-separated epic IDs, or empty for auto-discover
+# Note: unlike the --epics CLI flag (which uses commas), this variable is space-separated
+# because the PS1 splits on whitespace at line 257. Convert: "a,b,c" -> "a b c".
 $LOG_DIR = "agent_logs"
 $MIN_FREE_MEMORY_PCT = if ($env:MIN_FREE_MEMORY_PCT) { [int]$env:MIN_FREE_MEMORY_PCT } else { 20 }
 $WATCHDOG_THRESHOLD = if ($env:WATCHDOG_THRESHOLD) { [int]$env:WATCHDOG_THRESHOLD } else { 15 }
@@ -283,8 +285,8 @@ function Get-NextEpic {
 # ============================================================
 function Build-Prompt {
     param([string]$EpicId)
-    # Six backticks (``````): PowerShell here-strings use @" "@ which conflicts with
-    # markdown triple backticks. Using six backticks renders as triple in the output.
+    # Six backticks (``````): here-strings pass backticks literally. Six backticks form
+    # a valid 6-backtick markdown code fence, avoiding conflict with triple-backtick content.
     return @"
 You are running in an autonomous infinity loop. Your task is to fully implement a beads epic.
 
@@ -353,20 +355,24 @@ Example: HUMAN_REQUIRED: Need AWS credentials configured in .env
 function Invoke-ExtractText {
     param([string]$TraceFile, [string]$OutputFile)
     if (-not (Test-Path $TraceFile)) { return }
-    Get-Content $TraceFile | ForEach-Object {
-        $line = $_.Trim()
-        if ([string]::IsNullOrEmpty($line)) { return }
-        try {
-            $obj = $line | ConvertFrom-Json -ErrorAction SilentlyContinue
-            if ($obj.type -eq 'assistant') {
-                foreach ($block in $obj.message.content) {
-                    if ($block.type -eq 'text' -and -not [string]::IsNullOrEmpty($block.text)) {
-                        $block.text
+    $results = [System.Collections.Generic.List[string]]::new()
+    switch -File $TraceFile {
+        default {
+            $line = $_.Trim()
+            if ([string]::IsNullOrEmpty($line)) { continue }
+            try {
+                $obj = $line | ConvertFrom-Json -ErrorAction SilentlyContinue
+                if ($obj.type -eq 'assistant') {
+                    foreach ($block in $obj.message.content) {
+                        if ($block.type -eq 'text' -and -not [string]::IsNullOrEmpty($block.text)) {
+                            $results.Add($block.text)
+                        }
                     }
                 }
-            }
-        } catch { }
-    } | Set-Content $OutputFile
+            } catch { }
+        }
+    }
+    $results | Set-Content $OutputFile -Encoding utf8
 }
 
 # ============================================================
@@ -405,17 +411,17 @@ $EXEC_LOG = Join-Path $LOG_DIR 'loop-execution.jsonl'
 function Write-LoopStatus {
     param([string]$Status, [string]$EpicId = '', [int]$Attempt = 0)
     if ($Status -eq 'idle') {
-        @{ status = 'idle'; timestamp = (Get-IsoTimestamp) } | ConvertTo-Json -Compress | Set-Content $STATUS_FILE
+        @{ status = 'idle'; timestamp = (Get-IsoTimestamp) } | ConvertTo-Json -Compress | Set-Content $STATUS_FILE -Encoding utf8
     } else {
         @{ epic_id = $EpicId; attempt = $Attempt; started_at = (Get-IsoTimestamp); status = $Status } |
-            ConvertTo-Json -Compress | Set-Content $STATUS_FILE
+            ConvertTo-Json -Compress | Set-Content $STATUS_FILE -Encoding utf8
     }
 }
 
 function Write-ResultLog {
     param([string]$EpicId, [string]$Result, [int]$Attempts, [long]$Duration)
     @{ epic_id = $EpicId; result = $Result; attempts = $Attempts; duration_s = $Duration; timestamp = (Get-IsoTimestamp) } |
-        ConvertTo-Json -Compress | Add-Content $EXEC_LOG
+        ConvertTo-Json -Compress | Add-Content $EXEC_LOG -Encoding utf8
 }
 
 # ============================================================
@@ -473,8 +479,14 @@ try {
                 if (Test-Path $latestPath) { Remove-Item $latestPath -Force }
                 New-Item -ItemType SymbolicLink -Path $latestPath -Target (Split-Path $TRACEFILE -Leaf) -ErrorAction Stop | Out-Null
             } catch {
-                # Fallback: write filename to .latest as plain text
-                Split-Path $TRACEFILE -Leaf | Set-Content $latestPath
+                # Fallback: hard link (no Developer Mode needed, same volume only)
+                if (Test-Path $latestPath) { Remove-Item $latestPath -Force }
+                try {
+                    New-Item -ItemType HardLink -Path $latestPath -Target $TRACEFILE -ErrorAction Stop | Out-Null
+                } catch {
+                    # Last resort: plain text file with filename
+                    Split-Path $TRACEFILE -Leaf | Set-Content $latestPath -Encoding utf8
+                }
             }
 
             Log "Attempt $ATTEMPT/$($MAX_RETRIES + 1) for $EPIC_ID (log: $LOGFILE)"
@@ -498,9 +510,12 @@ try {
             # Using -NoNewWindow (not -WindowStyle Hidden) so the child inherits
             # environment variables (ANTHROPIC_API_KEY, etc.).
             $promptFile = Join-Path $LOG_DIR "prompt_${EPIC_ID}-${TS}.txt"
-            $PROMPT | Set-Content -Path $promptFile -NoNewline
+            $PROMPT | Set-Content -Path $promptFile -NoNewline -Encoding utf8
 
-            $proc = Start-Process -FilePath (Get-Command claude).Source `
+            # Note: if 'claude' resolves to a .cmd wrapper (npm install), Start-Process
+            # may not forward stdin correctly. Workaround: install Claude Code natively
+            # or use WSL2 path instead.
+            $proc = Start-Process -FilePath "claude" `
                 -ArgumentList '--dangerously-skip-permissions','--permission-mode','auto','--model',$MODEL,'--output-format','stream-json','--verbose','-p','-' `
                 -NoNewWindow -PassThru `
                 -RedirectStandardInput $promptFile `
@@ -606,7 +621,7 @@ try {
     # Crash handler -- catches terminating errors (strict mode, native command failures)
     Log "CRASH: $_"
     @{ status = 'crashed'; error = "$_"; timestamp = (Get-IsoTimestamp) } |
-        ConvertTo-Json -Compress | Set-Content (Join-Path $LOG_DIR '.loop-status.json') -ErrorAction SilentlyContinue
+        ConvertTo-Json -Compress | Set-Content $STATUS_FILE -ErrorAction SilentlyContinue
 } finally {
     Stop-MemoryWatchdog
     Stop-StaleWatchdog
@@ -619,16 +634,16 @@ $TOTAL_DURATION = (Get-EpochSeconds) - $LOOP_START
 
 if (-not $env:LOOP_DRY_RUN) {
     @{ type = 'summary'; completed = $COMPLETED; failed = $FAILED_COUNT; skipped = $SKIPPED; total_duration_s = $TOTAL_DURATION } |
-        ConvertTo-Json -Compress | Add-Content $EXEC_LOG
+        ConvertTo-Json -Compress | Add-Content $EXEC_LOG -Encoding utf8
     Write-LoopStatus 'idle'
 
     # Push to remote if available
     try {
         $null = git remote get-url origin 2>$null
         Log "Pushing to remote..."
-        git push 2>$null
+        git push 2>&1
     } catch {
-        Log "WARN: git push failed (check SSH/auth)"
+        Log "WARN: git push failed: $_"
     }
 }
 

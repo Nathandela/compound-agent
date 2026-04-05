@@ -47,7 +47,7 @@ The function returns 0 (proceed) or 1 (skip). When a dependency is not closed, t
 
 The `get_next_epic()` function supports two modes:
 
-**Explicit IDs** (`--epics E1 E2 E3`): Iterates over the provided `EPIC_IDS` array in order, checking each for:
+**Explicit IDs** (`--epics "E1,E2,E3"`): Iterates over the provided `EPIC_IDS` array in order, checking each for:
 - Not already in the PROCESSED set
 - Status is open (`bd show <id> --json | parse_json .status` == "open")
 - All dependencies closed (`check_deps_closed`)

@@ -85,6 +85,12 @@ docs/compound/
 | View stats | `ca stats` |
 | Run full workflow | `/compound:cook-it <epic-id>` |
 | Health check | `ca doctor` |
+| Project info | `ca info` / `ca info --open` |
+| Telemetry health | `ca health` |
+| Polish loop | `ca polish` |
+| Submit feedback | `ca feedback` |
+
+See [CLI_REFERENCE.md](CLI_REFERENCE.md) for the full 17+ command list.
 
 ---
 
