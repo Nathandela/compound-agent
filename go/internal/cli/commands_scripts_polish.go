@@ -127,8 +127,8 @@ func polishScriptConfig(opts polishGenerateOptions) string {
 # Iterates N cycles of: audit fleet -> polish architect -> inner infinity loop
 #
 # Usage:
-#   ./polish-loop.sh
-#   POLISH_DRY_RUN=1 ./polish-loop.sh  # Preview without executing
+#   .compound-agent/polish-loop.sh
+#   POLISH_DRY_RUN=1 .compound-agent/polish-loop.sh  # Preview without executing
 
 set -euo pipefail
 

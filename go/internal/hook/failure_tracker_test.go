@@ -215,6 +215,40 @@ func TestWithSearch_PassesCorrectTokensToSearch(t *testing.T) {
 	}
 }
 
+func TestWriteFailureState_CreatesDir(t *testing.T) {
+	dir := t.TempDir()
+	// stateDir does NOT exist yet
+	stateDir := filepath.Join(dir, ".compound-agent")
+
+	err := writeFailureState(stateDir, failureState{
+		Count:     1,
+		Timestamp: 1,
+	})
+	if err != nil {
+		t.Fatalf("writeFailureState should create dir, got: %v", err)
+	}
+
+	// Verify file was written
+	if _, err := os.Stat(filepath.Join(stateDir, failureStateFileName)); err != nil {
+		t.Error("state file should exist after write")
+	}
+}
+
+func TestProcessToolFailure_MissingStateDir(t *testing.T) {
+	dir := t.TempDir()
+	// Use a non-existent subdirectory as stateDir
+	stateDir := filepath.Join(dir, ".compound-agent")
+
+	// Three failures should still trigger the tip even when dir doesn't pre-exist
+	ProcessToolFailure("Bash", map[string]interface{}{"command": "npm test"}, stateDir)
+	ProcessToolFailure("Bash", map[string]interface{}{"command": "npm test"}, stateDir)
+	result := ProcessToolFailure("Bash", map[string]interface{}{"command": "npm test"}, stateDir)
+
+	if result.SpecificOutput == nil {
+		t.Fatal("expected tip on threshold even with missing state dir")
+	}
+}
+
 func TestWithSearch_SubThresholdNoSearch(t *testing.T) {
 	dir := t.TempDir()
 	called := false

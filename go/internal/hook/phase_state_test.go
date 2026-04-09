@@ -352,6 +352,90 @@ func TestMaxPhaseIndex(t *testing.T) {
 	}
 }
 
+func TestGetPhaseState_LegacyPathFallback(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	// Write state to legacy path (.claude/.ca-phase-state.json)
+	legacyDir := filepath.Join(dir, ".claude")
+	os.MkdirAll(legacyDir, 0o755)
+
+	state := PhaseState{
+		CookitActive: true,
+		EpicID:       "legacy-epic",
+		CurrentPhase: "work",
+		PhaseIndex:   3,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{"post-plan"},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	}
+	data, _ := json.Marshal(state)
+	os.WriteFile(filepath.Join(legacyDir, ".ca-phase-state.json"), data, 0o644)
+
+	// .compound-agent/ does NOT exist — GetPhaseState should find legacy file
+	got := GetPhaseState(dir)
+	if got == nil {
+		t.Fatal("expected non-nil state from legacy path fallback")
+	}
+	if got.EpicID != "legacy-epic" {
+		t.Errorf("EpicID = %q, want legacy-epic", got.EpicID)
+	}
+
+	// Verify auto-migration: new path should now exist
+	if _, err := os.Stat(PhaseStatePath(dir)); err != nil {
+		t.Error("expected state file to be migrated to new path")
+	}
+
+	// Verify legacy file was cleaned up
+	if _, err := os.Stat(filepath.Join(legacyDir, ".ca-phase-state.json")); !os.IsNotExist(err) {
+		t.Error("expected legacy file to be removed after migration")
+	}
+}
+
+func TestGetPhaseState_LegacyPathSkippedWhenNewExists(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	// Write different states to both paths
+	legacyDir := filepath.Join(dir, ".claude")
+	os.MkdirAll(legacyDir, 0o755)
+	newDir := filepath.Join(dir, ".compound-agent")
+	os.MkdirAll(newDir, 0o755)
+
+	legacyState := PhaseState{
+		CookitActive: true,
+		EpicID:       "legacy-epic",
+		CurrentPhase: "plan",
+		PhaseIndex:   2,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	}
+	newState := PhaseState{
+		CookitActive: true,
+		EpicID:       "new-epic",
+		CurrentPhase: "work",
+		PhaseIndex:   3,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	}
+
+	legacyData, _ := json.Marshal(legacyState)
+	newData, _ := json.Marshal(newState)
+	os.WriteFile(filepath.Join(legacyDir, ".ca-phase-state.json"), legacyData, 0o644)
+	os.WriteFile(filepath.Join(newDir, ".ca-phase-state.json"), newData, 0o644)
+
+	// Should read from new path, not legacy
+	got := GetPhaseState(dir)
+	if got == nil {
+		t.Fatal("expected non-nil state")
+	}
+	if got.EpicID != "new-epic" {
+		t.Errorf("EpicID = %q, want new-epic (should prefer new path)", got.EpicID)
+	}
+}
+
 func TestExpectedGateForPhase(t *testing.T) {
 	t.Parallel()
 	tests := []struct {

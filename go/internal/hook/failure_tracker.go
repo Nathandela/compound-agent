@@ -51,6 +51,9 @@ func writeFailureState(stateDir string, state failureState) error {
 	if err != nil {
 		return fmt.Errorf("marshal failure state: %w", err)
 	}
+	if err := os.MkdirAll(stateDir, 0o755); err != nil {
+		return fmt.Errorf("create state dir: %w", err)
+	}
 	if err := os.WriteFile(filepath.Join(stateDir, failureStateFileName), data, 0o644); err != nil {
 		return fmt.Errorf("write failure state: %w", err)
 	}

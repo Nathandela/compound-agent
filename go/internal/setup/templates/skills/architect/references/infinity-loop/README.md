@@ -11,7 +11,7 @@ The infinity loop (`ca loop`) generates a standalone bash script that autonomous
 | Epic IDs | `--epics <ids>` | auto-discover | Comma-separated epic IDs to process |
 | Model | `--model <model>` | claude-opus-4-6[1m] | Claude model for sessions |
 | Max retries | `--max-retries <n>` | 1 | Retries per epic on failure |
-| Output | `-o, --output <path>` | ./infinity-loop.sh | Script output path |
+| Output | `-o, --output <path>` | .compound-agent/infinity-loop.sh | Script output path |
 | Force | `--force` | false | Overwrite existing script |
 | Reviewers | `--reviewers <names>` | none | Comma-separated: claude-sonnet,claude-opus,gemini,codex |
 | Review cadence | `--review-every <n>` | 0 (end-only) | Review every N completed epics |
@@ -39,9 +39,9 @@ Use this decision tree to find the right reference file:
 ### Minimal (auto-discover epics, no review)
 ```bash
 ca loop --force
-LOOP_DRY_RUN=1 ./infinity-loop.sh
+LOOP_DRY_RUN=1 .compound-agent/infinity-loop.sh
 LOOP_SESSION="compound-loop-$(basename "$PWD")"
-screen -dmS "$LOOP_SESSION" ./infinity-loop.sh
+screen -dmS "$LOOP_SESSION" .compound-agent/infinity-loop.sh
 mkdir -p .beads && echo "$LOOP_SESSION" > .beads/loop-session-name
 ```
 

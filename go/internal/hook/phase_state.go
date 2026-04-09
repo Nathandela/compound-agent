@@ -54,12 +54,23 @@ func PhaseStatePath(repoRoot string) string {
 	return filepath.Join(repoRoot, stateArtifactDir, ".ca-phase-state.json")
 }
 
+// legacyPhaseStatePath returns the old path (.claude/.ca-phase-state.json)
+// used before the migration to .compound-agent/.
+func legacyPhaseStatePath(repoRoot string) string {
+	return filepath.Join(repoRoot, ".claude", ".ca-phase-state.json")
+}
+
 // GetPhaseState reads and validates the phase state from disk.
 // Returns nil if file is missing, corrupted, or stale (>72h).
+// Falls back to legacy path (.claude/.ca-phase-state.json) and auto-migrates.
 func GetPhaseState(repoRoot string) *PhaseState {
 	data, err := os.ReadFile(PhaseStatePath(repoRoot))
 	if err != nil {
-		return nil
+		// Fallback: try legacy path and auto-migrate if found
+		data, err = readAndMigrateLegacyPhaseState(repoRoot)
+		if err != nil {
+			return nil
+		}
 	}
 
 	// First unmarshal into a raw map to handle legacy fields
@@ -210,6 +221,31 @@ func CleanPhaseStateIfFinal(repoRoot string) {
 			return
 		}
 	}
+}
+
+// readAndMigrateLegacyPhaseState reads phase state from the legacy .claude/ path.
+// If found, auto-migrates to .compound-agent/ and removes the legacy file.
+// Returns the raw data or an error if legacy file doesn't exist.
+func readAndMigrateLegacyPhaseState(repoRoot string) ([]byte, error) {
+	legacy := legacyPhaseStatePath(repoRoot)
+	data, err := os.ReadFile(legacy)
+	if err != nil {
+		return nil, err
+	}
+
+	// Auto-migrate: write to new location, best-effort cleanup of legacy
+	newPath := PhaseStatePath(repoRoot)
+	if err := os.MkdirAll(filepath.Dir(newPath), 0o755); err != nil {
+		slog.Debug("legacy phase state migration: mkdir failed", "error", err)
+		return data, nil
+	}
+	if err := os.WriteFile(newPath, data, 0o644); err != nil {
+		slog.Debug("legacy phase state migration: write failed", "error", err)
+		return data, nil
+	}
+	os.Remove(legacy)
+	slog.Debug("migrated legacy phase state", "from", legacy, "to", newPath)
+	return data, nil
 }
 
 // ExpectedGateForPhase returns the required gate name for a phase index, or "" for none.

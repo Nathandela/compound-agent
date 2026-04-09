@@ -218,7 +218,7 @@ The `REVIEW_TIMEOUT` environment variable controls the per-reviewer timeout (in 
 
 For large codebases where reviewers need more time:
 ```bash
-REVIEW_TIMEOUT=1800 ./infinity-loop.sh   # 30 minutes per reviewer
+REVIEW_TIMEOUT=1800 .compound-agent/infinity-loop.sh   # 30 minutes per reviewer
 ```
 
 The timeout uses `portable_timeout` for cross-platform support (GNU `timeout`, macOS `gtimeout`, or shell fallback). See `pre-flight.md` for launch configuration.

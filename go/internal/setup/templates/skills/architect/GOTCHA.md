@@ -6,11 +6,11 @@ Things to do and not do when running the Architect skill. For loop-specific gotc
 
 - **Read `loop-launcher/SKILL.md` before launching any loop.** It has the complete reference for flags, pipeline patterns, monitoring, and critical gotchas.
 - **Always launch loops in a screen session.** Never run infinity or polish loops in the foreground. Use `screen -dmS compound-loop-projectname bash pipeline.sh`. This prevents session loss on disconnect.
-- **Chain infinity loop + polish loop via pipeline script.** The polish loop is a separate script. Use a pipeline script or `bash infinity-loop.sh && bash polish-loop.sh` to chain them.
+- **Chain infinity loop + polish loop via pipeline script.** The polish loop is a separate script. Use a pipeline script or `bash .compound-agent/infinity-loop.sh && bash .compound-agent/polish-loop.sh` to chain them.
 - **Use comma-separated values for `--epics` and `--reviewers` flags.** The `ca loop` CLI expects comma-separated strings, not space-separated positional arguments.
 - **Run from the `go/` directory** (or wherever `go.mod` lives). `ca loop` and `ca polish` won't find the module otherwise.
 - **Use `--force` flag** when regenerating loop scripts to overwrite existing ones.
-- **Dry-run first** with `LOOP_DRY_RUN=1 bash infinity-loop.sh` and `POLISH_DRY_RUN=1 bash polish-loop.sh`. Validates configuration without spawning Claude sessions.
+- **Dry-run first** with `LOOP_DRY_RUN=1 bash .compound-agent/infinity-loop.sh` and `POLISH_DRY_RUN=1 bash .compound-agent/polish-loop.sh`. Validates configuration without spawning Claude sessions.
 - **Use readable screen session names.** Prefer `compound-loop-projectname` over hashes. Makes `screen -ls` output scannable.
 - **Persist session name** to `.beads/loop-session-name` so monitoring commands can find it.
 - **Run `bd sync` before launching.** Ensures beads state is synced before autonomous sessions modify it.
