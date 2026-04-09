@@ -44,7 +44,7 @@ $MODEL = "claude-opus-4-6[1m]"
 $EPIC_IDS = ""  # Space-separated epic IDs, or empty for auto-discover
 # Note: unlike the --epics CLI flag (which uses commas), this variable is space-separated
 # because the PS1 splits on whitespace at line 257. Convert: "a,b,c" -> "a b c".
-$LOG_DIR = "agent_logs"
+$LOG_DIR = ".compound-agent/agent_logs"
 $MIN_FREE_MEMORY_PCT = if ($env:MIN_FREE_MEMORY_PCT) { [int]$env:MIN_FREE_MEMORY_PCT } else { 20 }
 $WATCHDOG_THRESHOLD = if ($env:WATCHDOG_THRESHOLD) { [int]$env:WATCHDOG_THRESHOLD } else { 15 }
 $WATCHDOG_INTERVAL = if ($env:WATCHDOG_INTERVAL) { [int]$env:WATCHDOG_INTERVAL } else { 30 }

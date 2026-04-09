@@ -9,6 +9,13 @@ import (
 	"github.com/nathandelacretaz/compound-agent/internal/build"
 )
 
+// ArtifactRoot is the directory name for all compound-agent runtime artifacts
+// (loop scripts, agent logs). It lives at the repository root and is gitignored.
+const ArtifactRoot = ".compound-agent"
+
+// ArtifactLogDir is the subdirectory inside ArtifactRoot for agent logs.
+const ArtifactLogDir = "agent_logs"
+
 // InitOptions controls what init creates.
 type InitOptions struct {
 	SkipHooks     bool
@@ -51,6 +58,7 @@ func initDirectories(repoRoot string, result *InitResult) error {
 		filepath.Join(repoRoot, ".claude", "agents", "compound"),
 		filepath.Join(repoRoot, ".claude", "commands", "compound"),
 		filepath.Join(repoRoot, ".claude", "skills", "compound"),
+		filepath.Join(repoRoot, ArtifactRoot),
 	}
 
 	for _, dir := range dirs {
@@ -71,7 +79,13 @@ func initDirectories(repoRoot string, result *InitResult) error {
 		result.FilesCreated = append(result.FilesCreated, indexPath)
 	}
 
-	return EnsureGitignore(repoRoot)
+	if err := EnsureGitignore(repoRoot); err != nil {
+		return err
+	}
+	if err := EnsureRootGitignore(repoRoot); err != nil {
+		return err
+	}
+	return MigrateLegacyArtifacts(repoRoot)
 }
 
 // initHooks installs or upgrades Claude Code hooks in settings.json.
@@ -192,6 +206,128 @@ func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
 	}
 
 	return result, nil
+}
+
+// ArtifactRootPath returns the absolute path to the artifact root directory.
+func ArtifactRootPath(repoRoot string) string {
+	return filepath.Join(repoRoot, ArtifactRoot)
+}
+
+// ArtifactLogPath returns the absolute path to the agent logs directory.
+func ArtifactLogPath(repoRoot string) string {
+	return filepath.Join(repoRoot, ArtifactRoot, ArtifactLogDir)
+}
+
+// EnsureRootGitignore creates or updates the root .gitignore with .compound-agent/ entry.
+func EnsureRootGitignore(repoRoot string) error {
+	gitignorePath := filepath.Join(repoRoot, ".gitignore")
+
+	marker := "# compound-agent managed"
+	patterns := marker + "\n" + ArtifactRoot + "/\n"
+
+	existing, err := os.ReadFile(gitignorePath)
+	if err == nil {
+		content := string(existing)
+		if strings.Contains(content, marker) {
+			// Already has marker — check if it has stale individual entries and update
+			return updateRootGitignoreBlock(gitignorePath, content, marker, patterns)
+		}
+		// Append our block
+		combined := strings.TrimRight(content, "\n") + "\n\n" + patterns
+		return os.WriteFile(gitignorePath, []byte(combined), 0644)
+	}
+	if !os.IsNotExist(err) {
+		return fmt.Errorf("read root .gitignore: %w", err)
+	}
+
+	return os.WriteFile(gitignorePath, []byte(patterns), 0644)
+}
+
+// updateRootGitignoreBlock replaces the existing compound-agent managed block with the new one.
+// This handles migration from stale individual entries (agent_logs/, infinity-loop.sh, etc.)
+// to the single .compound-agent/ entry.
+func updateRootGitignoreBlock(path, content, marker, newBlock string) error {
+	idx := strings.Index(content, marker)
+	if idx < 0 {
+		return nil
+	}
+
+	// Extract the existing managed block (from marker to next blank line or EOF)
+	rest := content[idx:]
+	endIdx := strings.Index(rest, "\n\n")
+
+	var existingBlock string
+	if endIdx >= 0 {
+		existingBlock = rest[:endIdx+1] // include trailing \n
+	} else {
+		existingBlock = strings.TrimRight(rest, "\n") + "\n"
+	}
+
+	// If the block already matches, no-op
+	if existingBlock == newBlock {
+		return nil
+	}
+
+	// Replace the old block with the new one
+	updated := content[:idx] + newBlock
+	if endIdx >= 0 {
+		updated += rest[endIdx+1:] // skip the first \n of \n\n, keep the rest
+	}
+
+	return os.WriteFile(path, []byte(updated), 0644)
+}
+
+// MigrateLegacyArtifacts detects and moves legacy artifacts from the project root
+// into .compound-agent/. Prints a notice for each migrated item.
+// If both legacy and new locations exist, skips with a warning.
+func MigrateLegacyArtifacts(repoRoot string) error {
+	artifactRoot := ArtifactRootPath(repoRoot)
+
+	// Ensure artifact root exists
+	if err := os.MkdirAll(artifactRoot, 0755); err != nil {
+		return fmt.Errorf("create artifact root: %w", err)
+	}
+
+	// Items to migrate: {legacy relative path, destination relative to artifact root}
+	items := []struct {
+		legacy string // relative to repoRoot
+		dest   string // relative to artifactRoot
+	}{
+		{"agent_logs", ArtifactLogDir},
+		{"infinity-loop.sh", "infinity-loop.sh"},
+		{"polish-loop.sh", "polish-loop.sh"},
+		{"improvement-loop.sh", "improvement-loop.sh"},
+	}
+
+	for _, item := range items {
+		legacyPath := filepath.Join(repoRoot, item.legacy)
+		destPath := filepath.Join(artifactRoot, item.dest)
+
+		// Check if legacy exists
+		if _, err := os.Stat(legacyPath); os.IsNotExist(err) {
+			continue
+		}
+
+		// Check for conflict: both exist
+		if _, err := os.Stat(destPath); err == nil {
+			fmt.Fprintf(os.Stderr, "⚠ Skipping migration of %s: both %s and %s exist\n",
+				item.legacy, legacyPath, destPath)
+			continue
+		}
+
+		// Ensure destination parent exists
+		if err := os.MkdirAll(filepath.Dir(destPath), 0755); err != nil {
+			return fmt.Errorf("create destination dir for %s: %w", item.legacy, err)
+		}
+
+		// Move
+		if err := os.Rename(legacyPath, destPath); err != nil {
+			return fmt.Errorf("migrate %s: %w", item.legacy, err)
+		}
+		fmt.Fprintf(os.Stderr, "✓ Migrated %s → %s/%s\n", item.legacy, ArtifactRoot, item.dest)
+	}
+
+	return nil
 }
 
 // EnsureGitignore creates or updates .claude/.gitignore with required patterns.

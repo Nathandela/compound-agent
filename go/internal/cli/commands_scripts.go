@@ -52,7 +52,7 @@ func improveCmd() *cobra.Command {
 	initCmd.Flags().String("dir", "improve", "Directory for improvement programs")
 	cmd.AddCommand(initCmd)
 
-	cmd.Flags().StringVarP(&output, "output", "o", "improvement-loop.sh", "Output script path")
+	cmd.Flags().StringVarP(&output, "output", "o", ".compound-agent/improvement-loop.sh", "Output script path")
 	cmd.Flags().IntVar(&maxIters, "max-iters", 5, "Max iterations per topic")
 	cmd.Flags().IntVar(&budget, "time-budget", 0, "Total time budget in seconds (0=unlimited)")
 	cmd.Flags().StringVar(&model, "model", "claude-opus-4-6[1m]", "Claude model to use")
@@ -154,7 +154,7 @@ MAX_ITERS=%d
 TIME_BUDGET=%d
 MODEL=%s
 TOPIC_FILTER=%s
-LOG_DIR="agent_logs"
+LOG_DIR=".compound-agent/agent_logs"
 START_TIME=$(date +%%s)
 %s
 mkdir -p "$LOG_DIR"
@@ -314,7 +314,7 @@ func loopCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&o.output, "output", "o", "infinity-loop.sh", "Output script path")
+	cmd.Flags().StringVarP(&o.output, "output", "o", ".compound-agent/infinity-loop.sh", "Output script path")
 	cmd.Flags().IntVar(&o.maxRetries, "max-retries", 1, "Max retries per epic on failure")
 	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-6[1m]", "Claude model to use")
 	cmd.Flags().BoolVarP(&o.force, "force", "f", false, "Overwrite existing script")
@@ -337,7 +337,7 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 	}
 	output := o.output
 	if output == "" {
-		output = "infinity-loop.sh"
+		output = ".compound-agent/infinity-loop.sh"
 	}
 	if !o.force {
 		if _, err := os.Stat(output); err == nil {
@@ -457,7 +457,7 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string, compa
 	fmt.Fprintf(&b, "MAX_RETRIES=%d\n", maxRetries)
 	fmt.Fprintf(&b, "MODEL=%s\n", escapedModel)
 	fmt.Fprintf(&b, "EPIC_IDS=%s\n", escapedEpicIDs)
-	fmt.Fprintf(&b, "LOG_DIR=\"agent_logs\"\n")
+	fmt.Fprintf(&b, "LOG_DIR=\".compound-agent/agent_logs\"\n")
 	fmt.Fprintf(&b, "MIN_FREE_MEMORY_PCT=${MIN_FREE_MEMORY_PCT:-20}  # Stop loop if free memory drops below this %%\n")
 	fmt.Fprintf(&b, "WATCHDOG_THRESHOLD=${WATCHDOG_THRESHOLD:-15}     # Kill session if free memory drops below this %%\n")
 	fmt.Fprintf(&b, "WATCHDOG_INTERVAL=${WATCHDOG_INTERVAL:-30}       # Seconds between watchdog checks\n")
@@ -1151,7 +1151,7 @@ func watchCmd() *cobra.Command {
 	cmd.Flags().StringVar(&epicID, "epic", "", "Watch a specific epic trace")
 	cmd.Flags().BoolVar(&follow, "follow", false, "Follow the file (not yet implemented, reads once)")
 	cmd.Flags().BoolVar(&improve, "improve", false, "Watch improvement loop traces")
-	cmd.Flags().StringVar(&logDir, "log-dir", "", "Log directory (default: agent_logs/)")
+	cmd.Flags().StringVar(&logDir, "log-dir", "", "Log directory (default: .compound-agent/agent_logs/)")
 	// Support --no-follow
 	cmd.Flags().Lookup("follow").NoOptDefVal = "true"
 	return cmd
@@ -1161,7 +1161,7 @@ func watchCmd() *cobra.Command {
 func runWatch(cmd *cobra.Command, epicID string, follow, improve bool, logDir string) error {
 	if logDir == "" {
 		repoRoot := util.GetRepoRoot()
-		logDir = filepath.Join(repoRoot, "agent_logs")
+		logDir = filepath.Join(repoRoot, ".compound-agent", "agent_logs")
 	}
 
 	traceFile := resolveTraceFile(cmd, epicID, improve, logDir)

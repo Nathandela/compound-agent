@@ -39,6 +39,26 @@ func TestImproveCommand_GeneratesScript(t *testing.T) {
 	}
 }
 
+func TestImproveCommand_UsesCompoundAgentLogDir(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(improveCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "improve.sh")
+
+	_, err := executeCommand(root, "improve", "-o", outPath, "--model", "claude-sonnet-4-6")
+	if err != nil {
+		t.Fatalf("improve command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+	if !strings.Contains(script, `LOG_DIR=".compound-agent/agent_logs"`) {
+		t.Error("expected LOG_DIR to use .compound-agent/agent_logs")
+	}
+}
+
 func TestImproveCommand_ForceOverwrite(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
@@ -86,6 +106,26 @@ func TestLoopCommand_GeneratesScript(t *testing.T) {
 	}
 	if !strings.Contains(script, "EPIC_COMPLETE") {
 		t.Error("expected EPIC_COMPLETE marker detection")
+	}
+}
+
+func TestLoopCommand_UsesCompoundAgentLogDir(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+	if !strings.Contains(script, `LOG_DIR=".compound-agent/agent_logs"`) {
+		t.Error("expected LOG_DIR to use .compound-agent/agent_logs")
 	}
 }
 

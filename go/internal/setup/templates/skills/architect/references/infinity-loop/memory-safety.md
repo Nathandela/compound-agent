@@ -53,8 +53,8 @@ cleanup_orphans() {
 
 Override for your stack:
 ```bash
-ORPHAN_PROC_PATTERN="vitest|node.*\.test\." ./infinity-loop.sh   # JS only
-ORPHAN_PROC_PATTERN="go\.test" ./infinity-loop.sh                 # Go only
+ORPHAN_PROC_PATTERN="vitest|node.*\.test\." ./.compound-agent/infinity-loop.sh   # JS only
+ORPHAN_PROC_PATTERN="go\.test" ./.compound-agent/infinity-loop.sh                 # Go only
 ```
 
 ## Layer 2: Pre-session Memory Gate
@@ -113,7 +113,7 @@ start_memory_watchdog() {
 }
 ```
 
-Memory watchdog log files are written to `agent_logs/memory_<epic>-<ts>.log`.
+Memory watchdog log files are written to `.compound-agent/agent_logs/memory_<epic>-<ts>.log`.
 
 ## Layer 4: Stale Output Watchdog
 
@@ -163,5 +163,5 @@ Stale watchdog events are written to the same memory log file with a `STALE_WATC
 
 Lenient example (for machines with less RAM headroom):
 ```bash
-MIN_FREE_MEMORY_PCT=10 WATCHDOG_THRESHOLD=8 WATCHDOG_INTERVAL=60 ./infinity-loop.sh
+MIN_FREE_MEMORY_PCT=10 WATCHDOG_THRESHOLD=8 WATCHDOG_INTERVAL=60 ./.compound-agent/infinity-loop.sh
 ```

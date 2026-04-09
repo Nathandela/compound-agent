@@ -130,7 +130,7 @@ For systems too large for a single feature cycle. `/compound:architect` decompos
 
 # Step 2: generate and run the loop
 ca loop --reviewers claude-sonnet --review-every 3
-./infinity-loop.sh
+./.compound-agent/infinity-loop.sh
 # → Processes each epic in dependency order: spec-dev → plan → work → review → compound
 # → Captures lessons after every cycle, improving subsequent cycles
 ```
@@ -154,7 +154,7 @@ ca loop --reviewers claude-sonnet --review-every 3
 ca loop --epics "beads-abc,beads-def,beads-ghi" --max-retries 2
 
 # Run it
-./infinity-loop.sh
+./.compound-agent/infinity-loop.sh
 ```
 
 The loop respects beads dependency graphs — it only processes epics whose dependencies are complete. If an epic fails after `--max-retries` attempts, it stops and reports before proceeding.
@@ -180,10 +180,10 @@ ca improve --topics lint tests --max-iters 3
 ca improve --dry-run
 
 # Run the generated script
-./improvement-loop.sh
+./.compound-agent/improvement-loop.sh
 
 # Preview without executing Claude sessions
-IMPROVE_DRY_RUN=1 ./improvement-loop.sh
+IMPROVE_DRY_RUN=1 ./.compound-agent/improvement-loop.sh
 ```
 
 Each iteration makes one focused improvement, commits it, and moves on. If an iteration finds nothing to improve or fails validation, it reverts cleanly and moves to the next topic. The loop tracks consecutive no-improvement results and stops early to avoid diminishing returns.
@@ -303,7 +303,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 |---------|-------------|
 | `ca loop` | Generate infinity loop script for autonomous epic processing |
 | `ca loop --epics "id1,id2,id3"` | Target specific epic IDs (comma-separated) |
-| `ca loop -o <path>` | Custom output path (default: `./infinity-loop.sh`) |
+| `ca loop -o <path>` | Custom output path (default: `./.compound-agent/infinity-loop.sh`) |
 | `ca loop --max-retries <n>` | Max retries per epic on failure (default: 1) |
 | `ca loop --force` | Overwrite existing script |
 | `ca loop --reviewers <names...>` | Enable review phase with specified reviewers (claude-sonnet, claude-opus, gemini, codex) |

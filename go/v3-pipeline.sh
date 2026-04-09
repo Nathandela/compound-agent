@@ -7,9 +7,9 @@ trap 'echo "[pipeline] FAILED at line $LINENO" >&2' ERR
 cd "$(dirname "$0")"
 
 echo "[pipeline] Starting infinity loop..."
-bash infinity-loop.sh
+bash .compound-agent/infinity-loop.sh
 
 echo "[pipeline] Infinity loop complete. Starting polish loop (2 cycles)..."
-bash polish-loop.sh
+bash .compound-agent/polish-loop.sh
 
 echo "[pipeline] v3.0 pipeline complete."

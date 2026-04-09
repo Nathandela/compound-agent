@@ -30,7 +30,7 @@ func polishCmd() *cobra.Command {
 		},
 	}
 
-	cmd.Flags().StringVarP(&o.output, "output", "o", "polish-loop.sh", "Output script path")
+	cmd.Flags().StringVarP(&o.output, "output", "o", ".compound-agent/polish-loop.sh", "Output script path")
 	cmd.Flags().IntVar(&o.cycles, "cycles", 3, "Number of polish cycles")
 	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-6[1m]", "Claude model to use")
 	cmd.Flags().StringVar(&o.specFile, "spec-file", "", "Path to spec file for audit context (required)")
@@ -138,7 +138,7 @@ MODEL=%s
 META_EPIC=%s
 SPEC_FILE=%s
 CONFIGURED_REVIEWERS=%s
-LOG_DIR="agent_logs"
+LOG_DIR=".compound-agent/agent_logs"
 REVIEW_TIMEOUT=${REVIEW_TIMEOUT:-600}
 %s
 mkdir -p "$LOG_DIR"
@@ -764,7 +764,7 @@ echo "{\"status\":\"completed\",\"cycles\":$CYCLES,\"timestamp\":\"$(date -u +%Y
 # Commit and push results
 if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
   log "Committing polish loop artifacts"
-  git add docs/specs/polish-report-cycle-*.md agent_logs/.polish-status.json 2>/dev/null || true
+  git add docs/specs/polish-report-cycle-*.md .compound-agent/agent_logs/.polish-status.json 2>/dev/null || true
   git commit -m "chore: polish loop cycle completion" 2>/dev/null || true
 fi
 if git remote get-url origin >/dev/null 2>&1; then

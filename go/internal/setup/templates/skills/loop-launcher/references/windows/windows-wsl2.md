@@ -80,11 +80,11 @@ VS Code: use the "WSL" remote extension to open the repo directly inside WSL2.
 ca loop --epics "E1,E2,E3" --reviewers "claude-sonnet,gemini" --force
 
 # Dry-run
-LOOP_DRY_RUN=1 bash infinity-loop.sh
+LOOP_DRY_RUN=1 bash .compound-agent/infinity-loop.sh
 
 # Launch in a detached tmux session
 LOOP_SESSION="compound-loop-$(basename "$PWD")"
-tmux new-session -d -s "$LOOP_SESSION" 'bash infinity-loop.sh'
+tmux new-session -d -s "$LOOP_SESSION" 'bash .compound-agent/infinity-loop.sh'
 mkdir -p .beads && echo "$LOOP_SESSION" > .beads/loop-session-name
 ```
 
@@ -96,8 +96,8 @@ cat > pipeline.sh << 'SCRIPT'
 set -e
 trap 'echo "[pipeline] FAILED at line $LINENO" >&2' ERR
 cd "$(dirname "$0")"
-bash infinity-loop.sh
-bash polish-loop.sh
+bash .compound-agent/infinity-loop.sh
+bash .compound-agent/polish-loop.sh
 SCRIPT
 
 LOOP_SESSION="compound-loop-$(basename "$PWD")"
@@ -109,7 +109,7 @@ mkdir -p .beads && echo "$LOOP_SESSION" > .beads/loop-session-name
 
 ```powershell
 # [PowerShell] Launch directly from Windows
-wsl -d Ubuntu -- bash -c 'cd ~/projects/my-app && tmux new-session -d -s compound-loop "bash infinity-loop.sh"'
+wsl -d Ubuntu -- bash -c 'cd ~/projects/my-app && tmux new-session -d -s compound-loop "bash .compound-agent/infinity-loop.sh"'
 ```
 
 Note: this shortcut does not save the session name to `.beads/loop-session-name`. To enable the monitoring commands below, run from WSL2:
@@ -136,8 +136,8 @@ All monitoring commands from the main SKILL.md work identically inside WSL2:
 
 ```bash
 ca watch                                          # Live trace tail
-cat agent_logs/.loop-status.json                  # Current status
-cat agent_logs/loop-execution.jsonl               # Completed epics
+cat .compound-agent/agent_logs/.loop-status.json                  # Current status
+cat .compound-agent/agent_logs/loop-execution.jsonl               # Completed epics
 tmux attach -t "$(cat .beads/loop-session-name)"  # Attach to session
 ```
 
@@ -145,7 +145,7 @@ tmux attach -t "$(cat .beads/loop-session-name)"  # Attach to session
 
 ```powershell
 # [PowerShell] Quick status check
-wsl -d Ubuntu -- bash -c 'cd ~/projects/my-app && cat agent_logs/.loop-status.json'
+wsl -d Ubuntu -- bash -c 'cd ~/projects/my-app && cat .compound-agent/agent_logs/.loop-status.json'
 
 # [PowerShell] Check if session is alive
 wsl -d Ubuntu -- tmux has-session -t compound-loop 2>$null
@@ -157,7 +157,7 @@ Same as Unix. The only difference is `stat` syntax -- WSL2 uses the Linux varian
 
 ```bash
 # File modification time (seconds since epoch)
-stat -c '%Y' agent_logs/.loop-status.json
+stat -c '%Y' .compound-agent/agent_logs/.loop-status.json
 ```
 
 ## Polish Loop
@@ -171,10 +171,10 @@ ca polish --spec-file "docs/specs/my-spec.md" \
   --cycles 2 --force
 
 # Dry-run
-POLISH_DRY_RUN=1 bash polish-loop.sh
+POLISH_DRY_RUN=1 bash .compound-agent/polish-loop.sh
 
 # Launch (after infinity loop, or as part of pipeline.sh above)
-tmux new-session -d -s polish-loop 'bash polish-loop.sh'
+tmux new-session -d -s polish-loop 'bash .compound-agent/polish-loop.sh'
 ```
 
 Reviewer CLIs (`gemini`, `codex`) must also be installed inside WSL2 for the polish audit fleet to work.
@@ -188,7 +188,7 @@ Reviewer CLIs (`gemini`, `codex`) must also be installed inside WSL2 for the pol
 | `claude` not found | Installed on Windows, not WSL2 | Install Claude Code inside WSL2 separately |
 | `screen` not found | Not installed | `sudo apt install screen` (or use tmux) |
 | `ca` resolves to stale npm binary | Global npm install outdated | Use `go/dist/ca` or `npm install compound-agent@latest` inside WSL2 |
-| tmux: `no server running` | No active sessions | Session finished or crashed; check `agent_logs/.loop-status.json` |
+| tmux: `no server running` | No active sessions | Session finished or crashed; check `.compound-agent/agent_logs/.loop-status.json` |
 
 ## WSL2 Configuration Tips
 

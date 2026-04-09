@@ -56,7 +56,7 @@ ca polish --spec-file "docs/specs/your-spec.md" \
 | `--max-retries` | `1` | Retries per epic on failure |
 | `--review-blocking` | `false` | Fail loop if review not approved after max cycles |
 | `--review-model` | `claude-opus-4-6[1m]` | Model for implementer fix sessions |
-| `-o, --output` | `infinity-loop.sh` | Output script path |
+| `-o, --output` | `.compound-agent/infinity-loop.sh` | Output script path |
 | `--force` | (off) | Overwrite existing script |
 
 ### Flags Reference — Polish Loop (`ca polish`)
@@ -68,7 +68,7 @@ ca polish --spec-file "docs/specs/your-spec.md" \
 | `--cycles` | `3` | Number of polish cycles |
 | `--model` | `claude-opus-4-6[1m]` | Model for polish architect sessions |
 | `--reviewers` | `claude-sonnet,claude-opus,gemini,codex` | Comma-separated audit fleet |
-| `-o, --output` | `polish-loop.sh` | Output script path |
+| `-o, --output` | `.compound-agent/polish-loop.sh` | Output script path |
 | `--force` | (off) | Overwrite existing script |
 
 ## Launching
@@ -78,7 +78,7 @@ Always launch in a screen session. Never run loops in the foreground.
 ### Single loop
 ```bash
 LOOP_SESSION="compound-loop-$(basename "$(pwd)")"
-screen -dmS "$LOOP_SESSION" bash infinity-loop.sh
+screen -dmS "$LOOP_SESSION" bash .compound-agent/infinity-loop.sh
 mkdir -p .beads && echo "$LOOP_SESSION" > .beads/loop-session-name
 ```
 
@@ -89,8 +89,8 @@ cat > pipeline.sh << 'SCRIPT'
 set -e
 trap 'echo "[pipeline] FAILED at line $LINENO" >&2' ERR
 cd "$(dirname "$0")"
-bash infinity-loop.sh
-bash polish-loop.sh
+bash .compound-agent/infinity-loop.sh
+bash .compound-agent/polish-loop.sh
 SCRIPT
 LOOP_SESSION="compound-loop-$(basename "$(pwd)")"
 screen -dmS "$LOOP_SESSION" bash pipeline.sh
@@ -109,8 +109,8 @@ Before launching:
 4. Verify `claude` CLI is available and authenticated
 5. Verify `bd` CLI is available
 6. Sync beads: `bd dolt push`
-7. Dry-run infinity loop: `LOOP_DRY_RUN=1 bash infinity-loop.sh`
-8. Dry-run polish loop: `POLISH_DRY_RUN=1 bash polish-loop.sh`
+7. Dry-run infinity loop: `LOOP_DRY_RUN=1 bash .compound-agent/infinity-loop.sh`
+8. Dry-run polish loop: `POLISH_DRY_RUN=1 bash .compound-agent/polish-loop.sh`
 9. Verify screen is available: `command -v screen`
 
 Full pre-flight checklist with monitoring protocol: `architect/references/infinity-loop/pre-flight.md`.
@@ -123,9 +123,9 @@ Full pre-flight checklist with monitoring protocol: `architect/references/infini
 |---------|---------------|
 | `screen -r "$(cat .beads/loop-session-name)"` | Attach to live session (Ctrl-A D to detach) |
 | `ca watch` | Live trace tail from active session |
-| `cat agent_logs/.loop-status.json` | Current epic and status |
-| `cat agent_logs/loop-execution.jsonl` | Completed epics with durations |
-| `ls agent_logs/polish-cycle-*/` | Polish cycle reports and audit findings |
+| `cat .compound-agent/agent_logs/.loop-status.json` | Current epic and status |
+| `cat .compound-agent/agent_logs/loop-execution.jsonl` | Completed epics with durations |
+| `ls .compound-agent/agent_logs/polish-cycle-*/` | Polish cycle reports and audit findings |
 | `screen -S "$(cat .beads/loop-session-name)" -X quit` | Kill the loop |
 
 ### Post-Launch Verification
@@ -134,7 +134,7 @@ After launching a loop in screen, verify it started by running a background Bash
 
 ```bash
 # Check 1: status file
-sleep 60 && cat agent_logs/.loop-status.json 2>/dev/null || echo "No status file yet"
+sleep 60 && cat .compound-agent/agent_logs/.loop-status.json 2>/dev/null || echo "No status file yet"
 # Check 2: screen session
 screen -ls 2>/dev/null | grep "$(cat .beads/loop-session-name 2>/dev/null || echo compound-loop)" || echo "No screen session found"
 ```
@@ -146,18 +146,18 @@ When the result comes back: if `.loop-status.json` shows `"status":"running"` an
 When the user asks about loop progress, follow this protocol to build a structured overview.
 
 **Step 1 — Gather data** (use parallel subagents for speed):
-- Read `agent_logs/.loop-status.json` — current epic, attempt number, status
-- Read `agent_logs/loop-execution.jsonl` — all completed epics with result, duration
+- Read `.compound-agent/agent_logs/.loop-status.json` — current epic, attempt number, status
+- Read `.compound-agent/agent_logs/loop-execution.jsonl` — all completed epics with result, duration
 - Run `bd show <epic-id>` for each epic to get titles and statuses
 - Run `git log --oneline -5` to see recent commit activity
-- For polish loops: also read `agent_logs/.polish-status.json` and list `agent_logs/polish-cycle-*/`
+- For polish loops: also read `.compound-agent/agent_logs/.polish-status.json` and list `.compound-agent/agent_logs/polish-cycle-*/`
 
 **Step 2 — Detect stalls**:
 - If `.loop-status.json` shows `"status":"running"`, check when it was last modified:
-  - macOS: `stat -f '%m' agent_logs/.loop-status.json`
-  - Linux: `stat -c '%Y' agent_logs/.loop-status.json`
-- Calculate the delta: `DELTA=$(( $(date +%s) - $(stat -f '%m' agent_logs/.loop-status.json) ))` (macOS) or `DELTA=$(( $(date +%s) - $(stat -c '%Y' agent_logs/.loop-status.json) ))` (Linux). If `$DELTA > 300`, proceed with stall check below.
-- If last modified > 5 minutes ago: read the last 20 lines of the active trace (`tail -20 "agent_logs/$(readlink agent_logs/.latest)"`), wait 15 seconds, read again. If output is identical, flag as potentially stalled.
+  - macOS: `stat -f '%m' .compound-agent/agent_logs/.loop-status.json`
+  - Linux: `stat -c '%Y' .compound-agent/agent_logs/.loop-status.json`
+- Calculate the delta: `DELTA=$(( $(date +%s) - $(stat -f '%m' .compound-agent/agent_logs/.loop-status.json) ))` (macOS) or `DELTA=$(( $(date +%s) - $(stat -c '%Y' .compound-agent/agent_logs/.loop-status.json) ))` (Linux). If `$DELTA > 300`, proceed with stall check below.
+- If last modified > 5 minutes ago: read the last 20 lines of the active trace (`tail -20 ".compound-agent/agent_logs/$(readlink .compound-agent/agent_logs/.latest)"`), wait 15 seconds, read again. If output is identical, flag as potentially stalled.
 - If status is `"crashed"`: report crash details (exit code, line number, timestamp) immediately.
 - Verify screen session is alive: `screen -ls | grep "$(cat .beads/loop-session-name)"`
 
@@ -190,14 +190,14 @@ Present a structured report like this:
 
 | Path | Content | When to read |
 |------|---------|-------------|
-| `agent_logs/.loop-status.json` | Current epic, attempt, status | Always -- primary status |
-| `agent_logs/loop-execution.jsonl` | Completed epics with result, duration | Always -- progress history |
-| `agent_logs/.latest` | Symlink to active trace file | Stall detection |
-| `agent_logs/trace_<id>-<ts>.jsonl` | Raw stream-json per session | Deep debugging only |
-| `agent_logs/loop_<id>-<ts>.log` | Extracted assistant text per session | Investigating a specific epic |
-| `agent_logs/memory_<id>-<ts>.log` | Memory watchdog readings | Suspecting OOM |
-| `agent_logs/.polish-status.json` | Polish loop cycle/status | During polish loops |
-| `agent_logs/polish-cycle-<N>/` | Per-cycle audit findings and reports | Polish loop review |
+| `.compound-agent/agent_logs/.loop-status.json` | Current epic, attempt, status | Always -- primary status |
+| `.compound-agent/agent_logs/loop-execution.jsonl` | Completed epics with result, duration | Always -- progress history |
+| `.compound-agent/agent_logs/.latest` | Symlink to active trace file | Stall detection |
+| `.compound-agent/agent_logs/trace_<id>-<ts>.jsonl` | Raw stream-json per session | Deep debugging only |
+| `.compound-agent/agent_logs/loop_<id>-<ts>.log` | Extracted assistant text per session | Investigating a specific epic |
+| `.compound-agent/agent_logs/memory_<id>-<ts>.log` | Memory watchdog readings | Suspecting OOM |
+| `.compound-agent/agent_logs/.polish-status.json` | Polish loop cycle/status | During polish loops |
+| `.compound-agent/agent_logs/polish-cycle-<N>/` | Per-cycle audit findings and reports | Polish loop review |
 
 ## Gotchas
 

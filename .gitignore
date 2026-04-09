@@ -51,13 +51,8 @@ go/internal/**/.claude/
 # Rust build artifacts
 rust/embed-daemon/target/
 
-# Generated loop scripts (output of ca loop / ca polish / ca improve)
-infinity-loop.sh
-polish-loop.sh
-improvement-loop.sh
-
-# Agent logs
-agent_logs/
+# Compound agent runtime artifacts (loop scripts + agent logs)
+.compound-agent/
 
 # Claude worktrees
 .claude/worktrees/

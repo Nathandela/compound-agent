@@ -153,10 +153,10 @@ trap _loop_cleanup EXIT
 
 | File | Content |
 |------|---------|
-| `agent_logs/.loop-status.json` | Current state: `{"epic_id":"E1","attempt":2,"started_at":"...","status":"running"}` |
-| `agent_logs/loop-execution.jsonl` | One line per completed epic with result, attempts, duration |
-| `agent_logs/memory_<epic>-<ts>.log` | Watchdog memory readings per session |
-| `agent_logs/.latest` | Symlink to active trace file |
+| `.compound-agent/agent_logs/.loop-status.json` | Current state: `{"epic_id":"E1","attempt":2,"started_at":"...","status":"running"}` |
+| `.compound-agent/agent_logs/loop-execution.jsonl` | One line per completed epic with result, attempts, duration |
+| `.compound-agent/agent_logs/memory_<epic>-<ts>.log` | Watchdog memory readings per session |
+| `.compound-agent/agent_logs/.latest` | Symlink to active trace file |
 
 Summary record appended at loop exit:
 ```json

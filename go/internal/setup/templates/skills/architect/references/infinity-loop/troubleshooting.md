@@ -40,8 +40,8 @@ git push
 
 **Diagnosis**:
 ```bash
-grep "Working tree dirty" agent_logs/loop_*.log
-grep "auto-commit" agent_logs/loop_*.log
+grep "Working tree dirty" .compound-agent/agent_logs/loop_*.log
+grep "auto-commit" .compound-agent/agent_logs/loop_*.log
 ```
 
 ---
@@ -56,8 +56,8 @@ grep "auto-commit" agent_logs/loop_*.log
 
 **Diagnosis**:
 ```bash
-grep "No commits in range" agent_logs/loop_*.log
-ls agent_logs/reviews/
+grep "No commits in range" .compound-agent/agent_logs/loop_*.log
+ls .compound-agent/agent_logs/reviews/
 ```
 
 ---
@@ -72,16 +72,16 @@ ls agent_logs/reviews/
 
 **Diagnosis**:
 ```bash
-grep "configured but unavailable" agent_logs/loop_*.log
-grep "Configured reviewers:" agent_logs/loop_*.log
-grep "Available reviewers:" agent_logs/loop_*.log
+grep "configured but unavailable" .compound-agent/agent_logs/loop_*.log
+grep "Configured reviewers:" .compound-agent/agent_logs/loop_*.log
+grep "Available reviewers:" .compound-agent/agent_logs/loop_*.log
 ```
 
 ---
 
 ### extract_text produces empty logs
 
-**Symptom**: `agent_logs/loop_*.log` files are empty but `agent_logs/trace_*.jsonl` files have content. Warning: "Macro log is empty but trace has content."
+**Symptom**: `.compound-agent/agent_logs/loop_*.log` files are empty but `.compound-agent/agent_logs/trace_*.jsonl` files have content. Warning: "Macro log is empty but trace has content."
 
 **Root cause**: The `extract_text` jq parser failed (jq not installed, or Claude's stream-json format changed). The loop falls back to trace-file marker detection (unanchored grep), which is less reliable.
 
@@ -91,7 +91,7 @@ grep "Available reviewers:" agent_logs/loop_*.log
 ```bash
 command -v jq && echo "jq OK" || echo "jq MISSING"
 command -v python3 && echo "python3 OK" || echo "python3 MISSING"
-head -1 agent_logs/trace_*.jsonl | jq .   # Test jq parsing
+head -1 .compound-agent/agent_logs/trace_*.jsonl | jq .   # Test jq parsing
 ```
 
 ---
@@ -106,13 +106,13 @@ head -1 agent_logs/trace_*.jsonl | jq .   # Test jq parsing
 
 **Diagnosis**:
 ```bash
-cat agent_logs/memory_*.log | tail -20
-grep "WATCHDOG" agent_logs/memory_*.log
+cat .compound-agent/agent_logs/memory_*.log | tail -20
+grep "WATCHDOG" .compound-agent/agent_logs/memory_*.log
 ```
 
 ```bash
 # More lenient thresholds
-WATCHDOG_THRESHOLD=10 WATCHDOG_INTERVAL=60 ./infinity-loop.sh
+WATCHDOG_THRESHOLD=10 WATCHDOG_INTERVAL=60 ./.compound-agent/infinity-loop.sh
 # Kill memory-hungry background processes
 pkill -f vitest; pkill -f "node.*test"
 ```
@@ -129,7 +129,7 @@ pkill -f vitest; pkill -f "node.*test"
 
 **Diagnosis**:
 ```bash
-grep "git push" agent_logs/loop_*.log
+grep "git push" .compound-agent/agent_logs/loop_*.log
 git push
 ssh -T git@github.com   # Test SSH auth
 ```
@@ -147,7 +147,7 @@ ssh -T git@github.com   # Test SSH auth
 **Diagnosis**:
 ```bash
 # Verify log() writes to stderr, not stdout
-grep 'log()' infinity-loop.sh
+grep 'log()' .compound-agent/infinity-loop.sh
 # Should see: echo "..." >&2
 # Should NOT see: echo "..." (without redirect)
 ```
@@ -158,7 +158,7 @@ See `epic-ordering.md` for the full explanation of the stdout/return-value patte
 
 ### Reviewers produce 1-byte or empty output
 
-**Symptom**: Review report files in `agent_logs/reviews/` are empty or contain only a newline. Reviewer logged as "NO OUTPUT (crashed or timed out)."
+**Symptom**: Review report files in `.compound-agent/agent_logs/reviews/` are empty or contain only a newline. Reviewer logged as "NO OUTPUT (crashed or timed out)."
 
 **Root cause**: The Claude reviewer was spawned without `--dangerously-skip-permissions`. Without this flag, Claude pauses at the first tool use waiting for human permission confirmation. With no human, the session times out producing no substantive output.
 
@@ -167,9 +167,9 @@ See `epic-ordering.md` for the full explanation of the stdout/return-value patte
 **Diagnosis**:
 ```bash
 # Check report file sizes
-wc -c agent_logs/reviews/*/*.md
+wc -c .compound-agent/agent_logs/reviews/*/*.md
 # Check if --dangerously-skip-permissions is in the script
-grep "dangerously-skip-permissions" infinity-loop.sh
+grep "dangerously-skip-permissions" .compound-agent/infinity-loop.sh
 ```
 
 See `review-fleet.md` for correct per-reviewer invocation flags.
@@ -178,7 +178,7 @@ See `review-fleet.md` for correct per-reviewer invocation flags.
 
 ### Dry-run creates ghost entries in execution log
 
-**Symptom**: After running `LOOP_DRY_RUN=1 ./infinity-loop.sh`, `agent_logs/loop-execution.jsonl` contains entries even though no real sessions ran.
+**Symptom**: After running `LOOP_DRY_RUN=1 ./.compound-agent/infinity-loop.sh`, `.compound-agent/agent_logs/loop-execution.jsonl` contains entries even though no real sessions ran.
 
 **Root cause**: Older generated scripts lacked guards around execution log writes during dry-run mode. The dry-run path exercised the full loop logic including log writes.
 
@@ -187,9 +187,9 @@ See `review-fleet.md` for correct per-reviewer invocation flags.
 **Diagnosis**:
 ```bash
 # Check for dry-run entries (they'll have duration_s: 0)
-grep '"duration_s":0' agent_logs/loop-execution.jsonl
+grep '"duration_s":0' .compound-agent/agent_logs/loop-execution.jsonl
 # Clean up ghost entries
-: > agent_logs/loop-execution.jsonl   # Truncate if all entries are ghosts
+: > .compound-agent/agent_logs/loop-execution.jsonl   # Truncate if all entries are ghosts
 ```
 
 ---
@@ -208,7 +208,7 @@ Or edit the existing script: change `MODEL='claude-opus-4-6'` to `MODEL='claude-
 
 **Diagnosis**:
 ```bash
-grep "^MODEL=" infinity-loop.sh
+grep "^MODEL=" .compound-agent/infinity-loop.sh
 # Should show: MODEL='claude-opus-4-6[1m]'
 # Bad: MODEL='claude-opus-4-6' (missing [1m])
 ```
@@ -231,9 +231,9 @@ Or edit the existing script: add `--permission-mode auto \` after `--dangerously
 
 **Diagnosis**:
 ```bash
-grep "permission-mode" infinity-loop.sh
+grep "permission-mode" .compound-agent/infinity-loop.sh
 # Should find: --permission-mode auto
-grep "end_turn" agent_logs/trace_*.jsonl | tail -5
+grep "end_turn" .compound-agent/agent_logs/trace_*.jsonl | tail -5
 ```
 
 ---
@@ -248,10 +248,10 @@ grep "end_turn" agent_logs/trace_*.jsonl | tail -5
 
 **Diagnosis**:
 ```bash
-grep "STALE_WATCHDOG" agent_logs/memory_*.log
+grep "STALE_WATCHDOG" .compound-agent/agent_logs/memory_*.log
 # Tune the timeout for your workload:
-SESSION_STALE_TIMEOUT=900 ./infinity-loop.sh   # 15 min (aggressive)
-SESSION_STALE_TIMEOUT=3600 ./infinity-loop.sh  # 60 min (lenient)
+SESSION_STALE_TIMEOUT=900 ./.compound-agent/infinity-loop.sh   # 15 min (aggressive)
+SESSION_STALE_TIMEOUT=3600 ./.compound-agent/infinity-loop.sh  # 60 min (lenient)
 ```
 
 ---
@@ -276,8 +276,8 @@ Common causes:
 
 **Diagnosis**:
 ```bash
-grep "Skip.*blocked by" agent_logs/loop_*.log 2>/dev/null
-tail -1 agent_logs/loop-execution.jsonl   # Check summary
+grep "Skip.*blocked by" .compound-agent/agent_logs/loop_*.log 2>/dev/null
+tail -1 .compound-agent/agent_logs/loop-execution.jsonl   # Check summary
 ```
 
 ---

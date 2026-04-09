@@ -13,7 +13,7 @@ The polish loop (`ca polish`) generates a standalone bash script that iterates N
 | Spec file | `--spec-file <path>` | (required) | Spec file for audit context |
 | Meta-epic | `--meta-epic <id>` | (required) | Parent meta-epic ID |
 | Reviewers | `--reviewers <names>` | claude-sonnet,claude-opus,gemini,codex | Audit fleet |
-| Output | `-o, --output <path>` | ./polish-loop.sh | Script output path |
+| Output | `-o, --output <path>` | ./.compound-agent/polish-loop.sh | Script output path |
 | Force | `--force` | false | Overwrite existing script |
 
 ## How It Works
@@ -48,7 +48,7 @@ ca polish --spec-file "docs/specs/my-spec.md" --meta-epic "my-meta-epic" \
   --reviewers "claude-sonnet,claude-opus,gemini" --cycles 3 --force
 
 # Run in sequence
-bash infinity-loop.sh && bash polish-loop.sh
+bash .compound-agent/infinity-loop.sh && bash .compound-agent/polish-loop.sh
 ```
 
 Or create a pipeline script:
@@ -56,8 +56,8 @@ Or create a pipeline script:
 ```bash
 #!/usr/bin/env bash
 set -euo pipefail
-bash infinity-loop.sh
-bash polish-loop.sh
+bash .compound-agent/infinity-loop.sh
+bash .compound-agent/polish-loop.sh
 git push 2>/dev/null || echo "git push failed"
 ```
 
@@ -76,7 +76,7 @@ git push 2>/dev/null || echo "git push failed"
 | `npx not found` | Node.js/npm not installed | Install Node.js 18+ |
 | `claude CLI not found` | Claude Code not installed | Install Claude Code |
 | `bd CLI not found` | Beads not installed | Install beads |
-| No epics created | Polish architect found nothing to fix | Check audit reports in `agent_logs/polish-cycle-N/` |
+| No epics created | Polish architect found nothing to fix | Check audit reports in `.compound-agent/agent_logs/polish-cycle-N/` |
 | Inner loop exits with code 2 | All polish epics blocked (likely dep on meta-epic) | Run `bd blocked` and remove stale deps |
-| Inner loop crashes | Generated inner loop has issues | Check `agent_logs/polish-cycle-N/inner-loop.stderr` |
-| Reviewer produces empty output | CLI crash or timeout | Check `agent_logs/polish-cycle-N/<reviewer>.stderr` |
+| Inner loop crashes | Generated inner loop has issues | Check `.compound-agent/agent_logs/polish-cycle-N/inner-loop.stderr` |
+| Reviewer produces empty output | CLI crash or timeout | Check `.compound-agent/agent_logs/polish-cycle-N/<reviewer>.stderr` |

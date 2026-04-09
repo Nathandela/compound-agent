@@ -483,6 +483,183 @@ func TestInitRepo_PrunesStaleTemplates(t *testing.T) {
 	}
 }
 
+func TestInitRepo_CreatesArtifactRoot(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, ".git"), 0755)
+
+	_, err := InitRepo(dir, InitOptions{SkipHooks: true, SkipTemplates: true})
+	if err != nil {
+		t.Fatalf("InitRepo failed: %v", err)
+	}
+
+	artifactDir := filepath.Join(dir, ArtifactRoot)
+	if _, err := os.Stat(artifactDir); os.IsNotExist(err) {
+		t.Error("expected .compound-agent/ directory to be created")
+	}
+}
+
+func TestEnsureRootGitignore(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	if err := EnsureRootGitignore(dir); err != nil {
+		t.Fatalf("EnsureRootGitignore failed: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	if err != nil {
+		t.Fatalf("failed to read root .gitignore: %v", err)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "# compound-agent managed") {
+		t.Error("missing marker in root .gitignore")
+	}
+	if !strings.Contains(content, ArtifactRoot+"/") {
+		t.Errorf("missing %s/ in root .gitignore", ArtifactRoot)
+	}
+}
+
+func TestEnsureRootGitignore_Idempotent(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	if err := EnsureRootGitignore(dir); err != nil {
+		t.Fatalf("first call: %v", err)
+	}
+	first, _ := os.ReadFile(filepath.Join(dir, ".gitignore"))
+
+	if err := EnsureRootGitignore(dir); err != nil {
+		t.Fatalf("second call: %v", err)
+	}
+	second, _ := os.ReadFile(filepath.Join(dir, ".gitignore"))
+
+	if string(first) != string(second) {
+		t.Error("root .gitignore changed on second call")
+	}
+}
+
+func TestEnsureRootGitignore_AppendsToExisting(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	existing := "node_modules/\ndist/\n"
+	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(existing), 0644)
+
+	if err := EnsureRootGitignore(dir); err != nil {
+		t.Fatalf("EnsureRootGitignore failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	content := string(data)
+	if !strings.Contains(content, "node_modules/") {
+		t.Error("existing content was lost")
+	}
+	if !strings.Contains(content, ArtifactRoot+"/") {
+		t.Error("artifact root not appended")
+	}
+}
+
+func TestEnsureRootGitignore_MigratesStaleEntries(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	// Simulate old-style marker block with individual entries
+	stale := "# compound-agent managed\nagent_logs/\ninfinity-loop.sh\npolish-loop.sh\nimprovement-loop.sh\n"
+	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(stale), 0644)
+
+	if err := EnsureRootGitignore(dir); err != nil {
+		t.Fatalf("EnsureRootGitignore failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(dir, ".gitignore"))
+	content := string(data)
+	if !strings.Contains(content, ArtifactRoot+"/") {
+		t.Error("new entry not present after migration")
+	}
+	if strings.Contains(content, "agent_logs/") {
+		t.Error("stale agent_logs/ entry should be replaced")
+	}
+}
+
+func TestMigrateLegacyArtifacts(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	// Create legacy artifacts
+	os.MkdirAll(filepath.Join(dir, "agent_logs"), 0755)
+	os.WriteFile(filepath.Join(dir, "agent_logs", "test.log"), []byte("log data"), 0644)
+	os.WriteFile(filepath.Join(dir, "infinity-loop.sh"), []byte("#!/bin/bash"), 0755)
+	os.WriteFile(filepath.Join(dir, "polish-loop.sh"), []byte("#!/bin/bash"), 0755)
+
+	if err := MigrateLegacyArtifacts(dir); err != nil {
+		t.Fatalf("MigrateLegacyArtifacts failed: %v", err)
+	}
+
+	// Verify moved
+	artifactRoot := filepath.Join(dir, ArtifactRoot)
+	if _, err := os.Stat(filepath.Join(artifactRoot, ArtifactLogDir, "test.log")); os.IsNotExist(err) {
+		t.Error("agent_logs/test.log not migrated")
+	}
+	if _, err := os.Stat(filepath.Join(artifactRoot, "infinity-loop.sh")); os.IsNotExist(err) {
+		t.Error("infinity-loop.sh not migrated")
+	}
+	if _, err := os.Stat(filepath.Join(artifactRoot, "polish-loop.sh")); os.IsNotExist(err) {
+		t.Error("polish-loop.sh not migrated")
+	}
+
+	// Verify legacy removed
+	if _, err := os.Stat(filepath.Join(dir, "agent_logs")); !os.IsNotExist(err) {
+		t.Error("legacy agent_logs/ should be removed after migration")
+	}
+	if _, err := os.Stat(filepath.Join(dir, "infinity-loop.sh")); !os.IsNotExist(err) {
+		t.Error("legacy infinity-loop.sh should be removed after migration")
+	}
+}
+
+func TestMigrateLegacyArtifacts_ConflictGuard(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	// Create both legacy and new-location artifacts
+	os.MkdirAll(filepath.Join(dir, "agent_logs"), 0755)
+	os.WriteFile(filepath.Join(dir, "agent_logs", "old.log"), []byte("old"), 0644)
+
+	artifactRoot := filepath.Join(dir, ArtifactRoot)
+	os.MkdirAll(filepath.Join(artifactRoot, ArtifactLogDir), 0755)
+	os.WriteFile(filepath.Join(artifactRoot, ArtifactLogDir, "new.log"), []byte("new"), 0644)
+
+	if err := MigrateLegacyArtifacts(dir); err != nil {
+		t.Fatalf("MigrateLegacyArtifacts failed: %v", err)
+	}
+
+	// Legacy should still exist (skipped)
+	if _, err := os.Stat(filepath.Join(dir, "agent_logs", "old.log")); os.IsNotExist(err) {
+		t.Error("legacy should be preserved on conflict")
+	}
+	// New should be untouched
+	data, _ := os.ReadFile(filepath.Join(artifactRoot, ArtifactLogDir, "new.log"))
+	if string(data) != "new" {
+		t.Error("new-location data should be untouched")
+	}
+}
+
+func TestMigrateLegacyArtifacts_NothingToMigrate(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	// No legacy artifacts — should be a no-op
+	if err := MigrateLegacyArtifacts(dir); err != nil {
+		t.Fatalf("MigrateLegacyArtifacts failed: %v", err)
+	}
+
+	// .compound-agent/ should exist (created by the function)
+	if _, err := os.Stat(filepath.Join(dir, ArtifactRoot)); os.IsNotExist(err) {
+		t.Error("artifact root should be created even with nothing to migrate")
+	}
+}
+
 func TestInitRepo_DirsCreatedAccurate(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

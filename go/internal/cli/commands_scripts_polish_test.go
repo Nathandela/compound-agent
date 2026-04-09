@@ -41,6 +41,28 @@ func TestPolishCommand_GeneratesScript(t *testing.T) {
 	}
 }
 
+func TestPolishCommand_UsesCompoundAgentLogDir(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/specs/my-spec.md",
+		"--meta-epic", "test-epic-123")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+	if !strings.Contains(script, `LOG_DIR=".compound-agent/agent_logs"`) {
+		t.Error("expected LOG_DIR to use .compound-agent/agent_logs")
+	}
+}
+
 func TestPolishCommand_ForceOverwrite(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
