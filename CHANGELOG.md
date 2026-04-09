@@ -7,6 +7,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.0] - 2026-04-09
+
+### Changed
+
+- **Artifact consolidation**: All runtime artifacts (loop scripts, agent logs, phase state files) now live under `.compound-agent/` instead of being scattered across the project root and `.claude/`. The `ca setup` command auto-migrates legacy locations with conflict detection (skips if both old and new exist).
+- **Root `.gitignore` management**: `ca setup` now maintains a marker-delimited block in the root `.gitignore` for `.compound-agent/` entries, replacing individual pattern lines.
+
+### Fixed
+
+- **Retrocompatibility**: `GetPhaseState()` now falls back to the legacy `.claude/.ca-phase-state.json` path when the new `.compound-agent/` path is missing, and auto-migrates on first access. Repos upgrading without re-running `ca init` no longer lose active cook-it sessions.
+- **Failure tracker on fresh repos**: `writeFailureState()` now auto-creates the `.compound-agent/` directory, fixing silent `post-tool-failure` hook regression on repos that haven't run `ca init`.
+- **Stale path references**: Updated all `./infinity-loop.sh`, `./polish-loop.sh`, `./improvement-loop.sh` references to `.compound-agent/` prefix in GOTCHA.md, infinity-loop README, review-fleet.md, and generated script headers.
+- **`.claude/.gitignore` cleanup**: Removed stale `.ca-*-state.json` patterns (files moved to `.compound-agent/`), added `.ca-hints-shown` and `skills/compound/skills_index.json`.
+
 ## [2.6.2] - 2026-04-05
 
 ### Added
