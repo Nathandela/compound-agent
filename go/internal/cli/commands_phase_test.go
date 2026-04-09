@@ -11,7 +11,7 @@ import (
 func TestPhaseCheckInit(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	cmd := phaseCheckCmd()
 	out := new(strings.Builder)
@@ -22,7 +22,7 @@ func TestPhaseCheckInit(t *testing.T) {
 	}
 
 	// Verify state file was created
-	statePath := filepath.Join(dir, ".claude", ".ca-phase-state.json")
+	statePath := filepath.Join(dir, ".compound-agent", ".ca-phase-state.json")
 	data, err := os.ReadFile(statePath)
 	if err != nil {
 		t.Fatalf("read state: %v", err)
@@ -47,7 +47,7 @@ func TestPhaseCheckInit(t *testing.T) {
 func TestPhaseCheckStatus(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	// Init first
 	initCmd := phaseCheckCmd()
@@ -76,7 +76,7 @@ func TestPhaseCheckStatus(t *testing.T) {
 func TestPhaseCheckStatusJSON(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	// Init first
 	initCmd := phaseCheckCmd()
@@ -103,7 +103,7 @@ func TestPhaseCheckStatusJSON(t *testing.T) {
 func TestPhaseCheckStart(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	// Init
 	initCmd := phaseCheckCmd()
@@ -125,7 +125,7 @@ func TestPhaseCheckStart(t *testing.T) {
 	}
 
 	// Verify state updated
-	data, _ := os.ReadFile(filepath.Join(dir, ".claude", ".ca-phase-state.json"))
+	data, _ := os.ReadFile(filepath.Join(dir, ".compound-agent", ".ca-phase-state.json"))
 	var state map[string]interface{}
 	json.Unmarshal(data, &state)
 	if state["current_phase"] != "plan" {
@@ -136,7 +136,7 @@ func TestPhaseCheckStart(t *testing.T) {
 func TestPhaseCheckGate(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	// Init
 	initCmd := phaseCheckCmd()
@@ -161,7 +161,7 @@ func TestPhaseCheckGate(t *testing.T) {
 func TestPhaseCheckClean(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	// Init
 	initCmd := phaseCheckCmd()
@@ -170,7 +170,7 @@ func TestPhaseCheckClean(t *testing.T) {
 	initCmd.Execute()
 
 	// Verify state exists
-	statePath := filepath.Join(dir, ".claude", ".ca-phase-state.json")
+	statePath := filepath.Join(dir, ".compound-agent", ".ca-phase-state.json")
 	if _, err := os.Stat(statePath); err != nil {
 		t.Fatal("state file should exist after init")
 	}
@@ -190,7 +190,7 @@ func TestPhaseCheckClean(t *testing.T) {
 func TestPhaseCheckInvalidPhase(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	initCmd := phaseCheckCmd()
 	initCmd.SetArgs([]string{"init", "epic-4", "--repo-root", dir})
@@ -228,7 +228,7 @@ func TestInstallBeadsCmd(t *testing.T) {
 func TestPhaseCheckInitGuardsActiveState(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	// First init succeeds
 	cmd1 := phaseCheckCmd()
@@ -257,7 +257,7 @@ func TestPhaseCheckInitGuardsActiveState(t *testing.T) {
 	}
 
 	// Verify new epic ID
-	data, _ := os.ReadFile(filepath.Join(dir, ".claude", ".ca-phase-state.json"))
+	data, _ := os.ReadFile(filepath.Join(dir, ".compound-agent", ".ca-phase-state.json"))
 	var state map[string]interface{}
 	json.Unmarshal(data, &state)
 	if state["epic_id"] != "epic-b" {
@@ -268,7 +268,7 @@ func TestPhaseCheckInitGuardsActiveState(t *testing.T) {
 func TestPhaseCheckStartResetsGatesAndSkills(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	// Init
 	cmd := phaseCheckCmd()
@@ -289,7 +289,7 @@ func TestPhaseCheckStartResetsGatesAndSkills(t *testing.T) {
 	cmd3.Execute()
 
 	// Verify gates and skills were reset
-	data, _ := os.ReadFile(filepath.Join(dir, ".claude", ".ca-phase-state.json"))
+	data, _ := os.ReadFile(filepath.Join(dir, ".compound-agent", ".ca-phase-state.json"))
 	var state phaseState
 	json.Unmarshal(data, &state)
 	if len(state.GatesPassed) != 0 {
@@ -303,7 +303,7 @@ func TestPhaseCheckStartResetsGatesAndSkills(t *testing.T) {
 func TestPhaseCheckInitArchitect(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	cmd := phaseCheckCmd()
 	out := new(strings.Builder)
@@ -313,7 +313,7 @@ func TestPhaseCheckInitArchitect(t *testing.T) {
 		t.Fatalf("execute: %v", err)
 	}
 
-	data, err := os.ReadFile(filepath.Join(dir, ".claude", ".ca-phase-state.json"))
+	data, err := os.ReadFile(filepath.Join(dir, ".compound-agent", ".ca-phase-state.json"))
 	if err != nil {
 		t.Fatalf("read state: %v", err)
 	}
@@ -335,7 +335,7 @@ func TestPhaseCheckInitArchitect(t *testing.T) {
 func TestPhaseCheckInitInvalidPhase(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	cmd := phaseCheckCmd()
 	cmd.SetOut(new(strings.Builder))
@@ -350,7 +350,7 @@ func TestPhaseCheckInitInvalidPhase(t *testing.T) {
 func TestPhaseCheckStartArchitect(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, ".claude"), 0755)
+	os.MkdirAll(filepath.Join(dir, ".compound-agent"), 0755)
 
 	// Init as architect first
 	initCmd := phaseCheckCmd()

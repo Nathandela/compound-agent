@@ -193,9 +193,8 @@ func TestEnsureGitignore(t *testing.T) {
 		"*.sqlite",
 		"*.sqlite-shm",
 		"*.sqlite-wal",
-		".ca-phase-state.json",
-		".ca-failure-state.json",
-		".ca-read-state.json",
+		".ca-hints-shown",
+		"skills/compound/skills_index.json",
 	} {
 		if !strings.Contains(content, pattern) {
 			t.Errorf("missing pattern %q in .gitignore", pattern)
@@ -248,7 +247,7 @@ func TestEnsureGitignore_AppendsToExisting(t *testing.T) {
 	if !strings.Contains(content, "# compound-agent managed") {
 		t.Error("marker not appended")
 	}
-	if !strings.Contains(content, ".ca-phase-state.json") {
+	if !strings.Contains(content, ".ca-hints-shown") {
 		t.Error("patterns not appended")
 	}
 }
@@ -657,6 +656,70 @@ func TestMigrateLegacyArtifacts_NothingToMigrate(t *testing.T) {
 	// .compound-agent/ should exist (created by the function)
 	if _, err := os.Stat(filepath.Join(dir, ArtifactRoot)); os.IsNotExist(err) {
 		t.Error("artifact root should be created even with nothing to migrate")
+	}
+}
+
+func TestMigrateLegacyArtifacts_StateFiles(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	// Create legacy state files in .claude/
+	claudeDir := filepath.Join(dir, ".claude")
+	os.MkdirAll(claudeDir, 0755)
+	os.WriteFile(filepath.Join(claudeDir, ".ca-phase-state.json"), []byte(`{"epic_id":"test"}`), 0644)
+	os.WriteFile(filepath.Join(claudeDir, ".ca-failure-state.json"), []byte(`{"count":1}`), 0644)
+
+	if err := MigrateLegacyArtifacts(dir); err != nil {
+		t.Fatalf("MigrateLegacyArtifacts failed: %v", err)
+	}
+
+	artifactRoot := filepath.Join(dir, ArtifactRoot)
+
+	// Verify moved
+	data, err := os.ReadFile(filepath.Join(artifactRoot, ".ca-phase-state.json"))
+	if err != nil {
+		t.Error(".ca-phase-state.json not migrated")
+	} else if string(data) != `{"epic_id":"test"}` {
+		t.Errorf("phase state content = %q, want original", string(data))
+	}
+
+	if _, err := os.Stat(filepath.Join(artifactRoot, ".ca-failure-state.json")); os.IsNotExist(err) {
+		t.Error(".ca-failure-state.json not migrated")
+	}
+
+	// Verify legacy removed
+	if _, err := os.Stat(filepath.Join(claudeDir, ".ca-phase-state.json")); !os.IsNotExist(err) {
+		t.Error("legacy .ca-phase-state.json should be removed after migration")
+	}
+}
+
+func TestMigrateLegacyArtifacts_StateFileConflict(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+
+	// Create legacy state file in .claude/
+	claudeDir := filepath.Join(dir, ".claude")
+	os.MkdirAll(claudeDir, 0755)
+	os.WriteFile(filepath.Join(claudeDir, ".ca-phase-state.json"), []byte(`{"epic_id":"old"}`), 0644)
+
+	// Create new-location state file in .compound-agent/
+	artifactRoot := filepath.Join(dir, ArtifactRoot)
+	os.MkdirAll(artifactRoot, 0755)
+	os.WriteFile(filepath.Join(artifactRoot, ".ca-phase-state.json"), []byte(`{"epic_id":"new"}`), 0644)
+
+	if err := MigrateLegacyArtifacts(dir); err != nil {
+		t.Fatalf("MigrateLegacyArtifacts failed: %v", err)
+	}
+
+	// Legacy should still exist (skipped due to conflict)
+	if _, err := os.Stat(filepath.Join(claudeDir, ".ca-phase-state.json")); os.IsNotExist(err) {
+		t.Error("legacy should be preserved on conflict")
+	}
+
+	// New-location should be untouched
+	data, _ := os.ReadFile(filepath.Join(artifactRoot, ".ca-phase-state.json"))
+	if string(data) != `{"epic_id":"new"}` {
+		t.Error("new-location data should be untouched on conflict")
 	}
 }
 

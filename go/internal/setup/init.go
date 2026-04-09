@@ -297,6 +297,10 @@ func MigrateLegacyArtifacts(repoRoot string) error {
 		{"infinity-loop.sh", "infinity-loop.sh"},
 		{"polish-loop.sh", "polish-loop.sh"},
 		{"improvement-loop.sh", "improvement-loop.sh"},
+		// Phase state files migrated from .claude/ to .compound-agent/
+		{filepath.Join(".claude", ".ca-phase-state.json"), ".ca-phase-state.json"},
+		{filepath.Join(".claude", ".ca-failure-state.json"), ".ca-failure-state.json"},
+		{filepath.Join(".claude", ".ca-read-state.json"), ".ca-read-state.json"},
 	}
 
 	for _, item := range items {
@@ -345,9 +349,6 @@ func EnsureGitignore(repoRoot string) error {
 *.sqlite
 *.sqlite-shm
 *.sqlite-wal
-.ca-phase-state.json
-.ca-failure-state.json
-.ca-read-state.json
 .ca-hints-shown
 skills/compound/skills_index.json
 `

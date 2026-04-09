@@ -197,7 +197,7 @@ func dispatchToolFailure(stdin io.Reader, hookName string, db *sql.DB) (interfac
 		data.ToolInput = map[string]interface{}{}
 	}
 	repoRoot := util.GetRepoRoot()
-	stateDir := filepath.Join(repoRoot, ".claude")
+	stateDir := filepath.Join(repoRoot, stateArtifactDir)
 	searchFn := makeLessonSearchFunc(db, repoRoot, hookName)
 	return ProcessToolFailureWithSearch(data.ToolName, data.ToolInput, data.ToolOutput, stateDir, searchFn), 0, false
 }
@@ -259,7 +259,7 @@ func dispatchToolSuccess(stdin io.Reader) (interface{}, int, bool) {
 	if err != nil {
 		return handleErrorResult("post-tool-success", err), 0, true
 	}
-	stateDir := filepath.Join(util.GetRepoRoot(), ".claude")
+	stateDir := filepath.Join(util.GetRepoRoot(), stateArtifactDir)
 	ProcessToolSuccess(stateDir)
 	return map[string]interface{}{}, 0, false
 }

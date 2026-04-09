@@ -45,9 +45,13 @@ func maxPhaseIndex() int {
 	return max
 }
 
+// stateArtifactDir is the directory for compound-agent runtime state files.
+// Must match setup.ArtifactRoot.
+const stateArtifactDir = ".compound-agent"
+
 // PhaseStatePath returns the filesystem path for the phase state file.
 func PhaseStatePath(repoRoot string) string {
-	return filepath.Join(repoRoot, ".claude", ".ca-phase-state.json")
+	return filepath.Join(repoRoot, stateArtifactDir, ".ca-phase-state.json")
 }
 
 // GetPhaseState reads and validates the phase state from disk.

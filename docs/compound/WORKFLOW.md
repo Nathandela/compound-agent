@@ -99,7 +99,7 @@ If interrupted, cook-it can resume:
 
 ### Phase state tracking
 
-Cook-it persists state in `.claude/.ca-phase-state.json`. Useful commands:
+Cook-it persists state in `.compound-agent/.ca-phase-state.json`. Useful commands:
 
 ```bash
 ca phase-check status      # See current phase state

@@ -20,7 +20,7 @@ func TestGetPhaseState_NoFile(t *testing.T) {
 func TestGetPhaseState_ValidState(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".claude")
+	stateDir := filepath.Join(dir, ".compound-agent")
 	os.MkdirAll(stateDir, 0o755)
 
 	state := PhaseState{
@@ -50,7 +50,7 @@ func TestGetPhaseState_ValidState(t *testing.T) {
 func TestGetPhaseState_CorruptedJSON(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".claude")
+	stateDir := filepath.Join(dir, ".compound-agent")
 	os.MkdirAll(stateDir, 0o755)
 	os.WriteFile(filepath.Join(stateDir, ".ca-phase-state.json"), []byte("{bad json"), 0o644)
 
@@ -63,7 +63,7 @@ func TestGetPhaseState_CorruptedJSON(t *testing.T) {
 func TestGetPhaseState_StaleState(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".claude")
+	stateDir := filepath.Join(dir, ".compound-agent")
 	os.MkdirAll(stateDir, 0o755)
 
 	state := PhaseState{
@@ -87,7 +87,7 @@ func TestGetPhaseState_StaleState(t *testing.T) {
 func TestGetPhaseState_InactiveState(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".claude")
+	stateDir := filepath.Join(dir, ".compound-agent")
 	os.MkdirAll(stateDir, 0o755)
 
 	state := PhaseState{
@@ -114,7 +114,7 @@ func TestGetPhaseState_InactiveState(t *testing.T) {
 func TestGetPhaseState_LegacyLfgActive(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".claude")
+	stateDir := filepath.Join(dir, ".compound-agent")
 	os.MkdirAll(stateDir, 0o755)
 
 	// Legacy format uses lfg_active
@@ -133,7 +133,7 @@ func TestGetPhaseState_LegacyLfgActive(t *testing.T) {
 func TestUpdatePhaseState(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".claude")
+	stateDir := filepath.Join(dir, ".compound-agent")
 	os.MkdirAll(stateDir, 0o755)
 
 	state := PhaseState{
@@ -167,7 +167,7 @@ func TestUpdatePhaseState(t *testing.T) {
 func TestWritePhaseState(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".claude")
+	stateDir := filepath.Join(dir, ".compound-agent")
 	os.MkdirAll(stateDir, 0o755)
 
 	state := &PhaseState{
@@ -199,7 +199,7 @@ func TestWritePhaseState(t *testing.T) {
 func TestPhaseStatePath(t *testing.T) {
 	t.Parallel()
 	got := PhaseStatePath("/some/repo")
-	want := filepath.Join("/some/repo", ".claude", ".ca-phase-state.json")
+	want := filepath.Join("/some/repo", ".compound-agent", ".ca-phase-state.json")
 	if got != want {
 		t.Errorf("PhaseStatePath = %q, want %q", got, want)
 	}
@@ -256,7 +256,7 @@ func TestCleanPhaseStateIfFinal(t *testing.T) {
 	t.Parallel()
 	t.Run("cleans when final gate present", func(t *testing.T) {
 		dir := t.TempDir()
-		stateDir := filepath.Join(dir, ".claude")
+		stateDir := filepath.Join(dir, ".compound-agent")
 		os.MkdirAll(stateDir, 0o755)
 
 		state := &PhaseState{
@@ -279,7 +279,7 @@ func TestCleanPhaseStateIfFinal(t *testing.T) {
 
 	t.Run("preserves when final gate absent", func(t *testing.T) {
 		dir := t.TempDir()
-		stateDir := filepath.Join(dir, ".claude")
+		stateDir := filepath.Join(dir, ".compound-agent")
 		os.MkdirAll(stateDir, 0o755)
 
 		state := &PhaseState{
@@ -317,7 +317,7 @@ func TestPhaseIndex_Architect(t *testing.T) {
 func TestGetPhaseState_ArchitectPhase(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".claude")
+	stateDir := filepath.Join(dir, ".compound-agent")
 	os.MkdirAll(stateDir, 0o755)
 
 	state := PhaseState{

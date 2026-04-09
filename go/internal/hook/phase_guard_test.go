@@ -11,7 +11,7 @@ import (
 
 func writePhaseState(t *testing.T, dir string, state PhaseState) {
 	t.Helper()
-	stateDir := filepath.Join(dir, ".claude")
+	stateDir := filepath.Join(dir, ".compound-agent")
 	if err := os.MkdirAll(stateDir, 0o755); err != nil {
 		t.Fatal(err)
 	}

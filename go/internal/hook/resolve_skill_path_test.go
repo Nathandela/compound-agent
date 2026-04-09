@@ -78,7 +78,7 @@ func TestProcessPhaseGuard_UsesResolveSkillPath(t *testing.T) {
 func TestProcessPhaseGuard_ArchitectPhase(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".claude")
+	stateDir := filepath.Join(dir, ".compound-agent")
 	os.MkdirAll(stateDir, 0o755)
 
 	// Write a state with architect phase manually (not via normal cook-it flow)
@@ -105,7 +105,7 @@ func TestProcessPhaseGuard_ArchitectPhase(t *testing.T) {
 func TestProcessPhaseGuard_ArchitectPhase_NotRead(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	stateDir := filepath.Join(dir, ".claude")
+	stateDir := filepath.Join(dir, ".compound-agent")
 	os.MkdirAll(stateDir, 0o755)
 
 	state := PhaseState{

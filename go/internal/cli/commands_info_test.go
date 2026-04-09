@@ -259,8 +259,8 @@ func TestInfoCmd_PhaseStateActive(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 
-	claudeDir := filepath.Join(dir, ".claude")
-	if err := os.MkdirAll(claudeDir, 0755); err != nil {
+	artifactDir := filepath.Join(dir, ".compound-agent")
+	if err := os.MkdirAll(artifactDir, 0755); err != nil {
 		t.Fatal(err)
 	}
 	state := hook.PhaseState{

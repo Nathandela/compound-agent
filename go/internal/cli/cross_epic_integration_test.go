@@ -71,8 +71,8 @@ func TestSkillIndex_Exactly13Skills(t *testing.T) {
 // handles the legacy "lfg_active" field name from older versions.
 func TestPhaseGuard_LegacyLfgActiveField(t *testing.T) {
 	dir := t.TempDir()
-	claudeDir := filepath.Join(dir, ".claude")
-	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+	artifactDir := filepath.Join(dir, ".compound-agent")
+	if err := os.MkdirAll(artifactDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -112,8 +112,8 @@ func TestPhaseGuard_LegacyLfgActiveField(t *testing.T) {
 // TestPhaseGuard_NewCookitActiveField verifies the current "cookit_active" field works.
 func TestPhaseGuard_NewCookitActiveField(t *testing.T) {
 	dir := t.TempDir()
-	claudeDir := filepath.Join(dir, ".claude")
-	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+	artifactDir := filepath.Join(dir, ".compound-agent")
+	if err := os.MkdirAll(artifactDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
 
@@ -178,7 +178,11 @@ func TestInfoCmd_CrossEpic_AllDataSources(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Source 3: phase state
+	// Source 3: phase state (lives in .compound-agent/)
+	artifactDir := filepath.Join(dir, ".compound-agent")
+	if err := os.MkdirAll(artifactDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	state := hook.PhaseState{
 		CookitActive: true,
 		EpicID:       "cross-epic-test",

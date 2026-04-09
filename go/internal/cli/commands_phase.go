@@ -64,8 +64,8 @@ func handlePhaseInit(cmd *cobra.Command, root, epicID string, force bool, phase 
 		return fmt.Errorf("invalid phase %q. Valid: %v", phase, hook.ValidSkillPhases)
 	}
 
-	if err := os.MkdirAll(filepath.Join(root, ".claude"), 0755); err != nil {
-		return fmt.Errorf("create .claude dir: %w", err)
+	if err := os.MkdirAll(filepath.Join(root, ".compound-agent"), 0755); err != nil {
+		return fmt.Errorf("create .compound-agent dir: %w", err)
 	}
 
 	if !force {
