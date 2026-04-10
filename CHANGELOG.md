@@ -7,6 +7,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.7.1] - 2026-04-10
+
+### Added
+
+- **Surface alignment reviewer**: New agent-role-skill that verifies cross-layer connectivity (frontend↔backend↔database↔API). Checks regenerate-and-diff compliance, architecture test presence, database testing fidelity, schema evolution safety, and auth surface coverage. Spawned for medium and large diffs during review phase.
+- **P16 "Surfaces stay connected"**: New principle in the agentic audit/setup manifesto (Pillar II). Scores projects on cross-layer integration testing maturity (0-2). Updated overall scoring from 30→32.
+- **5 deep research documents** shipped with the library: architecture tests (ArchUnit survey), regenerate-and-diff patterns, database testing patterns, test infrastructure as code, and protobuf schema evolution. Mapped to specific reviewer agents for calibrated reviews.
+- **Research-calibrated review fleet**: Review skill now includes surface-alignment-reviewer in medium+ tier (9 reviewers), with calibration query for surface alignment lessons. Lesson-calibration references updated with all 5 research doc mappings.
+
+### Changed
+
+- **build-great-things**: Added "System coherence is craft" as third design philosophy foundation. New structural coherence section in mandatory quality checklist (6 items). Added laziness pattern #13 "Disconnected layers".
+- **Existing reviewers enhanced**: drift-detector, test-coverage-reviewer, and architecture-reviewer now reference relevant research documents. test-coverage-reviewer distinguishes integration from unit tests and flags SQLite substitution.
+
+### Fixed
+
+- **Dependencies**: `modernc.org/sqlite` 1.48.0→1.48.1 (fixes memory leaks and double-free in multi-statement queries), `libc` 0.2.183→0.2.184 (patch bump of transitive Rust dependency).
+
 ## [2.7.0] - 2026-04-09
 
 ### Changed
