@@ -47,6 +47,11 @@ Beyond lessons, reviewers may receive research excerpts:
 - `docs/compound/research/code-review/` — for systematic review methodology
 - `docs/compound/research/tdd/` — for TDD and testing pattern reviews
 - `docs/compound/research/property-testing/` — for property-based test reviews
+- `docs/compound/research/tdd/architecture-tests-archunit.md` — for architecture-reviewer and drift-detector (layer isolation rules, dependency graph enforcement)
+- `docs/compound/research/tdd/regenerate-and-diff-testing.md` — for surface-alignment-reviewer and drift-detector (derived artifact freshness)
+- `docs/compound/research/tdd/database-testing-patterns.md` — for test-coverage-reviewer and surface-alignment-reviewer (DB testing fidelity, anti-patterns)
+- `docs/compound/research/tdd/test-infrastructure-as-code.md` — for test-coverage-reviewer (Testcontainers, fixture orchestration, service virtualization)
+- `docs/compound/research/spec_design/protobuf-schema-evolution.md` — for surface-alignment-reviewer and security-reviewer (schema breaking change detection)
 
 Only include excerpts that are directly relevant to the reviewer's domain and the specific code under review.
 

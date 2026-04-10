@@ -24,6 +24,8 @@ module-boundary-reviewer -> **Drift Detector** -> implementation-reviewer
 
 ## Literature
 - Consult `docs/compound/research/property-testing/` for invariant-driven development and constraint verification
+- Consult `docs/compound/research/tdd/architecture-tests-archunit.md` for executable architecture rules (layer isolation, cycle detection, framework isolation) that prevent structural drift
+- Consult `docs/compound/research/tdd/regenerate-and-diff-testing.md` for detecting stale derived artifacts (generated types, migrations, lockfiles)
 - Run `ca knowledge "invariant drift detection"` for indexed knowledge on drift patterns
 
 ## Deployment

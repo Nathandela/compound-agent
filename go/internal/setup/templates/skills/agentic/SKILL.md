@@ -1,6 +1,6 @@
 ---
 name: Agentic Codebase
-description: Audit and set up a codebase for agentic AI development using the 15-principle manifesto
+description: Audit and set up a codebase for agentic AI development using the 16-principle manifesto
 phase: work
 ---
 
@@ -8,7 +8,7 @@ phase: work
 
 ## Overview
 
-Assess and improve a codebase's readiness for AI agent collaboration. Based on the 15-principle Agentic Codebase Manifesto organized across 3 pillars.
+Assess and improve a codebase's readiness for AI agent collaboration. Based on the 16-principle Agentic Codebase Manifesto organized across 3 pillars.
 
 This skill operates in two modes:
 - **Mode: audit** -- Score the codebase against all 15 principles, produce a report with evidence and prioritized actions
@@ -66,7 +66,7 @@ Score 0: Documentation lives outside version control
 Score 1: Some docs in repo but key knowledge is external
 Score 2: All project knowledge versioned in docs/
 
-#### Pillar II: Implementation Feedbacks (Mechanical Verification) -- max 8 points
+#### Pillar II: Implementation Feedbacks (Mechanical Verification) -- max 10 points
 
 **P5. Test is specification**
 Check: Tests define behavior before or alongside implementation
@@ -95,6 +95,13 @@ Evidence: Automated formatting, dependency updates, quality monitoring
 Score 0: No automated maintenance
 Score 1: Basic formatting but no proactive monitoring
 Score 2: Automated formatting + dependency updates + quality tracking
+
+**P16. Surfaces stay connected**
+Check: Cross-layer alignment is verified automatically (generated artifacts, DB migrations, API contracts, auth routes)
+Evidence: Look for regenerate-and-diff CI steps, architecture test infrastructure, real-DB integration tests, schema evolution guards, dynamic auth scanning
+Score 0: No cross-layer tests or verification -- layers can drift silently
+Score 1: Some integration tests exist but no regenerate-and-diff, no architecture rules, or tests use SQLite/mocks instead of real database
+Score 2: Automated surface alignment checks in CI -- generated artifacts verified fresh, layer isolation enforced, DB tests use real connections, schema evolution guarded
 
 #### Pillar III: Mapping the Context (Navigable Structure) -- max 8 points
 
@@ -158,7 +165,7 @@ Score 2: Well-decomposed with clear interfaces
    - Grep for: type annotations, structured logging, ADR format
    - Read key files: README, config files, sample source files
 4. Score each principle (0-2) with specific evidence
-5. Aggregate scores by pillar and compute total out of 30
+5. Aggregate scores by pillar and compute total out of 32
 6. Generate prioritized actions (score-0 first, then score-1)
 7. Present report to user
 
@@ -204,6 +211,13 @@ Run the full audit first. Setup only addresses gaps found by the audit.
 **P13 gaps**: Flag over-abstraction (deep inheritance, excessive wrappers), suggest simplification targets
 **P14 gaps**: Suggest CI pipeline improvements, test harness setup, or pre-commit hooks for detected stack
 **P15 gaps**: Identify tightly coupled modules, suggest interface extraction for parallel workability
+**P16 gaps**: Suggest surface alignment infrastructure for detected stack:
+  - **Go**: `arch-go` config for layer rules + `pgtestdb`/Testcontainers for real DB tests
+  - **Python**: `import-linter` for layer isolation + `pytest-alembic` for migration testing + Testcontainers
+  - **JavaScript/TypeScript**: `dependency-cruiser` for import boundaries + schema validation CI step
+  - **Java/Kotlin**: ArchUnit test skeleton + Testcontainers + Flyway validate
+  - **Any stack with generated code**: Regenerate-and-diff CI step (`generate && git diff --exit-code`)
+  - **Any stack with API routes**: Dynamic auth route scanning test skeleton
 **P8 gaps**: Suggest automated formatting (prettier/black/rustfmt), dependency update tooling (renovate/dependabot), and quality monitoring
 
 3. Before each action, use \`AskUserQuestion\`: "Create [file]? Preview: [content]"
@@ -233,7 +247,7 @@ After all approved actions are applied, verify:
 
 ## Quality Criteria
 
-- All 15 principles assessed with specific evidence
+- All 16 principles assessed with specific evidence
 - Scores justified with findings
 - Pillar totals and overall score calculated correctly
 - Actions prioritized (score-0 before score-1)

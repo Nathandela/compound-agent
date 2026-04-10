@@ -36,6 +36,16 @@ Deep research produced via `/compound:get-a-phd` for agent domain knowledge. Eac
 | Document | Target Agents |
 |----------|---------------|
 | [tdd/test-driven-development-methodology.md](tdd/test-driven-development-methodology.md) | work phase, test-writer, implementer, cct-subagent |
+| [tdd/architecture-tests-archunit.md](tdd/architecture-tests-archunit.md) | surface-alignment-reviewer, architecture-reviewer, drift-detector, agentic-setup |
+| [tdd/regenerate-and-diff-testing.md](tdd/regenerate-and-diff-testing.md) | surface-alignment-reviewer, drift-detector, build-great-things |
+| [tdd/database-testing-patterns.md](tdd/database-testing-patterns.md) | surface-alignment-reviewer, test-coverage-reviewer, anti-cargo-cult-reviewer |
+| [tdd/test-infrastructure-as-code.md](tdd/test-infrastructure-as-code.md) | surface-alignment-reviewer, test-coverage-reviewer, agentic-setup |
+
+### Schema Evolution
+
+| Document | Target Agents |
+|----------|---------------|
+| [spec_design/protobuf-schema-evolution.md](spec_design/protobuf-schema-evolution.md) | surface-alignment-reviewer, architecture-reviewer, spec-dev |
 
 ### Property Testing
 

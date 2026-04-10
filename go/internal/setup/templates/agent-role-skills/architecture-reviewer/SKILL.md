@@ -19,6 +19,7 @@ Review code for architectural consistency, pattern compliance, module boundary i
 
 ## Literature
 - Consult `docs/compound/research/code-review/` for systematic review methodology and architectural assessment frameworks
+- Consult `docs/compound/research/tdd/architecture-tests-archunit.md` for executable layer isolation rules per language (ArchUnit, import-linter, dependency-cruiser, arch-go)
 - Run `ca knowledge "architecture module design"` for indexed knowledge on design patterns
 
 ## Collaboration

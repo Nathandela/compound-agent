@@ -46,6 +46,23 @@ The perceptual science behind the constraints:
 
 *Full survey: `docs/compound/research/design/web-apps/refactoring-ui-design-principles.md`*
 
+### System coherence is craft (Surface Alignment)
+
+The first two foundations address code architecture and visual design. This third addresses the connective tissue between layers. A great product is not just well-structured and beautiful — it is *connected*. Every layer talks to every other layer through verified channels, not assumed ones.
+
+The core failure mode of AI-assisted development is **disconnected layers**: a frontend that renders beautifully but calls an API endpoint that doesn't exist, an API that accepts requests but never persists to the database, a migration that runs but doesn't match the ORM models, generated types that were committed once and never updated. Each layer passes its own tests in isolation, but the system as a whole doesn't work.
+
+The antidote is **surface alignment** — the discipline of verifying that derived artifacts match their source of truth, that layers enforce directional dependencies, and that integration tests hit real infrastructure instead of mocks. This is not separate from craft — it *is* craft. A building with beautiful interiors but no plumbing is not a well-designed building. A web application with polished UI but disconnected persistence is not a well-built product.
+
+The principles:
+
+- **Single source of truth, derived everything else.** Database models generate migrations. API schemas generate client types. The source changes; the artifacts are regenerated and committed. CI fails if they drift. This is the regenerate-and-diff pattern — the most reliable way to prevent layer divergence.
+- **Test through the real stack.** Integration tests that substitute SQLite for PostgreSQL, or mock the HTTP layer, provide false confidence. The semantic differences between databases are exactly where production bugs hide. Use Testcontainers, transaction rollback, or template databases — not mocks.
+- **Enforce layer isolation mechanically.** Import rules (`import-linter`, `dependency-cruiser`, `arch-go`, ArchUnit) catch structural violations at CI time. Without them, domain logic gradually accumulates framework imports, and the architecture diagram becomes fiction.
+- **Every route is either public or protected.** Dynamic route scanning tests discover all endpoints and verify that non-public ones require authentication. Without this, new unprotected routes slip through silently.
+
+*Full surveys: `docs/compound/research/tdd/regenerate-and-diff-testing.md`, `docs/compound/research/tdd/architecture-tests-archunit.md`, `docs/compound/research/tdd/database-testing-patterns.md`*
+
 ---
 
 ## How to Use This Skill
@@ -162,6 +179,14 @@ Every great build follows this sequence. **Do not skip phases.** Do not jump to 
 - [ ] Reduced motion preference respected (prefers-reduced-motion)
 - [ ] Screen reader announcement for dynamic content changes
 
+### Structural Coherence
+- [ ] Generated artifacts (types, clients, migrations) are fresh — regenerating produces identical output
+- [ ] API contracts match implementation (OpenAPI/GraphQL spec reflects actual endpoints and response shapes)
+- [ ] Database schema matches ORM models (no pending migrations, no model-DDL drift)
+- [ ] All non-public routes require authentication (no unprotected endpoints)
+- [ ] Integration tests hit real infrastructure (not SQLite-for-PostgreSQL or mocked data layers)
+- [ ] Layer dependencies flow in one direction (no circular imports, no domain importing infrastructure)
+
 ### Completeness
 - [ ] 404 page is designed, not default
 - [ ] Favicon and Open Graph meta tags are set
@@ -198,6 +223,8 @@ Ousterhout calls the programmer who optimizes for speed-of-shipping over structu
 
 12. **Arbitrary spacing**: Using whatever pixel value "looks right" without a system. *Instead*: Define a geometric spacing scale (4, 8, 16, 24, 32, 48, 64) and use only those values. Weber-Fechner law: perceptually uniform steps require multiplicative increments.
 
+13. **Disconnected layers**: Building a feature that looks complete — the UI renders, the API accepts requests, the database has tables — but the layers aren't actually wired together. The form submits to an endpoint that returns hardcoded data. The API writes to the database but the frontend reads from a different source. Types were generated once and never updated after the schema changed. *Instead*: Verify connectivity explicitly. After building a feature, trace a request from UI → API → DB → response → UI rendering. If any link is stubbed, mocked, or stale, the feature is not done. Run the regenerate-and-diff check on all derived artifacts. The system works when data flows through all layers and back.
+
 ---
 
 ## Research Library
@@ -208,3 +235,6 @@ Deep survey papers that ground this skill's two intellectual foundations. Each p
 |-------|-----------------|
 | `docs/compound/research/development/software-design/philosophy-of-software-design.md` | Ousterhout's 13 principles (deep modules, complexity management, information hiding, define errors out of existence, strategic programming) — the code architecture philosophy |
 | `docs/compound/research/design/web-apps/refactoring-ui-design-principles.md` | Wathan & Schoger's systematic visual design (hierarchy, spacing, typography, color, shadows, border alternatives) — the visual design philosophy |
+| `docs/compound/research/tdd/regenerate-and-diff-testing.md` | The SSOT derivation pattern — how to keep generated artifacts in sync across layers |
+| `docs/compound/research/tdd/architecture-tests-archunit.md` | Executable architecture rules — layer isolation, cycle detection, framework isolation by language |
+| `docs/compound/research/tdd/database-testing-patterns.md` | Real database testing — anti-patterns (SQLite substitution, mocked queries) and correct patterns (Testcontainers, transaction rollback) |

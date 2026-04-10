@@ -1,6 +1,6 @@
 ---
 name: compound:agentic-audit
-description: Audit codebase against the 15-principle agentic manifesto
+description: Audit codebase against the 16-principle agentic manifesto
 argument-hint: "<scope or focus area>"
 ---
 $ARGUMENTS

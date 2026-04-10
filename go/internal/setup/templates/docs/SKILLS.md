@@ -70,7 +70,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 ### `/compound:agentic-audit`
 
-**Purpose**: Audit a codebase against the 15-principle Agentic Codebase Manifesto.
+**Purpose**: Audit a codebase against the 16-principle Agentic Codebase Manifesto.
 
 **When invoked**: When evaluating a codebase's readiness for AI agent collaboration.
 

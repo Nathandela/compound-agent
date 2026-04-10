@@ -16,10 +16,13 @@ Review tests for meaningful assertions, edge case coverage, and absence of cargo
 5. Verify no mocked business logic (vi.mock on the thing being tested)
 6. Check test names describe expected behavior
 7. Ensure property-based tests exist for pure functions
-8. For many test files, spawn opus subagents to review test files in parallel (1 per test file).
+8. **Distinguish integration from unit tests**: Code that touches databases, APIs, or external services needs integration tests with real connections — not just unit tests with mocks. Flag SQLite-in-memory substitution for PostgreSQL/MySQL as a fidelity gap.
+9. For many test files, spawn opus subagents to review test files in parallel (1 per test file).
 
 ## Literature
 - Consult `docs/compound/research/tdd/` for test quality assessment and coverage methodology
+- Consult `docs/compound/research/tdd/database-testing-patterns.md` for DB testing anti-patterns (SQLite substitution, mocked queries, factory-without-persist)
+- Consult `docs/compound/research/tdd/test-infrastructure-as-code.md` for test infrastructure patterns (Testcontainers, transaction rollback, template databases)
 - Consult `docs/compound/research/property-testing/` for property-based testing theory
 - Run `ca knowledge "test coverage quality"` for indexed knowledge
 

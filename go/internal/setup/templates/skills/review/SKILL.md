@@ -32,8 +32,8 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 6. Search memory with `ca search` for known patterns and recurring issues (broader search beyond per-reviewer calibration)
 7. Select reviewer tier based on diff size:
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-subagent
-   - **Medium** (100-500): add architecture, performance, scenario-coverage, pattern-matcher (8 total)
-   - **Large** (500+): all reviewers including doc-gardener, drift-detector, runtime-verifier
+   - **Medium** (100-500): add architecture, performance, scenario-coverage, pattern-matcher, surface-alignment-reviewer (9 total)
+   - **Large** (500+): all reviewers including doc-gardener, drift-detector, runtime-verifier, surface-alignment-reviewer
 8. **Runtime Verification (contract-driven)**: Spawn `runtime-verifier` when the Verification Contract requires runtime proof.
    - If `Required evidence` includes `runtime_startup`, `browser_evidence`, or `contract_checks`, spawn `runtime-verifier`
    - **Web UI project**: runtime-verifier validates startup and browser-level behavior
@@ -63,7 +63,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
    - **Graceful degradation**: If Playwright is unavailable, record a **P3/INFO** finding ("Playwright not available for visual verification") and proceed with code-only review. Tag visual concerns with [NEEDS_QA] for the QA Engineer.
    - **Cleanup**: Stop the dev server after screenshot capture.
 11. Spawn reviewers in an **AgentTeam** (TeamCreate + Task with `team_name`):
-   - Role skills: `.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer,scenario-coverage-reviewer}/SKILL.md`
+   - Role skills: `.claude/skills/compound/agents/{security-reviewer,architecture-reviewer,performance-reviewer,test-coverage-reviewer,simplicity-reviewer,scenario-coverage-reviewer,surface-alignment-reviewer}/SKILL.md`
    - Security specialist skills (on-demand, spawned by security-reviewer): `.claude/skills/compound/agents/{security-injection,security-secrets,security-auth,security-data,security-deps}/SKILL.md`
    - Runtime verifier (conditional, see step 8): `.claude/skills/compound/agents/runtime-verifier/SKILL.md`
    - Design craft reviewer (conditional, see step 10): `.claude/skills/compound/agents/design-craft-reviewer/SKILL.md`
@@ -112,6 +112,7 @@ Each reviewer receives lessons filtered by their domain:
 - **performance-reviewer**: `ca search "performance optimization latency"`
 - **design-craft-reviewer**: `ca search "design craft visual hierarchy spacing motion states"`
 - **pattern-matcher**: `ca search "pattern recurring mistake"`
+- **surface-alignment-reviewer**: `ca search "surface alignment layer connectivity generated types migration schema"`
 
 ### Calibration Rules
 - **Cap**: 3-5 lessons per reviewer (prevents context dilution)
@@ -147,12 +148,14 @@ When the runtime-verifier is triggered by the Verification Contract:
 ## Literature
 - Consult `docs/compound/research/scenario-testing/` for runtime verification methodology and testing best practices
 - Consult `docs/compound/research/code-review/` for systematic review methodology, severity taxonomies, and evidence-based review practices
+- Consult `docs/compound/research/tdd/` for TDD methodology, architecture tests, database testing patterns, regenerate-and-diff, and test infrastructure
+- Consult `docs/compound/research/spec_design/protobuf-schema-evolution.md` for schema compatibility rules across API formats
 - Run `ca knowledge "code review methodology"` for indexed knowledge on review techniques
 - Run `ca search "review"` for lessons from past review cycles
 
 ## Common Pitfalls
 - Ignoring reviewer feedback because "it works"
-- Not running all 12 reviewer perspectives (skipping dimensions)
+- Not running all 13 reviewer perspectives (skipping dimensions)
 - Treating all findings as equal priority (classify P1/P2/P3 first)
 - Not creating beads issues for deferred fixes
 - Skipping quality gates before review
@@ -173,7 +176,7 @@ When the runtime-verifier is triggered by the Verification Contract:
 ## Quality Criteria
 - Baseline quality gates pass (`{{QUALITY_GATE_TEST}}`, `{{QUALITY_GATE_LINT}}`)
 - `{{QUALITY_GATE_BUILD}}` passed when the Verification Contract required build evidence
-- All 12 reviewer perspectives were applied in parallel
+- All 13 reviewer perspectives were applied in parallel (including surface-alignment-reviewer)
 - Findings are classified P0/P1/P2/P3 and deduplicated
 - **Verification Contract checked and all required evidence verified**
 - **Reviewers were calibrated with 3-5 relevant lessons each (LCR)**
