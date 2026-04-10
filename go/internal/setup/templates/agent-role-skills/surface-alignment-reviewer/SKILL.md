@@ -76,7 +76,7 @@ Verify that all API routes/endpoints have appropriate auth protection:
 2. For applicable checks, examine the codebase for infrastructure (tooling, tests, CI config)
 3. For each check, examine whether the specific changes in this diff maintain alignment
 4. Produce findings using the output format below
-5. Share cross-cutting findings via SendMessage: DB fidelity issues go to test-coverage-reviewer; architecture violations go to architecture-reviewer; schema breaks go to security-reviewer
+5. Route cross-cutting findings via SendMessage (see Collaboration section below)
 
 ## Literature
 - Consult `docs/compound/research/tdd/regenerate-and-diff-testing.md` for the SSOT derivation pattern and CI integration strategies

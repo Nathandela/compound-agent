@@ -42,7 +42,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: After all work tasks are closed.
 
-**What it does**: Runs baseline quality gates plus contract-required build checks, verifies Acceptance Criteria and Verification Contract evidence, selects reviewer tier based on diff size (4-11 reviewers), spawns reviewers in an AgentTeam, classifies findings by severity, fixes all P1s, runs `/implementation-reviewer`.
+**What it does**: Runs baseline quality gates plus contract-required build checks, verifies Acceptance Criteria and Verification Contract evidence, selects reviewer tier based on diff size (4-13 reviewers), spawns reviewers in an AgentTeam, classifies findings by severity, fixes all P1s, runs `/implementation-reviewer`.
 
 ### `/compound:compound`
 
@@ -74,7 +74,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: When evaluating a codebase's readiness for AI agent collaboration.
 
-**What it does**: Detects the project stack, scores all 15 principles (0-2) with specific evidence across 3 pillars (Codebase Memory, Implementation Feedbacks, Mapping the Context) plus cross-cutting concerns. Produces a scored report (out of 30) with prioritized actions and offers to create a beads epic for improvements.
+**What it does**: Detects the project stack, scores all 16 principles (0-2) with specific evidence across 3 pillars (Codebase Memory, Implementation Feedbacks, Mapping the Context) plus cross-cutting concerns. Produces a scored report (out of 32) with prioritized actions and offers to create a beads epic for improvements.
 
 ### `/compound:agentic-setup`
 

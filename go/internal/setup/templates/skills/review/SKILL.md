@@ -33,7 +33,7 @@ Perform thorough code review by spawning specialized reviewers in parallel, cons
 7. Select reviewer tier based on diff size:
    - **Small** (<100 lines): 4 core -- security, test-coverage, simplicity, cct-subagent
    - **Medium** (100-500): add architecture, performance, scenario-coverage, pattern-matcher, surface-alignment-reviewer (9 total)
-   - **Large** (500+): all reviewers including doc-gardener, drift-detector, runtime-verifier, surface-alignment-reviewer
+   - **Large** (500+): all reviewers including doc-gardener, drift-detector, runtime-verifier
 8. **Runtime Verification (contract-driven)**: Spawn `runtime-verifier` when the Verification Contract requires runtime proof.
    - If `Required evidence` includes `runtime_startup`, `browser_evidence`, or `contract_checks`, spawn `runtime-verifier`
    - **Web UI project**: runtime-verifier validates startup and browser-level behavior

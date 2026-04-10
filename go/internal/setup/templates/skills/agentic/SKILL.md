@@ -11,7 +11,7 @@ phase: work
 Assess and improve a codebase's readiness for AI agent collaboration. Based on the 16-principle Agentic Codebase Manifesto organized across 3 pillars.
 
 This skill operates in two modes:
-- **Mode: audit** -- Score the codebase against all 15 principles, produce a report with evidence and prioritized actions
+- **Mode: audit** -- Score the codebase against all 16 principles, produce a report with evidence and prioritized actions
 - **Mode: setup** -- Run audit first, then incrementally fill gaps with real content generated from codebase analysis
 
 Mode is set by the calling command (\`/compound:agentic-audit\` or \`/compound:agentic-setup\`). The command wrapper tells you which mode to run -- do not parse \`$ARGUMENTS\` for mode detection.
@@ -34,7 +34,7 @@ Each principle is scored:
 
 Adapt criteria to the detected stack. For example: "strict mode" means TypeScript strict, Python mypy --strict, or Rust default safety. "Linter" means ESLint, pylint/ruff, clippy, golangci-lint, etc. Score based on the ecosystem's equivalent tooling.
 
-### The 15 Principles
+### The 16 Principles
 
 #### Pillar I: Codebase Memory (Traceability) -- max 8 points
 
@@ -179,7 +179,7 @@ Pillar I: Codebase Memory -- X/8
 | P1 | Repository is the only truth | 0/1/2 | finding |
 ...repeat for all pillars with separator rows...
 
-**Overall Score: X/30**
+**Overall Score: X/32**
 
 ### Priority Actions
 1. [Score-0 items first, most impactful]

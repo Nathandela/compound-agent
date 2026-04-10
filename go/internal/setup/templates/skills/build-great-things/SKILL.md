@@ -16,7 +16,7 @@ You are building something that will be seen, used, and judged by real humans. Y
 
 ## Design Philosophy
 
-Two intellectual foundations underpin this skill — one for code architecture, one for visual design. Together they provide the *why* behind every principle in the phases that follow.
+Three intellectual foundations underpin this skill — one for code architecture, one for visual design, and one for structural connectivity. Together they provide the *why* behind every principle in the phases that follow.
 
 ### Complexity is the root cause (Ousterhout)
 
@@ -229,7 +229,7 @@ Ousterhout calls the programmer who optimizes for speed-of-shipping over structu
 
 ## Research Library
 
-Deep survey papers that ground this skill's two intellectual foundations. Each phase also has its own `references/REFERENCES.md` with topic-specific papers.
+Deep survey papers that ground this skill's three intellectual foundations. Each phase also has its own `references/REFERENCES.md` with topic-specific papers.
 
 | Paper | What it provides |
 |-------|-----------------|
