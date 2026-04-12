@@ -762,14 +762,18 @@ log "Polish loop completed: $CYCLES cycles"
 echo "{\"status\":\"completed\",\"cycles\":$CYCLES,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$LOG_DIR/.polish-status.json"
 
 # Commit and push results
-if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
-  log "Committing polish loop artifacts"
-  git add docs/specs/polish-report-cycle-*.md .compound-agent/agent_logs/.polish-status.json 2>/dev/null || true
-  git commit -m "chore: polish loop cycle completion" 2>/dev/null || true
-fi
-if git remote get-url origin >/dev/null 2>&1; then
-  log "Pushing results"
-  git push 2>/dev/null || log "WARN: git push failed (non-fatal)"
+if [ "${POLISH_DRY_RUN:-}" = "1" ]; then
+  log "DRY RUN: would commit and push polish loop artifacts"
+else
+  if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    log "Committing polish loop artifacts"
+    git add docs/specs/polish-report-cycle-*.md .compound-agent/agent_logs/.polish-status.json 2>/dev/null || true
+    git commit -m "chore: polish loop cycle completion" 2>/dev/null || true
+  fi
+  if git remote get-url origin >/dev/null 2>&1; then
+    log "Pushing results"
+    git push 2>/dev/null || log "WARN: git push failed (non-fatal)"
+  fi
 fi
 
 log "Done"
