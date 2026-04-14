@@ -820,3 +820,66 @@ func TestPolishCommand_CompactPctForwardedToInnerLoop(t *testing.T) {
 		t.Error("expected --compact-pct forwarded to inner ca loop call")
 	}
 }
+
+// TestPolishCommand_PostLoopRespectsDryRun pins the post-loop dry-run guard so
+// future refactors of polishScriptPostLoop cannot silently regress: the
+// .polish-status.json write, the git commit, and the git push must all sit
+// inside the POLISH_DRY_RUN=1 else branch, and a dry-run must emit a distinct
+// "dry-run-completed" status so monitoring tools can tell preflights apart
+// from real runs. Regression test for #16.
+func TestPolishCommand_PostLoopRespectsDryRun(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	postIdx := strings.Index(script, "# --- Post Loop ---")
+	if postIdx < 0 {
+		t.Fatal("missing '# --- Post Loop ---' section marker")
+	}
+	postLoop := script[postIdx:]
+
+	if !strings.Contains(postLoop, `[ "${POLISH_DRY_RUN:-}" = "1" ]`) {
+		t.Error("post-loop section missing POLISH_DRY_RUN guard")
+	}
+	if !strings.Contains(postLoop, "DRY RUN: would commit and push polish loop artifacts") {
+		t.Error("post-loop section missing dry-run log message")
+	}
+	if !strings.Contains(postLoop, `\"status\":\"dry-run-completed\"`) {
+		t.Error("dry-run path must write status=dry-run-completed (distinct from real-run completion)")
+	}
+
+	// Every git-mutating line and the real-run status write must appear AFTER
+	// the dry-run guard's `else` keyword so they cannot execute in dry-run.
+	elseIdx := strings.Index(postLoop, "\nelse\n")
+	if elseIdx < 0 {
+		t.Fatal("post-loop dry-run guard missing else branch")
+	}
+	mustBeGuarded := []string{
+		`\"status\":\"completed\"`,
+		"git commit -m",
+		"git push",
+		"git add docs/specs/polish-report-cycle",
+	}
+	for _, needle := range mustBeGuarded {
+		idx := strings.Index(postLoop, needle)
+		if idx < 0 {
+			t.Errorf("post-loop section missing expected line: %q", needle)
+			continue
+		}
+		if idx < elseIdx {
+			t.Errorf("line %q appears before the dry-run else branch — it would still execute in dry-run", needle)
+		}
+	}
+}
