@@ -759,12 +759,13 @@ done
 func polishScriptPostLoop() string {
 	return `# --- Post Loop ---
 log "Polish loop completed: $CYCLES cycles"
-echo "{\"status\":\"completed\",\"cycles\":$CYCLES,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$LOG_DIR/.polish-status.json"
 
-# Commit and push results
+# Write status and commit/push results
 if [ "${POLISH_DRY_RUN:-}" = "1" ]; then
+  echo "{\"status\":\"dry-run-completed\",\"cycles\":$CYCLES,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$LOG_DIR/.polish-status.json"
   log "DRY RUN: would commit and push polish loop artifacts"
 else
+  echo "{\"status\":\"completed\",\"cycles\":$CYCLES,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$LOG_DIR/.polish-status.json"
   if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
     log "Committing polish loop artifacts"
     git add docs/specs/polish-report-cycle-*.md .compound-agent/agent_logs/.polish-status.json 2>/dev/null || true
