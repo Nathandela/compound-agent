@@ -7,6 +7,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **`polish-loop.sh` dry-run leaked state** (#17, #16): `POLISH_DRY_RUN=1` now fully skips the post-loop commit/push block AND writes a distinct `"status":"dry-run-completed"` to `.polish-status.json` instead of overwriting it with `"status":"completed"`. Previously a dry run still mutated git *and* produced a status file indistinguishable from a real run, defeating the preflight contract and misleading any monitoring tool that polled the status file. Regression test `TestPolishCommand_PostLoopRespectsDryRun` pins the guard structure so this can't silently come back.
+
 ## [2.7.1] - 2026-04-10
 
 ### Added
