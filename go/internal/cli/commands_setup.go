@@ -1,10 +1,13 @@
 package cli
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/nathandelacretaz/compound-agent/internal/setup"
 	"github.com/nathandelacretaz/compound-agent/internal/util"
@@ -68,26 +71,34 @@ func setupCmd() *cobra.Command {
 	registerSetupClaudeCmd(cmd)
 
 	var (
-		skipHooks bool
-		jsonOut   bool
-		repoRoot  string
+		skipHooks    bool
+		jsonOut      bool
+		repoRoot     string
+		profile      string
+		confirmPrune bool
 	)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		return runSetup(cmd, resolveRoot(repoRoot), skipHooks, jsonOut)
+		return runSetup(cmd, resolveRoot(repoRoot), skipHooks, jsonOut, profile, confirmPrune)
 	}
 
 	cmd.Flags().BoolVar(&skipHooks, "skip-hooks", false, "Skip installing hooks")
 	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
 	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root")
+	cmd.Flags().StringVar(&profile, "profile", "",
+		"Install profile: minimal (lesson capture only), workflow (+ cook-it), full (default, everything)")
+	cmd.Flags().BoolVar(&confirmPrune, "confirm-prune", false,
+		"Acknowledge that a lower profile will prune existing workflow templates from disk")
 	return cmd
 }
 
 // runSetup performs the setup command logic.
-func runSetup(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool) error {
+func runSetup(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool, profile string, confirmPrune bool) error {
 	result, err := setup.InitRepo(repoRoot, setup.InitOptions{
-		SkipHooks:  skipHooks,
-		BinaryPath: resolveBinaryPath(),
+		SkipHooks:    skipHooks,
+		BinaryPath:   resolveBinaryPath(),
+		Profile:      setup.InitProfile(profile),
+		ConfirmPrune: confirmPrune,
 	})
 	if err != nil {
 		return fmt.Errorf("setup: %w", err)
@@ -608,4 +619,141 @@ func registerSetupCommands(rootCmd *cobra.Command) {
 	rootCmd.AddCommand(initCmd())
 	rootCmd.AddCommand(setupCmd())
 	rootCmd.AddCommand(doctorCmd())
+	rootCmd.AddCommand(uninstallCmd())
+}
+
+// uninstallCmd reverses `ca init` / `ca setup`.
+// Three tiers:
+//
+//	default:      remove managed hooks from settings.json only
+//	--templates:  also remove compound/ template dirs and plugin.json
+//	--all:        also remove .compound-agent/ runtime state and strip
+//	              AGENTS.md, CLAUDE.md, and .gitignore marker blocks
+//
+// Always preserves .claude/lessons/ and .claude/compound-agent.json.
+// Requires --yes for non-interactive confirmation; otherwise prints the
+// plan, reads stdin for a y/n answer, and aborts on anything but "y".
+func uninstallCmd() *cobra.Command {
+	var (
+		yes          bool
+		templatesOpt bool
+		allOpt       bool
+		jsonOut      bool
+		repoRoot     string
+	)
+	cmd := &cobra.Command{
+		Use:   "uninstall",
+		Short: "Remove compound-agent hooks, templates, and runtime state",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runUninstall(cmd, resolveRoot(repoRoot),
+				uninstallOptsFromFlags(yes, templatesOpt, allOpt, jsonOut))
+		},
+	}
+	cmd.Flags().BoolVar(&yes, "yes", false, "Skip interactive confirmation")
+	cmd.Flags().BoolVar(&templatesOpt, "templates", false,
+		"Also remove compound/ template directories and plugin.json")
+	cmd.Flags().BoolVar(&allOpt, "all", false,
+		"Also remove .compound-agent/ runtime state and strip marker blocks from AGENTS.md/CLAUDE.md/.gitignore (implies --templates)")
+	cmd.Flags().BoolVar(&jsonOut, "json", false, "output as JSON")
+	cmd.Flags().StringVar(&repoRoot, "repo-root", "", "Repository root")
+	return cmd
+}
+
+// uninstallRunOpts bundles the parsed uninstall CLI flags.
+type uninstallRunOpts struct {
+	mode    setup.UninstallMode
+	yes     bool
+	jsonOut bool
+}
+
+func uninstallOptsFromFlags(yes, templatesOpt, allOpt, jsonOut bool) uninstallRunOpts {
+	mode := setup.UninstallHooksOnly
+	if templatesOpt {
+		mode = setup.UninstallTemplates
+	}
+	if allOpt {
+		mode = setup.UninstallAll
+	}
+	return uninstallRunOpts{mode: mode, yes: yes, jsonOut: jsonOut}
+}
+
+func runUninstall(cmd *cobra.Command, repoRoot string, opts uninstallRunOpts) error {
+	plan := setup.PlanUninstall(repoRoot, setup.UninstallOptions{Mode: opts.mode})
+	if len(plan) == 0 {
+		if opts.jsonOut {
+			return writeJSON(cmd, map[string]any{"removed": false, "reason": "nothing to uninstall"})
+		}
+		cmd.Println("[info] Nothing to uninstall — no compound-agent artifacts detected.")
+		return nil
+	}
+
+	// Print the plan, then require explicit consent.
+	cmd.Println("[plan] ca uninstall would remove:")
+	for _, item := range plan {
+		cmd.Printf("  - %s\n", item)
+	}
+	cmd.Println("[plan] Preserved: .claude/lessons/, .claude/compound-agent.json")
+
+	if !opts.yes {
+		if !readConfirmation(cmd.InOrStdin(), cmd.OutOrStdout()) {
+			cmd.Println("[info] Aborted — no changes made.")
+			return nil
+		}
+	}
+
+	result, err := setup.Uninstall(repoRoot, setup.UninstallOptions{Mode: opts.mode})
+	if err != nil {
+		return fmt.Errorf("uninstall: %w", err)
+	}
+
+	if opts.jsonOut {
+		return writeJSON(cmd, map[string]any{
+			"removed":          !result.Empty,
+			"hooksRemoved":     result.HooksRemoved,
+			"templatesRemoved": result.TemplatesRemoved,
+			"runtimeRemoved":   result.RuntimeRemoved,
+			"markersStripped":  result.MarkersStripped,
+		})
+	}
+	printUninstallResult(cmd, result)
+	return nil
+}
+
+func printUninstallResult(cmd *cobra.Command, r *setup.UninstallResult) {
+	if r.HooksRemoved {
+		cmd.Println("[ok] Removed compound-agent hooks from .claude/settings.json")
+	}
+	if len(r.TemplatesRemoved) > 0 {
+		cmd.Println("[ok] Removed template paths:")
+		for _, p := range r.TemplatesRemoved {
+			cmd.Printf("       - %s\n", p)
+		}
+	}
+	if r.RuntimeRemoved {
+		cmd.Println("[ok] Removed runtime state (.compound-agent/)")
+	}
+	if len(r.MarkersStripped) > 0 {
+		cmd.Println("[ok] Stripped compound-agent blocks from:")
+		for _, p := range r.MarkersStripped {
+			cmd.Printf("       - %s\n", p)
+		}
+	}
+	cmd.Println("[ok] Lessons preserved at .claude/lessons/")
+}
+
+// readConfirmation reads a single line from stdin and returns true iff the
+// trimmed lower-cased response starts with "y". An empty or unreadable line
+// means "no" (safer default for a destructive action).
+func readConfirmation(stdin io.Reader, stdout io.Writer) bool {
+	fmt.Fprint(stdout, "Proceed? [y/N]: ")
+	if stdin == nil {
+		return false
+	}
+	r := bufio.NewReader(stdin)
+	line, err := r.ReadString('\n')
+	if err != nil && line == "" {
+		return false
+	}
+	answer := strings.ToLower(strings.TrimSpace(line))
+	return strings.HasPrefix(answer, "y")
 }

@@ -5,15 +5,25 @@ import (
 	"path/filepath"
 )
 
-// FallbackTestCmd is used when no project stack can be detected.
-const FallbackTestCmd = "detect and run the project's test suite"
+// Fallback commands are substituted for {{QUALITY_GATE_*}} placeholders
+// when the project stack cannot be detected. They MUST be concrete shell
+// commands that exit non-zero with a diagnostic on stderr so that:
+//  1. Agents see a visible failure instead of interpreting English prose
+//     as a command, which silently "succeeds" or produces confusing errors.
+//  2. Humans running the command see a clear message about what to configure.
+//
+// Format: sh -c 'echo "<diagnostic>" >&2; exit 1'. Single-token, POSIX-only
+// dependencies (echo, exit). Safe to run multiple times with no side effects.
+//
+// Keep the diagnostic prefixed with [compound-agent] so tests and users
+// can grep for it reliably.
+const FallbackTestCmd = `sh -c 'echo "[compound-agent] test command not configured for this stack — edit .claude/skills/compound/*/SKILL.md or re-run ca setup in a repo with a detectable stack (go.mod, Cargo.toml, pyproject.toml, package.json, Makefile)" >&2; exit 1'`
 
-// FallbackLintCmd is used when no project stack can be detected.
-const FallbackLintCmd = "detect and run the project's linter"
+// FallbackLintCmd: see FallbackTestCmd for the contract.
+const FallbackLintCmd = `sh -c 'echo "[compound-agent] lint command not configured for this stack — edit .claude/skills/compound/*/SKILL.md or re-run ca setup in a repo with a detectable stack" >&2; exit 1'`
 
-// FallbackBuildCmd is used when no build/package verification command can be
-// confidently detected.
-const FallbackBuildCmd = "detect and run the project's build/package verification when the verification contract requires it"
+// FallbackBuildCmd: see FallbackTestCmd for the contract.
+const FallbackBuildCmd = `sh -c 'echo "[compound-agent] build command not configured for this stack — edit .claude/skills/compound/*/SKILL.md or re-run ca setup in a repo with a detectable stack" >&2; exit 1'`
 
 // StackInfo holds the detected quality gate commands for a project.
 type StackInfo struct {

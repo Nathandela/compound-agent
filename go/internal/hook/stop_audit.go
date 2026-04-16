@@ -9,12 +9,17 @@ type StopAuditResult struct {
 }
 
 func hasTransitionEvidence(state *PhaseState) bool {
-	// Final phase always requires explicit gate verification
-	if state.PhaseIndex == 5 {
+	// Final cook-it phase always requires explicit gate verification.
+	// Using len(Phases) keeps the constant in one place — if the cook-it
+	// phase list ever changes length, this branch tracks it.
+	if state.PhaseIndex == len(Phases) {
 		return true
 	}
 
-	// For phases 2-4, only block when next phase skill has been read
+	// Non-cook-it phases (e.g. architect at index 6) and out-of-range
+	// values return false: there's no "next cook-it phase skill" to look for.
+	// For cook-it phases 1..len(Phases)-1, we check whether the next phase's
+	// skill file has been read as transition evidence.
 	if state.PhaseIndex < 1 || state.PhaseIndex >= len(Phases) {
 		return false
 	}

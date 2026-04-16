@@ -40,11 +40,15 @@ type managedHookSpec struct {
 	matcher      string
 	markers      []string
 	buildCommand func(binaryPath string) string
+	// profile is the minimum InitProfile that should install this hook.
+	// ProfileMinimal hooks = lesson-capture plumbing (prime, user-prompt).
+	// ProfileWorkflow hooks = phase/failure tracking.
+	profile InitProfile
 }
 
 var managedHookSpecs = []managedHookSpec{
-	{hookType: "SessionStart", matcher: "", markers: []string{"BIN prime"}, buildCommand: makePrimeCommand},
-	{hookType: "PreCompact", matcher: "", markers: []string{"BIN prime"}, buildCommand: makePrimeCommand},
+	{hookType: "SessionStart", matcher: "", markers: []string{"BIN prime"}, buildCommand: makePrimeCommand, profile: ProfileMinimal},
+	{hookType: "PreCompact", matcher: "", markers: []string{"BIN prime"}, buildCommand: makePrimeCommand, profile: ProfileMinimal},
 	{
 		hookType: "UserPromptSubmit",
 		matcher:  "",
@@ -52,6 +56,7 @@ var managedHookSpecs = []managedHookSpec{
 		buildCommand: func(binaryPath string) string {
 			return makeHookCommand(binaryPath, "user-prompt")
 		},
+		profile: ProfileMinimal,
 	},
 	{
 		hookType: "PostToolUseFailure",
@@ -60,6 +65,7 @@ var managedHookSpecs = []managedHookSpec{
 		buildCommand: func(binaryPath string) string {
 			return makeHookCommand(binaryPath, "post-tool-failure")
 		},
+		profile: ProfileWorkflow,
 	},
 	{
 		hookType: "PostToolUse",
@@ -68,6 +74,7 @@ var managedHookSpecs = []managedHookSpec{
 		buildCommand: func(binaryPath string) string {
 			return makeHookCommand(binaryPath, "post-tool-success")
 		},
+		profile: ProfileWorkflow,
 	},
 	{
 		hookType: "PostToolUse",
@@ -76,6 +83,7 @@ var managedHookSpecs = []managedHookSpec{
 		buildCommand: func(binaryPath string) string {
 			return makeHookCommand(binaryPath, "post-read")
 		},
+		profile: ProfileWorkflow,
 	},
 	{
 		hookType: "PreToolUse",
@@ -84,6 +92,7 @@ var managedHookSpecs = []managedHookSpec{
 		buildCommand: func(binaryPath string) string {
 			return makeHookCommand(binaryPath, "phase-guard")
 		},
+		profile: ProfileWorkflow,
 	},
 	{
 		hookType: "Stop",
@@ -92,7 +101,19 @@ var managedHookSpecs = []managedHookSpec{
 		buildCommand: func(binaryPath string) string {
 			return makeHookCommand(binaryPath, "phase-audit")
 		},
+		profile: ProfileWorkflow,
 	},
+}
+
+// hookSpecsForProfile returns specs whose minimum profile is <= selected.
+func hookSpecsForProfile(profile InitProfile) []managedHookSpec {
+	out := make([]managedHookSpec, 0, len(managedHookSpecs))
+	for _, spec := range managedHookSpecs {
+		if profileIncludes(spec.profile, profile) {
+			out = append(out, spec)
+		}
+	}
+	return out
 }
 
 // ReadClaudeSettings reads and parses a Claude Code settings.json file.
@@ -343,15 +364,44 @@ func upgradeNpxHooks(hooks map[string]any, binaryPath string) {
 	}
 }
 
-// AddAllHooks adds all compound-agent hooks to settings.
-// binaryPath can be empty string for npx fallback, or path to Go binary.
+// AddAllHooks adds all compound-agent hooks to settings (ProfileFull).
+// Kept for backward compatibility — new callers should use AddHooksForProfile.
 func AddAllHooks(settings map[string]any, binaryPath string) {
+	AddHooksForProfile(settings, binaryPath, ProfileFull)
+}
+
+// AddHooksForProfile installs hooks whose minimum profile is <= the selected
+// profile, and REMOVES any compound-agent hooks that are not in the profile.
+// This makes downgrades (e.g. full→minimal) clean up phase-guard etc.
+// binaryPath can be empty for npx fallback.
+func AddHooksForProfile(settings map[string]any, binaryPath string, profile InitProfile) {
 	hooks := getHooksMap(settings)
+	upgradeNpxHooks(hooks, binaryPath) // rewrite existing npx commands to binary path
+	removeOutOfProfileHooks(hooks, profile)
+	installInProfileHooks(hooks, binaryPath, profile)
+	dropEmptyHookArrays(hooks)
+}
 
-	// Upgrade existing npx-based hooks to use direct binary path
-	upgradeNpxHooks(hooks, binaryPath)
-
+// removeOutOfProfileHooks strips managed hook entries whose spec is not in
+// the selected profile. Used on downgrades (full→minimal drops phase-guard etc).
+func removeOutOfProfileHooks(hooks map[string]any, profile InitProfile) {
 	for _, spec := range managedHookSpecs {
+		if profileIncludes(spec.profile, profile) {
+			continue
+		}
+		arr, ok := hooks[spec.hookType].([]any)
+		if !ok {
+			continue
+		}
+		filtered, _, _ := filterHookEntries(arr, spec.markers)
+		hooks[spec.hookType] = filtered
+	}
+}
+
+// installInProfileHooks refreshes the hook entries for each in-profile spec.
+// Existing entries with matching markers are replaced, not duplicated.
+func installInProfileHooks(hooks map[string]any, binaryPath string, profile InitProfile) {
+	for _, spec := range hookSpecsForProfile(profile) {
 		arr := getHookArray(hooks, spec.hookType)
 		filtered, _, firstCommand := filterHookEntries(arr, spec.markers)
 		command := spec.buildCommand(binaryPath)
@@ -362,14 +412,32 @@ func AddAllHooks(settings map[string]any, binaryPath string) {
 	}
 }
 
-// HasAllHooks checks if all required compound-agent hooks are installed.
+// dropEmptyHookArrays deletes hook-type keys with zero entries so
+// settings.json doesn't carry "PreToolUse": [] style noise. upgradeNpxHooks
+// and pruning passes can create these eagerly.
+func dropEmptyHookArrays(hooks map[string]any) {
+	for _, hookType := range HookTypes {
+		arr, ok := hooks[hookType].([]any)
+		if ok && len(arr) == 0 {
+			delete(hooks, hookType)
+		}
+	}
+}
+
+// HasAllHooks checks if all hooks for ProfileFull are installed.
+// Retained for backward-compat callers (doctor checks, etc.).
 func HasAllHooks(settings map[string]any) bool {
+	return HasAllHooksForProfile(settings, ProfileFull)
+}
+
+// HasAllHooksForProfile checks whether every hook spec belonging to the
+// selected profile is present in settings.
+func HasAllHooksForProfile(settings map[string]any, profile InitProfile) bool {
 	hooks, ok := settings["hooks"].(map[string]any)
 	if !ok {
 		return false
 	}
-
-	for _, spec := range managedHookSpecs {
+	for _, spec := range hookSpecsForProfile(profile) {
 		arr, ok := hooks[spec.hookType].([]any)
 		if !ok {
 			return false
@@ -379,6 +447,29 @@ func HasAllHooks(settings map[string]any) bool {
 		}
 	}
 	return true
+}
+
+// hooksHaveOutOfProfileEntries reports whether settings contains any
+// compound-agent hook entry whose spec is NOT in the selected profile.
+// Used to trigger a cleanup write during downgrades.
+func hooksHaveOutOfProfileEntries(settings map[string]any, profile InitProfile) bool {
+	hooks, ok := settings["hooks"].(map[string]any)
+	if !ok {
+		return false
+	}
+	for _, spec := range managedHookSpecs {
+		if profileIncludes(spec.profile, profile) {
+			continue
+		}
+		arr, ok := hooks[spec.hookType].([]any)
+		if !ok {
+			continue
+		}
+		if hasHookMarker(arr, spec.markers) {
+			return true
+		}
+	}
+	return false
 }
 
 // hookArrayHasNpx checks if any entry in a hook array contains npx commands.

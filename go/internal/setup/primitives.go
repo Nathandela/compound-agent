@@ -428,6 +428,169 @@ func pruneFlatDirs(repoRoot string) (int, error) {
 	return pruned, nil
 }
 
+// PruneForProfile removes installed templates that are not in the selected
+// profile's expected set. For ProfileFull this is equivalent to
+// PruneStaleTemplates. For lower profiles, groups excluded by the profile
+// are treated as "expected empty" and pruned accordingly.
+func PruneForProfile(repoRoot string, profile InitProfile) (int, error) {
+	if profile == ProfileFull {
+		return PruneStaleTemplates(repoRoot)
+	}
+	pruned := 0
+	for _, step := range pruneStepsForProfile(repoRoot, profile) {
+		n, err := step()
+		if err != nil {
+			return pruned, err
+		}
+		pruned += n
+	}
+	return pruned, nil
+}
+
+// pruneStepsForProfile returns the ordered list of prune operations for a
+// sub-full profile. Each step returns (count, error) and is composable so
+// PruneForProfile remains a simple accumulator loop.
+func pruneStepsForProfile(repoRoot string, profile InitProfile) []func() (int, error) {
+	skillsDir := filepath.Join(repoRoot, ".claude", "skills", "compound")
+	rolesDir := filepath.Join(repoRoot, ".claude", "skills", "compound", "agents")
+	researchDir := filepath.Join(repoRoot, "docs", "compound", "research")
+
+	return []func() (int, error){
+		// Flat template dirs.
+		func() (int, error) {
+			return pruneStaleFiles(filepath.Join(repoRoot, ".claude", "agents", "compound"),
+				templatesByProfile(ProfileWorkflow, profile, templates.AgentTemplates))
+		},
+		func() (int, error) {
+			return pruneStaleFiles(filepath.Join(repoRoot, ".claude", "commands", "compound"),
+				templatesByProfile(ProfileWorkflow, profile, templates.CommandTemplates))
+		},
+		func() (int, error) {
+			return pruneStaleFiles(filepath.Join(repoRoot, "docs", "compound"),
+				templatesByProfile(ProfileWorkflow, profile, templates.DocTemplates))
+		},
+		// Research tree: sub-full profiles prune the entire tree.
+		func() (int, error) { return pruneResearchForProfile(researchDir, profile) },
+		// Phase skills (dirs + internals).
+		func() (int, error) {
+			return pruneStaleSubdirs(skillsDir,
+				templatesByProfile(ProfileWorkflow, profile, templates.PhaseSkills),
+				[]string{"agents"})
+		},
+		func() (int, error) { return prunePhaseSkillInternalsForProfile(skillsDir, profile) },
+		// Agent role skills (dirs + internals).
+		func() (int, error) {
+			return pruneStaleSubdirs(rolesDir,
+				templatesByProfile(ProfileWorkflow, profile, templates.AgentRoleSkills), nil)
+		},
+		func() (int, error) { return pruneAgentRoleSkillInternalsForProfile(rolesDir, profile) },
+	}
+}
+
+// pruneResearchForProfile removes the research tree when the selected profile
+// doesn't include it. For ProfileFull this delegates to pruneResearchInternals.
+func pruneResearchForProfile(researchDir string, profile InitProfile) (int, error) {
+	if profile == ProfileFull {
+		return pruneResearchInternals(researchDir)
+	}
+	info, err := os.Stat(researchDir)
+	if err != nil {
+		return 0, nil // already absent: nothing to prune
+	}
+	if !info.IsDir() {
+		return 0, nil
+	}
+	if err := os.RemoveAll(researchDir); err != nil {
+		return 0, fmt.Errorf("remove %s: %w", researchDir, err)
+	}
+	return 1, nil
+}
+
+// templatesByProfile returns the template map if the minimum profile is met,
+// otherwise an empty map (signals the pruner that nothing is expected here).
+func templatesByProfile(minProfile, selected InitProfile, fn func() map[string]string) map[string]string {
+	if profileIncludes(minProfile, selected) {
+		return fn()
+	}
+	return map[string]string{}
+}
+
+// prunePhaseSkillInternalsForProfile mirrors prunePhaseSkillInternals but
+// empties the expected sets when the profile excludes phase skills.
+func prunePhaseSkillInternalsForProfile(skillsDir string, profile InitProfile) (int, error) {
+	if !profileIncludes(ProfileWorkflow, profile) {
+		// Profile excludes workflow skills entirely: expected = {}.
+		return pruneManagedSubtree(skillsDir, "",
+			map[string]bool{"skills_index.json": true}, // preserve generated index
+			map[string]bool{},
+			map[string]bool{"agents": true})
+	}
+	return prunePhaseSkillInternals(skillsDir)
+}
+
+// pruneAgentRoleSkillInternalsForProfile mirrors pruneAgentRoleSkillInternals
+// but empties the expected sets when the profile excludes role skills.
+func pruneAgentRoleSkillInternalsForProfile(rolesDir string, profile InitProfile) (int, error) {
+	if !profileIncludes(ProfileWorkflow, profile) {
+		return pruneManagedSubtree(rolesDir, "", map[string]bool{}, map[string]bool{}, nil)
+	}
+	return pruneAgentRoleSkillInternals(rolesDir)
+}
+
+// detectOutOfProfileTemplates returns a list of paths (relative to repoRoot)
+// that would be removed when installing with the selected profile. Used to
+// enforce the --confirm-prune gate on downgrades.
+func detectOutOfProfileTemplates(repoRoot string, profile InitProfile) []string {
+	if profile == ProfileFull {
+		return nil
+	}
+
+	var found []string
+
+	// Workflow-only groups: if profile < workflow, presence of any content here triggers prune.
+	if !profileIncludes(ProfileWorkflow, profile) {
+		for _, rel := range []string{
+			".claude/agents/compound",
+			".claude/commands/compound",
+			".claude/skills/compound",
+			"docs/compound",
+		} {
+			if dirHasAnyFile(filepath.Join(repoRoot, rel)) {
+				found = append(found, rel)
+			}
+		}
+	}
+
+	// Research tree: only in full. If profile < full, and research dir exists non-empty, flag.
+	if !profileIncludes(ProfileFull, profile) {
+		researchDir := filepath.Join(repoRoot, "docs", "compound", "research")
+		if dirHasAnyFile(researchDir) {
+			found = append(found, "docs/compound/research")
+		}
+	}
+
+	return found
+}
+
+// dirHasAnyFile reports whether the directory exists and contains at least
+// one regular file anywhere in its subtree. Used to detect existing template
+// content before a downgrade prune.
+func dirHasAnyFile(dir string) bool {
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		return false
+	}
+	found := false
+	_ = filepath.Walk(dir, func(_ string, d os.FileInfo, err error) error {
+		if err != nil || d.IsDir() {
+			return nil
+		}
+		found = true
+		return filepath.SkipDir
+	})
+	return found
+}
+
 // PruneStaleTemplates removes installed templates that no longer
 // exist in the current template set. Only touches compound/ namespaces.
 // Returns count of items removed.

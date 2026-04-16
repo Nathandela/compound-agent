@@ -21,6 +21,16 @@ type InitOptions struct {
 	SkipHooks     bool
 	SkipTemplates bool   // Skip installing agent/command/skill/doc templates.
 	BinaryPath    string // Path to the Go binary for hook commands. Empty = npx fallback.
+
+	// Profile selects which template and hook groups to install.
+	// Empty string uses defaultProfile (ProfileFull) for backward compatibility.
+	// See InitProfile for semantics.
+	Profile InitProfile
+
+	// ConfirmPrune acknowledges that running a lower profile than what's
+	// currently installed will delete workflow templates from disk.
+	// Without this flag, InitRepo errors rather than prune silently.
+	ConfirmPrune bool
 }
 
 // InitResult reports what init did.
@@ -89,19 +99,23 @@ func initDirectories(repoRoot string, result *InitResult) error {
 }
 
 // initHooks installs or upgrades Claude Code hooks in settings.json.
-func initHooks(repoRoot string, binaryPath string, result *InitResult) error {
+// Only hooks whose minimum profile is <= the selected profile are installed.
+// Hooks that don't belong to the selected profile are REMOVED so downgrading
+// cleans up phase-guard etc.
+func initHooks(repoRoot string, binaryPath string, profile InitProfile, result *InitResult) error {
 	settingsPath := filepath.Join(repoRoot, ".claude", "settings.json")
 	settings, err := ReadClaudeSettings(settingsPath)
 	if err != nil {
 		return fmt.Errorf("read settings: %w", err)
 	}
 
-	needsInstall := !HasAllHooks(settings)
+	needsInstall := !HasAllHooksForProfile(settings, profile)
 	needsUpgrade := HooksNeedUpgrade(settings, binaryPath)
 	needsDedupe := HooksNeedDedupe(settings)
+	hasOutOfProfile := hooksHaveOutOfProfileEntries(settings, profile)
 
-	if needsInstall || needsUpgrade || needsDedupe {
-		AddAllHooks(settings, binaryPath)
+	if needsInstall || needsUpgrade || needsDedupe || hasOutOfProfile {
+		AddHooksForProfile(settings, binaryPath, profile)
 		if err := WriteClaudeSettings(settingsPath, settings); err != nil {
 			return fmt.Errorf("write settings: %w", err)
 		}
@@ -111,9 +125,14 @@ func initHooks(repoRoot string, binaryPath string, result *InitResult) error {
 	return nil
 }
 
-// installTemplates installs all template assets (agents, commands, skills, docs).
-// Detects the project stack to substitute quality gate placeholders.
-func installTemplates(repoRoot string, result *InitResult) error {
+// installTemplates installs template assets gated by the selected profile.
+// AGENTS.md, CLAUDE.md, and plugin.json are installed for every profile
+// (they're the lesson-capture interface). Template groups branch on profile.
+//
+// When the selected profile is lower than what's on disk, templates belonging
+// to the higher profile would be pruned. To avoid silent data loss, this
+// function refuses to prune without ConfirmPrune=true.
+func installTemplates(repoRoot string, profile InitProfile, confirmPrune bool, result *InitResult) error {
 	version := build.Version
 
 	updated, err := UpdateAgentsMd(repoRoot)
@@ -135,35 +154,74 @@ func installTemplates(repoRoot string, result *InitResult) error {
 	result.PluginCreated = created
 	result.PluginUpdated = pluginUpdated
 
+	// Downgrade safety: if the expected set for this profile would delete
+	// templates that exist on disk, require explicit acknowledgment.
+	if !confirmPrune {
+		if stale := detectOutOfProfileTemplates(repoRoot, profile); len(stale) > 0 {
+			return fmt.Errorf(
+				"profile %q would prune %d existing template path(s) (e.g. %s); "+
+					"re-run with ConfirmPrune=true (CLI: --confirm-prune) to proceed",
+				profile, len(stale), firstN(stale, 3))
+		}
+	}
+
 	stack := DetectStack(repoRoot)
-	return installTemplateGroups(repoRoot, version, stack, result)
+	return installTemplateGroups(repoRoot, version, stack, profile, result)
 }
 
-// installTemplateGroups installs agent, command, skill, role skill, and doc templates.
-// Stack info is used to substitute quality gate placeholders in skills and docs.
-func installTemplateGroups(repoRoot string, version string, stack StackInfo, result *InitResult) error {
+// firstN returns a comma-separated preview of up to n elements.
+func firstN(ss []string, n int) string {
+	if len(ss) > n {
+		ss = ss[:n]
+	}
+	out := ""
+	for i, s := range ss {
+		if i > 0 {
+			out += ", "
+		}
+		out += s
+	}
+	return out
+}
+
+// installTemplateGroups installs agent, command, skill, role skill, and doc templates,
+// gated by profile. Stack info substitutes quality gate placeholders.
+//
+// Profile gating:
+//   - ProfileMinimal:  no template groups run
+//   - ProfileWorkflow: agents, commands, phase skills, role skills, doc templates
+//   - ProfileFull:     all groups + research tree
+//
+// The prune step always runs so that downgrades clean up what's no longer
+// in the selected profile's expected set. (Downgrade safety is enforced at
+// the installTemplates layer.)
+func installTemplateGroups(repoRoot string, version string, stack StackInfo, profile InitProfile, result *InitResult) error {
 	type installFunc struct {
-		fn   func() (int, int, error)
-		setN func(int)
-		setU func(int)
-		name string
+		fn      func() (int, int, error)
+		setN    func(int)
+		setU    func(int)
+		name    string
+		minProf InitProfile
 	}
 	groups := []installFunc{
 		{func() (int, int, error) { return InstallAgentTemplates(repoRoot) },
-			func(n int) { result.AgentsInstalled = n }, func(u int) { result.AgentsUpdated = u }, "agent templates"},
+			func(n int) { result.AgentsInstalled = n }, func(u int) { result.AgentsUpdated = u }, "agent templates", ProfileWorkflow},
 		{func() (int, int, error) { return InstallWorkflowCommands(repoRoot) },
-			func(n int) { result.CommandsInstalled = n }, func(u int) { result.CommandsUpdated = u }, "workflow commands"},
+			func(n int) { result.CommandsInstalled = n }, func(u int) { result.CommandsUpdated = u }, "workflow commands", ProfileWorkflow},
 		{func() (int, int, error) { return InstallPhaseSkills(repoRoot, stack) },
-			func(n int) { result.SkillsInstalled = n }, func(u int) { result.SkillsUpdated = u }, "phase skills"},
+			func(n int) { result.SkillsInstalled = n }, func(u int) { result.SkillsUpdated = u }, "phase skills", ProfileWorkflow},
 		{func() (int, int, error) { return InstallAgentRoleSkills(repoRoot) },
-			func(n int) { result.RoleSkillsInstalled = n }, func(u int) { result.RoleSkillsUpdated = u }, "agent role skills"},
+			func(n int) { result.RoleSkillsInstalled = n }, func(u int) { result.RoleSkillsUpdated = u }, "agent role skills", ProfileWorkflow},
 		{func() (int, int, error) { return InstallDocTemplates(repoRoot, version, stack) },
-			func(n int) { result.DocsInstalled = n }, func(u int) { result.DocsUpdated = u }, "doc templates"},
+			func(n int) { result.DocsInstalled = n }, func(u int) { result.DocsUpdated = u }, "doc templates", ProfileWorkflow},
 		{func() (int, int, error) { return InstallResearchDocs(repoRoot) },
-			func(n int) { result.ResearchInstalled = n }, func(u int) { result.ResearchUpdated = u }, "research docs"},
+			func(n int) { result.ResearchInstalled = n }, func(u int) { result.ResearchUpdated = u }, "research docs", ProfileFull},
 	}
 
 	for _, g := range groups {
+		if !profileIncludes(g.minProf, profile) {
+			continue
+		}
 		n, u, err := g.fn()
 		if err != nil {
 			return fmt.Errorf("install %s: %w", g.name, err)
@@ -172,21 +230,33 @@ func installTemplateGroups(repoRoot string, version string, stack StackInfo, res
 		g.setU(u)
 	}
 
-	pruned, err := PruneStaleTemplates(repoRoot)
+	pruned, err := PruneForProfile(repoRoot, profile)
 	if err != nil {
 		return fmt.Errorf("prune stale templates: %w", err)
 	}
 	result.TemplatesPruned = pruned
 
-	if err := CompileSkillsIndex(repoRoot); err != nil {
-		return fmt.Errorf("compile skills index: %w", err)
+	if profileIncludes(ProfileWorkflow, profile) {
+		if err := CompileSkillsIndex(repoRoot); err != nil {
+			return fmt.Errorf("compile skills index: %w", err)
+		}
 	}
 	return nil
 }
 
 // InitRepo initializes compound-agent in a repository.
 // Creates .claude/ structure, lessons index, and optionally installs hooks.
+//
+// The profile (opts.Profile) gates which template groups and hooks are
+// installed. Invalid profiles error BEFORE any filesystem changes.
 func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
+	// Validate profile BEFORE any filesystem writes so callers can recover
+	// cleanly from typos without leaving half-written state.
+	if err := validateProfile(opts.Profile); err != nil {
+		return nil, err
+	}
+	opts.Profile = resolveProfile(opts.Profile)
+
 	result := &InitResult{Success: true}
 
 	if err := initDirectories(repoRoot, result); err != nil {
@@ -194,13 +264,13 @@ func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
 	}
 
 	if !opts.SkipHooks {
-		if err := initHooks(repoRoot, opts.BinaryPath, result); err != nil {
+		if err := initHooks(repoRoot, opts.BinaryPath, opts.Profile, result); err != nil {
 			return nil, err
 		}
 	}
 
 	if !opts.SkipTemplates {
-		if err := installTemplates(repoRoot, result); err != nil {
+		if err := installTemplates(repoRoot, opts.Profile, opts.ConfirmPrune, result); err != nil {
 			return nil, err
 		}
 	}

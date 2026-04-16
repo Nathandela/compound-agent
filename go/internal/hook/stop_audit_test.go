@@ -151,3 +151,66 @@ func TestProcessStopAudit_Phase5AlwaysRequiresGate(t *testing.T) {
 		t.Fatal("phase 5 should always block without final gate")
 	}
 }
+
+// Architect is index 6 -- outside the cook-it 5-phase sequence.
+// ProcessStopAudit short-circuits on ExpectedGateForPhase("")
+// before hasTransitionEvidence is called, so this MUST allow stop.
+func TestProcessStopAudit_ArchitectPhaseDoesNotBlock(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writePhaseState(t, dir, PhaseState{
+		CookitActive: true,
+		EpicID:       "test",
+		CurrentPhase: "architect",
+		PhaseIndex:   6,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	})
+
+	result := ProcessStopAudit(dir, false)
+	if result.Continue != nil {
+		t.Fatal("architect phase (index 6) has no gate; should allow stop")
+	}
+}
+
+// hasTransitionEvidence is called with PhaseIndex values that passed
+// validatePhaseState (1..maxPhaseIndex). It must never panic when the
+// index exceeds len(Phases) -- architect (index 6) is the canonical case.
+func TestHasTransitionEvidence_OutOfRangeReturnsFalse(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name  string
+		index int
+	}{
+		{"architect index 6", 6},
+		{"upper bound", maxPhaseIndex() + 1},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			state := &PhaseState{
+				PhaseIndex: tc.index,
+				SkillsRead: []string{".claude/skills/compound/work/SKILL.md"},
+			}
+			got := hasTransitionEvidence(state)
+			if got {
+				t.Errorf("expected false for PhaseIndex=%d, got true", tc.index)
+			}
+		})
+	}
+}
+
+// Pin the final-phase branch: any PhaseIndex equal to the cook-it final
+// phase index (currently 5) must return true regardless of skill reads.
+func TestHasTransitionEvidence_FinalPhaseAlwaysTrue(t *testing.T) {
+	t.Parallel()
+	state := &PhaseState{
+		PhaseIndex: len(Phases), // 5
+		SkillsRead: []string{},
+	}
+	if !hasTransitionEvidence(state) {
+		t.Errorf("final cook-it phase must always return true")
+	}
+}

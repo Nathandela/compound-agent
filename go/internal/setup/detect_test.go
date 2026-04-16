@@ -2,7 +2,10 @@ package setup
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -199,6 +202,104 @@ func TestDetectStack_MakefileOnly(t *testing.T) {
 	}
 	if info.BuildCmd != "make build" {
 		t.Errorf("BuildCmd = %q, want %q", info.BuildCmd, "make build")
+	}
+}
+
+// --- Fallback command behavior (audit item E) ---
+//
+// The fallback strings are substituted into SKILL.md files where agents
+// interpret them as shell commands (e.g., "Run `{{QUALITY_GATE_TEST}}`").
+// Prose like "detect and run the project's test suite" executes as a
+// command and fails silently or with a confusing error.
+//
+// Fallbacks must be concrete shell commands that fail loudly so the
+// agent sees a diagnostic and can ask the user for guidance.
+
+func TestFallbackCommand_ExitsNonZero(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("sh-based fallback contract applies to POSIX hosts only")
+	}
+	cases := []struct{ name, cmd string }{
+		{"test", FallbackTestCmd},
+		{"lint", FallbackLintCmd},
+		{"build", FallbackBuildCmd},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := exec.Command("/bin/sh", "-c", tc.cmd)
+			out, err := cmd.CombinedOutput()
+			if err == nil {
+				t.Fatalf("fallback %s command succeeded; expected non-zero exit\noutput: %s", tc.name, out)
+			}
+			exitErr, ok := err.(*exec.ExitError)
+			if !ok {
+				t.Fatalf("fallback %s: expected *exec.ExitError, got %T: %v", tc.name, err, err)
+			}
+			if exitErr.ExitCode() == 0 {
+				t.Fatalf("fallback %s exited 0; want non-zero", tc.name)
+			}
+		})
+	}
+}
+
+func TestFallbackCommand_DiagnosticOnStderr(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("sh-based fallback contract applies to POSIX hosts only")
+	}
+	cases := []struct {
+		name      string
+		cmd       string
+		wantInMsg string
+	}{
+		{"test", FallbackTestCmd, "test"},
+		{"lint", FallbackLintCmd, "lint"},
+		{"build", FallbackBuildCmd, "build"},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			cmd := exec.Command("/bin/sh", "-c", tc.cmd)
+			var stderr strings.Builder
+			cmd.Stderr = &stderr
+			_ = cmd.Run()
+			msg := stderr.String()
+			if msg == "" {
+				t.Fatalf("fallback %s produced no stderr diagnostic", tc.name)
+			}
+			if !strings.Contains(strings.ToLower(msg), "compound-agent") {
+				t.Errorf("fallback %s stderr missing 'compound-agent' tag: %q", tc.name, msg)
+			}
+			if !strings.Contains(strings.ToLower(msg), tc.wantInMsg) {
+				t.Errorf("fallback %s stderr missing gate identifier %q: %q", tc.name, tc.wantInMsg, msg)
+			}
+		})
+	}
+}
+
+func TestFallbackCommand_Idempotent(t *testing.T) {
+	t.Parallel()
+	if runtime.GOOS == "windows" {
+		t.Skip("sh-based fallback contract applies to POSIX hosts only")
+	}
+	// Running the fallback twice must yield identical exit codes and no side effects
+	// (no file writes into cwd).
+	dir := t.TempDir()
+	for i := 0; i < 2; i++ {
+		cmd := exec.Command("/bin/sh", "-c", FallbackTestCmd)
+		cmd.Dir = dir
+		_ = cmd.Run()
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatalf("read tempdir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("fallback command had side effects in cwd: %v", entries)
 	}
 }
 
