@@ -87,6 +87,8 @@ func uninstallHooks(repoRoot string, result *UninstallResult) error {
 }
 
 // uninstallTemplates removes the compound/ template directories and plugin.json.
+// Real I/O errors (permission denied, read-only FS) propagate so the user
+// sees an actionable failure instead of a false-positive "removed" report.
 func uninstallTemplates(repoRoot string, result *UninstallResult) error {
 	removed, err := removeTemplateDirs(repoRoot)
 	if err != nil {
@@ -95,7 +97,11 @@ func uninstallTemplates(repoRoot string, result *UninstallResult) error {
 	result.TemplatesRemoved = removed
 
 	pluginPath := filepath.Join(repoRoot, ".claude", "plugin.json")
-	if err := removeIfExists(pluginPath); err == nil {
+	existed, err := removeIfPresent(pluginPath)
+	if err != nil {
+		return fmt.Errorf("remove .claude/plugin.json: %w", err)
+	}
+	if existed {
 		result.TemplatesRemoved = append(result.TemplatesRemoved, ".claude/plugin.json")
 	}
 	return nil
@@ -221,12 +227,23 @@ func removeTemplateDirs(repoRoot string) ([]string, error) {
 	return removed, nil
 }
 
-func removeIfExists(path string) error {
+// removeIfPresent removes path, suppressing ErrNotExist. Returns
+// (existed, err):
+//   - (true,  nil)   on successful removal
+//   - (false, nil)   when the file was absent (idempotent no-op)
+//   - (false, err)   on any real I/O error (permission, read-only FS, etc.)
+//
+// Callers should propagate err so users see actionable failures instead of a
+// false-positive "removed" report.
+func removeIfPresent(path string) (bool, error) {
 	err := os.Remove(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return err
+	if err == nil {
+		return true, nil
 	}
-	return err
+	if errors.Is(err, os.ErrNotExist) {
+		return false, nil
+	}
+	return false, err
 }
 
 func markerFiles() []string {

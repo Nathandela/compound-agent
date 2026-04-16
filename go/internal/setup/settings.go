@@ -576,6 +576,9 @@ func removeHookEntries(arr []any) ([]any, bool) {
 }
 
 // RemoveAllHooks removes all compound-agent hooks from settings.
+// After removal, any hook-type key that is now an empty slice is deleted
+// so settings.json stays free of "HookType": [] noise — symmetric with
+// the dropEmptyHookArrays cleanup in AddHooksForProfile.
 func RemoveAllHooks(settings map[string]any) bool {
 	hooks, ok := settings["hooks"].(map[string]any)
 	if !ok {
@@ -595,5 +598,6 @@ func RemoveAllHooks(settings map[string]any) bool {
 		hooks[hookType] = filtered
 	}
 
+	dropEmptyHookArrays(hooks)
 	return anyRemoved
 }
