@@ -310,7 +310,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca loop --review-every <n>` | Review every N completed epics (0 = end-only, default: 0) |
 | `ca loop --max-review-cycles <n>` | Max review/fix iterations (default: 3) |
 | `ca loop --review-blocking` | Fail loop if review not approved after max cycles |
-| `ca loop --review-model <model>` | Model for implementer fix sessions (default: claude-opus-4-6[1m]) |
+| `ca loop --review-model <model>` | Model for implementer fix sessions (default: claude-opus-4-7[1m]) |
 | `ca improve` | Generate improvement loop script from `improve/*.md` programs |
 | `ca improve --topics <names...>` | Run only specific topics |
 | `ca improve --max-iters <n>` | Max iterations per topic (default: 5) |

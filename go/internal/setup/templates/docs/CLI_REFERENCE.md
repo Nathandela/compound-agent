@@ -111,7 +111,7 @@ ca loop                    # Generate infinity loop script for autonomous proces
 ca loop --epics "epic-1,epic-2"
 ca loop --output my-loop.sh
 ca loop --max-retries 5
-ca loop --model claude-opus-4-6[1m]
+ca loop --model claude-opus-4-7[1m]
 ca loop --force            # Overwrite existing script
 ```
 
@@ -160,7 +160,7 @@ ca polish --spec-file "docs/specs/my-spec.md"
 ca polish --meta-epic "meta-epic-id"
 ca polish --reviewers "claude-sonnet,claude-opus,gemini,codex"
 ca polish --cycles 2
-ca polish --model claude-opus-4-6[1m]
+ca polish --model claude-opus-4-7[1m]
 ca polish --force          # Overwrite existing script
 ```
 

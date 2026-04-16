@@ -40,7 +40,7 @@ $PSNativeCommandUseErrorActionPreference = $true
 # Config
 # ============================================================
 $MAX_RETRIES = 1
-$MODEL = "claude-opus-4-6[1m]"
+$MODEL = "claude-opus-4-7[1m]"
 $EPIC_IDS = ""  # Space-separated epic IDs, or empty for auto-discover
 # Note: unlike the --epics CLI flag (which uses commas), this variable is space-separated
 # because the PS1 splits on whitespace at line 257. Convert: "a,b,c" -> "a b c".

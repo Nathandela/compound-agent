@@ -9,7 +9,7 @@ The infinity loop (`ca loop`) generates a standalone bash script that autonomous
 | Parameter | CLI Flag | Default | Description |
 |-----------|----------|---------|-------------|
 | Epic IDs | `--epics <ids>` | auto-discover | Comma-separated epic IDs to process |
-| Model | `--model <model>` | claude-opus-4-6[1m] | Claude model for sessions |
+| Model | `--model <model>` | claude-opus-4-7[1m] | Claude model for sessions |
 | Max retries | `--max-retries <n>` | 1 | Retries per epic on failure |
 | Output | `-o, --output <path>` | .compound-agent/infinity-loop.sh | Script output path |
 | Force | `--force` | false | Overwrite existing script |
@@ -17,7 +17,7 @@ The infinity loop (`ca loop`) generates a standalone bash script that autonomous
 | Review cadence | `--review-every <n>` | 0 (end-only) | Review every N completed epics |
 | Review cycles | `--max-review-cycles <n>` | 3 | Max review/fix iterations |
 | Review blocking | `--review-blocking` | false | Fail loop if review not approved |
-| Review model | `--review-model <model>` | claude-opus-4-6[1m] | Model for fix sessions |
+| Review model | `--review-model <model>` | claude-opus-4-7[1m] | Model for fix sessions |
 | Compact threshold | `--compact-pct <0-100>` | 0 (Claude default) | Context auto-compaction % (suggested: 50 for 1M context) |
 
 ## Where to Look

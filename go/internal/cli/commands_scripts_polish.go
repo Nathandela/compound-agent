@@ -32,7 +32,7 @@ func polishCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&o.output, "output", "o", ".compound-agent/polish-loop.sh", "Output script path")
 	cmd.Flags().IntVar(&o.cycles, "cycles", 3, "Number of polish cycles")
-	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-6[1m]", "Claude model to use")
+	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-7[1m]", "Claude model to use")
 	cmd.Flags().StringVar(&o.specFile, "spec-file", "", "Path to spec file for audit context (required)")
 	cmd.Flags().StringVar(&o.metaEpic, "meta-epic", "", "Parent meta-epic ID (required)")
 	cmd.Flags().StringVar(&o.reviewers, "reviewers", "claude-sonnet,claude-opus,gemini,codex", "Comma-separated reviewers")
@@ -446,7 +446,7 @@ run_polish_audit() {
     local model_name=""
 
     case "$reviewer" in
-      (claude-opus)   model_name="claude-opus-4-6[1m]" ;;
+      (claude-opus)   model_name="claude-opus-4-7[1m]" ;;
       (claude-sonnet) model_name="claude-sonnet-4-6" ;;
     esac
 

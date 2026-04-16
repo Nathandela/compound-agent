@@ -37,7 +37,7 @@ func TestLoopCommand_WithReviewers(t *testing.T) {
 		"--max-review-cycles", "5",
 		"--review-every", "2",
 		"--review-blocking",
-		"--review-model", "claude-opus-4-6",
+		"--review-model", "claude-opus-4-7",
 	)
 	if err != nil {
 		t.Fatalf("loop --reviewers failed: %v", err)
@@ -260,7 +260,7 @@ func TestLoopScriptReviewConfig_SetsVariables(t *testing.T) {
 		reviewers:       []string{"claude-sonnet", "gemini"},
 		maxReviewCycles: 5,
 		reviewBlocking:  true,
-		reviewModel:     "claude-opus-4-6",
+		reviewModel:     "claude-opus-4-7",
 		reviewEvery:     3,
 	})
 
@@ -696,7 +696,7 @@ func TestLoopScriptReviewConfig_NonBlocking(t *testing.T) {
 		reviewers:       []string{"gemini"},
 		maxReviewCycles: 3,
 		reviewBlocking:  false,
-		reviewModel:     "claude-opus-4-6",
+		reviewModel:     "claude-opus-4-7",
 		reviewEvery:     0,
 	})
 

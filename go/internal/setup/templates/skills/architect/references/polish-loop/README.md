@@ -9,7 +9,7 @@ The polish loop (`ca polish`) generates a standalone bash script that iterates N
 | Parameter | CLI Flag | Default | Description |
 |-----------|----------|---------|-------------|
 | Cycles | `--cycles <n>` | 3 | Number of audit/fix cycles |
-| Model | `--model <model>` | claude-opus-4-6[1m] | Claude model for sessions |
+| Model | `--model <model>` | claude-opus-4-7[1m] | Claude model for sessions |
 | Spec file | `--spec-file <path>` | (required) | Spec file for audit context |
 | Meta-epic | `--meta-epic <id>` | (required) | Parent meta-epic ID |
 | Reviewers | `--reviewers <names>` | claude-sonnet,claude-opus,gemini,codex | Audit fleet |

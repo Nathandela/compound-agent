@@ -196,21 +196,21 @@ grep '"duration_s":0' .compound-agent/agent_logs/loop-execution.jsonl
 
 ### Context window is 200K instead of 1M
 
-**Symptom**: Claude sessions run out of context quickly. The `--model` value in the script is `claude-opus-4-6` without the `[1m]` suffix. Output token counts are low (~4K instead of ~32K).
+**Symptom**: Claude sessions run out of context quickly. The `--model` value in the script is `claude-opus-4-7` without the `[1m]` suffix. Output token counts are low (~4K instead of ~32K).
 
-**Root cause**: The model ID `claude-opus-4-6` defaults to 200K context. The `[1m]` suffix (`claude-opus-4-6[1m]`) is required to request 1M context. Claude Code strips the suffix before sending the API call.
+**Root cause**: The model ID `claude-opus-4-7` defaults to 200K context. The `[1m]` suffix (`claude-opus-4-7[1m]`) is required to request 1M context. Claude Code strips the suffix before sending the API call.
 
 **Fix**: Regenerate the script with the correct model:
 ```bash
-ca loop --model 'claude-opus-4-6[1m]' --force
+ca loop --model 'claude-opus-4-7[1m]' --force
 ```
-Or edit the existing script: change `MODEL='claude-opus-4-6'` to `MODEL='claude-opus-4-6[1m]'`.
+Or edit the existing script: change `MODEL='claude-opus-4-7'` to `MODEL='claude-opus-4-7[1m]'`.
 
 **Diagnosis**:
 ```bash
 grep "^MODEL=" .compound-agent/infinity-loop.sh
-# Should show: MODEL='claude-opus-4-6[1m]'
-# Bad: MODEL='claude-opus-4-6' (missing [1m])
+# Should show: MODEL='claude-opus-4-7[1m]'
+# Bad: MODEL='claude-opus-4-7' (missing [1m])
 ```
 
 ---

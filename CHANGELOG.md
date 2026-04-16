@@ -9,10 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.2] - 2026-04-16
+
 ### Added
 
 - **`ca uninstall` command**: reverses `ca init` / `ca setup` in three tiers. Default removes managed Claude Code hooks from `.claude/settings.json`. `--templates` additionally removes the `compound/` template directories (`.claude/agents/compound/`, `.claude/commands/compound/`, `.claude/skills/compound/`, `docs/compound/`) and `.claude/plugin.json`. `--all` additionally removes `.compound-agent/` runtime state and strips managed marker blocks from `AGENTS.md`, `.claude/CLAUDE.md`, root `.gitignore`, and `.claude/.gitignore`. `.claude/lessons/` and `.claude/compound-agent.json` are ALWAYS preserved. Requires `--yes` to skip interactive confirmation.
 - **Install profiles (`ca setup --profile <minimal|workflow|full>`)**: `minimal` installs only lesson-capture plumbing (lessons dir, AGENTS.md integration, plugin.json, and 3 hooks — SessionStart/PreCompact prime + UserPromptSubmit reminder) — no commands, no phase skills, no agent role skills, no docs. `workflow` adds the 5-phase cook-it workflow (all commands, phase skills, agent role skills, doc templates, all phase/failure hooks) but skips the `docs/compound/research/` tree. `full` (default, backward-compatible) installs everything. `--confirm-prune` is required when a lower profile would delete existing templates on disk.
+
+### Changed
+
+- **Default model bumped to Opus 4.7**: All default model references updated from `claude-opus-4-6[1m]` to `claude-opus-4-7[1m]`. Affects `ca loop --model`, `ca loop --review-model`, `ca polish --model`, `ca improve --model`, the `claude-opus` reviewer selector in the generated review/polish scripts, and the Simplicity lens in the architect advisory fleet. Template skills (`loop-launcher/SKILL.md`, `architect/references/infinity-loop/README.md`, `architect/references/infinity-loop/troubleshooting.md`, `architect/references/polish-loop/README.md`, `architect/references/advisory-fleet.md`) and shipped docs (`CLI_REFERENCE.md`) updated to match. The Windows PowerShell reference template `$MODEL` default also updated.
 
 ### Fixed
 

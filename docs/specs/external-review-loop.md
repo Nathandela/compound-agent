@@ -48,7 +48,7 @@ Key discovery: All 3 CLIs support session resumption:
 --reviewers <names...>    Which reviewers to use (default: claude-sonnet claude-opus gemini codex)
 --max-review-cycles <n>   Max review/fix iterations (default: 3)
 --review-blocking         Fail loop if review not approved after max cycles
---review-model <model>    Model for implementer fix sessions (default: claude-opus-4-6[1m])
+--review-model <model>    Model for implementer fix sessions (default: claude-opus-4-7[1m])
 ```
 
 ## Generated Bash Script Flow

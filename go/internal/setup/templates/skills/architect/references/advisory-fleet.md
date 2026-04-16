@@ -32,7 +32,7 @@ Four evaluation lenses, each assigned to a different model when available:
 | 1 | **Security & Reliability** | Attack surfaces, failure modes, data integrity, recovery, trust boundaries | claude | `--model claude-sonnet-4-6` |
 | 2 | **Scalability & Performance** | Bottlenecks, growth patterns, resource consumption, data volume, latency | gemini | (none needed) |
 | 3 | **Organizational & Delivery** | Team boundaries, delivery risk, coordination cost, cognitive load, deployment order | codex | (none needed) |
-| 4 | **Simplicity & Alternatives** | Over-engineering, simpler alternatives, premature abstraction, YAGNI violations | claude | `--model claude-opus-4-6` |
+| 4 | **Simplicity & Alternatives** | Over-engineering, simpler alternatives, premature abstraction, YAGNI violations | claude | `--model claude-opus-4-7` |
 
 ### Lens-Specific Questions
 

@@ -26,7 +26,7 @@ Do NOT autonomously decide to launch loops.
 ### Infinity Loop
 ```bash
 ca loop --epics "id1,id2,id3" \
-  --model "claude-opus-4-6[1m]" \
+  --model "claude-opus-4-7[1m]" \
   --reviewers "claude-sonnet,claude-opus,gemini,codex" \
   --review-every 1 \
   --max-review-cycles 3 \
@@ -40,7 +40,7 @@ ca polish --spec-file "docs/specs/your-spec.md" \
   --meta-epic "meta-epic-id" \
   --reviewers "claude-sonnet,claude-opus,gemini,codex" \
   --cycles 2 \
-  --model "claude-opus-4-6[1m]" \
+  --model "claude-opus-4-7[1m]" \
   --force
 ```
 
@@ -49,13 +49,13 @@ ca polish --spec-file "docs/specs/your-spec.md" \
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--epics` | (auto-discover) | Comma-separated epic IDs |
-| `--model` | `claude-opus-4-6[1m]` | Model for implementation sessions |
+| `--model` | `claude-opus-4-7[1m]` | Model for implementation sessions |
 | `--reviewers` | (none) | Comma-separated: `claude-sonnet,claude-opus,gemini,codex` |
 | `--review-every` | `0` (end-only) | Review after every N epics |
 | `--max-review-cycles` | `3` | Max review/fix iterations |
 | `--max-retries` | `1` | Retries per epic on failure |
 | `--review-blocking` | `false` | Fail loop if review not approved after max cycles |
-| `--review-model` | `claude-opus-4-6[1m]` | Model for implementer fix sessions |
+| `--review-model` | `claude-opus-4-7[1m]` | Model for implementer fix sessions |
 | `-o, --output` | `.compound-agent/infinity-loop.sh` | Output script path |
 | `--force` | (off) | Overwrite existing script |
 
@@ -66,7 +66,7 @@ ca polish --spec-file "docs/specs/your-spec.md" \
 | `--meta-epic` | (required) | Parent meta-epic ID for traceability |
 | `--spec-file` | (required) | Path to the spec for reviewer context |
 | `--cycles` | `3` | Number of polish cycles |
-| `--model` | `claude-opus-4-6[1m]` | Model for polish architect sessions |
+| `--model` | `claude-opus-4-7[1m]` | Model for polish architect sessions |
 | `--reviewers` | `claude-sonnet,claude-opus,gemini,codex` | Comma-separated audit fleet |
 | `-o, --output` | `.compound-agent/polish-loop.sh` | Output script path |
 | `--force` | (off) | Overwrite existing script |
