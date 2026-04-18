@@ -11,10 +11,21 @@ This project uses compound-agent for session memory via **CLI commands**.
 |---------|---------|
 | `ca search "query"` | Search lessons - MUST call before architectural decisions; use anytime you need context |
 | `ca knowledge "query"` | Semantic search over project docs - MUST call before architectural decisions; use keyword phrases, not questions |
-| `ca learn "insight"` | Capture lessons - use AFTER corrections or discoveries |
+| `ca learn "insight" --type lesson --severity medium --tags "tag1,tag2"` | Capture lesson (see flags below) |
+| `ca learn "..." --type pattern --pattern-bad "bad" --pattern-good "good"` | Capture pattern (--pattern-* required for type=pattern) |
 | `ca list` | List all stored lessons |
 | `ca show <id>` | Show details of a specific lesson |
-| `ca wrong <id>` | Mark a lesson as incorrect |
+| `ca wrong <id> --reason "..."` | Mark a lesson as incorrect/superseded |
+| `ca update <id> --severity high --tags "security"` | Update an existing lesson |
+
+**`ca learn` flags:**
+- `--type` — `lesson` (default) · `solution` · `pattern` · `preference`
+- `--severity` — `high` · `medium` · `low`
+- `--tags` — comma-separated, no spaces: `"eslint,typescript,catch"`
+- `--trigger` — what caused this insight (quoted string)
+- `--pattern-bad` / `--pattern-good` — required when `--type pattern`
+
+> Full reference: `docs/compound/CLI_REFERENCE.md` → "Capture commands"
 
 ### Mandatory Recall
 
