@@ -256,4 +256,3 @@ func TestContract_DSNPragmasApplied(t *testing.T) {
 		t.Errorf("busy_timeout = %d, want 5000", timeout)
 	}
 }
-
