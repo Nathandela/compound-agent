@@ -20,19 +20,7 @@ Before starting EACH phase, you MUST use the Read tool to open its skill file:
 Do NOT proceed from memory. Read the skill, then follow it exactly.
 
 ## Session Start
-When a cooking session begins, IMMEDIATELY print the banner below (copy it verbatim):
-
-         o
-        /|\
-       o-o-o
-      /|\ /|\
-     o-o-o-o-o
-      \|/ \|/
-       o-o-o
-        \|/
-         o
-
-Then proceed with the protocol below.
+When a cooking session begins, proceed with the protocol below.
 
 ## Phase Execution Protocol
 0. Initialize state: `ca phase-check init <epic-id>`
