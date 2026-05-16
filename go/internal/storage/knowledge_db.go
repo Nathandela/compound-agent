@@ -497,6 +497,7 @@ func (k *KnowledgeDB) HydrateChunks(ids []string) []KnowledgeChunk {
 		args[i] = id
 	}
 
+	//nolint:gosec // G202: b.String() contains only '?' and ',' — no user input is concatenated.
 	rows, err := k.db.Query(
 		"SELECT id, file_path, start_line, end_line, content_hash, text, model, updated_at FROM chunks WHERE id IN ("+b.String()+")",
 		args...,
