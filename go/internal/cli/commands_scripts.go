@@ -220,11 +220,13 @@ trap _loop_cleanup EXIT
 }
 
 // loopScriptMemorySafety returns the 4-layer memory defense: orphan cleanup,
-// memory gate, memory watchdog, and stale output watchdog.
+// memory gate, memory watchdog, stale output watchdog, and the bg kill ladder.
 func loopScriptMemorySafety() string { //nolint:funlen // bash template string
 	return `# --- Memory Safety (4-Layer Defense) ---
 
 # cleanup_orphans() - Kill leftover test/build processes from THIS repo between sessions
+# (p backend: PID-based pgrep, scoped to repo cwd — R-PLEGACY byte-identical)
+# (bg backend: also enumerates ~/.claude/jobs/ for stray bg sessions from this loop)
 # Scoped to current working directory to avoid killing unrelated processes
 cleanup_orphans() {
   local killed=0
@@ -245,6 +247,88 @@ cleanup_orphans() {
   if [ "$killed" -gt 0 ]; then
     log "Cleaned up $killed orphan test processes"
     sleep 2  # Let OS reclaim memory
+  fi
+
+  # bg backend: enumerate ~/.claude/jobs/ for stray sessions from prior crashed loop
+  # attempts. Conservative policy (R-HARVEST-FAIL):
+  #   - Only act on sessions that have a snapshot in .ca-worktree-snapshots/ (this repo).
+  #   - Only stop clearly-stale sessions (state.json mtime older than 2x SESSION_STALE_TIMEOUT).
+  #   - Only claude rm if the session has NO un-harvested worktree (no new worktree vs snapshot).
+  #   - Otherwise: log HUMAN_REQUIRED and leave the session for manual recovery.
+  #   - Never touch sessions owned by other repos (scoped by snapshot presence).
+  if [ "$CA_BACKEND" = "bg" ]; then
+    local jobs_dir="$HOME/.claude/jobs"
+    local snapshot_dir
+    snapshot_dir="$(git rev-parse --show-toplevel 2>/dev/null || echo '')/.ca-worktree-snapshots"
+    if [ -d "$jobs_dir" ] && [ -d "$snapshot_dir" ]; then
+      local now_ts
+      now_ts=$(date +%s 2>/dev/null || echo 0)
+      local stale_threshold=$(( ${SESSION_STALE_TIMEOUT:-1800} * 2 ))
+      for state_file in "$jobs_dir"/*/state.json; do
+        [ -f "$state_file" ] || continue
+        local orphan_id
+        orphan_id=$(basename "$(dirname "$state_file")")
+        # Only handle sessions that have a snapshot in this repo (ownership check).
+        local snap_file="$snapshot_dir/$orphan_id.txt"
+        [ -f "$snap_file" ] || continue
+        # Skip the currently active session (AGENT_HANDLE is set during dispatch).
+        [ "$orphan_id" = "${AGENT_HANDLE:-}" ] && continue
+        # Check terminal state: skip sessions already done/stopped/failed/etc.
+        local orphan_state=""
+        if [ "$HAS_JQ" = true ]; then
+          orphan_state=$(jq -r '.state // empty' "$state_file" 2>/dev/null || true)
+        else
+          orphan_state=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('state','') or '')
+except Exception:
+    pass
+" "$state_file" 2>/dev/null || true)
+        fi
+        case "$orphan_state" in
+          done|completed|failed|stopped|error|cancel) continue ;;
+        esac
+        # Check staleness: state.json mtime must be older than stale_threshold.
+        local mtime
+        mtime=$(stat -c '%Y' "$state_file" 2>/dev/null || stat -f '%m' "$state_file" 2>/dev/null || echo 0)
+        local age=$(( now_ts - mtime ))
+        if [ "$age" -lt "$stale_threshold" ]; then
+          continue  # Session is recent; skip
+        fi
+        log "WARN: cleanup_orphans: stale bg orphan $orphan_id (age ${age}s) — checking harvest safety"
+        # Harvest-safety check: detect un-harvested worktree by diffing snapshot vs current.
+        local pre_wts=""
+        pre_wts=$(cat "$snap_file" 2>/dev/null || true)
+        local cur_wts=""
+        cur_wts=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
+        local has_new_wt=false
+        while IFS= read -r wt_path; do
+          [ -z "$wt_path" ] && continue
+          if ! printf '%s\n' "$pre_wts" | grep -qF "$wt_path"; then
+            has_new_wt=true
+            break
+          fi
+        done <<SNAPEOF
+$cur_wts
+SNAPEOF
+        if [ "$has_new_wt" = true ]; then
+          # Un-harvested worktree present: cannot safely rm. Log HUMAN_REQUIRED.
+          local msg="HUMAN_REQUIRED: cleanup_orphans: orphan bg session $orphan_id has un-harvested worktree — inspect manually and merge, then: claude rm $orphan_id"
+          log "$msg"
+          if [ -n "${HARVEST_LOG:-}" ]; then
+            printf '%s\n' "$msg" >> "$HARVEST_LOG" 2>/dev/null || true
+          fi
+        else
+          # No un-harvested worktree: safe to stop and rm.
+          log "cleanup_orphans: stopping stale orphan $orphan_id (no un-harvested worktree)"
+          claude stop "$orphan_id" 2>/dev/null || true
+          claude rm "$orphan_id" 2>/dev/null || true
+          rm -f "$snap_file" 2>/dev/null || true
+        fi
+      done
+    fi
   fi
 }
 
@@ -349,6 +433,96 @@ stop_stale_watchdog() {
     wait "$STALE_WATCHDOG_PID" 2>/dev/null || true
     STALE_WATCHDOG_PID=""
   fi
+}
+
+# bg_kill_ladder <handle> <reason> <mem_log>
+# Three-stage escalation for a wedged bg session (R-WATCHDOG, G4):
+#   Stage 1: claude stop <handle>  (~1s, halts work — spike G4 verified)
+#            Wait BG_POLL_INTERVAL then re-poll; if terminal, done.
+#   Stage 2: claude rm <handle>   — ONLY if no un-harvested worktree (R-HARVEST-FAIL).
+#            If worktree present: log HUMAN_REQUIRED, skip rm, proceed to stage 3.
+#   Stage 3: scoped process sweep — pkill processes whose argv contains the session handle.
+#            Scoped only to processes from this session; never a broad pkill.
+# Writes STALE_WATCHDOG:/WATCHDOG: markers to mem_log so existing detection still works.
+bg_kill_ladder() {
+  local handle="$1" reason="$2" mem_log="$3"
+  local ts
+  ts=$(date '+%Y-%m-%d_%H-%M-%S')
+
+  # Stage 1: stop the session.
+  if [ "$reason" = "stale" ]; then
+    echo "[$ts] STALE_WATCHDOG: bg session $handle stale — stage1: claude stop" >> "$mem_log"
+  else
+    echo "[$ts] WATCHDOG: bg session $handle $reason — stage1: claude stop" >> "$mem_log"
+  fi
+  log "bg_kill_ladder[$handle]: stage1 — agent_stop (delegates to claude stop)"
+  agent_stop "$handle"
+  sleep "${BG_POLL_INTERVAL:-15}"
+
+  # Re-poll: if already terminal, no further action needed.
+  local post_state=""
+  local state_file="$HOME/.claude/jobs/$handle/state.json"
+  if [ -f "$state_file" ]; then
+    if [ "${HAS_JQ:-false}" = true ]; then
+      post_state=$(jq -r '.state // empty' "$state_file" 2>/dev/null || true)
+    else
+      post_state=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('state','') or '')
+except Exception:
+    pass
+" "$state_file" 2>/dev/null || true)
+    fi
+  fi
+  case "$post_state" in
+    done|completed|failed|stopped|error|cancel)
+      log "bg_kill_ladder[$handle]: session reached terminal state after stop — done"
+      return 0
+      ;;
+  esac
+
+  # Stage 2: harvest-safety check then claude rm.
+  log "bg_kill_ladder[$handle]: stage2 — harvest-safety check before claude rm"
+  local repo_root snapshot_dir snap_file
+  repo_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  snapshot_dir="${repo_root:+$repo_root/.ca-worktree-snapshots}"
+  snap_file="${snapshot_dir:+$snapshot_dir/$handle.txt}"
+
+  local pre_wts="" cur_wts="" has_new_wt=false
+  if [ -n "$snap_file" ] && [ -f "$snap_file" ]; then
+    pre_wts=$(cat "$snap_file" 2>/dev/null || true)
+    cur_wts=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
+    while IFS= read -r wt_path; do
+      [ -z "$wt_path" ] && continue
+      if ! printf '%s\n' "$pre_wts" | grep -qF "$wt_path"; then
+        has_new_wt=true
+        break
+      fi
+    done <<LADDEEOF
+$cur_wts
+LADDEEOF
+  fi
+
+  if [ "$has_new_wt" = true ]; then
+    # Un-harvested worktree: cannot rm. Log HUMAN_REQUIRED; proceed to scoped sweep only.
+    local hr_msg="HUMAN_REQUIRED: bg_kill_ladder: session $handle has un-harvested worktree — cannot claude rm; inspect manually then: claude rm $handle"
+    log "$hr_msg"
+    if [ -n "${HARVEST_LOG:-}" ]; then
+      printf '%s\n' "$hr_msg" >> "${HARVEST_LOG}" 2>/dev/null || true
+    fi
+  else
+    log "bg_kill_ladder[$handle]: stage2 — claude rm (no un-harvested worktree)"
+    claude rm "$handle" 2>/dev/null || true
+    rm -f "$snap_file" 2>/dev/null || true
+    return 0
+  fi
+
+  # Stage 3: scoped process sweep — kill only processes whose argv contains the handle.
+  # This is a last resort for residual subprocesses; never a broad pkill.
+  log "bg_kill_ladder[$handle]: stage3 — scoped process sweep for handle $handle"
+  pkill -f "$handle" 2>/dev/null || true
 }
 
 `
@@ -1140,6 +1314,8 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
     else
       # bg backend: poll state.json until terminal, with stale-liveness detection.
       # Stale liveness uses state.json mtime/inFlight heartbeat (G3: transcript is end-only).
+      # ca watch: TRACEFILE (.latest symlink target) receives synthetic poll-status events
+      # each iteration so ca watch shows live progress during bg sessions (R-FRAMEWORK).
       bg_last_update="" bg_stale_secs=0 bg_state_file="$HOME/.claude/jobs/$AGENT_HANDLE/state.json"
       bg_killed=false
       while true; do
@@ -1149,6 +1325,12 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
           break
         fi
 
+        # Write a synthetic poll-status event to TRACEFILE for ca watch live view.
+        # Format: stream-json content_block_delta so readAndFormat renders it as text.
+        # agent_collect will overwrite TRACEFILE with the real transcript at end-of-session.
+        printf '{"type":"content_block_delta","timestamp":"%s","delta":{"type":"text_delta","text":"[bg poll] session %s state=running (stale_secs=%d)\\n"}}\n' \
+          "$(date '+%Y-%m-%dT%H:%M:%SZ')" "$AGENT_HANDLE" "$bg_stale_secs" >> "$TRACEFILE" 2>/dev/null || true
+
         # Stale-liveness: track state.json modification time (G3: transcript absent mid-run).
         bg_cur_mtime=""
         if [ -f "$bg_state_file" ]; then
@@ -1157,9 +1339,9 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
         if [ -n "$bg_cur_mtime" ] && [ "$bg_cur_mtime" = "$bg_last_update" ]; then
           bg_stale_secs=$((bg_stale_secs + BG_POLL_INTERVAL))
           if [ "$bg_stale_secs" -ge "$SESSION_STALE_TIMEOUT" ]; then
-            echo "[$(date '+%Y-%m-%d_%H-%M-%S')] STALE_WATCHDOG: bg session $AGENT_HANDLE stale for ${bg_stale_secs}s" >> "$MEM_LOG"
-            log "WARN: bg session $AGENT_HANDLE stale for ${bg_stale_secs}s — stopping via agent_stop"
-            agent_stop "$AGENT_HANDLE"
+            echo "[$(date '+%Y-%m-%d_%H-%M-%S')] STALE_WATCHDOG: bg session $AGENT_HANDLE stale for ${bg_stale_secs}s — escalating kill ladder" >> "$MEM_LOG"
+            log "WARN: bg session $AGENT_HANDLE stale for ${bg_stale_secs}s — escalating via bg_kill_ladder"
+            bg_kill_ladder "$AGENT_HANDLE" "stale" "$MEM_LOG"
             bg_killed=true
             break
           fi
@@ -1172,9 +1354,9 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
         bg_mem_pct=""
         bg_mem_pct=$(get_memory_pct)
         if [ -n "$bg_mem_pct" ] && [ "$bg_mem_pct" -lt "$WATCHDOG_THRESHOLD" ] 2>/dev/null; then
-          echo "[$(date '+%Y-%m-%d_%H-%M-%S')] WATCHDOG: bg session $AGENT_HANDLE memory ${bg_mem_pct}% < ${WATCHDOG_THRESHOLD}%, stopping" >> "$MEM_LOG"
-          log "WARN: memory ${bg_mem_pct}% < ${WATCHDOG_THRESHOLD}%, stopping bg session $AGENT_HANDLE"
-          agent_stop "$AGENT_HANDLE"
+          echo "[$(date '+%Y-%m-%d_%H-%M-%S')] WATCHDOG: bg session $AGENT_HANDLE memory ${bg_mem_pct}% < ${WATCHDOG_THRESHOLD}% — escalating kill ladder" >> "$MEM_LOG"
+          log "WARN: memory ${bg_mem_pct}% < ${WATCHDOG_THRESHOLD}%, escalating via bg_kill_ladder"
+          bg_kill_ladder "$AGENT_HANDLE" "memory ${bg_mem_pct}%" "$MEM_LOG"
           bg_killed=true
           break
         fi

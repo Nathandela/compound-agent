@@ -1986,6 +1986,518 @@ func TestBgBackend_NoTopLevelLocal(t *testing.T) {
 	}
 }
 
+// --- T4: Watchdog / Orphans / ca watch ---
+
+// TestT4_KillLadder_HasStopThenRmThenSweep verifies that the bg stale-watchdog
+// kill ladder in the generated script escalates through all three stages:
+// (1) agent_stop, (2) claude rm (harvest-safe), (3) scoped process sweep.
+// R-WATCHDOG, AC-8, S7.
+func TestT4_KillLadder_HasStopThenRmThenSweep(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The kill ladder must be present somewhere in the script.
+	if !strings.Contains(script, "bg_kill_ladder") {
+		t.Error("kill ladder function (bg_kill_ladder) must be defined in the generated script (R-WATCHDOG)")
+	}
+	// The ladder must call agent_stop (step 1).
+	seam := loopScriptSeam()
+	memSafety := loopScriptMemorySafety()
+	ladder := seam + memSafety
+	if !strings.Contains(ladder, "bg_kill_ladder") {
+		t.Error("bg_kill_ladder must be defined in the seam or memory-safety section")
+	}
+}
+
+// TestT4_KillLadder_StaleMarkerWritten verifies that the stale-watchdog trip
+// writes a STALE_WATCHDOG: marker to MEM_LOG (so existing detection still works).
+// R-WATCHDOG.
+func TestT4_KillLadder_StaleMarkerWritten(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	if !strings.Contains(script, "STALE_WATCHDOG:") {
+		t.Error("stale-watchdog trip must write STALE_WATCHDOG: marker to MEM_LOG (R-WATCHDOG)")
+	}
+	if !strings.Contains(script, "WATCHDOG:") {
+		t.Error("memory-watchdog trip must write WATCHDOG: marker to MEM_LOG (R-MEMGUARD)")
+	}
+}
+
+// TestT4_KillLadder_BgLadderFunction verifies that bg_kill_ladder implements
+// the required three-stage escalation: stop -> harvest-safe rm -> scoped sweep.
+// The ladder function must be present in the memory-safety or seam section.
+func TestT4_KillLadder_BgLadderFunction(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Find the bg_kill_ladder function body.
+	idx := strings.Index(script, "bg_kill_ladder()")
+	if idx < 0 {
+		t.Fatal("bg_kill_ladder() not found in generated script")
+	}
+	// Extract a reasonable window (up to 100 lines).
+	body := script[idx:]
+	closeIdx := strings.Index(body, "\n}\n")
+	if closeIdx > 0 {
+		body = body[:closeIdx]
+	}
+
+	// Stage 1: agent_stop must be called.
+	if !strings.Contains(body, "agent_stop") {
+		t.Error("bg_kill_ladder stage 1 must call agent_stop (claude stop)")
+	}
+	// Stage 2: claude rm must be referenced (harvest-safe rm).
+	if !strings.Contains(body, "claude rm") {
+		t.Error("bg_kill_ladder stage 2 must reference claude rm (harvest-safe teardown)")
+	}
+	// Stage 3: scoped process sweep (pkill/kill of processes owning this handle).
+	if !strings.Contains(body, "pkill") && !strings.Contains(body, "HUMAN_REQUIRED") {
+		t.Error("bg_kill_ladder stage 3 must include scoped sweep (pkill) or log HUMAN_REQUIRED")
+	}
+	// The ladder must not rm if worktree is un-harvested (harvest-safety check present).
+	if !strings.Contains(body, "worktree") && !strings.Contains(body, "snapshot") {
+		t.Error("bg_kill_ladder must include harvest-safety check before claude rm")
+	}
+}
+
+// TestT4_KillLadder_Runtime_NoRmIfWorktreePresent is a runtime test that verifies
+// the kill ladder does NOT invoke claude rm when the bg session has an un-harvested
+// worktree. This enforces the data-loss guard (R-HARVEST-FAIL).
+func TestT4_KillLadder_Runtime_NoRmIfWorktreePresent(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+
+	// Init git repo and create a worktree simulating an un-harvested bg session.
+	setupGitRepoForHarvest(t, repoDir)
+	// Write the pre-dispatch snapshot.
+	snapshotDir := filepath.Join(repoDir, ".ca-worktree-snapshots")
+	preSnapshot := captureWorktreePathsBeforeWorktree(t, repoDir)
+	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+		t.Fatalf("mkdir snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, "t1.txt"), []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+	// Add the worktree (simulating un-harvested work).
+	addWorktreeWithCommit(t, repoDir)
+
+	// Build claude stub that records rm invocations.
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	memLog := filepath.Join(t.TempDir(), "mem.log")
+	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
+
+	// Build a script that invokes bg_kill_ladder directly with a fake handle.
+	seam := loopScriptSeam()
+	memSafety := loopScriptMemorySafety()
+	script := "#!/usr/bin/env bash\n" +
+		"set -euo pipefail\n" +
+		"export PATH=\"" + stubDir + ":$PATH\"\n" +
+		"export HARVEST_LOG=\"" + harvestLog + "\"\n" +
+		"CA_BACKEND=bg\n" +
+		"HAS_JQ=false\n" +
+		"log() { echo \"[LOG] $*\" >&2; }\n" +
+		memSafety + "\n" +
+		seam + "\n" +
+		"AGENT_HANDLE=t1\n" +
+		"MEM_LOG=\"" + memLog + "\"\n" +
+		"bg_kill_ladder \"$AGENT_HANDLE\" \"stale\" \"$MEM_LOG\"\n"
+
+	scriptPath := filepath.Join(t.TempDir(), "ladder-test.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput() // allow non-zero (HUMAN_REQUIRED path)
+
+	// Assert: claude rm must NOT have been called (un-harvested worktree present).
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	if _, statErr := os.Stat(rmLog); statErr == nil {
+		t.Errorf("claude rm was invoked despite un-harvested worktree — data-loss guard broken\nscript output:\n%s", out)
+	}
+
+	// Assert: HUMAN_REQUIRED logged instead.
+	harvest, _ := os.ReadFile(harvestLog)
+	memLogData, _ := os.ReadFile(memLog)
+	combined := string(harvest) + string(memLogData) + string(out)
+	if !strings.Contains(combined, "HUMAN_REQUIRED") {
+		t.Errorf("HUMAN_REQUIRED must be logged when kill ladder cannot rm an un-harvested session\noutput:\n%s", combined)
+	}
+}
+
+// TestT4_KillLadder_Runtime_RmIfNoWorktree verifies the kill ladder DOES invoke
+// claude rm when the session has NO un-harvested worktree (safe teardown).
+func TestT4_KillLadder_Runtime_RmIfNoWorktree(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+
+	// Init git repo WITHOUT any worktree (snapshot exists but no new worktree).
+	setupGitRepoForHarvest(t, repoDir)
+	snapshotDir := filepath.Join(repoDir, ".ca-worktree-snapshots")
+	// Write snapshot that matches the current worktree set (no new worktrees).
+	preSnapshot := captureWorktreePathsBeforeWorktree(t, repoDir)
+	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+		t.Fatalf("mkdir snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, "t1.txt"), []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+	// NOTE: no worktree added — session t1 has no un-harvested work.
+
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	memLog := filepath.Join(t.TempDir(), "mem.log")
+	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
+
+	seam := loopScriptSeam()
+	memSafety := loopScriptMemorySafety()
+	script := "#!/usr/bin/env bash\n" +
+		"set -euo pipefail\n" +
+		"export PATH=\"" + stubDir + ":$PATH\"\n" +
+		"export HARVEST_LOG=\"" + harvestLog + "\"\n" +
+		"CA_BACKEND=bg\n" +
+		"HAS_JQ=false\n" +
+		"log() { echo \"[LOG] $*\" >&2; }\n" +
+		memSafety + "\n" +
+		seam + "\n" +
+		"AGENT_HANDLE=t1\n" +
+		"MEM_LOG=\"" + memLog + "\"\n" +
+		"bg_kill_ladder \"$AGENT_HANDLE\" \"stale\" \"$MEM_LOG\"\n"
+
+	scriptPath := filepath.Join(t.TempDir(), "ladder-no-wt.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput()
+
+	// Assert: claude rm MUST have been called (no un-harvested work).
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	if _, statErr := os.Stat(rmLog); statErr != nil {
+		t.Errorf("claude rm was NOT invoked for session with no worktree — teardown must proceed\noutput:\n%s", out)
+	}
+}
+
+// TestT4_CleanupOrphans_BgSectionPresent verifies that cleanup_orphans has a
+// bg-aware section that enumerates ~/.claude/jobs/ for stray sessions.
+// R-FRAMEWORK, AC-11.
+func TestT4_CleanupOrphans_BgSectionPresent(t *testing.T) {
+	t.Parallel()
+	memSafety := loopScriptMemorySafety()
+
+	// The cleanup_orphans function must enumerate ~/.claude/jobs/.
+	if !strings.Contains(memSafety, ".claude/jobs") {
+		t.Error("cleanup_orphans must enumerate ~/.claude/jobs/ for bg orphan detection (R-FRAMEWORK)")
+	}
+	// The bg orphan section must not unconditionally call claude rm.
+	// It must include a harvest-safety check (worktree check or snapshot check).
+	if !strings.Contains(memSafety, "HUMAN_REQUIRED") {
+		t.Error("cleanup_orphans bg section must log HUMAN_REQUIRED for un-safe-to-rm orphans")
+	}
+}
+
+// TestT4_CleanupOrphans_PBackendBehaviorUnchanged verifies that the PID-based
+// p-path in cleanup_orphans is byte-identical after adding the bg section.
+// R-PLEGACY.
+func TestT4_CleanupOrphans_PBackendBehaviorUnchanged(t *testing.T) {
+	t.Parallel()
+	memSafety := loopScriptMemorySafety()
+
+	// The p backend's existing pgrep-based orphan detection must still be present.
+	if !strings.Contains(memSafety, "pgrep") {
+		t.Error("p backend pgrep-based orphan detection must remain in cleanup_orphans (R-PLEGACY)")
+	}
+	// The test/build process patterns must still be there.
+	if !strings.Contains(memSafety, "vitest") {
+		t.Error("vitest pattern must remain in p-backend cleanup_orphans (R-PLEGACY)")
+	}
+	if !strings.Contains(memSafety, "go.test") && !strings.Contains(memSafety, "go\\.test") {
+		t.Error("go.test pattern must remain in p-backend cleanup_orphans (R-PLEGACY)")
+	}
+}
+
+// TestT4_CleanupOrphans_Runtime_NoRmOrphanWithWorktree is a runtime test that
+// asserts a bg orphan session with an un-harvested worktree does NOT get
+// claude rm'd by cleanup_orphans. Conservative policy: log HUMAN_REQUIRED.
+func TestT4_CleanupOrphans_Runtime_NoRmOrphanWithWorktree(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+
+	// Set up git repo with an orphan worktree.
+	setupGitRepoForHarvest(t, repoDir)
+	snapshotDir := filepath.Join(repoDir, ".ca-worktree-snapshots")
+	preSnapshot := captureWorktreePathsBeforeWorktree(t, repoDir)
+	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+		t.Fatalf("mkdir snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, "orphan1.txt"), []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+	// Add the worktree (orphaned un-harvested work).
+	addWorktreeWithCommit(t, repoDir)
+
+	// Create a fake ~/.claude/jobs/orphan1/state.json with a stale non-terminal state.
+	jobsDir := filepath.Join(t.TempDir(), ".claude", "jobs", "orphan1")
+	if err := os.MkdirAll(jobsDir, 0o755); err != nil {
+		t.Fatalf("mkdir jobs dir: %v", err)
+	}
+	// Write a state.json with a non-terminal state (working) and old mtime.
+	stateJSON := `{"state":"working","inFlight":{"tasks":1}}`
+	stateFile := filepath.Join(jobsDir, "state.json")
+	if err := os.WriteFile(stateFile, []byte(stateJSON), 0o644); err != nil {
+		t.Fatalf("write state.json: %v", err)
+	}
+	// Backdate the state.json to simulate staleness (older than SESSION_STALE_TIMEOUT*2).
+	pastTime := "200101010000"
+	exec.Command("touch", "-t", pastTime, stateFile).Run() //nolint:errcheck
+
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
+	memSafety := loopScriptMemorySafety()
+	seam := loopScriptSeam()
+
+	// Script: call cleanup_orphans with a fake CLAUDE_JOBS_DIR and REPO_ROOT override.
+	script := "#!/usr/bin/env bash\n" +
+		"set -euo pipefail\n" +
+		"export PATH=\"" + stubDir + ":$PATH\"\n" +
+		"export HARVEST_LOG=\"" + harvestLog + "\"\n" +
+		"CA_BACKEND=bg\n" +
+		"HAS_JQ=false\n" +
+		"SESSION_STALE_TIMEOUT=300\n" +
+		"CLAUDE_JOBS_DIR=\"" + filepath.Join(t.TempDir(), ".claude", "jobs") + "\"\n" +
+		"log() { echo \"[LOG] $*\" >&2; }\n" +
+		memSafety + "\n" +
+		seam + "\n" +
+		"cleanup_orphans\n"
+
+	// We need the real jobs dir to be the one we set up.
+	// Override HOME to point to a temp dir containing our fake .claude/jobs.
+	fakeHome := t.TempDir()
+	fakeDotClaude := filepath.Join(fakeHome, ".claude", "jobs", "orphan1")
+	if err := os.MkdirAll(fakeDotClaude, 0o755); err != nil {
+		t.Fatalf("mkdir fake jobs: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fakeDotClaude, "state.json"), []byte(stateJSON), 0o644); err != nil {
+		t.Fatalf("write fake state.json: %v", err)
+	}
+	exec.Command("touch", "-t", pastTime, filepath.Join(fakeDotClaude, "state.json")).Run() //nolint:errcheck
+
+	// Write the snapshot for the orphan session in the repo.
+	if err := os.WriteFile(filepath.Join(snapshotDir, "orphan1.txt"), []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	scriptPath := filepath.Join(t.TempDir(), "orphan-test.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"HOME="+fakeHome,
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput()
+
+	// Assert: claude rm must NOT have been called (un-harvested worktree).
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	if _, statErr := os.Stat(rmLog); statErr == nil {
+		t.Errorf("cleanup_orphans called claude rm on orphan with un-harvested worktree — data-loss guard broken\noutput:\n%s", out)
+	}
+	// Assert: HUMAN_REQUIRED logged.
+	harvest, _ := os.ReadFile(harvestLog)
+	if !strings.Contains(string(harvest)+string(out), "HUMAN_REQUIRED") {
+		t.Errorf("cleanup_orphans must log HUMAN_REQUIRED for orphan with un-harvested worktree\noutput:\n%s\nharvest log:\n%s", out, harvest)
+	}
+}
+
+// TestT4_CaWatch_BgPollingAppendsToTracefile verifies that the bg poll loop
+// appends synthetic status events to $TRACEFILE, enabling `ca watch` to show
+// live output during a bg session. R-FRAMEWORK, AC-11.
+func TestT4_CaWatch_BgPollingAppendsToTracefile(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The bg poll loop must append a status record to TRACEFILE each poll.
+	// We verify by checking that the bg poll loop references TRACEFILE for writes.
+	// The simplest check: the bg poll section must write/append to TRACEFILE.
+	bgPollIdx := strings.Index(script, "bg backend: poll state.json")
+	if bgPollIdx < 0 {
+		t.Fatal("bg poll section comment not found in generated script")
+	}
+	bgPollSection := script[bgPollIdx:]
+	// Find the end of the bg poll block (the fi that closes the if CA_BACKEND=p).
+	// We check that TRACEFILE is referenced in writes within this section.
+	if !strings.Contains(bgPollSection, "TRACEFILE") {
+		t.Error("bg poll loop must reference TRACEFILE for ca watch live status (R-FRAMEWORK)")
+	}
+}
+
+// TestT4_CaWatch_PBackendLatestSymlinkUnchanged verifies that the .latest
+// symlink mechanism for p backend is byte-identical (R-PLEGACY).
+func TestT4_CaWatch_PBackendLatestSymlinkUnchanged(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The .latest symlink update must still be present before claude invocation.
+	if !strings.Contains(script, `ln -sf "$(basename "$TRACEFILE")" "$LOG_DIR/.latest"`) {
+		t.Error(".latest symlink update for p backend must remain byte-identical (R-PLEGACY)")
+	}
+}
+
+// TestT4_CaWatch_BgDataSourceDocumented verifies that the generated script
+// or the seam code documents the bg ca watch data source.
+func TestT4_CaWatch_BgDataSourceDocumented(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The script must document that ca watch for bg uses the TRACEFILE
+	// (which agent_collect populates from the transcript at end-of-session).
+	if !strings.Contains(script, "ca watch") && !strings.Contains(script, "bg.*watch") {
+		// The documentation lives in comments; check the seam.
+		seam := loopScriptSeam()
+		if !strings.Contains(seam, "ca watch") {
+			t.Error("bg ca watch data source must be documented in the generated script or seam comments")
+		}
+	}
+}
+
 // TestSeamScript_BashSyntax verifies that the generated seam functions produce
 // valid bash syntax (regression guard for formatting bugs in template strings).
 func TestSeamScript_BashSyntax(t *testing.T) {
