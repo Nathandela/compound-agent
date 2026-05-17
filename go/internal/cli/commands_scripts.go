@@ -641,16 +641,24 @@ log_result() {
 //	  <flags...> are passed verbatim; prompt is read from stdin or provided via -p.
 func loopScriptSeam() string { //nolint:funlen // bash template string
 	return `# --- Backend Seam (R-SEAM) ---
-# CA_BACKEND selects the claude execution backend. Only "p" is implemented here.
-# "bg" (claude --bg) is introduced in T2. Swap point for the future migration.
+# CA_BACKEND selects the claude execution backend: "p" (legacy) or "bg" (default).
+# "p"  = claude -p streaming subshell (legacy, R-PLEGACY)
+# "bg" = claude --bg background session polled via state.json (R-BG)
 CA_BACKEND=${CA_BACKEND:-p}
 
+# BG_POLL_INTERVAL: seconds between state.json polls for the bg backend.
+BG_POLL_INTERVAL=${BG_POLL_INTERVAL:-15}
+
 # AGENT_HANDLE is set by agent_dispatch; used by agent_poll/stop/cleanup and watchdogs.
+# p backend:  AGENT_HANDLE = background subshell PID
+# bg backend: AGENT_HANDLE = 8-hex session id parsed from "backgrounded · <id>"
 AGENT_HANDLE=""
 
 # agent_dispatch <logfile> <tracefile> <model> <prompt>
-# p backend: runs claude -p in a background subshell, sets AGENT_HANDLE=PID.
-# Pipeline matches pre-T1 exactly: stream-json | tee tracefile | extract_text > logfile
+# p backend:  runs claude -p in a background subshell, sets AGENT_HANDLE=PID.
+#             Pipeline matches pre-T1 exactly: stream-json | tee tracefile | extract_text > logfile
+# bg backend: dispatches claude --bg, parses 8-hex session id, sets AGENT_HANDLE=id.
+#             NOTE: --bg manages its own session id; do NOT pass --session-id (spike G1).
 agent_dispatch() {
   local logfile="$1" tracefile="$2" model="$3" prompt="$4"
   case "$CA_BACKEND" in
@@ -666,41 +674,218 @@ agent_dispatch() {
       ) &
       AGENT_HANDLE=$!
       ;;
+    bg)
+      # Dispatch claude --bg; parse the 8-hex session id from "backgrounded · <id>".
+      # ANSI-strip the output, then extract the id with grep -oE.
+      local raw_output
+      raw_output=$(claude --bg \
+        --dangerously-skip-permissions \
+        --permission-mode auto \
+        --model "$model" \
+        "$prompt" 2>&1 || true)
+      # Strip ANSI escape sequences, then extract the 8-hex session id.
+      local bg_id
+      bg_id=$(printf '%s' "$raw_output" | sed 's/\x1b\[[0-9;]*m//g' | \
+        grep -oE 'backgrounded[[:space:]]*[·•][[:space:]]*([0-9a-f]{8})' | \
+        grep -oE '[0-9a-f]{8}' | head -1 || true)
+      if [ -z "$bg_id" ] || ! printf '%s' "$bg_id" | grep -qE '^[0-9a-f]{8}$'; then
+        log "FATAL: bg dispatch failed: could not parse 8-hex session id from claude --bg output"
+        log "  claude output was: $raw_output"
+        exit 1
+      fi
+      AGENT_HANDLE="$bg_id"
+      log "bg session dispatched: handle=$AGENT_HANDLE"
+      ;;
     *)
       log "FATAL: unknown CA_BACKEND=$CA_BACKEND"; exit 1 ;;
   esac
 }
 
-# agent_poll <handle> -> "running" | "done"
-# p backend: check if the background subshell PID is still alive.
+# agent_poll <handle> -> "running" | "done" | "failed"
+# p backend:  check if the background subshell PID is still alive.
+# bg backend: read $HOME/.claude/jobs/<handle>/state.json; terminal iff
+#             .state ∈ {done,completed,failed,stopped,error,cancel} AND .inFlight.tasks==0.
+#             ANY unknown/empty/partial .state (incl. file absent or mid-write JSON)
+#             => "running" (NEVER false-terminal — spike: docs vocabulary was wrong,
+#             state="done" not "completed"; guard partial reads).
 agent_poll() {
   local handle="$1"
   case "$CA_BACKEND" in
     p) kill -0 "$handle" 2>/dev/null && echo "running" || echo "done" ;;
+    bg)
+      local state_file="$HOME/.claude/jobs/$handle/state.json"
+      if [ ! -f "$state_file" ]; then
+        echo "running"; return 0
+      fi
+      # Read .state and .inFlight.tasks defensively; treat parse errors as running.
+      local state in_flight
+      if [ "$HAS_JQ" = true ]; then
+        state=$(jq -r '.state // empty' "$state_file" 2>/dev/null || true)
+        in_flight=$(jq -r '.inFlight.tasks // 1' "$state_file" 2>/dev/null || echo 1)
+      else
+        state=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('state','') or '')
+except Exception:
+    pass
+" "$state_file" 2>/dev/null || true)
+        in_flight=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('inFlight',{}).get('tasks',1))
+except Exception:
+    print(1)
+" "$state_file" 2>/dev/null || echo 1)
+      fi
+      # Defensive terminal set (empirical: docs said "completed", actual is "done").
+      # Unknown/empty state => running (NEVER false-terminal).
+      case "$state" in
+        done|completed|failed|stopped|error|cancel)
+          if [ "${in_flight:-1}" -eq 0 ] 2>/dev/null; then
+            echo "done"
+          else
+            echo "running"
+          fi
+          ;;
+        *) echo "running" ;;
+      esac
+      ;;
     *) echo "done" ;;
   esac
 }
 
-# agent_collect <handle> <logfile> <tracefile> -> marker string
-# p backend: delegates to detect_marker (same anchored patterns as pre-T1).
+# agent_collect <handle> <logfile> <tracefile>
+# p backend:  delegates to detect_marker (same anchored patterns as pre-T1).
+# bg backend: INVERTED marker contract — reads state.json .output (then .detail),
+#             writes the text to $logfile so detect_marker's anchored patterns
+#             (^EPIC_COMPLETE$, ^HUMAN_REQUIRED:, ^EPIC_FAILED$) work UNCHANGED.
+#             Only if no anchored marker is found in .output/.detail, falls back
+#             to extracting the final assistant text from the .linkScanPath transcript.
+#             Also copies the transcript to $tracefile for ca watch/diagnostics.
 agent_collect() {
-  local logfile="$2" tracefile="$3"
-  detect_marker "$logfile" "$tracefile"
+  local handle="$1" logfile="$2" tracefile="$3"
+  case "$CA_BACKEND" in
+    p)
+      : # p backend: logfile/tracefile already populated by the dispatch pipeline
+      ;;
+    bg)
+      local state_file="$HOME/.claude/jobs/$handle/state.json"
+      local marker_text=""
+      local link_scan_path=""
+
+      # Primary: read .output.result (then .output as string), then .detail.
+      if [ -f "$state_file" ]; then
+        if [ "$HAS_JQ" = true ]; then
+          marker_text=$(jq -r '
+            (.output.result // .output // "") |
+            if type == "string" then . else "" end
+          ' "$state_file" 2>/dev/null || true)
+          if [ -z "$marker_text" ]; then
+            marker_text=$(jq -r '.detail // ""' "$state_file" 2>/dev/null || true)
+          fi
+          link_scan_path=$(jq -r '.linkScanPath // ""' "$state_file" 2>/dev/null || true)
+        else
+          marker_text=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    o = d.get('output','')
+    if isinstance(o, dict):
+        o = o.get('result','')
+    print(o or d.get('detail','') or '')
+except Exception:
+    pass
+" "$state_file" 2>/dev/null || true)
+          link_scan_path=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('linkScanPath','') or '')
+except Exception:
+    pass
+" "$state_file" 2>/dev/null || true)
+        fi
+      fi
+
+      # Check if marker_text contains an anchored marker.
+      local has_marker=false
+      if printf '%s\n' "$marker_text" | grep -qE '^(EPIC_COMPLETE|EPIC_FAILED|HUMAN_REQUIRED:)' 2>/dev/null; then
+        has_marker=true
+      fi
+
+      # Fallback: extract final assistant text from the .linkScanPath transcript JSONL.
+      if [ "$has_marker" = false ] && [ -n "$link_scan_path" ] && [ -f "$link_scan_path" ]; then
+        local transcript_text
+        if [ "$HAS_JQ" = true ]; then
+          transcript_text=$(jq -j '
+            select(.type == "assistant") |
+            .message.content[]? |
+            select(.type == "text") |
+            .text // empty
+          ' "$link_scan_path" 2>/dev/null | tail -c 4096 || true)
+        else
+          transcript_text=$(python3 -c "
+import sys, json
+lines = []
+for line in open(sys.argv[1]):
+    try:
+        obj = json.loads(line)
+        if obj.get('type') == 'assistant':
+            for b in obj.get('message',{}).get('content',[]):
+                if b.get('type') == 'text':
+                    lines.append(b.get('text',''))
+    except Exception:
+        pass
+print(''.join(lines)[-4096:])
+" "$link_scan_path" 2>/dev/null || true)
+        fi
+        if [ -n "$transcript_text" ]; then
+          marker_text="$transcript_text"
+        fi
+        # Copy transcript to tracefile for ca watch / diagnostics.
+        cp "$link_scan_path" "$tracefile" 2>/dev/null || true
+      elif [ -n "$link_scan_path" ] && [ -f "$link_scan_path" ]; then
+        # Transcript exists even when marker was found in .output; copy for diagnostics.
+        cp "$link_scan_path" "$tracefile" 2>/dev/null || true
+      fi
+
+      # Write marker text to logfile so detect_marker anchored patterns work unchanged.
+      printf '%s\n' "$marker_text" > "$logfile"
+      ;;
+  esac
 }
 
 # agent_stop <handle>
-# p backend: kill the process group (same semantics as pre-T1 kill -TERM -- -PGID).
+# p backend:  kill the process group (same semantics as pre-T1 kill -TERM -- -PGID).
+# bg backend: claude stop <handle> (spike G4: ~1s, effective, halts work promptly).
 agent_stop() {
   local handle="$1"
   case "$CA_BACKEND" in
     p) kill -TERM -- -"$handle" 2>/dev/null || kill "$handle" 2>/dev/null || true ;;
+    bg) claude stop "$handle" 2>/dev/null || true ;;
   esac
 }
 
 # agent_cleanup <handle>
-# p backend: noop (no session or worktree to clean up).
+# p backend:  noop (no session or worktree to clean up).
+# bg backend: T3: worktree-harvest (git merge worktree-<name>) and session removal
+#             are deferred to T3. Do NOT delete the session here — the worktree may
+#             contain uncommitted agent work. T3 implements harvest-safety-check
+#             before any session removal (R-HARVEST, R-HARVEST-FAIL).
 agent_cleanup() {
-  : # noop for p backend
+  case "$CA_BACKEND" in
+    p)
+      : # noop for p backend
+      ;;
+    bg)
+      # T3: worktree-harvest + session teardown deferred to T3 (R-HARVEST, R-HARVEST-FAIL).
+      # Do NOT delete the session here — T3 verifies harvest before teardown.
+      :
+      ;;
+  esac
 }
 
 # agent_invoke <model> [extra-flags...] -- [prompt-args...]
@@ -801,30 +986,89 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
     PROMPT=$(build_prompt "$EPIC_ID")
 
     # Dispatch through backend seam; AGENT_HANDLE is set by agent_dispatch.
-    # p backend: background subshell running claude -p | tee TRACEFILE | extract_text > LOGFILE
+    # p backend:  AGENT_HANDLE = background subshell PID (wait + watchdogs apply)
+    # bg backend: AGENT_HANDLE = 8-hex session id (poll loop applies; watchdogs are no-ops)
     MEM_LOG="$LOG_DIR/memory_${EPIC_ID}-${TS}.log"
     agent_dispatch "$LOGFILE" "$TRACEFILE" "$MODEL" "$PROMPT"
-    start_memory_watchdog "$AGENT_HANDLE" "$MEM_LOG"
-    start_stale_watchdog "$AGENT_HANDLE" "$TRACEFILE" "$MEM_LOG"
-    wait "$AGENT_HANDLE" 2>/dev/null || true
-    stop_stale_watchdog
-    stop_memory_watchdog
 
-    # Detect if watchdog killed the session
-    if [ -f "$MEM_LOG" ] && grep -q "STALE_WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
-      log "WARN: Session killed by stale output watchdog (see $MEM_LOG)"
-      cleanup_orphans
-    elif [ -f "$MEM_LOG" ] && grep -q "WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
-      log "WARN: Session killed by memory watchdog (see $MEM_LOG)"
-      cleanup_orphans
-    fi
+    if [ "$CA_BACKEND" = "p" ]; then
+      # p backend: block until the streaming subshell exits, using watchdogs for safety.
+      start_memory_watchdog "$AGENT_HANDLE" "$MEM_LOG"
+      start_stale_watchdog "$AGENT_HANDLE" "$TRACEFILE" "$MEM_LOG"
+      wait "$AGENT_HANDLE" 2>/dev/null || true
+      stop_stale_watchdog
+      stop_memory_watchdog
 
-    # Append stderr to macro log
-    [ -f "$LOGFILE.stderr" ] && cat "$LOGFILE.stderr" >> "$LOGFILE" && rm -f "$LOGFILE.stderr"
+      # Detect if watchdog killed the session
+      if [ -f "$MEM_LOG" ] && grep -q "STALE_WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
+        log "WARN: Session killed by stale output watchdog (see $MEM_LOG)"
+        cleanup_orphans
+      elif [ -f "$MEM_LOG" ] && grep -q "WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
+        log "WARN: Session killed by memory watchdog (see $MEM_LOG)"
+        cleanup_orphans
+      fi
 
-    # Health check: warn if macro log extraction failed
-    if [ -s "$TRACEFILE" ] && [ ! -s "$LOGFILE" ]; then
-      log "WARN: Macro log is empty but trace has content (extract_text may have failed)"
+      # Append stderr to macro log
+      [ -f "$LOGFILE.stderr" ] && cat "$LOGFILE.stderr" >> "$LOGFILE" && rm -f "$LOGFILE.stderr"
+
+      # Health check: warn if macro log extraction failed
+      if [ -s "$TRACEFILE" ] && [ ! -s "$LOGFILE" ]; then
+        log "WARN: Macro log is empty but trace has content (extract_text may have failed)"
+      fi
+
+    else
+      # bg backend: poll state.json until terminal, with stale-liveness detection.
+      # Stale liveness uses state.json mtime/inFlight heartbeat (G3: transcript is end-only).
+      bg_last_update="" bg_stale_secs=0 bg_state_file="$HOME/.claude/jobs/$AGENT_HANDLE/state.json"
+      bg_killed=false
+      while true; do
+        poll_result=""
+        poll_result=$(agent_poll "$AGENT_HANDLE")
+        if [ "$poll_result" != "running" ]; then
+          break
+        fi
+
+        # Stale-liveness: track state.json modification time (G3: transcript absent mid-run).
+        bg_cur_mtime=""
+        if [ -f "$bg_state_file" ]; then
+          bg_cur_mtime=$(stat -c '%Y' "$bg_state_file" 2>/dev/null || stat -f '%m' "$bg_state_file" 2>/dev/null || true)
+        fi
+        if [ -n "$bg_cur_mtime" ] && [ "$bg_cur_mtime" = "$bg_last_update" ]; then
+          bg_stale_secs=$((bg_stale_secs + BG_POLL_INTERVAL))
+          if [ "$bg_stale_secs" -ge "$SESSION_STALE_TIMEOUT" ]; then
+            echo "[$(date '+%Y-%m-%d_%H-%M-%S')] STALE_WATCHDOG: bg session $AGENT_HANDLE stale for ${bg_stale_secs}s" >> "$MEM_LOG"
+            log "WARN: bg session $AGENT_HANDLE stale for ${bg_stale_secs}s — stopping via agent_stop"
+            agent_stop "$AGENT_HANDLE"
+            bg_killed=true
+            break
+          fi
+        else
+          bg_stale_secs=0
+          bg_last_update="$bg_cur_mtime"
+        fi
+
+        # Memory watchdog: check memory pressure and stop bg session if needed.
+        bg_mem_pct=""
+        bg_mem_pct=$(get_memory_pct)
+        if [ -n "$bg_mem_pct" ] && [ "$bg_mem_pct" -lt "$WATCHDOG_THRESHOLD" ] 2>/dev/null; then
+          echo "[$(date '+%Y-%m-%d_%H-%M-%S')] WATCHDOG: bg session $AGENT_HANDLE memory ${bg_mem_pct}% < ${WATCHDOG_THRESHOLD}%, stopping" >> "$MEM_LOG"
+          log "WARN: memory ${bg_mem_pct}% < ${WATCHDOG_THRESHOLD}%, stopping bg session $AGENT_HANDLE"
+          agent_stop "$AGENT_HANDLE"
+          bg_killed=true
+          break
+        fi
+
+        sleep "$BG_POLL_INTERVAL"
+      done
+
+      if [ "$bg_killed" = true ]; then
+        log "WARN: bg session $AGENT_HANDLE was killed by watchdog (see $MEM_LOG)"
+        cleanup_orphans
+      fi
+
+      # Collect: populate LOGFILE (and TRACEFILE) from state.json/.output/.detail/transcript
+      # so the existing detect_marker anchored patterns work unchanged (R-MARKER).
+      agent_collect "$AGENT_HANDLE" "$LOGFILE" "$TRACEFILE"
     fi
 
     MARKER=$(detect_marker "$LOGFILE" "$TRACEFILE")

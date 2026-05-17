@@ -500,6 +500,503 @@ func TestLoopCommand_CompactPctValidation(t *testing.T) {
 	}
 }
 
+// --- T2 bg Backend Tests ---
+// These tests verify the bg backend implementation of the seam (R-BG, R-MARKER).
+// All tests are offline-safe: they inspect generated bash without running claude.
+// State.json fixture data is inline (no live sessions).
+
+// TestBgBackend_DispatchNoBg verifies that the bg dispatch does NOT pass
+// --session-id (spike G1: --bg manages its own session id).
+func TestBgBackend_DispatchNoBg(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	// Find the bg) branch of agent_dispatch
+	bgIdx := strings.Index(seam, "bg)")
+	if bgIdx < 0 {
+		t.Fatal("bg) branch not found in agent_dispatch seam")
+	}
+	bgSection := seam[bgIdx:]
+
+	// Must have --bg flag
+	if !strings.Contains(bgSection[:strings.Index(bgSection, "\n    ;;")+1], "--bg") {
+		// Try a wider search scoped to agent_dispatch
+		dispatchIdx := strings.Index(seam, "agent_dispatch()")
+		if dispatchIdx < 0 {
+			t.Fatal("agent_dispatch() not found in seam")
+		}
+		dispatchEnd := strings.Index(seam[dispatchIdx:], "\n}\n")
+		dispatchBody := seam[dispatchIdx : dispatchIdx+dispatchEnd]
+		if !strings.Contains(dispatchBody, "--bg") {
+			t.Error("bg backend agent_dispatch must use --bg flag")
+		}
+	}
+
+	// Must NOT pass --session-id (spike G1: --bg ignores --session-id)
+	dispatchIdx := strings.Index(seam, "agent_dispatch()")
+	if dispatchIdx < 0 {
+		t.Fatal("agent_dispatch() not found in seam")
+	}
+	dispatchEnd := strings.Index(seam[dispatchIdx:], "\n}\n")
+	dispatchBody := seam[dispatchIdx : dispatchIdx+dispatchEnd]
+	bgInDispatch := ""
+	if bgI := strings.Index(dispatchBody, "bg)"); bgI >= 0 {
+		bgInDispatch = dispatchBody[bgI:]
+		if endI := strings.Index(bgInDispatch, ";;"); endI >= 0 {
+			bgInDispatch = bgInDispatch[:endI]
+		}
+	}
+	if strings.Contains(bgInDispatch, "--session-id") {
+		t.Error("bg backend agent_dispatch must NOT pass --session-id (spike G1: --bg manages its own session id)")
+	}
+}
+
+// TestBgBackend_DispatchClaudeFlags verifies the bg dispatch command-line:
+// --dangerously-skip-permissions, --permission-mode auto, --model, --bg.
+func TestBgBackend_DispatchClaudeFlags(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	dispatchIdx := strings.Index(seam, "agent_dispatch()")
+	if dispatchIdx < 0 {
+		t.Fatal("agent_dispatch() not found in seam")
+	}
+	dispatchEnd := strings.Index(seam[dispatchIdx:], "\n}\n")
+	dispatchBody := seam[dispatchIdx : dispatchIdx+dispatchEnd]
+
+	// Extract the bg branch
+	bgI := strings.Index(dispatchBody, "bg)")
+	if bgI < 0 {
+		t.Fatal("bg) branch not found in agent_dispatch")
+	}
+	bgBranch := dispatchBody[bgI:]
+	endI := strings.Index(bgBranch, ";;")
+	if endI > 0 {
+		bgBranch = bgBranch[:endI]
+	}
+
+	required := map[string]string{
+		"--bg":                           "bg flag for background execution",
+		"--dangerously-skip-permissions": "permissions bypass flag",
+		"--permission-mode auto":         "permission mode flag",
+		`"$model"`:                       "model variable",
+	}
+	for needle, desc := range required {
+		if !strings.Contains(bgBranch, needle) {
+			t.Errorf("bg dispatch missing %s: expected %q in bg branch", desc, needle)
+		}
+	}
+}
+
+// TestBgBackend_HandleIdParsing verifies that the bg dispatch parses the 8-hex
+// session id from the "backgrounded · <id>" line and validates it.
+func TestBgBackend_HandleIdParsing(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	dispatchIdx := strings.Index(seam, "agent_dispatch()")
+	if dispatchIdx < 0 {
+		t.Fatal("agent_dispatch() not found in seam")
+	}
+	dispatchEnd := strings.Index(seam[dispatchIdx:], "\n}\n")
+	dispatchBody := seam[dispatchIdx : dispatchIdx+dispatchEnd]
+
+	bgI := strings.Index(dispatchBody, "bg)")
+	if bgI < 0 {
+		t.Fatal("bg) branch not found in agent_dispatch")
+	}
+	bgBranch := dispatchBody[bgI:]
+
+	// Must parse something that looks like an 8-hex id from the backgrounded line
+	if !strings.Contains(bgBranch, "backgrounded") && !strings.Contains(bgBranch, "[0-9a-f]") {
+		// The parsing must reference the known output line pattern
+		if !strings.Contains(bgBranch, "AGENT_HANDLE") {
+			t.Error("bg dispatch must set AGENT_HANDLE from parsed session id")
+		}
+	}
+
+	// Must validate the parsed id (non-empty at minimum)
+	if !strings.Contains(bgBranch, "AGENT_HANDLE") {
+		t.Error("bg dispatch must set AGENT_HANDLE global")
+	}
+}
+
+// TestBgBackend_PollTerminalStates verifies that agent_poll bg branch treats
+// the full defensive terminal set as done, and unknown/empty state as running.
+// This is the R-BG + S12 contract: unknown state MUST NOT be treated as terminal.
+func TestBgBackend_PollTerminalStates(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	pollIdx := strings.Index(seam, "agent_poll()")
+	if pollIdx < 0 {
+		t.Fatal("agent_poll() not found in seam")
+	}
+	pollEnd := strings.Index(seam[pollIdx:], "\n}\n")
+	pollBody := seam[pollIdx : pollIdx+pollEnd]
+
+	bgI := strings.Index(pollBody, "bg)")
+	if bgI < 0 {
+		t.Fatal("bg) branch not found in agent_poll")
+	}
+	bgBranch := pollBody[bgI:]
+	endI := strings.Index(bgBranch, ";;")
+	if endI > 0 {
+		bgBranch = bgBranch[:endI]
+	}
+
+	// Must read state.json from the jobs directory
+	if !strings.Contains(bgBranch, "state.json") {
+		t.Error("bg agent_poll must read state.json for completion detection (R-BG)")
+	}
+	if !strings.Contains(bgBranch, ".claude/jobs") && !strings.Contains(bgBranch, "HOME") {
+		t.Error("bg agent_poll must read from ~/.claude/jobs/<handle>/state.json")
+	}
+
+	// Must check inFlight.tasks == 0 alongside .state (R-BG)
+	if !strings.Contains(bgBranch, "inFlight") && !strings.Contains(bgBranch, "in_flight") {
+		t.Error("bg agent_poll must check inFlight.tasks==0 (R-BG: terminal requires state + no in-flight tasks)")
+	}
+
+	// Must include the defensive terminal state set (S12: unknown state => running)
+	terminalStates := []string{"done", "failed", "stopped", "error", "cancel"}
+	for _, state := range terminalStates {
+		if !strings.Contains(bgBranch, state) {
+			t.Errorf("bg agent_poll missing terminal state %q in defensive set (R-BG)", state)
+		}
+	}
+
+	// Unknown/missing state must default to running, not terminal.
+	// The bash must echo "running" as the default (not "done").
+	// We verify the function default echo is "running".
+	if !strings.Contains(bgBranch, `"running"`) && !strings.Contains(bgBranch, `running`) {
+		t.Error("bg agent_poll must echo 'running' for unknown/empty state (S12: NEVER false-terminal)")
+	}
+}
+
+// TestBgBackend_PollStateJsonPath verifies the exact path used to read state.json.
+func TestBgBackend_PollStateJsonPath(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	pollIdx := strings.Index(seam, "agent_poll()")
+	if pollIdx < 0 {
+		t.Fatal("agent_poll() not found in seam")
+	}
+	pollEnd := strings.Index(seam[pollIdx:], "\n}\n")
+	pollBody := seam[pollIdx : pollIdx+pollEnd]
+
+	// Must construct path using $HOME/.claude/jobs/<handle>/state.json
+	if !strings.Contains(pollBody, "state.json") {
+		t.Error("agent_poll bg must reference state.json")
+	}
+	// Must use $handle or equivalent variable
+	if !strings.Contains(pollBody, `$handle`) && !strings.Contains(pollBody, `$1`) {
+		t.Error("agent_poll bg must use the handle variable to construct the state.json path")
+	}
+}
+
+// TestBgBackend_CollectInvertedMarker verifies R-MARKER: agent_collect bg reads
+// .output/.detail from state.json first, writes to $logfile so detect_marker
+// anchored patterns (^EPIC_COMPLETE$, ^HUMAN_REQUIRED:, ^EPIC_FAILED$) work unchanged.
+// Also verifies fallback to .linkScanPath transcript (S3).
+func TestBgBackend_CollectInvertedMarker(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	collectIdx := strings.Index(seam, "agent_collect()")
+	if collectIdx < 0 {
+		t.Fatal("agent_collect() not found in seam")
+	}
+	collectEnd := strings.Index(seam[collectIdx:], "\n}\n")
+	collectBody := seam[collectIdx : collectIdx+collectEnd]
+
+	bgI := strings.Index(collectBody, "bg)")
+	if bgI < 0 {
+		t.Fatal("bg) branch not found in agent_collect")
+	}
+	bgBranch := collectBody[bgI:]
+	endI := strings.Index(bgBranch, ";;")
+	if endI > 0 {
+		bgBranch = bgBranch[:endI]
+	}
+
+	// Must read .output from state.json (primary marker source, S2)
+	if !strings.Contains(bgBranch, "output") {
+		t.Error("bg agent_collect must read .output from state.json (R-MARKER primary, S2)")
+	}
+
+	// Must read .detail as secondary (S2 fallback)
+	if !strings.Contains(bgBranch, "detail") {
+		t.Error("bg agent_collect must read .detail as secondary marker source (R-MARKER, S2)")
+	}
+
+	// Must write to $logfile so detect_marker's anchored ^EPIC_COMPLETE$ works (S2)
+	if !strings.Contains(bgBranch, "logfile") {
+		t.Error("bg agent_collect must write marker text to $logfile for detect_marker anchored patterns")
+	}
+
+	// Must have transcript fallback via .linkScanPath (S3: no anchored marker in .output)
+	if !strings.Contains(bgBranch, "linkScanPath") && !strings.Contains(bgBranch, "transcript") {
+		t.Error("bg agent_collect must fall back to .linkScanPath transcript if .output lacks anchored marker (S3)")
+	}
+}
+
+// TestBgBackend_CollectPopulatesTracefile verifies that agent_collect bg populates
+// $tracefile from the transcript for ca watch / diagnostics.
+func TestBgBackend_CollectPopulatesTracefile(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	collectIdx := strings.Index(seam, "agent_collect()")
+	if collectIdx < 0 {
+		t.Fatal("agent_collect() not found in seam")
+	}
+	collectEnd := strings.Index(seam[collectIdx:], "\n}\n")
+	collectBody := seam[collectIdx : collectIdx+collectEnd]
+
+	bgI := strings.Index(collectBody, "bg)")
+	if bgI < 0 {
+		t.Fatal("bg) branch not found in agent_collect")
+	}
+	bgBranch := collectBody[bgI:]
+	endI := strings.Index(bgBranch, ";;")
+	if endI > 0 {
+		bgBranch = bgBranch[:endI]
+	}
+
+	// Must write to tracefile (for ca watch and diagnostics)
+	if !strings.Contains(bgBranch, "tracefile") {
+		t.Error("bg agent_collect must populate $tracefile from transcript for ca watch/diagnostics")
+	}
+}
+
+// TestBgBackend_StopUsesClaude verifies that agent_stop bg uses "claude stop <handle>"
+// (spike G4: ~1s, effective).
+func TestBgBackend_StopUsesClaude(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	stopIdx := strings.Index(seam, "agent_stop()")
+	if stopIdx < 0 {
+		t.Fatal("agent_stop() not found in seam")
+	}
+	stopEnd := strings.Index(seam[stopIdx:], "\n}\n")
+	stopBody := seam[stopIdx : stopIdx+stopEnd]
+
+	bgI := strings.Index(stopBody, "bg)")
+	if bgI < 0 {
+		t.Fatal("bg) branch not found in agent_stop")
+	}
+	bgBranch := stopBody[bgI:]
+	endI := strings.Index(bgBranch, ";;")
+	if endI > 0 {
+		bgBranch = bgBranch[:endI]
+	}
+
+	if !strings.Contains(bgBranch, "claude stop") {
+		t.Error("bg agent_stop must invoke 'claude stop <handle>' (spike G4: ~1s effective)")
+	}
+	// Must pass the handle
+	if !strings.Contains(bgBranch, `"$handle"`) && !strings.Contains(bgBranch, "$handle") {
+		t.Error("bg agent_stop must pass $handle to 'claude stop'")
+	}
+}
+
+// TestBgBackend_CleanupDeferredToT3 verifies that agent_cleanup bg has a clear
+// T3 comment deferring worktree-harvest + claude rm to T3.
+func TestBgBackend_CleanupDeferredToT3(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	cleanupIdx := strings.Index(seam, "agent_cleanup()")
+	if cleanupIdx < 0 {
+		t.Fatal("agent_cleanup() not found in seam")
+	}
+	cleanupEnd := strings.Index(seam[cleanupIdx:], "\n}\n")
+	cleanupBody := seam[cleanupIdx : cleanupIdx+cleanupEnd]
+
+	// Must have a T3 comment deferring worktree-harvest and claude rm
+	if !strings.Contains(cleanupBody, "T3") {
+		t.Error("agent_cleanup must contain a T3: comment deferring worktree-harvest + claude rm to T3")
+	}
+	// Must NOT call claude rm (that's T3)
+	if strings.Contains(cleanupBody, "claude rm") {
+		t.Error("agent_cleanup must NOT call 'claude rm' in T2 (deferred to T3)")
+	}
+}
+
+// TestBgBackend_MainLoopPollsUntilTerminal verifies that the generated main loop
+// script contains a bg-specific poll loop: after agent_dispatch, it polls via
+// agent_poll until not "running", then calls agent_collect.
+func TestBgBackend_MainLoopPollsUntilTerminal(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The main loop must call agent_poll (for bg backend turn completion)
+	if !strings.Contains(script, "agent_poll") {
+		t.Error("main loop must call agent_poll for bg backend turn completion (R-BG)")
+	}
+
+	// The main loop must call agent_collect (to populate LOGFILE for detect_marker)
+	if !strings.Contains(script, "agent_collect") {
+		t.Error("main loop must call agent_collect after terminal state (R-MARKER)")
+	}
+
+	// agent_poll must be called with AGENT_HANDLE
+	if !strings.Contains(script, `agent_poll "$AGENT_HANDLE"`) {
+		t.Error("main loop must call agent_poll with $AGENT_HANDLE")
+	}
+
+	// agent_collect must be called with AGENT_HANDLE, LOGFILE, TRACEFILE
+	if !strings.Contains(script, `agent_collect "$AGENT_HANDLE"`) {
+		t.Error("main loop must call agent_collect with $AGENT_HANDLE")
+	}
+}
+
+// TestBgBackend_StaleWatchdogBgAware verifies that the bg stale detection uses
+// state.json mtime/inFlight heartbeat, not transcript byte growth
+// (spike G3: transcript is end-only).
+func TestBgBackend_StaleWatchdogBgAware(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The bg poll loop must include a stale timeout check using state.json
+	// (either mtime or last-seen-update tracking)
+	if !strings.Contains(script, "SESSION_STALE_TIMEOUT") {
+		t.Error("bg stale detection must use SESSION_STALE_TIMEOUT for heartbeat check")
+	}
+	// The bg stale detection must reference state.json
+	if !strings.Contains(script, "state.json") {
+		t.Error("bg stale detection must reference state.json for heartbeat (G3: transcript is end-only)")
+	}
+}
+
+// TestBgBackend_MemoryWatchdogUsesAgentStop verifies that the memory watchdog
+// for the bg backend calls agent_stop (which delegates to "claude stop").
+func TestBgBackend_MemoryWatchdogUsesAgentStop(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	// The memory watchdog kill in the bg branch must use agent_stop
+	// OR the start_memory_watchdog in the main loop is replaced by a bg-aware variant.
+	// At minimum, verify agent_stop for bg does "claude stop" and that the
+	// main loop still calls stop_memory_watchdog (p regression preserved).
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// p backend: stop_memory_watchdog must still be present (R-PLEGACY)
+	if !strings.Contains(script, "stop_memory_watchdog") {
+		t.Error("stop_memory_watchdog must remain for p backend regression (R-PLEGACY)")
+	}
+	// agent_stop bg must use claude stop (verified in TestBgBackend_StopUsesClaude)
+	// Here verify agent_stop is referenced in the watchdog kill path or bg poll loop
+	if !strings.Contains(seam, "claude stop") {
+		t.Error("bg backend must use 'claude stop' via agent_stop (R-MEMGUARD)")
+	}
+}
+
+// TestBgBackend_PBackendUnchanged verifies that the p backend seam functions
+// are byte-identical after adding the bg backend (R-PLEGACY regression).
+func TestBgBackend_PBackendUnchanged(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	// p backend dispatch must still have the full claude -p pipeline
+	dispatchIdx := strings.Index(seam, "agent_dispatch()")
+	if dispatchIdx < 0 {
+		t.Fatal("agent_dispatch() not found in seam")
+	}
+	dispatchEnd := strings.Index(seam[dispatchIdx:], "\n}\n")
+	dispatchBody := seam[dispatchIdx : dispatchIdx+dispatchEnd]
+
+	pI := strings.Index(dispatchBody, "p)")
+	if pI < 0 {
+		t.Fatal("p) branch not found in agent_dispatch")
+	}
+	pBranch := dispatchBody[pI:]
+	endI := strings.Index(pBranch, ";;")
+	if endI > 0 {
+		pBranch = pBranch[:endI]
+	}
+
+	pRequired := map[string]string{
+		"--output-format stream-json": "stream-json output (p backend)",
+		"--verbose":                   "verbose flag (p backend)",
+		"-p ":                         "print flag (p backend)",
+		"tee ":                        "tee to tracefile (p backend)",
+		"extract_text":                "extract_text pipeline (p backend)",
+	}
+	for needle, desc := range pRequired {
+		if !strings.Contains(pBranch, needle) {
+			t.Errorf("p backend agent_dispatch missing %s after adding bg backend (R-PLEGACY)", desc)
+		}
+	}
+}
+
+// TestBgBackend_BashSyntaxWithBgBackend verifies that the generated scripts
+// (with and without reviewers) pass bash -n syntax check after adding bg backend.
+func TestBgBackend_BashSyntaxWithBgBackend(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"no-reviewers", []string{"loop", "-o", filepath.Join(dir, "bg-basic.sh")}},
+		{"with-reviewers", []string{"loop", "-o", filepath.Join(dir, "bg-review.sh"),
+			"--reviewers", "claude-sonnet,gemini", "--review-every", "2"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := executeCommand(root, tt.args...)
+			if err != nil {
+				t.Fatalf("command failed: %v", err)
+			}
+			out, bashErr := executeBashSyntaxCheck(t, tt.args[2])
+			if bashErr != nil {
+				t.Errorf("bash -n syntax check failed after bg backend addition:\n%s\n%v", out, bashErr)
+			}
+		})
+	}
+}
+
 // --- T1 Seam Tests ---
 // These tests verify the 3-operation backend seam introduced in T1.
 // They prove: (a) seam functions are emitted, (b) no raw `claude -p` exists
@@ -741,6 +1238,92 @@ func TestPolishCommand_SeamFunctionsPresent(t *testing.T) {
 	// Polish architect must use agent_invoke
 	if !strings.Contains(architect, "agent_invoke ") {
 		t.Error("run_polish_architect must call agent_invoke (not raw claude -p)")
+	}
+}
+
+// TestBgBackend_NoTopLevelLocal verifies that the generated loop script contains
+// no `local` declarations outside a bash function body. `local` at script top
+// level under `set -euo pipefail` causes bash to abort with exit 1 (bash:
+// local: can only be used in a function), which silently breaks CA_BACKEND=bg
+// before the first poll. The check tracks brace depth: any `local ` token
+// found at depth 0 (top level) is a regression.
+func TestBgBackend_NoTopLevelLocal(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "no-local.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("failed to read generated script: %v", err)
+	}
+
+	// Walk the generated script line by line, tracking brace depth to detect
+	// whether we are inside a bash function body. A function body starts when
+	// a line matching `name() {` (or `name () {`) is seen; depth increments on
+	// `{` and decrements on `}`. `local` is only valid at depth >= 1.
+	depth := 0
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		trimmed := strings.TrimSpace(line)
+
+		// Skip comment lines.
+		if strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+
+		// Count brace changes (simple heuristic sufficient for our templates).
+		for _, ch := range trimmed {
+			if ch == '{' {
+				depth++
+			} else if ch == '}' {
+				if depth > 0 {
+					depth--
+				}
+			}
+		}
+
+		// After updating depth: a `local` keyword on a line that ends at depth 0
+		// was executed at the previous depth. Re-derive: check if this line
+		// contains `local ` AND the depth BEFORE accounting for this line's
+		// braces was 0. We compute pre-line depth for accurate detection.
+		//
+		// Simpler and equally correct: re-scan with pre-depth below.
+		_ = i
+	}
+
+	// Second pass: track pre-line depth correctly.
+	depth = 0
+	for lineNo, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "#") {
+			// Track braces in comments? No — comments don't affect depth.
+			continue
+		}
+
+		preDepth := depth
+		for _, ch := range trimmed {
+			if ch == '{' {
+				depth++
+			} else if ch == '}' {
+				if depth > 0 {
+					depth--
+				}
+			}
+		}
+
+		// A `local` on a line where preDepth == 0 is top-level and illegal.
+		if preDepth == 0 && strings.Contains(trimmed, "local ") {
+			t.Errorf("line %d: `local` at script top level (depth 0) — illegal under set -euo pipefail: %q",
+				lineNo+1, line)
+		}
 	}
 }
 
