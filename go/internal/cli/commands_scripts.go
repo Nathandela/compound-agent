@@ -675,6 +675,12 @@ agent_dispatch() {
       AGENT_HANDLE=$!
       ;;
     bg)
+      # Snapshot the current worktree set BEFORE dispatching claude --bg.
+      # T3: harvest uses this to identify the new worktree created by the bg session
+      # (diff before vs after to find exactly one new worktree-<name> entry).
+      local pre_snapshot
+      pre_snapshot=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
+
       # Dispatch claude --bg; parse the 8-hex session id from "backgrounded · <id>".
       # ANSI-strip the output, then extract the id with grep -oE.
       local raw_output
@@ -694,6 +700,14 @@ agent_dispatch() {
         exit 1
       fi
       AGENT_HANDLE="$bg_id"
+
+      # Store the pre-dispatch worktree snapshot keyed to this session handle.
+      # T3 harvest reads this to identify the session's worktree (R-HARVEST).
+      local snapshot_dir
+      snapshot_dir="$(git rev-parse --show-toplevel 2>/dev/null)/.ca-worktree-snapshots"
+      mkdir -p "$snapshot_dir" 2>/dev/null || true
+      printf '%s\n' "$pre_snapshot" > "$snapshot_dir/$AGENT_HANDLE.txt" 2>/dev/null || true
+
       log "bg session dispatched: handle=$AGENT_HANDLE"
       ;;
     *)
@@ -869,23 +883,130 @@ agent_stop() {
   esac
 }
 
-# agent_cleanup <handle>
+# agent_cleanup <handle> [marker]
 # p backend:  noop (no session or worktree to clean up).
-# bg backend: T3: worktree-harvest (git merge worktree-<name>) and session removal
-#             are deferred to T3. Do NOT delete the session here — the worktree may
-#             contain uncommitted agent work. T3 implements harvest-safety-check
-#             before any session removal (R-HARVEST, R-HARVEST-FAIL).
+# bg backend: worktree-harvest (R-HARVEST) + session teardown.
+#   1. Discover the session worktree by diffing git worktree list against the
+#      pre-dispatch snapshot written by agent_dispatch (R-HARVEST worktree association).
+#   2. If marker is "complete": git merge --no-ff worktree-<name> into the working branch.
+#      On success: agent_stop then claude rm (teardown). On conflict: abort + HUMAN_REQUIRED.
+#   3. If marker is not "complete" (failed/absent): harvest-fail — keep worktree,
+#      record HUMAN_REQUIRED, do NOT claude rm (R-HARVEST-FAIL).
+#   4. Zero new worktrees: snapshot-anomaly or teardown-only — teardown session.
+#   5. >1 new worktrees: ambiguous — harvest-fail, do NOT guess (R-HARVEST-FAIL).
+#
+# CALLER CONTRACT: agent_cleanup always returns 0 so that set -euo pipefail in the
+# generated loop does not abort before case "$MARKER" runs. Failure paths communicate
+# their outcome by reassigning the caller's MARKER variable (direct call, not subshell)
+# to "human:<reason>" so the loop's case statement triggers human-required handling.
 agent_cleanup() {
+  local handle="$1" marker="${2:-}"
   case "$CA_BACKEND" in
     p)
-      : # noop for p backend
+      : # noop for p backend (R-PLEGACY)
       ;;
     bg)
-      # T3: worktree-harvest + session teardown deferred to T3 (R-HARVEST, R-HARVEST-FAIL).
-      # Do NOT delete the session here — T3 verifies harvest before teardown.
-      :
+      # --- Worktree discovery (T3: diff before/after snapshot) ---
+      local repo_root snapshot_dir snapshot_file
+      repo_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+      snapshot_dir="$repo_root/.ca-worktree-snapshots"
+      snapshot_file="$snapshot_dir/$handle.txt"
+
+      # Current worktree set.
+      local cur_worktrees
+      cur_worktrees=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
+
+      # Pre-dispatch snapshot (paths only, one per line).
+      local pre_worktrees=""
+      if [ -f "$snapshot_file" ]; then
+        pre_worktrees=$(cat "$snapshot_file")
+      fi
+
+      # Diff: find paths present in cur but not in pre.
+      local new_worktrees=""
+      while IFS= read -r wt_path; do
+        [ -z "$wt_path" ] && continue
+        if ! printf '%s\n' "$pre_worktrees" | grep -qF "$wt_path"; then
+          new_worktrees="${new_worktrees:+$new_worktrees
+}$wt_path"
+        fi
+      done <<EOF
+$cur_worktrees
+EOF
+
+      # Count new worktrees.
+      local wt_count=0
+      if [ -n "$new_worktrees" ]; then
+        wt_count=$(printf '%s\n' "$new_worktrees" | grep -c '.' || true)
+      fi
+
+      local wt_path="" wt_branch=""
+
+      if [ "$wt_count" -eq 0 ]; then
+        # Zero new worktrees: claude --bg always auto-isolates, so this most likely
+        # indicates a snapshot anomaly (missing/corrupt pre-dispatch snapshot) rather
+        # than "agent made no commits". Teardown-only — no merge attempted.
+        log "bg cleanup: no new worktree found for handle $handle (snapshot anomaly or teardown-only) — no merge needed"
+        agent_stop "$handle"
+        claude rm "$handle" 2>/dev/null || true
+        return 0
+      elif [ "$wt_count" -gt 1 ]; then
+        log "ERROR: bg cleanup: $wt_count new worktrees found for handle $handle — ambiguous, refusing to harvest"
+        log "  New worktrees: $new_worktrees"
+        log "  Inspect manually, then merge and: claude rm $handle"
+        _harvest_fail "$handle" "ambiguous worktrees ($wt_count new worktrees for handle $handle)"
+        # Reassign caller's MARKER so the loop's case statement handles this as human-required.
+        MARKER="human:harvest-ambiguous ($wt_count new worktrees for handle $handle)"
+        return 0
+      fi
+
+      # Exactly one new worktree — derive branch name from path (worktree-<basename>).
+      wt_path=$(printf '%s\n' "$new_worktrees" | head -1)
+      local wt_name
+      wt_name=$(basename "$wt_path")
+      wt_branch="worktree-$wt_name"
+      log "bg cleanup: discovered worktree $wt_path on branch $wt_branch"
+
+      # --- Harvest decision: only merge on success marker ---
+      if [ "$marker" != "complete" ]; then
+        log "WARN: bg cleanup: marker='$marker' (not complete) — harvest-fail, retaining worktree"
+        _harvest_fail "$handle" "marker=$marker (not complete)"
+        # MARKER is already non-complete; leave it unchanged so the loop's case handles it.
+        return 0
+      fi
+
+      # --- Merge: integrate worktree branch into working branch ---
+      log "bg cleanup: merging $wt_branch into working branch (git merge --no-ff)"
+      if git merge --no-ff "$wt_branch" -m "harvest(bg): merge $wt_branch from session $handle" 2>/dev/null; then
+        log "bg cleanup: merge successful — tearing down session $handle"
+        # Clean up snapshot file now that harvest succeeded.
+        rm -f "$snapshot_file" 2>/dev/null || true
+        # Order: stop then rm (R-HARVEST: teardown only after verified harvest).
+        agent_stop "$handle"
+        claude rm "$handle" 2>/dev/null || true
+      else
+        log "ERROR: bg cleanup: merge conflict on $wt_branch — aborting merge, retaining worktree"
+        git merge --abort 2>/dev/null || true
+        _harvest_fail "$handle" "merge conflict on $wt_branch"
+        # Reassign caller's MARKER so the loop's case statement handles this as human-required.
+        MARKER="human:harvest-conflict on $wt_branch"
+        return 0
+      fi
       ;;
   esac
+  return 0
+}
+
+# _harvest_fail <handle> <reason>
+# Records HUMAN_REQUIRED to the loop log and the HARVEST_LOG env var (if set).
+# Does NOT call claude rm — the worktree is retained for manual inspection (R-HARVEST-FAIL).
+_harvest_fail() {
+  local handle="$1" reason="$2"
+  local msg="HUMAN_REQUIRED: harvest failed for session $handle: $reason"
+  log "$msg"
+  if [ -n "${HARVEST_LOG:-}" ]; then
+    printf '%s\n' "$msg" >> "$HARVEST_LOG" 2>/dev/null || true
+  fi
 }
 
 # agent_invoke <model> [extra-flags...] -- [prompt-args...]
@@ -1072,6 +1193,11 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
     fi
 
     MARKER=$(detect_marker "$LOGFILE" "$TRACEFILE")
+
+    # bg backend: harvest worktree and tear down session now that the marker is known.
+    # The cleanup is marker-aware: success -> merge + teardown; failure -> keep worktree.
+    # p backend: agent_cleanup is a noop.
+    agent_cleanup "$AGENT_HANDLE" "$MARKER"
 `
 }
 

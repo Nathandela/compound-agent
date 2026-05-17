@@ -57,6 +57,9 @@ rust/embed-daemon/target/
 # Claude worktrees
 .claude/worktrees/
 
+# Worktree harvest snapshots (retained on failure; must not pollute git status)
+.ca-worktree-snapshots/
+
 # Environment
 .env
 .env.*

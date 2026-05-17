@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -803,9 +804,12 @@ func TestBgBackend_StopUsesClaude(t *testing.T) {
 	}
 }
 
-// TestBgBackend_CleanupDeferredToT3 verifies that agent_cleanup bg has a clear
-// T3 comment deferring worktree-harvest + claude rm to T3.
-func TestBgBackend_CleanupDeferredToT3(t *testing.T) {
+// TestT3_CleanupHasHarvestLogic verifies agent_cleanup bg implements the T3
+// worktree-harvest: git merge --no-ff, conditional claude rm only on success,
+// and HUMAN_REQUIRED on failure (R-HARVEST, R-HARVEST-FAIL).
+// We scan the full seam string since _harvest_fail is a companion function
+// defined in the same seam block.
+func TestT3_CleanupHasHarvestLogic(t *testing.T) {
 	t.Parallel()
 	seam := loopScriptSeam()
 
@@ -814,15 +818,670 @@ func TestBgBackend_CleanupDeferredToT3(t *testing.T) {
 		t.Fatal("agent_cleanup() not found in seam")
 	}
 	cleanupEnd := strings.Index(seam[cleanupIdx:], "\n}\n")
+	if cleanupEnd < 0 {
+		t.Fatal("agent_cleanup() closing brace not found")
+	}
 	cleanupBody := seam[cleanupIdx : cleanupIdx+cleanupEnd]
 
-	// Must have a T3 comment deferring worktree-harvest and claude rm
-	if !strings.Contains(cleanupBody, "T3") {
-		t.Error("agent_cleanup must contain a T3: comment deferring worktree-harvest + claude rm to T3")
+	// Must perform a git merge --no-ff into the working branch.
+	if !strings.Contains(cleanupBody, "git merge --no-ff") {
+		t.Error("agent_cleanup bg must perform git merge --no-ff to integrate worktree branch")
 	}
-	// Must NOT call claude rm (that's T3)
-	if strings.Contains(cleanupBody, "claude rm") {
-		t.Error("agent_cleanup must NOT call 'claude rm' in T2 (deferred to T3)")
+	// Must discover worktrees via git worktree list.
+	if !strings.Contains(cleanupBody, "git worktree list") {
+		t.Error("agent_cleanup bg must use git worktree list to discover the session worktree")
+	}
+	// Must call claude rm to delete the session AFTER harvest (success path).
+	if !strings.Contains(cleanupBody, "claude rm") {
+		t.Error("agent_cleanup bg must call claude rm to remove session after successful harvest")
+	}
+	// Must call agent_stop before claude rm (order: stop then rm).
+	agentStopIdx := strings.Index(cleanupBody, "agent_stop")
+	claudeRmIdx := strings.Index(cleanupBody, "claude rm")
+	if agentStopIdx < 0 {
+		t.Error("agent_cleanup bg must call agent_stop before claude rm")
+	}
+	if claudeRmIdx >= 0 && agentStopIdx >= 0 && agentStopIdx > claudeRmIdx {
+		t.Error("agent_cleanup bg must call agent_stop BEFORE claude rm")
+	}
+	// _harvest_fail companion function must record HUMAN_REQUIRED (scanned from full seam).
+	if !strings.Contains(seam, "HUMAN_REQUIRED") {
+		t.Error("seam must record HUMAN_REQUIRED on harvest failure (in agent_cleanup or _harvest_fail)")
+	}
+	// The noop sentinel for the old T2 deferred path must be gone.
+	if strings.Contains(cleanupBody, "deferred to T3") {
+		t.Error("agent_cleanup must no longer have the T2 'deferred to T3' noop comment — T3 is now implemented")
+	}
+}
+
+// TestT3_CleanupHarvestFailNoRm verifies the harvest-fail path does NOT call
+// claude rm, aborts the merge if started, and records HUMAN_REQUIRED (R-HARVEST-FAIL, S5).
+// Scans the full seam since _harvest_fail is defined alongside agent_cleanup.
+func TestT3_CleanupHarvestFailNoRm(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	// Must abort on conflict (R-HARVEST-FAIL).
+	if !strings.Contains(seam, "git merge --abort") {
+		t.Error("seam must call 'git merge --abort' on conflict")
+	}
+	// HUMAN_REQUIRED must be present and correlated with merge-abort.
+	hrIdx := strings.Index(seam, "HUMAN_REQUIRED")
+	mergeAbortIdx := strings.Index(seam, "git merge --abort")
+	if hrIdx < 0 || mergeAbortIdx < 0 {
+		t.Error("seam must have both git merge --abort and HUMAN_REQUIRED for the harvest-fail path")
+	}
+	// claude rm must NOT appear in the same conditional branch as merge --abort.
+	// Check: the text between merge --abort and the next "}" does not contain "claude rm".
+	if mergeAbortIdx >= 0 {
+		afterAbort := seam[mergeAbortIdx:]
+		closeIdx := strings.Index(afterAbort, "\n      fi\n")
+		if closeIdx > 0 {
+			abortBlock := afterAbort[:closeIdx]
+			if strings.Contains(abortBlock, "claude rm") {
+				t.Error("harvest-fail path must NOT call 'claude rm' (retain worktree for inspection)")
+			}
+		}
+	}
+}
+
+// TestT3_DispatchSnapshotsWorktrees verifies that the bg dispatch path snapshots
+// the worktree set before claude --bg so that harvest can identify the new worktree
+// by diffing before/after (R-HARVEST worktree association).
+func TestT3_DispatchSnapshotsWorktrees(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	dispatchIdx := strings.Index(seam, "agent_dispatch()")
+	if dispatchIdx < 0 {
+		t.Fatal("agent_dispatch() not found in seam")
+	}
+	dispatchEnd := strings.Index(seam[dispatchIdx:], "\n}\n")
+	if dispatchEnd < 0 {
+		t.Fatal("agent_dispatch() closing brace not found")
+	}
+	dispatchBody := seam[dispatchIdx : dispatchIdx+dispatchEnd]
+
+	// Find the bg) branch
+	bgIdx := strings.Index(dispatchBody, "bg)")
+	if bgIdx < 0 {
+		t.Fatal("bg) branch not found in agent_dispatch")
+	}
+	bgBranch := dispatchBody[bgIdx:]
+	if endIdx := strings.Index(bgBranch, ";;"); endIdx >= 0 {
+		bgBranch = bgBranch[:endIdx]
+	}
+
+	// Must snapshot worktrees (git worktree list) BEFORE claude --bg dispatch
+	// so harvest can diff new worktrees after the session completes.
+	if !strings.Contains(bgBranch, "git worktree list") {
+		t.Error("bg agent_dispatch must snapshot git worktree list before claude --bg for harvest association")
+	}
+	// The snapshot must be stored where agent_cleanup can find it (keyed to handle)
+	if !strings.Contains(bgBranch, ".ca-worktree-snapshot") && !strings.Contains(bgBranch, "worktree-snapshot") {
+		t.Error("bg agent_dispatch must store the worktree snapshot in a per-handle file for harvest association")
+	}
+}
+
+// TestT3_CleanupCalledAfterDetectMarker verifies the main loop calls agent_cleanup
+// after detect_marker so the harvest decision can be marker-aware (R-HARVEST, R-HARVEST-FAIL).
+func TestT3_CleanupCalledAfterDetectMarker(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// We need the CALL to agent_cleanup (with $AGENT_HANDLE), not just its definition.
+	// The call site is `agent_cleanup "$AGENT_HANDLE"` (with optional extra args).
+	callSite := `agent_cleanup "$AGENT_HANDLE"`
+	detectSite := `MARKER=$(detect_marker`
+
+	detectIdx := strings.Index(script, detectSite)
+	cleanupIdx := strings.Index(script, callSite)
+	if detectIdx < 0 {
+		t.Fatal(`MARKER=$(detect_marker not found in generated loop script`)
+	}
+	if cleanupIdx < 0 {
+		t.Fatalf("agent_cleanup call site %q not found in generated loop script (must be called post-detect_marker)", callSite)
+	}
+	if cleanupIdx < detectIdx {
+		t.Errorf("agent_cleanup call must appear AFTER detect_marker in the loop (harvest is marker-aware): cleanup@%d detect@%d", cleanupIdx, detectIdx)
+	}
+}
+
+// TestT3_CleanupAcceptsMarkerArg verifies agent_cleanup receives the marker
+// as its second argument so it can distinguish success vs harvest-fail.
+func TestT3_CleanupAcceptsMarkerArg(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The generated loop must call agent_cleanup "$AGENT_HANDLE" "$MARKER"
+	if !strings.Contains(script, `agent_cleanup "$AGENT_HANDLE" "$MARKER"`) {
+		t.Error(`generated loop must call agent_cleanup "$AGENT_HANDLE" "$MARKER" to pass marker to cleanup`)
+	}
+}
+
+// TestT3_PBackendCleanupUnchanged verifies the p backend agent_cleanup remains a noop
+// (R-PLEGACY: p backend must be byte-identical to pre-migration).
+func TestT3_PBackendCleanupUnchanged(t *testing.T) {
+	t.Parallel()
+	seam := loopScriptSeam()
+
+	cleanupIdx := strings.Index(seam, "agent_cleanup()")
+	if cleanupIdx < 0 {
+		t.Fatal("agent_cleanup() not found in seam")
+	}
+	cleanupEnd := strings.Index(seam[cleanupIdx:], "\n}\n")
+	if cleanupEnd < 0 {
+		t.Fatal("agent_cleanup() closing brace not found")
+	}
+	cleanupBody := seam[cleanupIdx : cleanupIdx+cleanupEnd]
+
+	// p backend must still be a noop
+	pIdx := strings.Index(cleanupBody, "p)")
+	if pIdx < 0 {
+		t.Fatal("p) branch not found in agent_cleanup")
+	}
+	pBranch := cleanupBody[pIdx:]
+	if endIdx := strings.Index(pBranch, ";;"); endIdx >= 0 {
+		pBranch = pBranch[:endIdx]
+	}
+	// p backend: should be just a noop (:)
+	if strings.Contains(pBranch, "git merge") || strings.Contains(pBranch, "claude rm") {
+		t.Error("p backend agent_cleanup must remain a noop (R-PLEGACY)")
+	}
+}
+
+// TestT3_HarvestIntegration_Success tests the harvest bash against a real temp git repo.
+// Sets up a worktree-branch with a commit (simulating the bg agent's work), invokes
+// the harvest logic with claude stubbed as a noop, and asserts:
+// - working branch HEAD advances by the agent commit (S4, AC-5)
+// - claude rm is invoked (worktree teardown)
+// - no HUMAN_REQUIRED recorded
+func TestT3_HarvestIntegration_Success(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+
+	// Set up temp git repo: initial commit, then snapshot (before worktree), then worktree+commit.
+	initialHead := setupGitRepoForHarvest(t, repoDir)
+
+	// Write the pre-dispatch snapshot (agent_dispatch would have written this before claude --bg).
+	snapshotDir := filepath.Join(repoDir, ".ca-worktree-snapshots")
+	snapshotFile := filepath.Join(snapshotDir, "t1.txt")
+	preSnapshot := captureWorktreePathsBeforeWorktree(t, repoDir)
+	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+		t.Fatalf("mkdir snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(snapshotFile, []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	// Add the worktree (simulating what claude --bg does).
+	addWorktreeWithCommit(t, repoDir)
+
+	logFile := filepath.Join(t.TempDir(), "harvest.log")
+	rmLogFile := filepath.Join(stubDir, "claude-rm.log")
+	harvestScript := buildHarvestTestScript(t, repoDir, stubDir, logFile, "complete")
+
+	cmd := exec.Command("bash", harvestScript)
+	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com")
+	cmd.Dir = repoDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("harvest script failed (success path): %v\noutput:\n%s", err, out)
+	}
+
+	// Assert: working branch HEAD advanced (contains the worktree commit).
+	currentHead := gitHead(t, repoDir)
+	if currentHead == initialHead {
+		t.Errorf("working branch HEAD not advanced after harvest: still at initial %s\nscript output:\n%s", initialHead, out)
+	}
+	logOut := exec.Command("git", "log", "--oneline", "main")
+	logOut.Dir = repoDir
+	gitLogBytes, _ := logOut.CombinedOutput()
+	if !strings.Contains(string(gitLogBytes), "agent: task done") {
+		t.Errorf("agent commit not found on main after harvest:\n%s\nscript output:\n%s", gitLogBytes, out)
+	}
+
+	// Assert: claude rm was invoked.
+	if _, statErr := os.Stat(rmLogFile); statErr != nil {
+		t.Errorf("claude rm was NOT invoked after successful harvest (expected teardown)\nscript output:\n%s", out)
+	}
+
+	// Assert: no HUMAN_REQUIRED in harvest log.
+	if data, readErr := os.ReadFile(logFile); readErr == nil {
+		if strings.Contains(string(data), "HUMAN_REQUIRED") {
+			t.Errorf("unexpected HUMAN_REQUIRED in harvest log for success path:\n%s", data)
+		}
+	}
+}
+
+// TestT3_HarvestIntegration_Conflict tests the harvest-fail path (S5, AC-6):
+// induces a merge conflict, asserts working branch NOT advanced, merge aborted,
+// claude rm NOT invoked, HUMAN_REQUIRED recorded.
+func TestT3_HarvestIntegration_Conflict(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+
+	// Set up repo, snapshot, add worktree with conflicting commit, then add conflicting main commit.
+	setupGitRepoForConflict(t, repoDir)
+
+	logFile := filepath.Join(t.TempDir(), "harvest.log")
+	rmLogFile := filepath.Join(stubDir, "claude-rm.log")
+	harvestScript := buildHarvestTestScript(t, repoDir, stubDir, logFile, "complete") // marker=complete so harvest is attempted
+
+	cmd := exec.Command("bash", harvestScript)
+	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com")
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput() // non-zero exit OK — harvest-fail returns 1
+
+	// Assert: working branch has no merge commit (merge was aborted).
+	logOut := exec.Command("git", "log", "--oneline", "main")
+	logOut.Dir = repoDir
+	gitLogBytes, _ := logOut.CombinedOutput()
+	if strings.Contains(string(gitLogBytes), "harvest(bg)") {
+		t.Errorf("harvest merge commit found on main after conflict — merge should have been aborted:\n%s\nscript output:\n%s", gitLogBytes, out)
+	}
+
+	// Assert: claude rm was NOT invoked.
+	if _, statErr := os.Stat(rmLogFile); statErr == nil {
+		t.Errorf("claude rm WAS invoked after harvest failure — must not delete worktree (R-HARVEST-FAIL)\nscript output:\n%s", out)
+	}
+
+	// Assert: HUMAN_REQUIRED recorded.
+	data, readErr := os.ReadFile(logFile)
+	if readErr != nil {
+		t.Fatalf("harvest log not written: %v\nscript output:\n%s", readErr, out)
+	}
+	if !strings.Contains(string(data), "HUMAN_REQUIRED") {
+		t.Errorf("HUMAN_REQUIRED not recorded on harvest failure:\nlog: %s\nscript output:\n%s", data, out)
+	}
+}
+
+// TestT3_LoopLevel_ConflictReachesCase verifies ISSUE 1 fix: after agent_cleanup on a
+// harvest conflict with MARKER=complete, the generated loop does NOT exit non-zero at
+// the cleanup call (set -euo pipefail must not trip), and the case "$MARKER" human:*
+// handler runs (bd-update-equivalent log line emitted).
+//
+// Before fix: agent_cleanup returned 1 on conflict, aborting the script before case ran.
+// After fix:  agent_cleanup returns 0 and reassigns MARKER to human:harvest-conflict,
+//             so case "$MARKER" correctly triggers the human:* branch.
+func TestT3_LoopLevel_ConflictReachesCase(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+	logFile := filepath.Join(t.TempDir(), "harvest.log")
+
+	// Set up a conflict scenario (snapshot + worktree-with-conflict + main-conflict-commit).
+	setupGitRepoForConflict(t, repoDir)
+
+	// Build a loop-level script: runs agent_cleanup then case "$MARKER" (like the real loop).
+	script := buildLoopLevelTestScript(t, repoDir, stubDir, logFile, "complete")
+
+	cmd := exec.Command("bash", script)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, err := cmd.CombinedOutput()
+	// Script must exit 0 — set -euo pipefail must not abort at the cleanup call.
+	if err != nil {
+		t.Fatalf("loop-level script exited non-zero after conflict cleanup (set -e tripped at agent_cleanup): %v\noutput:\n%s", err, out)
+	}
+
+	// The human:* branch of case "$MARKER" must have run.
+	if !strings.Contains(string(out), "CASE_HUMAN_TRIGGERED") {
+		t.Errorf("case \"$MARKER\" human:* branch did not run after conflict cleanup — MARKER not reassigned or case not reached\noutput:\n%s", out)
+	}
+
+	// HUMAN_REQUIRED must be recorded in the harvest log.
+	data, readErr := os.ReadFile(logFile)
+	if readErr != nil {
+		t.Fatalf("harvest log not written: %v\noutput:\n%s", readErr, out)
+	}
+	if !strings.Contains(string(data), "HUMAN_REQUIRED") {
+		t.Errorf("HUMAN_REQUIRED not recorded in harvest log for conflict path:\nlog: %s\noutput:\n%s", data, out)
+	}
+}
+
+// TestT3_LoopLevel_NonCompleteReachesCase verifies ISSUE 1 fix for the non-complete-marker
+// path: agent_cleanup with marker=failed must return 0 (not abort the loop), MARKER must
+// remain non-complete, and case "$MARKER" must reach the failed/human branch.
+func TestT3_LoopLevel_NonCompleteReachesCase(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+	logFile := filepath.Join(t.TempDir(), "harvest.log")
+
+	// Set up a minimal repo with snapshot + worktree (no conflict needed here).
+	setupGitRepoForHarvest(t, repoDir)
+	preSnapshot := captureWorktreePathsBeforeWorktree(t, repoDir)
+	snapshotDir := filepath.Join(repoDir, ".ca-worktree-snapshots")
+	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+		t.Fatalf("mkdir snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, "t1.txt"), []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+	addWorktreeWithCommit(t, repoDir)
+
+	// marker=failed: cleanup must keep worktree, return 0, leave MARKER as "failed".
+	script := buildLoopLevelTestScript(t, repoDir, stubDir, logFile, "failed")
+
+	cmd := exec.Command("bash", script)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("loop-level script exited non-zero after non-complete cleanup: %v\noutput:\n%s", err, out)
+	}
+
+	// The failed branch of case "$MARKER" must have run (not human: here).
+	if !strings.Contains(string(out), "CASE_FAILED_TRIGGERED") {
+		t.Errorf("case \"$MARKER\" failed branch did not run after non-complete cleanup\noutput:\n%s", out)
+	}
+
+	// claude rm must NOT have been invoked (worktree retained per R-HARVEST-FAIL).
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	if _, statErr := os.Stat(rmLog); statErr == nil {
+		t.Errorf("claude rm was invoked on non-complete marker path — worktree must be retained\noutput:\n%s", out)
+	}
+}
+
+// buildLoopLevelTestScript generates a bash script that simulates the real loop:
+// runs agent_cleanup then executes case "$MARKER" to verify the case block is reached.
+// The case block emits sentinel strings (CASE_HUMAN_TRIGGERED / CASE_FAILED_TRIGGERED)
+// so the test can assert which branch fired.
+func buildLoopLevelTestScript(t *testing.T, repoDir, stubDir, logFile, marker string) string {
+	t.Helper()
+
+	seam := loopScriptSeam()
+
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	// Simulates the real loop: detect_marker returns the initial marker; agent_cleanup
+	// may reassign MARKER; then case "$MARKER" runs exactly as in loopScriptAttemptCases.
+	script := "#!/usr/bin/env bash\n" +
+		"set -euo pipefail\n" +
+		"export PATH=\"" + stubDir + ":$PATH\"\n" +
+		"export HARVEST_LOG=\"" + logFile + "\"\n" +
+		"CA_BACKEND=bg\n" +
+		"\n" +
+		"log() { echo \"[LOG] $*\" >&2; }\n" +
+		"\n" +
+		seam + "\n" +
+		"\n" +
+		"AGENT_HANDLE=\"t1\"\n" +
+		"MARKER=\"" + marker + "\"\n" +
+		"\n" +
+		"# --- mirror the real loop sequence ---\n" +
+		"agent_cleanup \"$AGENT_HANDLE\" \"$MARKER\"\n" +
+		"\n" +
+		"# case block mirrors loopScriptAttemptCases — emit sentinels instead of bd update.\n" +
+		"case \"$MARKER\" in\n" +
+		"  complete)\n" +
+		"    echo CASE_COMPLETE_TRIGGERED\n" +
+		"    ;;\n" +
+		"  human:*)\n" +
+		"    REASON=\"${MARKER#human:}\"\n" +
+		"    echo \"CASE_HUMAN_TRIGGERED: $REASON\"\n" +
+		"    ;;\n" +
+		"  failed)\n" +
+		"    echo CASE_FAILED_TRIGGERED\n" +
+		"    ;;\n" +
+		"  *)\n" +
+		"    echo \"CASE_OTHER_TRIGGERED: $MARKER\"\n" +
+		"    ;;\n" +
+		"esac\n"
+
+	scriptPath := filepath.Join(t.TempDir(), "loop-level-test.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write loop-level test script: %v", err)
+	}
+	return scriptPath
+}
+
+// --- integration test helpers ---
+
+// setupGitRepoForHarvest initialises a git repo with an initial commit and returns
+// the initial HEAD SHA. The caller is responsible for writing the snapshot and
+// adding the worktree (order matters for snapshot correctness).
+func setupGitRepoForHarvest(t *testing.T, repoDir string) (initialHead string) {
+	t.Helper()
+	mustGit(t, repoDir, "init", "-b", "main")
+	mustGit(t, repoDir, "config", "user.email", "test@test.com")
+	mustGit(t, repoDir, "config", "user.name", "Test")
+	writeFile(t, repoDir, "README.md", "initial")
+	mustGit(t, repoDir, "add", "README.md")
+	mustGit(t, repoDir, "commit", "-m", "init")
+	return gitHead(t, repoDir)
+}
+
+// captureWorktreePathsBeforeWorktree returns the git worktree list --porcelain
+// worktree paths from repoDir (resolving symlinks so the snapshot matches
+// what the bash script will see at harvest time).
+func captureWorktreePathsBeforeWorktree(t *testing.T, repoDir string) string {
+	t.Helper()
+	cmd := exec.Command("bash", "-c",
+		`git worktree list --porcelain | grep '^worktree ' | awk '{print $2}'`)
+	cmd.Dir = repoDir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("capture worktree paths: %v\n%s", err, out)
+	}
+	return string(out)
+}
+
+// addWorktreeWithCommit creates a linked worktree at .claude/worktrees/t1 on branch
+// worktree-t1, and adds one commit on that branch (the "agent's work").
+func addWorktreeWithCommit(t *testing.T, repoDir string) {
+	t.Helper()
+	wtDir := filepath.Join(repoDir, ".claude", "worktrees", "t1")
+	mustGit(t, repoDir, "worktree", "add", "-b", "worktree-t1", wtDir)
+	writeFile(t, wtDir, "agent-output.txt", "agent work")
+	mustGit(t, wtDir, "add", "agent-output.txt")
+	gitCmd := exec.Command("git", "commit", "-m", "agent: task done")
+	gitCmd.Dir = wtDir
+	gitCmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	if out, err := gitCmd.CombinedOutput(); err != nil {
+		t.Fatalf("git commit in worktree: %v\n%s", err, out)
+	}
+}
+
+// setupGitRepoForConflict builds the full conflict scenario in one step:
+// init + initial commit + snapshot + worktree-with-conflicting-commit + main-conflicting-commit.
+func setupGitRepoForConflict(t *testing.T, repoDir string) {
+	t.Helper()
+	mustGit(t, repoDir, "init", "-b", "main")
+	mustGit(t, repoDir, "config", "user.email", "test@test.com")
+	mustGit(t, repoDir, "config", "user.name", "Test")
+
+	writeFile(t, repoDir, "shared.txt", "base")
+	mustGit(t, repoDir, "add", "shared.txt")
+	mustGit(t, repoDir, "commit", "-m", "init")
+
+	// Snapshot BEFORE adding worktree.
+	preSnapshot := captureWorktreePathsBeforeWorktree(t, repoDir)
+	snapshotDir := filepath.Join(repoDir, ".ca-worktree-snapshots")
+	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+		t.Fatalf("mkdir snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, "t1.txt"), []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	// Create worktree-t1 and add conflicting commit.
+	wtDir := filepath.Join(repoDir, ".claude", "worktrees", "t1")
+	mustGit(t, repoDir, "worktree", "add", "-b", "worktree-t1", wtDir)
+	writeFile(t, wtDir, "shared.txt", "agent version")
+	mustGit(t, wtDir, "add", "shared.txt")
+	gitCmd := exec.Command("git", "commit", "-m", "agent: modify shared file")
+	gitCmd.Dir = wtDir
+	gitCmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	if out, err := gitCmd.CombinedOutput(); err != nil {
+		t.Fatalf("git commit in worktree: %v\n%s", err, out)
+	}
+
+	// Commit on main that conflicts.
+	writeFile(t, repoDir, "shared.txt", "main version")
+	mustGit(t, repoDir, "add", "shared.txt")
+	mustGit(t, repoDir, "commit", "-m", "main: modify shared file")
+}
+
+// buildHarvestTestScript generates a standalone bash script that runs agent_cleanup
+// with the given marker against the repo in repoDir. claude is stubbed via stubDir.
+func buildHarvestTestScript(t *testing.T, repoDir, stubDir, logFile, marker string) string {
+	t.Helper()
+
+	seam := loopScriptSeam()
+
+	// Stub claude: records invocations, always exits 0.
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	script := "#!/usr/bin/env bash\n" +
+		"set -euo pipefail\n" +
+		"export PATH=\"" + stubDir + ":$PATH\"\n" +
+		"export HARVEST_LOG=\"" + logFile + "\"\n" +
+		"CA_BACKEND=bg\n" +
+		"\n" +
+		"log() { echo \"[LOG] $*\" >&2; }\n" +
+		"\n" +
+		seam + "\n" +
+		"\n" +
+		// Set AGENT_HANDLE and MARKER after the seam (seam resets AGENT_HANDLE=\"\").
+		"AGENT_HANDLE=\"t1\"\n" +
+		"MARKER=\"" + marker + "\"\n" +
+		"\n" +
+		"agent_cleanup \"$AGENT_HANDLE\" \"$MARKER\"\n"
+
+	scriptPath := filepath.Join(t.TempDir(), "harvest-test.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write harvest test script: %v", err)
+	}
+	return scriptPath
+}
+
+// --- shared git helpers ---
+
+func mustGit(t *testing.T, dir string, args ...string) {
+	t.Helper()
+	cmd := exec.Command("git", args...)
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git %v: %v\n%s", args, err, out)
+	}
+}
+
+func gitHead(t *testing.T, dir string) string {
+	t.Helper()
+	cmd := exec.Command("git", "rev-parse", "HEAD")
+	cmd.Dir = dir
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("git rev-parse HEAD: %v", err)
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func writeFile(t *testing.T, dir, name, content string) {
+	t.Helper()
+	path := name
+	if dir != "" {
+		path = filepath.Join(dir, name)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("mkdir for %s: %v", path, err)
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatalf("write %s: %v", path, err)
 	}
 }
 
