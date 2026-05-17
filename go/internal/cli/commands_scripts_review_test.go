@@ -71,43 +71,6 @@ func TestLoopCommand_WithReviewers(t *testing.T) {
 	}
 }
 
-func TestLoopCommand_WithImprove(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(loopCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "loop.sh")
-
-	_, err := executeCommand(root, "loop", "-o", outPath,
-		"--improve",
-		"--improve-max-iters", "10",
-		"--improve-time-budget", "3600",
-	)
-	if err != nil {
-		t.Fatalf("loop --improve failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	script := string(data)
-
-	if !strings.Contains(script, "MAX_ITERS=10") {
-		t.Error("expected MAX_ITERS=10 in script")
-	}
-	if !strings.Contains(script, "TIME_BUDGET=3600") {
-		t.Error("expected TIME_BUDGET=3600 in script")
-	}
-	if !strings.Contains(script, "Improvement phase") {
-		t.Error("expected improvement phase section in script")
-	}
-	if !strings.Contains(script, "get_topics") {
-		t.Error("expected get_topics function in script")
-	}
-	if !strings.Contains(script, "detect_improve_marker") {
-		t.Error("expected detect_improve_marker function in script")
-	}
-}
-
 func TestLoopCommand_InvalidReviewer(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
@@ -148,30 +111,6 @@ func TestLoopCommand_NoReviewWithoutFlag(t *testing.T) {
 	}
 	if strings.Contains(script, "detect_reviewers") {
 		t.Error("expected no reviewer detection without --reviewers flag")
-	}
-}
-
-func TestLoopCommand_NoImproveWithoutFlag(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(loopCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "loop.sh")
-
-	_, err := executeCommand(root, "loop", "-o", outPath)
-	if err != nil {
-		t.Fatalf("loop failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	script := string(data)
-
-	if strings.Contains(script, "Improvement phase") {
-		t.Error("expected no improvement phase without --improve flag")
-	}
-	if strings.Contains(script, "get_topics") {
-		t.Error("expected no get_topics without --improve flag")
 	}
 }
 
@@ -221,34 +160,6 @@ func TestLoopCommand_AllReviewersValid(t *testing.T) {
 
 	if !strings.Contains(script, "claude-sonnet claude-opus gemini codex") {
 		t.Error("expected all four reviewers in REVIEW_REVIEWERS")
-	}
-}
-
-func TestLoopCommand_ReviewAndImprove(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(loopCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "loop.sh")
-
-	_, err := executeCommand(root, "loop", "-o", outPath,
-		"--reviewers", "claude-sonnet",
-		"--improve",
-	)
-	if err != nil {
-		t.Fatalf("loop --reviewers --improve failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	script := string(data)
-
-	// Both phases should be present
-	if !strings.Contains(script, "run_review_phase") {
-		t.Error("expected run_review_phase in combined script")
-	}
-	if !strings.Contains(script, "Improvement phase") {
-		t.Error("expected improvement phase in combined script")
 	}
 }
 
@@ -395,42 +306,6 @@ func TestLoopScriptReviewLoop_FullCycleLogic(t *testing.T) {
 	}
 }
 
-func TestLoopScriptImprovePhase_ContainsAllSections(t *testing.T) {
-	t.Parallel()
-	phase := loopScriptImprovePhase(loopImproveOptions{
-		maxIters:   7,
-		timeBudget: 1800,
-	})
-
-	if !strings.Contains(phase, "MAX_ITERS=7") {
-		t.Error("expected MAX_ITERS=7")
-	}
-	if !strings.Contains(phase, "TIME_BUDGET=1800") {
-		t.Error("expected TIME_BUDGET=1800")
-	}
-	if !strings.Contains(phase, "get_topics") {
-		t.Error("expected get_topics function")
-	}
-	if !strings.Contains(phase, "build_improve_prompt") {
-		t.Error("expected build_improve_prompt function")
-	}
-	if !strings.Contains(phase, "detect_improve_marker") {
-		t.Error("expected detect_improve_marker function")
-	}
-	if !strings.Contains(phase, "IMPROVED") {
-		t.Error("expected IMPROVED marker")
-	}
-	if !strings.Contains(phase, "NO_IMPROVEMENT") {
-		t.Error("expected NO_IMPROVEMENT marker")
-	}
-	if !strings.Contains(phase, "git tag -f") {
-		t.Error("expected git tag for rollback")
-	}
-	if !strings.Contains(phase, "git reset --hard") {
-		t.Error("expected git reset for failed iterations")
-	}
-}
-
 func TestValidateReviewers_AcceptsValid(t *testing.T) {
 	t.Parallel()
 	for _, name := range []string{"claude-sonnet", "claude-opus", "gemini", "codex"} {
@@ -556,31 +431,6 @@ func TestLoopCommand_ReviewEndOnlyCallSite(t *testing.T) {
 	}
 }
 
-func TestLoopCommand_ImproveUsesFailedCount(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(loopCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "loop.sh")
-
-	_, err := executeCommand(root, "loop", "-o", outPath, "--improve")
-	if err != nil {
-		t.Fatalf("loop --improve failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	script := string(data)
-
-	// The improve phase must use FAILED_COUNT (not FAILED) to match the main loop variable
-	if strings.Contains(script, "[ $FAILED -eq 0 ]") {
-		t.Error("improve phase uses undefined $FAILED variable; should use $FAILED_COUNT")
-	}
-	if !strings.Contains(script, "FAILED_COUNT") {
-		t.Error("expected FAILED_COUNT in improve phase guard")
-	}
-}
-
 func TestLoopCommand_UsesTwoScopeLogging(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
@@ -667,11 +517,9 @@ func TestLoopCommand_GeneratedScriptBashSyntax(t *testing.T) {
 		{"basic", []string{"loop", "-o", filepath.Join(dir, "basic.sh")}},
 		{"with-reviewers", []string{"loop", "-o", filepath.Join(dir, "review.sh"),
 			"--reviewers", "claude-sonnet,gemini", "--review-every", "2"}},
-		{"with-improve", []string{"loop", "-o", filepath.Join(dir, "improve.sh"), "--improve"}},
 		{"all-flags", []string{"loop", "-o", filepath.Join(dir, "all.sh"),
 			"--reviewers", "claude-sonnet,claude-opus,gemini,codex",
-			"--review-every", "3", "--review-blocking", "--improve",
-			"--improve-max-iters", "10", "--improve-time-budget", "3600"}},
+			"--review-every", "3", "--review-blocking"}},
 	}
 
 	for _, tt := range tests {
@@ -1025,36 +873,6 @@ func TestLoopCommand_ReviewTriggersBeforeExit(t *testing.T) {
 	}
 }
 
-func TestLoopCommand_ImprovePhaseBeforeExit(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(loopCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "loop.sh")
-
-	_, err := executeCommand(root, "loop", "-o", outPath, "--improve")
-	if err != nil {
-		t.Fatalf("loop --improve failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	script := string(data)
-
-	improveIdx := strings.Index(script, "Improvement phase")
-	exitIdx := strings.LastIndex(script, "exit 0")
-
-	if improveIdx < 0 {
-		t.Fatal("improve phase not found")
-	}
-	if exitIdx < 0 {
-		t.Fatal("exit line not found")
-	}
-	if improveIdx > exitIdx {
-		t.Errorf("improve phase (pos %d) appears AFTER exit (pos %d) -- dead code", improveIdx, exitIdx)
-	}
-}
-
 func TestLoopCommand_ReviewInitBeforeWhile(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
@@ -1116,28 +934,6 @@ func TestLoopCommand_PeriodicTriggerInsideSuccessBranch(t *testing.T) {
 	}
 	if periodicIdx > elifIdx {
 		t.Error("periodic trigger should be BEFORE the elif branch (inside success branch)")
-	}
-}
-
-func TestLoopCommand_ImproveUsesPipeExtractText(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(loopCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "loop.sh")
-
-	_, err := executeCommand(root, "loop", "-o", outPath, "--improve")
-	if err != nil {
-		t.Fatalf("loop --improve failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	script := string(data)
-
-	// Improve phase must NOT call extract_text with file arguments
-	if strings.Contains(script, `extract_text "$TRACEFILE" "$LOGFILE"`) {
-		t.Error("improve phase calls extract_text with file args but function reads from stdin")
 	}
 }
 

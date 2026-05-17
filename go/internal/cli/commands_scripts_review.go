@@ -31,12 +31,6 @@ type loopReviewOptions struct {
 	reviewEvery     int
 }
 
-// loopImproveOptions holds improve-phase configuration for the loop script.
-type loopImproveOptions struct {
-	maxIters   int
-	timeBudget int // seconds, 0 = unlimited
-}
-
 // validateReviewers checks that all reviewer names are valid.
 func validateReviewers(reviewers []string) error {
 	valid := validLoopReviewerSet()

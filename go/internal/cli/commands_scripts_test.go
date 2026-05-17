@@ -9,76 +9,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func TestImproveCommand_GeneratesScript(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(improveCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "improvement-loop.sh")
-
-	out, err := executeCommand(root, "improve", "-o", outPath, "--model", "claude-sonnet-4-6")
-	if err != nil {
-		t.Fatalf("improve command failed: %v\nOutput: %s", err, out)
-	}
-
-	data, err := os.ReadFile(outPath)
-	if err != nil {
-		t.Fatalf("failed to read generated script: %v", err)
-	}
-
-	script := string(data)
-	if !strings.HasPrefix(script, "#!/usr/bin/env bash") {
-		t.Error("expected bash shebang")
-	}
-	if !strings.Contains(script, "MAX_ITERS") {
-		t.Error("expected MAX_ITERS variable")
-	}
-	if !strings.Contains(script, "improve/") {
-		t.Error("expected improve/ directory reference")
-	}
-}
-
-func TestImproveCommand_UsesCompoundAgentLogDir(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(improveCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "improve.sh")
-
-	_, err := executeCommand(root, "improve", "-o", outPath, "--model", "claude-sonnet-4-6")
-	if err != nil {
-		t.Fatalf("improve command failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	script := string(data)
-	if !strings.Contains(script, `LOG_DIR=".compound-agent/agent_logs"`) {
-		t.Error("expected LOG_DIR to use .compound-agent/agent_logs")
-	}
-}
-
-func TestImproveCommand_ForceOverwrite(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(improveCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "test.sh")
-	os.WriteFile(outPath, []byte("old"), 0644)
-
-	_, err := executeCommand(root, "improve", "-o", outPath, "--force")
-	if err != nil {
-		t.Fatalf("improve --force failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	if string(data) == "old" {
-		t.Error("expected file to be overwritten")
-	}
-}
-
 func TestLoopCommand_GeneratesScript(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
@@ -251,32 +181,6 @@ func TestAuditCommand_JSON(t *testing.T) {
 	}
 }
 
-func TestImproveCommand_ShellInjection(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(improveCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "test.sh")
-
-	payload := `"; rm -rf /; #`
-	_, err := executeCommand(root, "improve", "-o", outPath, "--force", "--model", payload)
-	if err != nil {
-		t.Fatalf("improve command failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	script := string(data)
-
-	// The payload must be inside single quotes, not bare double quotes
-	if strings.Contains(script, `MODEL="`+payload) {
-		t.Error("model flag is interpolated without escaping — shell injection possible")
-	}
-	if !strings.Contains(script, `MODEL='`) {
-		t.Error("expected MODEL to be single-quoted for shell safety")
-	}
-}
-
 func TestLoopCommand_ShellInjection(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
@@ -303,27 +207,6 @@ func TestLoopCommand_ShellInjection(t *testing.T) {
 	}
 }
 
-func TestImproveCommand_NoVerifyRemoved(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(improveCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "test.sh")
-
-	_, err := executeCommand(root, "improve", "-o", outPath, "--force")
-	if err != nil {
-		t.Fatalf("improve command failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	script := string(data)
-
-	if strings.Contains(script, "--no-verify") {
-		t.Error("generated script must not use --no-verify (bypasses pre-commit hooks)")
-	}
-}
-
 func TestFindTraceForEpic_PathTraversal(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
@@ -340,30 +223,6 @@ func TestFindTraceForEpic_PathTraversal(t *testing.T) {
 	// No trace file exists, should just return empty
 	if result != "" {
 		t.Errorf("expected empty for non-existent trace, got: %s", result)
-	}
-}
-
-func TestImproveCommand_UsesGitStashNotCheckout(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(improveCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "test.sh")
-
-	_, err := executeCommand(root, "improve", "-o", outPath, "--force")
-	if err != nil {
-		t.Fatalf("improve command failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	script := string(data)
-
-	if strings.Contains(script, "git checkout -- .") {
-		t.Error("generated script must not use 'git checkout -- .' (destroys unrelated work); use 'git stash' instead")
-	}
-	if !strings.Contains(script, "git stash") {
-		t.Error("expected 'git stash' in generated script for safe rollback")
 	}
 }
 
@@ -569,25 +428,6 @@ func TestLoopCommand_ZeroWorkExitCode(t *testing.T) {
 	}
 }
 
-func TestImproveInitSubcommand(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(improveCmd())
-
-	dir := t.TempDir()
-
-	out, err := executeCommand(root, "improve", "init", "--dir", dir)
-	if err != nil {
-		t.Fatalf("improve init failed: %v\nOutput: %s", err, out)
-	}
-
-	// Check that example file was created
-	files, _ := filepath.Glob(filepath.Join(dir, "*.md"))
-	if len(files) == 0 {
-		t.Error("expected at least one .md file to be created")
-	}
-}
-
 func TestLoopCommand_CompactPct(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
@@ -657,49 +497,5 @@ func TestLoopCommand_CompactPctValidation(t *testing.T) {
 				t.Errorf("--compact-pct %s: unexpected error: %v", tt.value, err)
 			}
 		})
-	}
-}
-
-func TestImproveCommand_CompactPctValidation(t *testing.T) {
-	t.Parallel()
-	tests := []struct {
-		name  string
-		value string
-	}{
-		{"negative", "-5"},
-		{"over100", "200"},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			root := &cobra.Command{Use: "ca"}
-			root.AddCommand(improveCmd())
-			dir := t.TempDir()
-			outPath := filepath.Join(dir, "improve.sh")
-			_, err := executeCommand(root, "improve", "-o", outPath, "--compact-pct", tt.value)
-			if err == nil {
-				t.Errorf("--compact-pct %s: expected error", tt.value)
-			}
-		})
-	}
-}
-
-func TestImproveCommand_CompactPct(t *testing.T) {
-	t.Parallel()
-	root := &cobra.Command{Use: "ca"}
-	root.AddCommand(improveCmd())
-
-	dir := t.TempDir()
-	outPath := filepath.Join(dir, "improve.sh")
-
-	_, err := executeCommand(root, "improve", "-o", outPath, "--compact-pct", "40")
-	if err != nil {
-		t.Fatalf("improve --compact-pct failed: %v", err)
-	}
-
-	data, _ := os.ReadFile(outPath)
-	script := string(data)
-	if !strings.Contains(script, "export CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40") {
-		t.Error("expected CLAUDE_AUTOCOMPACT_PCT_OVERRIDE=40 in script")
 	}
 }

@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **Improve loop (`ca improve`, `ca loop --improve`, `ca watch --improve`)**: Removed the improve loop command and all associated flags and shell-script plumbing. The feature is superseded; this removal is unrelated to the bg backend migration.
+
 ## [2.7.2] - 2026-04-16
 
 ### Added

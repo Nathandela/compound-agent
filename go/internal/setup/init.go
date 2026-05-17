@@ -366,7 +366,6 @@ func MigrateLegacyArtifacts(repoRoot string) error {
 		{"agent_logs", ArtifactLogDir},
 		{"infinity-loop.sh", "infinity-loop.sh"},
 		{"polish-loop.sh", "polish-loop.sh"},
-		{"improvement-loop.sh", "improvement-loop.sh"},
 		// Phase state files migrated from .claude/ to .compound-agent/
 		{filepath.Join(".claude", ".ca-phase-state.json"), ".ca-phase-state.json"},
 		{filepath.Join(".claude", ".ca-failure-state.json"), ".ca-failure-state.json"},

@@ -115,26 +115,11 @@ ca loop --model claude-opus-4-7[1m]
 ca loop --force            # Overwrite existing script
 ```
 
-## Improve command
-
-```bash
-ca improve                           # Generate improvement loop script
-ca improve --topics lint tests       # Run only specific topics
-ca improve --max-iters 3             # Max iterations per topic (default: 5)
-ca improve --time-budget 3600        # Total time budget in seconds (0=unlimited)
-ca improve --model claude-sonnet-4-6 # Choose model
-ca improve --output my-improve.sh    # Custom output path
-ca improve --force                   # Overwrite existing script
-ca improve --dry-run                 # Validate and print plan without generating
-ca improve init                      # Scaffold example improve/*.md program file
-```
-
 ## Watch command
 
 ```bash
 ca watch                             # Tail live trace from latest loop session
 ca watch --epic <id>                 # Watch a specific epic trace
-ca watch --improve                   # Watch improvement loop traces
 ca watch --no-follow                 # Print existing trace and exit
 ```
 
