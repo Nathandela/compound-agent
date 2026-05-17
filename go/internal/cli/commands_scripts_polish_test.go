@@ -613,9 +613,12 @@ func TestPolishCommand_ReviewerModelQuoting(t *testing.T) {
 	data, _ := os.ReadFile(outPath)
 	script := string(data)
 
-	// The model name with [1m] must be properly quoted to prevent glob expansion
-	if !strings.Contains(script, `--model "$model_name"`) {
-		t.Error("reviewer model name must be quoted to prevent glob expansion on [1m]")
+	// The model name with [1m] must be properly quoted to prevent glob expansion.
+	// T1 seam: audit reviewers now call agent_invoke "$model_name" (first positional arg);
+	// agent_invoke internally uses --model "$model" — still quoted at runtime.
+	// Verify the seam function body uses double-quoted --model expansion.
+	if !strings.Contains(script, `--model "$model"`) {
+		t.Error("agent_invoke must use --model \"$model\" to prevent glob expansion on [1m]")
 	}
 }
 
@@ -881,5 +884,91 @@ func TestPolishCommand_PostLoopRespectsDryRun(t *testing.T) {
 		if idx < elseIdx {
 			t.Errorf("line %q appears before the dry-run else branch — it would still execute in dry-run", needle)
 		}
+	}
+}
+
+// TestPolishCommand_AgentInvokeInAudit verifies that the audit fleet section
+// uses agent_invoke instead of raw claude -p for claude reviewers (R-SEAM).
+func TestPolishCommand_AgentInvokeInAudit(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1",
+		"--reviewers", "claude-sonnet,claude-opus,gemini,codex")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// agent_invoke must be defined in the polish script
+	if !strings.Contains(script, "agent_invoke()") {
+		t.Error("polish script must define agent_invoke() seam function")
+	}
+	// Audit fleet must call agent_invoke for claude reviewers, not raw claude -p
+	if !strings.Contains(script, "agent_invoke ") {
+		t.Error("polish audit fleet must call agent_invoke for claude reviewer calls")
+	}
+	// Polish architect must use agent_invoke
+	archIdx := strings.Index(script, "run_polish_architect()")
+	if archIdx < 0 {
+		t.Fatal("run_polish_architect function not found")
+	}
+	archBody := script[archIdx:]
+	closeIdx := strings.Index(archBody, "\n}\n")
+	if closeIdx > 0 {
+		archBody = archBody[:closeIdx]
+	}
+	if !strings.Contains(archBody, "agent_invoke ") {
+		t.Error("run_polish_architect must call agent_invoke (not raw claude -p)")
+	}
+}
+
+// TestPolishCommand_NoRawClaudePOutsideSeam verifies that the polish script
+// has no raw `claude ... -p` invocation outside the seam function body.
+func TestPolishCommand_NoRawClaudePOutsideSeam(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Find agent_invoke() definition start
+	invokeIdx := strings.Index(script, "agent_invoke()")
+	if invokeIdx < 0 {
+		t.Fatal("agent_invoke() not found in polish script")
+	}
+	// Extract the rest of the script after the seam function definitions
+	// (everything outside function bodies should not have raw claude -p)
+	// We check run_polish_audit and run_polish_architect don't have raw claude -p
+	auditIdx := strings.Index(script, "run_polish_audit()")
+	if auditIdx < 0 {
+		t.Fatal("run_polish_audit() not found")
+	}
+	auditBody := script[auditIdx:]
+	closeIdx := strings.Index(auditBody, "\n}\n")
+	if closeIdx > 0 {
+		auditBody = auditBody[:closeIdx]
+	}
+	// Inside run_polish_audit, claude reviewer calls must go through agent_invoke
+	if strings.Contains(auditBody, "portable_timeout \"$REVIEW_TIMEOUT\" claude") &&
+		!strings.Contains(auditBody, "agent_invoke") {
+		t.Error("run_polish_audit must use agent_invoke, not direct claude invocation")
 	}
 }

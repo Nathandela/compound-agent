@@ -98,6 +98,7 @@ func generatePolishScript(opts polishGenerateOptions) string {
 		polishScriptCrashHandler() +
 		polishScriptTimeout() +
 		polishScriptPrerequisites() +
+		polishScriptSeam() +
 		polishScriptReviewerDetection() +
 		polishScriptAuditPrompt() +
 		polishScriptRunAudit() +
@@ -106,6 +107,34 @@ func generatePolishScript(opts polishGenerateOptions) string {
 		polishScriptInnerLoop() +
 		polishScriptMainLoop() +
 		polishScriptPostLoop()
+}
+
+// polishScriptSeam returns the backend seam for the polish script.
+// Only agent_invoke is needed here (no PGID-based watchdog in the polish script).
+// CA_BACKEND mirrors the loop script seam; p backend passes through to claude.
+func polishScriptSeam() string {
+	return `# --- Backend Seam (R-SEAM) ---
+# CA_BACKEND selects the claude execution backend. Only "p" is implemented here.
+CA_BACKEND=${CA_BACKEND:-p}
+
+# agent_invoke <model> [extra-flags...] -- [prompt-args...]
+# Synchronous claude invocation for reviewers and polish architect.
+# p backend: passes all flags through to claude unchanged.
+agent_invoke() {
+  local model="$1"; shift
+  case "$CA_BACKEND" in
+    p)
+      claude --dangerously-skip-permissions \
+             --permission-mode auto \
+             --output-format text \
+             --model "$model" \
+             "$@"
+      ;;
+    *) log "FATAL: unknown CA_BACKEND=$CA_BACKEND"; exit 1 ;;
+  esac
+}
+
+`
 }
 
 // polishScriptConfig returns the header and config section.
@@ -458,10 +487,7 @@ run_polish_audit() {
 
     case "$reviewer" in
       (claude-opus|claude-sonnet)
-        (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
-          --dangerously-skip-permissions \
-          --permission-mode auto \
-          --output-format text \
+        (portable_timeout "$REVIEW_TIMEOUT" agent_invoke "$model_name" \
           -p - < "$prompt_file" > "$report" 2>"$cycle_dir/$reviewer.stderr" || true) &
         ;;
       (gemini)
@@ -630,10 +656,7 @@ ARCHITECT_HEADER_EOF
     echo "Read this file for product vision: $SPEC_FILE"
   } > "$prompt_file"
 
-  claude --model "$MODEL" \
-    --dangerously-skip-permissions \
-    --permission-mode auto \
-    --output-format text \
+  agent_invoke "$MODEL" \
     --verbose \
     -p - < "$prompt_file" > "$architect_log" 2>"$cycle_dir/polish-architect.stderr" || true
 

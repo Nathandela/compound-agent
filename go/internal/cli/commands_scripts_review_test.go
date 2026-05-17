@@ -608,7 +608,8 @@ func TestLoopCommand_MemoryWatchdog(t *testing.T) {
 		"start_memory_watchdog": "watchdog start function",
 		"stop_memory_watchdog":  "watchdog stop function",
 		"WATCHDOG_PID":          "watchdog PID tracking",
-		"CLAUDE_PGID":           "background subshell PID",
+		// T1 seam: CLAUDE_PGID renamed to AGENT_HANDLE (backend-agnostic; p backend sets it to subshell PID)
+		"AGENT_HANDLE": "backend-agnostic session handle (was CLAUDE_PGID pre-T1)",
 	}
 	for needle, desc := range checks {
 		if !strings.Contains(script, needle) {

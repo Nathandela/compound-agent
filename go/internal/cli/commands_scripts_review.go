@@ -301,16 +301,12 @@ spawn_reviewers() {
         local sid=""
         sid=$(read_session_id "$reviewer" "$REVIEW_DIR/sessions.json")
         if [ "$cycle" -eq 1 ]; then
-          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
-            --dangerously-skip-permissions \
-            --permission-mode auto \
-            --output-format text --session-id "$sid" \
+          (portable_timeout "$REVIEW_TIMEOUT" agent_invoke "$model_name" \
+            --session-id "$sid" \
             -p "$(cat "$prompt_file")" > "$report" 2>&1 || true) &
         else
-          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
-            --dangerously-skip-permissions \
-            --permission-mode auto \
-            --output-format text --resume "$sid" \
+          (portable_timeout "$REVIEW_TIMEOUT" agent_invoke "$model_name" \
+            --resume "$sid" \
             -p "$follow_up" > "$report" 2>&1 || true) &
         fi
         pids="$pids $!"
@@ -384,9 +380,7 @@ IMPL_PROMPT_FOOTER
   log "Running implementer session (prompt: $prompt_file)..."
   local impl_start
   impl_start=$(date +%s)
-  portable_timeout "$REVIEW_TIMEOUT" claude --model "$REVIEW_MODEL" --output-format text \
-         --dangerously-skip-permissions \
-         --permission-mode auto \
+  portable_timeout "$REVIEW_TIMEOUT" agent_invoke "$REVIEW_MODEL" \
          -p "$impl_prompt" > "$implementer_report" 2>&1 || true
   local impl_duration=$(( $(date +%s) - impl_start ))
   log "Implementer session complete (${impl_duration}s)"

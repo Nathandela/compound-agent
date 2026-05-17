@@ -126,6 +126,7 @@ func generateLoopScript(opts loopGenerateOptions) string {
 	}
 
 	helpers := loopScriptHelpers()
+	seam := loopScriptSeam()
 	preLoop := loopScriptPreLoop()
 	whileHeader := loopScriptWhileHeader()
 	epicProcessing := loopScriptEpicProcessing()
@@ -143,7 +144,7 @@ func generateLoopScript(opts loopGenerateOptions) string {
 	epicResult := loopScriptEpicResult(triggerPeriodic)
 	postLoop := loopScriptPostLoop(triggerFinal)
 
-	mainLoop := helpers + preLoop + triggerInit + whileHeader +
+	mainLoop := helpers + seam + preLoop + triggerInit + whileHeader +
 		epicProcessing + epicResult + postLoop
 
 	return config + crashHandler + memorySafety + parseJSON +
@@ -621,6 +622,110 @@ log_result() {
 `
 }
 
+// loopScriptSeam returns the backend seam functions (agent_dispatch, agent_poll,
+// agent_collect, agent_stop, agent_cleanup, agent_invoke) and the CA_BACKEND
+// selector. Only the "p" backend is implemented here; "bg" is added in T2.
+//
+// Seam contract (p backend):
+//
+//	agent_dispatch <logfile> <tracefile> <model> <prompt>
+//	  Runs claude -p in a background subshell; sets AGENT_HANDLE to the subshell PID.
+//	  Pipeline: claude ... -p "$prompt" 2>stderr | tee tracefile | extract_text > logfile
+//
+//	agent_poll <handle>          -- "running" if PID alive, "done" otherwise
+//	agent_collect <handle> <logfile> <tracefile> -- delegates to detect_marker
+//	agent_stop <handle>          -- kill -TERM process group, then PID
+//	agent_cleanup <handle>       -- noop for p backend
+//	agent_invoke <model> <flags...> -- -- <prompt-args...> > <outfile>
+//	  Synchronous claude invocation (text output, used by reviewer/implementer/architect).
+//	  <flags...> are passed verbatim; prompt is read from stdin or provided via -p.
+func loopScriptSeam() string { //nolint:funlen // bash template string
+	return `# --- Backend Seam (R-SEAM) ---
+# CA_BACKEND selects the claude execution backend. Only "p" is implemented here.
+# "bg" (claude --bg) is introduced in T2. Swap point for the future migration.
+CA_BACKEND=${CA_BACKEND:-p}
+
+# AGENT_HANDLE is set by agent_dispatch; used by agent_poll/stop/cleanup and watchdogs.
+AGENT_HANDLE=""
+
+# agent_dispatch <logfile> <tracefile> <model> <prompt>
+# p backend: runs claude -p in a background subshell, sets AGENT_HANDLE=PID.
+# Pipeline matches pre-T1 exactly: stream-json | tee tracefile | extract_text > logfile
+agent_dispatch() {
+  local logfile="$1" tracefile="$2" model="$3" prompt="$4"
+  case "$CA_BACKEND" in
+    p)
+      (
+        claude --dangerously-skip-permissions \
+               --permission-mode auto \
+               --model "$model" \
+               --output-format stream-json \
+               --verbose \
+               -p "$prompt" \
+               2>"$logfile.stderr" | tee "$tracefile" | extract_text > "$logfile"
+      ) &
+      AGENT_HANDLE=$!
+      ;;
+    *)
+      log "FATAL: unknown CA_BACKEND=$CA_BACKEND"; exit 1 ;;
+  esac
+}
+
+# agent_poll <handle> -> "running" | "done"
+# p backend: check if the background subshell PID is still alive.
+agent_poll() {
+  local handle="$1"
+  case "$CA_BACKEND" in
+    p) kill -0 "$handle" 2>/dev/null && echo "running" || echo "done" ;;
+    *) echo "done" ;;
+  esac
+}
+
+# agent_collect <handle> <logfile> <tracefile> -> marker string
+# p backend: delegates to detect_marker (same anchored patterns as pre-T1).
+agent_collect() {
+  local logfile="$2" tracefile="$3"
+  detect_marker "$logfile" "$tracefile"
+}
+
+# agent_stop <handle>
+# p backend: kill the process group (same semantics as pre-T1 kill -TERM -- -PGID).
+agent_stop() {
+  local handle="$1"
+  case "$CA_BACKEND" in
+    p) kill -TERM -- -"$handle" 2>/dev/null || kill "$handle" 2>/dev/null || true ;;
+  esac
+}
+
+# agent_cleanup <handle>
+# p backend: noop (no session or worktree to clean up).
+agent_cleanup() {
+  : # noop for p backend
+}
+
+# agent_invoke <model> [extra-flags...] -- [prompt-args...]
+# Synchronous claude invocation for reviewers, implementer, and polish architect.
+# Executes claude --dangerously-skip-permissions --permission-mode auto --output-format text
+# with the given model and extra flags, passing remaining args to claude directly.
+# Caller provides redirection (> outfile 2>stderr) and optional & for backgrounding.
+# p backend: passes all args through to claude unchanged.
+agent_invoke() {
+  local model="$1"; shift
+  case "$CA_BACKEND" in
+    p)
+      claude --dangerously-skip-permissions \
+             --permission-mode auto \
+             --output-format text \
+             --model "$model" \
+             "$@"
+      ;;
+    *) log "FATAL: unknown CA_BACKEND=$CA_BACKEND"; exit 1 ;;
+  esac
+}
+
+`
+}
+
 // loopScriptPreLoop returns the variable initialization before the while loop.
 func loopScriptPreLoop() string {
 	return `# --- Main Loop ---
@@ -695,22 +800,13 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
 
     PROMPT=$(build_prompt "$EPIC_ID")
 
-    # Two-scope logging: stream-json to trace JSONL, extracted text to macro log
-    # Run in background subshell so we can track PID for the memory watchdog
+    # Dispatch through backend seam; AGENT_HANDLE is set by agent_dispatch.
+    # p backend: background subshell running claude -p | tee TRACEFILE | extract_text > LOGFILE
     MEM_LOG="$LOG_DIR/memory_${EPIC_ID}-${TS}.log"
-    (
-      claude --dangerously-skip-permissions \
-             --permission-mode auto \
-             --model "$MODEL" \
-             --output-format stream-json \
-             --verbose \
-             -p "$PROMPT" \
-             2>"$LOGFILE.stderr" | tee "$TRACEFILE" | extract_text > "$LOGFILE"
-    ) &
-    CLAUDE_PGID=$!
-    start_memory_watchdog "$CLAUDE_PGID" "$MEM_LOG"
-    start_stale_watchdog "$CLAUDE_PGID" "$TRACEFILE" "$MEM_LOG"
-    wait "$CLAUDE_PGID" 2>/dev/null || true
+    agent_dispatch "$LOGFILE" "$TRACEFILE" "$MODEL" "$PROMPT"
+    start_memory_watchdog "$AGENT_HANDLE" "$MEM_LOG"
+    start_stale_watchdog "$AGENT_HANDLE" "$TRACEFILE" "$MEM_LOG"
+    wait "$AGENT_HANDLE" 2>/dev/null || true
     stop_stale_watchdog
     stop_memory_watchdog
 

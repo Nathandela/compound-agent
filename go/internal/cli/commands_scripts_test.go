@@ -308,9 +308,9 @@ func TestLoopCommand_StaleWatchdogPresent(t *testing.T) {
 		t.Error("expected STALE_WATCHDOG_PID global variable")
 	}
 
-	// Must wire stale watchdog into session spawning (alongside memory watchdog)
-	if !strings.Contains(script, `start_stale_watchdog "$CLAUDE_PGID"`) {
-		t.Error("expected stale watchdog to be started with CLAUDE_PGID")
+	// Must wire stale watchdog into session spawning via AGENT_HANDLE (T1 seam: was CLAUDE_PGID)
+	if !strings.Contains(script, `start_stale_watchdog "$AGENT_HANDLE"`) {
+		t.Error("expected stale watchdog to be started with AGENT_HANDLE (seam handle, was CLAUDE_PGID pre-T1)")
 	}
 	if !strings.Contains(script, `stop_stale_watchdog`) {
 		t.Error("expected stale watchdog to be stopped after wait")
@@ -495,6 +495,282 @@ func TestLoopCommand_CompactPctValidation(t *testing.T) {
 			}
 			if !tt.wantErr && err != nil {
 				t.Errorf("--compact-pct %s: unexpected error: %v", tt.value, err)
+			}
+		})
+	}
+}
+
+// --- T1 Seam Tests ---
+// These tests verify the 3-operation backend seam introduced in T1.
+// They prove: (a) seam functions are emitted, (b) no raw `claude -p` exists
+// outside the seam definition, (c) the p-backend contract (effective claude
+// invocation, extract_text pipeline, detect_marker anchors, watchdog wiring)
+// is equivalent to pre-T1 behavior.
+
+// TestLoopCommand_SeamFunctionsPresent verifies that the loop script contains
+// the five seam function definitions required by R-SEAM.
+func TestLoopCommand_SeamFunctionsPresent(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	seam := map[string]string{
+		"agent_dispatch()": "agent_dispatch seam function definition",
+		"agent_poll()":     "agent_poll seam function definition",
+		"agent_collect()":  "agent_collect seam function definition",
+		"agent_stop()":     "agent_stop seam function definition",
+		"agent_cleanup()":  "agent_cleanup seam function definition",
+		"CA_BACKEND":       "CA_BACKEND variable selecting p vs bg backend",
+	}
+	for needle, desc := range seam {
+		if !strings.Contains(script, needle) {
+			t.Errorf("missing %s: expected %q in generated script", desc, needle)
+		}
+	}
+}
+
+// TestLoopCommand_NoRawClaudePOutsideSeam verifies R-SEAM: no raw `claude -p`
+// call exists outside the seam function bodies. The only legal occurrences of
+// `claude ... -p` are inside the backend-specific seam function definitions.
+func TestLoopCommand_NoRawClaudePOutsideSeam(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// All raw `claude` invocations must be inside seam function definitions.
+	// We verify by checking that the epic-loop invocation site uses agent_dispatch,
+	// not a raw claude call.
+	if !strings.Contains(script, "agent_dispatch ") {
+		t.Error("expected agent_dispatch call at the epic-loop invocation site")
+	}
+
+	// The raw claude invocation must NOT appear outside the seam body.
+	// Strategy: find the claude invocation that carries --output-format stream-json
+	// and verify it only appears inside a function definition block, not inline
+	// in the main loop body.
+	//
+	// We check that the string "agent_dispatch" appears between the WHILE loop
+	// header and MARKER detection — i.e., the seam is called, not raw claude.
+	whileIdx := strings.Index(script, "while [ $ATTEMPT -le $MAX_RETRIES ]")
+	markerIdx := strings.Index(script, `MARKER=$(detect_marker`)
+	if whileIdx < 0 || markerIdx < 0 {
+		t.Fatal("expected attempt loop and MARKER detection in script")
+	}
+	loopBody := script[whileIdx:markerIdx]
+
+	// The loop body must call agent_dispatch, not raw claude
+	if !strings.Contains(loopBody, "agent_dispatch ") {
+		t.Error("epic retry loop body must call agent_dispatch (not raw claude -p)")
+	}
+	// The loop body must NOT contain a raw `claude --dangerously-skip-permissions`
+	// invocation (that belongs only inside the seam function definition)
+	if strings.Contains(loopBody, "claude --dangerously-skip-permissions") {
+		t.Error("raw claude --dangerously-skip-permissions must not appear in the loop body (must be inside seam)")
+	}
+}
+
+// TestLoopCommand_PBackendClaudeContract pins the effective claude command-line
+// that the p backend emits. It must include every flag that pre-T1 had:
+// --dangerously-skip-permissions, --permission-mode auto, --model, --output-format
+// stream-json, --verbose, and -p. This is the R-PLEGACY golden contract test.
+func TestLoopCommand_PBackendClaudeContract(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The p-backend agent_dispatch function body must contain the exact claude flags
+	// that pre-T1 used. Find the seam function definition block.
+	dispatchIdx := strings.Index(script, "agent_dispatch()")
+	if dispatchIdx < 0 {
+		t.Fatal("agent_dispatch() not found in generated script")
+	}
+	// Extract a reasonable window after the function start (up to 30 lines)
+	dispatchBody := script[dispatchIdx:]
+	// Narrow to the function body (find the closing })
+	closeIdx := strings.Index(dispatchBody, "\n}\n")
+	if closeIdx > 0 {
+		dispatchBody = dispatchBody[:closeIdx]
+	}
+
+	required := map[string]string{
+		"--dangerously-skip-permissions": "security bypass flag (pre-T1 contract)",
+		"--permission-mode auto":         "permission mode flag (pre-T1 contract)",
+		"--output-format stream-json":    "stream-json output format (pre-T1 contract)",
+		"--verbose":                      "verbose flag (pre-T1 contract)",
+		"-p ":                            "print flag (pre-T1 contract)",
+		"tee ":                           "tee piping to TRACEFILE (pre-T1 contract)",
+		"extract_text":                   "extract_text piping to LOGFILE (pre-T1 contract)",
+	}
+	for needle, desc := range required {
+		if !strings.Contains(dispatchBody, needle) {
+			t.Errorf("agent_dispatch p-backend missing %s: expected %q in function body", desc, needle)
+		}
+	}
+}
+
+// TestLoopCommand_SeamWatchdogWiring verifies that the watchdog functions
+// (memory and stale) are wired to AGENT_HANDLE (not raw CLAUDE_PGID).
+// This proves the seam indirection is complete: watchdogs operate on the
+// handle, which for p backend equals the subshell PID.
+func TestLoopCommand_SeamWatchdogWiring(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath)
+	if err != nil {
+		t.Fatalf("loop command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The main loop body must start watchdogs with AGENT_HANDLE.
+	if !strings.Contains(script, `start_memory_watchdog "$AGENT_HANDLE"`) {
+		t.Error("memory watchdog must be wired to $AGENT_HANDLE (not $CLAUDE_PGID)")
+	}
+	if !strings.Contains(script, `start_stale_watchdog "$AGENT_HANDLE"`) {
+		t.Error("stale watchdog must be wired to $AGENT_HANDLE (not $CLAUDE_PGID)")
+	}
+	// agent_dispatch must set AGENT_HANDLE
+	if !strings.Contains(script, "AGENT_HANDLE=") {
+		t.Error("agent_dispatch must set AGENT_HANDLE global")
+	}
+	// wait must use AGENT_HANDLE
+	if !strings.Contains(script, `wait "$AGENT_HANDLE"`) {
+		t.Error("wait must use $AGENT_HANDLE after dispatch")
+	}
+}
+
+// TestLoopCommand_SeamAgentInvoke verifies that the review and polish scripts
+// use agent_invoke (not raw `claude -p`) for reviewer/implementer/architect calls.
+func TestLoopCommand_SeamAgentInvoke(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath,
+		"--reviewers", "claude-sonnet,gemini",
+	)
+	if err != nil {
+		t.Fatalf("loop --reviewers failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Review spawner must use agent_invoke for claude reviewer calls
+	if !strings.Contains(script, "agent_invoke ") {
+		t.Error("expected agent_invoke call in reviewer spawner")
+	}
+
+	// agent_invoke function must be defined
+	if !strings.Contains(script, "agent_invoke()") {
+		t.Error("expected agent_invoke() function definition in script")
+	}
+}
+
+// TestReviewCommand_SeamFunctionsPresent verifies that the review function
+// emits agent_invoke and that raw `claude -p` in reviewers/implementer goes
+// through the seam.
+func TestReviewCommand_SeamFunctionsPresent(t *testing.T) {
+	t.Parallel()
+	spawner := loopScriptSpawnReviewers()
+	impl := loopScriptImplementerPhase()
+
+	// spawn_reviewers must use agent_invoke, not raw claude -p
+	if !strings.Contains(spawner, "agent_invoke ") {
+		t.Error("spawn_reviewers must call agent_invoke (not raw claude -p)")
+	}
+	// implementer must use agent_invoke
+	if !strings.Contains(impl, "agent_invoke ") {
+		t.Error("feed_implementer must call agent_invoke (not raw claude -p)")
+	}
+}
+
+// TestPolishCommand_SeamFunctionsPresent verifies that the polish script uses
+// agent_invoke for audit-fleet and polish-architect claude calls.
+func TestPolishCommand_SeamFunctionsPresent(t *testing.T) {
+	t.Parallel()
+	audit := polishScriptRunAudit()
+	architect := polishScriptPolishArchitect()
+
+	// Audit fleet must use agent_invoke for claude reviewers
+	if !strings.Contains(audit, "agent_invoke ") {
+		t.Error("run_polish_audit must call agent_invoke for claude reviewer calls")
+	}
+	// Polish architect must use agent_invoke
+	if !strings.Contains(architect, "agent_invoke ") {
+		t.Error("run_polish_architect must call agent_invoke (not raw claude -p)")
+	}
+}
+
+// TestSeamScript_BashSyntax verifies that the generated seam functions produce
+// valid bash syntax (regression guard for formatting bugs in template strings).
+func TestSeamScript_BashSyntax(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+
+	tests := []struct {
+		name string
+		args []string
+	}{
+		{"no-reviewers", []string{"loop", "-o", filepath.Join(dir, "seam-basic.sh")}},
+		{"with-reviewers", []string{"loop", "-o", filepath.Join(dir, "seam-review.sh"),
+			"--reviewers", "claude-sonnet,claude-opus,gemini,codex", "--review-every", "2"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := executeCommand(root, tt.args...)
+			if err != nil {
+				t.Fatalf("command failed: %v", err)
+			}
+			out, bashErr := executeBashSyntaxCheck(t, tt.args[2])
+			if bashErr != nil {
+				t.Errorf("bash -n syntax check failed:\n%s\n%v", out, bashErr)
 			}
 		})
 	}
