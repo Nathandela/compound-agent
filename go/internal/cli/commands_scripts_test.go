@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 )
@@ -1265,6 +1267,12 @@ func buildLoopLevelTestScript(t *testing.T, repoDir, stubDir, logFile, marker st
 		"  echo \"backgrounded · deadbeef\"\n" +
 		"  exit 0\n" +
 		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -1427,6 +1435,12 @@ func buildHarvestTestScript(t *testing.T, repoDir, stubDir, logFile, marker stri
 		"  echo \"backgrounded · deadbeef\"\n" +
 		"  exit 0\n" +
 		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -1539,6 +1553,91 @@ func TestBgBackend_MainLoopPollsUntilTerminal(t *testing.T) {
 	// agent_collect must be called with AGENT_HANDLE, LOGFILE, TRACEFILE
 	if !strings.Contains(script, `agent_collect "$AGENT_HANDLE"`) {
 		t.Error("main loop must call agent_collect with $AGENT_HANDLE")
+	}
+}
+
+// extractBgPollLoop returns the bg poll loop region of the generated loop
+// script — from the `bg_last_update=""` initializer through the matching
+// `done` that closes the `while true` poll loop. Used by runtime tests that
+// exercise the poll loop in isolation with stubbed helpers.
+func extractBgPollLoop(t *testing.T) string {
+	t.Helper()
+	setup := loopScriptAttemptSetup()
+	start := strings.Index(setup, `bg_last_update=""`)
+	if start < 0 {
+		t.Fatal("bg poll loop initializer (bg_last_update=\"\") not found in loopScriptAttemptSetup")
+	}
+	// The poll loop body ends at the first `\n      done\n` after the start
+	// (6-space indent matches the generated `done` that closes `while true`).
+	rel := strings.Index(setup[start:], "\n      done\n")
+	if rel < 0 {
+		t.Fatal("bg poll loop closing `done` not found in loopScriptAttemptSetup")
+	}
+	return setup[start : start+rel+len("\n      done\n")]
+}
+
+// TestBgBackend_PollLoop_EscalatesWhenStateJsonNeverAppears is a regression
+// test for the infinite-spin path (learning_agent-yvm8, fix D): when
+// claude --bg returns a parsed session id but the session dies before EVER
+// writing state.json, agent_poll returns "running" forever and the stale
+// watchdog never increments (the else branch resets bg_stale_secs=0 each
+// iteration). The loop must instead escalate the kill ladder within a bounded
+// first-write deadline (reusing SESSION_STALE_TIMEOUT) rather than spinning.
+func TestBgBackend_PollLoop_EscalatesWhenStateJsonNeverAppears(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	t.Parallel()
+
+	loopBody := extractBgPollLoop(t)
+
+	memLog := filepath.Join(t.TempDir(), "mem.log")
+	traceFile := filepath.Join(t.TempDir(), "trace.jsonl")
+	killLog := filepath.Join(t.TempDir(), "kill.log")
+
+	// Stubs: agent_poll always "running" (state.json never appears);
+	// get_memory_pct returns healthy (no memory escalation); bg_kill_ladder
+	// records the escalation and lets the loop break via bg_killed.
+	// SESSION_STALE_TIMEOUT=2, BG_POLL_INTERVAL=1 => deadline reached in ~2s.
+	// A hard 30s `timeout` proves the loop does NOT spin forever.
+	script := "#!/usr/bin/env bash\n" +
+		"set -euo pipefail\n" +
+		"agent_poll() { echo running; }\n" +
+		"get_memory_pct() { echo 90; }\n" +
+		"bg_kill_ladder() { echo \"bg_kill_ladder called: $1 $2\" >> \"" + killLog + "\"; }\n" +
+		"log() { echo \"[LOG] $*\" >&2; }\n" +
+		"AGENT_HANDLE=deadbeef\n" +
+		"HOME=\"" + t.TempDir() + "\"\n" +
+		"MEM_LOG=\"" + memLog + "\"\n" +
+		"TRACEFILE=\"" + traceFile + "\"\n" +
+		"SESSION_STALE_TIMEOUT=2\n" +
+		"BG_POLL_INTERVAL=1\n" +
+		"WATCHDOG_THRESHOLD=15\n" +
+		loopBody + "\n"
+
+	scriptPath := filepath.Join(t.TempDir(), "poll-loop.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	// Hard wall-clock cap: if the loop spins forever, the context kills it at
+	// 30s and the kill-ladder assertion below fails (the real bug).
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, "bash", scriptPath)
+	out, _ := cmd.CombinedOutput()
+	timedOut := ctx.Err() == context.DeadlineExceeded
+
+	killData, _ := os.ReadFile(killLog)
+	if !strings.Contains(string(killData), "bg_kill_ladder called") {
+		t.Errorf("bg poll loop must escalate bg_kill_ladder when state.json never appears (infinite-spin guard)\nscript output:\n%s", out)
+	}
+	memData, _ := os.ReadFile(memLog)
+	if !strings.Contains(string(memData), "STALE_WATCHDOG") {
+		t.Errorf("bg poll loop must log STALE_WATCHDOG when state.json never appears within the first-write deadline\nmem.log:\n%s\noutput:\n%s", memData, out)
+	}
+	if timedOut {
+		t.Errorf("bg poll loop spun until the 30s hard timeout — infinite-spin bug NOT fixed\noutput:\n%s", out)
 	}
 }
 
@@ -2145,6 +2244,12 @@ func TestT4_KillLadder_Runtime_NoRmIfWorktreePresent(t *testing.T) {
 		"  echo \"backgrounded · deadbeef\"\n" +
 		"  exit 0\n" +
 		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -2241,6 +2346,12 @@ func TestT4_KillLadder_Runtime_RmIfNoWorktree(t *testing.T) {
 		"  echo \"backgrounded · deadbeef\"\n" +
 		"  exit 0\n" +
 		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -2289,6 +2400,311 @@ func TestT4_KillLadder_Runtime_RmIfNoWorktree(t *testing.T) {
 	rmLogData, _ := os.ReadFile(rmLog)
 	if !strings.Contains(string(rmLogData), "t1") {
 		t.Errorf("claude rm was NOT invoked for session t1 with no worktree — teardown must proceed\noutput:\n%s", out)
+	}
+}
+
+// runBootstrapPreflight builds and runs a minimal harness around the generated
+// bootstrap_preflight (bg seam) with a claude stub whose behaviour is driven by
+// stubBody. Returns combined output and the process exit code.
+func runBootstrapPreflight(t *testing.T, repoDir, stubExtra string) (string, int) {
+	t.Helper()
+	stubDir := t.TempDir()
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		stubExtra +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	seam := loopScriptSeam("bg", false)
+	script := "#!/usr/bin/env bash\n" +
+		"set -euo pipefail\n" +
+		"export PATH=\"" + stubDir + ":$PATH\"\n" +
+		"CA_BACKEND=bg\n" +
+		"HAS_JQ=false\n" +
+		"log() { echo \"[LOG] $*\"; }\n" +
+		seam + "\n" +
+		"echo PREFLIGHT_PASSED\n"
+
+	scriptPath := filepath.Join(t.TempDir(), "preflight.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Dir = repoDir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	out, err := cmd.CombinedOutput()
+	code := 0
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		code = exitErr.ExitCode()
+	} else if err != nil {
+		t.Fatalf("run preflight: %v\n%s", err, out)
+	}
+	return string(out), code
+}
+
+// TestBootstrapPreflight_FailsLoudWhenBgIsolationNotNone is a regression test
+// for learning_agent-52r1 (fix B): the bg backend requires
+// worktree.bgIsolation: none (otherwise bd is unreachable from the auto-isolated
+// worktree and epics never close). bootstrap_preflight must FAIL LOUD (exit 1
+// with remediation) when the effective setting is not none.
+func TestBootstrapPreflight_FailsLoudWhenBgIsolationNotNone(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+	repoDir := t.TempDir()
+	setupGitRepoForHarvest(t, repoDir)
+
+	// claude config get worktree.bgIsolation -> "worktree" (NOT none).
+	stubExtra := "if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo worktree\n" +
+		"  exit 0\n" +
+		"fi\n"
+	out, code := runBootstrapPreflight(t, repoDir, stubExtra)
+
+	if code != 1 {
+		t.Errorf("bootstrap_preflight must exit 1 when bgIsolation is not none, got exit %d\noutput:\n%s", code, out)
+	}
+	if strings.Contains(out, "PREFLIGHT_PASSED") {
+		t.Errorf("bootstrap_preflight must NOT pass when bgIsolation is not none\noutput:\n%s", out)
+	}
+	if !strings.Contains(out, "bgIsolation") {
+		t.Errorf("bootstrap_preflight failure must mention bgIsolation in the remediation\noutput:\n%s", out)
+	}
+}
+
+// TestBootstrapPreflight_PassesWhenBgIsolationNone verifies the happy path:
+// `claude config get worktree.bgIsolation` reports none, so preflight proceeds.
+func TestBootstrapPreflight_PassesWhenBgIsolationNone(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+	repoDir := t.TempDir()
+	setupGitRepoForHarvest(t, repoDir)
+
+	stubExtra := "if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"subcmd=\"$1\"; shift\n" +
+		": \"$subcmd\"\n"
+	out, code := runBootstrapPreflight(t, repoDir, stubExtra)
+
+	if code != 0 {
+		t.Errorf("bootstrap_preflight must exit 0 when bgIsolation is none, got exit %d\noutput:\n%s", code, out)
+	}
+	if !strings.Contains(out, "PREFLIGHT_PASSED") {
+		t.Errorf("bootstrap_preflight must proceed when bgIsolation is none\noutput:\n%s", out)
+	}
+}
+
+// TestBootstrapPreflight_FailsLoudWhenBgIsolationUnconfirmable verifies the
+// safe default: if `claude config get` is unavailable AND no settings JSON
+// confirms bgIsolation=none, preflight must err toward failing loud (exit 1).
+func TestBootstrapPreflight_FailsLoudWhenBgIsolationUnconfirmable(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+	repoDir := t.TempDir()
+	setupGitRepoForHarvest(t, repoDir)
+
+	// `claude config get` exits non-zero (subcommand absent); no settings JSON
+	// exists in repoDir, so bgIsolation=none cannot be confirmed.
+	stubExtra := "if [ \"$1\" = \"config\" ]; then\n" +
+		"  echo \"error: unknown command 'config'\" >&2\n" +
+		"  exit 2\n" +
+		"fi\n"
+	out, code := runBootstrapPreflight(t, repoDir, stubExtra)
+
+	if code != 1 {
+		t.Errorf("bootstrap_preflight must exit 1 when bgIsolation=none cannot be confirmed, got exit %d\noutput:\n%s", code, out)
+	}
+	if strings.Contains(out, "PREFLIGHT_PASSED") {
+		t.Errorf("bootstrap_preflight must NOT pass when bgIsolation cannot be confirmed none\noutput:\n%s", out)
+	}
+}
+
+// TestBootstrapPreflight_PassesViaSettingsJSONWhenConfigGetAbsent verifies the
+// fallback: when `claude config get` is unavailable, preflight reads the
+// settings JSON precedence and passes if .worktree.bgIsolation == "none".
+func TestBootstrapPreflight_PassesViaSettingsJSONWhenConfigGetAbsent(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+	repoDir := t.TempDir()
+	setupGitRepoForHarvest(t, repoDir)
+
+	// project .claude/settings.json with worktree.bgIsolation = none.
+	claudeDir := filepath.Join(repoDir, ".claude")
+	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+		t.Fatalf("mkdir .claude: %v", err)
+	}
+	settings := `{"worktree":{"bgIsolation":"none"}}`
+	if err := os.WriteFile(filepath.Join(claudeDir, "settings.json"), []byte(settings), 0o644); err != nil {
+		t.Fatalf("write settings.json: %v", err)
+	}
+
+	stubExtra := "if [ \"$1\" = \"config\" ]; then\n" +
+		"  echo \"error: unknown command 'config'\" >&2\n" +
+		"  exit 2\n" +
+		"fi\n"
+	out, code := runBootstrapPreflight(t, repoDir, stubExtra)
+
+	if code != 0 {
+		t.Errorf("bootstrap_preflight must exit 0 when settings.json confirms bgIsolation=none, got exit %d\noutput:\n%s", code, out)
+	}
+	if !strings.Contains(out, "PREFLIGHT_PASSED") {
+		t.Errorf("bootstrap_preflight must proceed when settings.json confirms bgIsolation=none\noutput:\n%s", out)
+	}
+}
+
+// TestPolishArchitect_RunsSynchronouslyRegardlessOfBackend is a regression test
+// for learning_agent-52r1 (fix C): the polish architect only runs
+// `bd create --type=epic` / `bd dep add` and makes NO code edits, so it must
+// run on the SYNCHRONOUS path (agent_invoke) even under CA_BACKEND=bg so its
+// bd writes reach the main-tree Dolt (G2: bd is unreachable from a bg worktree).
+func TestPolishArchitect_RunsSynchronouslyRegardlessOfBackend(t *testing.T) {
+	t.Parallel()
+	arch := polishScriptPolishArchitect()
+
+	archIdx := strings.Index(arch, "run_polish_architect()")
+	if archIdx < 0 {
+		t.Fatal("run_polish_architect() not found")
+	}
+	body := arch[archIdx:]
+	closeIdx := strings.Index(body, "\n}\n")
+	if closeIdx > 0 {
+		body = body[:closeIdx]
+	}
+
+	// The architect dispatch must NOT branch on CA_BACKEND to a bg path — it
+	// must always invoke the synchronous agent_invoke so bd writes land in the
+	// main tree's Dolt.
+	if strings.Contains(body, "bg_dispatch_reviewer_polish") {
+		t.Error("polish architect must NOT dispatch via bg_dispatch_reviewer_polish — bd is unreachable from a bg worktree (G2); architect must run synchronously")
+	}
+	if !strings.Contains(body, "agent_invoke ") {
+		t.Error("polish architect must invoke agent_invoke (synchronous path) regardless of CA_BACKEND")
+	}
+}
+
+// TestT4_KillLadder_Runtime_NoRmIfSnapshotMissing is a regression test for the
+// data-loss path (learning_agent-o3lu, fix A/E): when the pre-dispatch snapshot
+// file is ABSENT, worktree safety cannot be verified, so the kill ladder MUST
+// treat the session as UNVERIFIABLE — NEVER invoke claude rm — and log
+// HUMAN_REQUIRED instead. Mirrors the safe-default already in the reviewer/polish
+// scripts (_snap_found=false idiom).
+func TestT4_KillLadder_Runtime_NoRmIfSnapshotMissing(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+
+	// Init git repo. NOTE: no snapshot file is written for handle t1 — the
+	// snapshot is MISSING, so worktree safety is unverifiable.
+	setupGitRepoForHarvest(t, repoDir)
+
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	memLog := filepath.Join(t.TempDir(), "mem.log")
+	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
+
+	seam := loopScriptSeam("bg", false)
+	memSafety := loopScriptMemorySafety()
+	script := "#!/usr/bin/env bash\n" +
+		"set -euo pipefail\n" +
+		"export PATH=\"" + stubDir + ":$PATH\"\n" +
+		"export HARVEST_LOG=\"" + harvestLog + "\"\n" +
+		"CA_BACKEND=bg\n" +
+		"HAS_JQ=false\n" +
+		"log() { echo \"[LOG] $*\" >&2; }\n" +
+		memSafety + "\n" +
+		seam + "\n" +
+		"AGENT_HANDLE=t1\n" +
+		"MEM_LOG=\"" + memLog + "\"\n" +
+		"bg_kill_ladder \"$AGENT_HANDLE\" \"stale\" \"$MEM_LOG\"\n"
+
+	scriptPath := filepath.Join(t.TempDir(), "ladder-no-snap.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput()
+
+	// Assert: claude rm must NOT have been called for session t1 — snapshot
+	// missing is unverifiable, so teardown must be refused (data-loss guard).
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	rmLogData, _ := os.ReadFile(rmLog)
+	if strings.Contains(string(rmLogData), "t1") {
+		t.Errorf("claude rm was invoked for session t1 despite MISSING snapshot — data-loss guard broken\nscript output:\n%s", out)
+	}
+
+	// Assert: HUMAN_REQUIRED logged instead.
+	harvest, _ := os.ReadFile(harvestLog)
+	memLogData, _ := os.ReadFile(memLog)
+	combined := string(harvest) + string(memLogData) + string(out)
+	if !strings.Contains(combined, "HUMAN_REQUIRED") {
+		t.Errorf("HUMAN_REQUIRED must be logged when kill ladder cannot verify worktree safety (missing snapshot)\noutput:\n%s", combined)
 	}
 }
 
@@ -2378,6 +2794,12 @@ func TestT4_CleanupOrphans_Runtime_NoRmOrphanWithWorktree(t *testing.T) {
 		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
 		"if [ \"$1\" = \"--bg\" ]; then\n" +
 		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
 		"  exit 0\n" +
 		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +

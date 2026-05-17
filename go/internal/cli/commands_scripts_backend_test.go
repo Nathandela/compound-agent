@@ -364,6 +364,10 @@ func buildPreflightHarness(t *testing.T, generatedScript, probeOutput, callLogPa
 		"# Smart claude stub for preflight tests\n" +
 		"CALL_LOG=" + callLogPath + "\n" +
 		"PROBE_FILE=" + probeFile + "\n" +
+		// bootstrap_preflight's bgIsolation precondition queries
+		// `claude config get worktree.bgIsolation`; simulate the required
+		// operator config so the disclaimer logic under test is reached.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then echo none; exit 0; fi\n" +
 		"case \"$1\" in\n" +
 		"  stop) echo \"stop $2\" >> \"$CALL_LOG\"; exit 0 ;;\n" +
 		"  rm)   echo \"rm $2\"   >> \"$CALL_LOG\"; exit 0 ;;\n" +
@@ -380,6 +384,8 @@ func buildPreflightHarness(t *testing.T, generatedScript, probeOutput, callLogPa
 		"export PATH=" + stubDir + ":$PATH\n" +
 		// Change into the temp git repo so git worktree list works.
 		"cd " + repoDir + "\n" +
+		// bootstrap_preflight gates the bgIsolation check on CA_BACKEND=bg.
+		"CA_BACKEND=bg\n" +
 		"log() { echo \"[LOG] $*\" >&2; }\n" +
 		funcDef + "\n" +
 		"bootstrap_preflight\n"

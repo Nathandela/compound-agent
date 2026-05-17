@@ -505,8 +505,9 @@ except Exception:
   snapshot_dir="${repo_root:+$repo_root/.ca-worktree-snapshots}"
   snap_file="${snapshot_dir:+$snapshot_dir/$handle.txt}"
 
-  local pre_wts="" cur_wts="" has_new_wt=false
+  local pre_wts="" cur_wts="" has_new_wt=false snap_found=false
   if [ -n "$snap_file" ] && [ -f "$snap_file" ]; then
+    snap_found=true
     pre_wts=$(cat "$snap_file" 2>/dev/null || true)
     cur_wts=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
     while IFS= read -r wt_path; do
@@ -523,6 +524,14 @@ LADDEEOF
   if [ "$has_new_wt" = true ]; then
     # Un-harvested worktree: cannot rm. Log HUMAN_REQUIRED; proceed to scoped sweep only.
     local hr_msg="HUMAN_REQUIRED: bg_kill_ladder: session $handle has un-harvested worktree — cannot claude rm; inspect manually then: claude rm $handle"
+    log "$hr_msg"
+    if [ -n "${HARVEST_LOG:-}" ]; then
+      printf '%s\n' "$hr_msg" >> "${HARVEST_LOG}" 2>/dev/null || true
+    fi
+  elif [ "$snap_found" = false ]; then
+    # Snapshot missing: safe default — cannot verify worktree safety, do NOT
+    # claude rm. Log HUMAN_REQUIRED; proceed to scoped sweep only.
+    local hr_msg="HUMAN_REQUIRED: bg_kill_ladder: session $handle has no pre-dispatch snapshot — cannot verify worktree safety; inspect manually then: claude rm $handle"
     log "$hr_msg"
     if [ -n "${HARVEST_LOG:-}" ]; then
       printf '%s\n' "$hr_msg" >> "${HARVEST_LOG}" 2>/dev/null || true
@@ -862,6 +871,54 @@ func loopScriptBootstrapPreflight() string {
 # No id     => disclaimer not accepted (or dispatch failed) => fail LOUD, exit 1.
 # set -e safe: all external commands guarded with || true; local is fine in bash functions.
 bootstrap_preflight() {
+  # Step 0: bg backend requires worktree.bgIsolation=none (G2: bd is keyed to
+  # the main repo path and is UNREACHABLE from an auto-isolated bg worktree, so
+  # epics never close / the polish architect's bd writes are lost). Fail LOUD if
+  # the effective setting is not confirmably "none". Skipped for CA_BACKEND=p.
+  if [ "$CA_BACKEND" = bg ]; then
+    local _bgiso="" _bgiso_src=""
+    # Preferred: ask the CLI directly (authoritative effective value).
+    if _bgiso=$(claude config get worktree.bgIsolation 2>/dev/null); then
+      _bgiso=$(printf '%s' "$_bgiso" | tr -d '[:space:]"' || true)
+      _bgiso_src="claude config get worktree.bgIsolation"
+    else
+      # Fallback: settings JSON precedence (local > project > user).
+      _bgiso=""
+      local _repo_root _sf
+      _repo_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+      for _sf in "${_repo_root:+$_repo_root/.claude/settings.local.json}" \
+                 "${_repo_root:+$_repo_root/.claude/settings.json}" \
+                 "$HOME/.claude/settings.json"; do
+        [ -n "$_sf" ] && [ -f "$_sf" ] || continue
+        _bgiso=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    v = d.get('worktree', {}).get('bgIsolation', '')
+    print(v if v is not None else '')
+except Exception:
+    pass
+" "$_sf" 2>/dev/null || true)
+        _bgiso=$(printf '%s' "$_bgiso" | tr -d '[:space:]"' || true)
+        if [ -n "$_bgiso" ]; then
+          _bgiso_src="$_sf"
+          break
+        fi
+      done
+    fi
+    if [ "$_bgiso" != "none" ]; then
+      log "FATAL: bootstrap_preflight: the bg backend requires Claude setting worktree.bgIsolation=none."
+      log "  Detected value: '${_bgiso:-<unconfirmed>}' (source: ${_bgiso_src:-none found})."
+      log "  Why: 'bd' (beads) is keyed to the main repo path and is unreachable from"
+      log "  the git worktree that claude --bg auto-isolates into. Without bgIsolation=none,"
+      log "  epics never close and the polish architect's bd writes are lost (spike G2)."
+      log "  Remediation: run 'claude config set worktree.bgIsolation none' (or add"
+      log "  {\"worktree\":{\"bgIsolation\":\"none\"}} to .claude/settings.json), then re-run."
+      log "  Alternatively, run with the legacy backend: --backend p."
+      exit 1
+    fi
+  fi
+
   # Step 1: pre-probe worktree snapshot (same pattern as agent_dispatch / T3).
   local pre_snapshot
   pre_snapshot=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
@@ -1210,8 +1267,9 @@ agent_cleanup() {
       cur_worktrees=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
 
       # Pre-dispatch snapshot (paths only, one per line).
-      local pre_worktrees=""
+      local pre_worktrees="" snap_found=false
       if [ -f "$snapshot_file" ]; then
+        snap_found=true
         pre_worktrees=$(cat "$snapshot_file")
       fi
 
@@ -1235,11 +1293,22 @@ EOF
 
       local wt_path="" wt_branch=""
 
-      if [ "$wt_count" -eq 0 ]; then
-        # Zero new worktrees: claude --bg always auto-isolates, so this most likely
-        # indicates a snapshot anomaly (missing/corrupt pre-dispatch snapshot) rather
-        # than "agent made no commits". Teardown-only — no merge attempted.
-        log "bg cleanup: no new worktree found for handle $handle (snapshot anomaly or teardown-only) — no merge needed"
+      if [ "$wt_count" -eq 0 ] && [ "$snap_found" = false ]; then
+        # Zero new worktrees AND snapshot missing: worktree safety is
+        # UNVERIFIABLE (the diff is meaningless without a pre-dispatch
+        # baseline). Safe default — refuse teardown; harvest-fail and
+        # require human inspection (R-HARVEST-FAIL).
+        log "ERROR: bg cleanup: no pre-dispatch snapshot for handle $handle — cannot verify worktree safety, refusing teardown"
+        log "  Inspect manually, then merge any worktree and remove the session by hand."
+        _harvest_fail "$handle" "missing pre-dispatch snapshot for handle $handle"
+        # Reassign caller's MARKER so the loop's case statement handles this as human-required.
+        MARKER="human:harvest-unverifiable (missing snapshot for handle $handle)"
+        return 0
+      elif [ "$wt_count" -eq 0 ]; then
+        # Zero new worktrees but snapshot present: the snapshot proves no new
+        # worktree was created (agent made no commits / teardown-only). Safe
+        # to tear down — no merge needed.
+        log "bg cleanup: no new worktree found for handle $handle (snapshot present, teardown-only) — no merge needed"
         agent_stop "$handle"
         claude rm "$handle" 2>/dev/null || true
         return 0
@@ -1450,6 +1519,12 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
       # each iteration so ca watch shows live progress during bg sessions (R-FRAMEWORK).
       bg_last_update="" bg_stale_secs=0 bg_state_file="$HOME/.claude/jobs/$AGENT_HANDLE/state.json"
       bg_killed=false
+      # First-write deadline: agent_poll returns "running" while state.json is
+      # absent (by design). If the session dies before EVER writing state.json
+      # the mtime watchdog never trips (else branch resets bg_stale_secs). Track
+      # dispatch wall-clock so a never-appearing state.json escalates after the
+      # same SESSION_STALE_TIMEOUT bound (no new tunable).
+      bg_dispatch_epoch=$(date '+%s' 2>/dev/null || echo 0)
       while true; do
         poll_result=""
         poll_result=$(agent_poll "$AGENT_HANDLE")
@@ -1473,6 +1548,19 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
           if [ "$bg_stale_secs" -ge "$SESSION_STALE_TIMEOUT" ]; then
             echo "[$(date '+%Y-%m-%d_%H-%M-%S')] STALE_WATCHDOG: bg session $AGENT_HANDLE stale for ${bg_stale_secs}s — escalating kill ladder" >> "$MEM_LOG"
             log "WARN: bg session $AGENT_HANDLE stale for ${bg_stale_secs}s — escalating via bg_kill_ladder"
+            bg_kill_ladder "$AGENT_HANDLE" "stale" "$MEM_LOG"
+            bg_killed=true
+            break
+          fi
+        elif [ -z "$bg_cur_mtime" ]; then
+          # state.json has never appeared: the mtime heartbeat cannot arm.
+          # Escalate once the first-write deadline (SESSION_STALE_TIMEOUT) has
+          # elapsed since dispatch, mirroring the stale path exactly.
+          bg_now_epoch=$(date '+%s' 2>/dev/null || echo 0)
+          bg_since_dispatch=$(( bg_now_epoch - bg_dispatch_epoch ))
+          if [ "$bg_since_dispatch" -ge "$SESSION_STALE_TIMEOUT" ]; then
+            echo "[$(date '+%Y-%m-%d_%H-%M-%S')] STALE_WATCHDOG: bg session $AGENT_HANDLE never wrote state.json within ${bg_since_dispatch}s — escalating kill ladder" >> "$MEM_LOG"
+            log "WARN: bg session $AGENT_HANDLE never wrote state.json within ${bg_since_dispatch}s — escalating via bg_kill_ladder"
             bg_kill_ladder "$AGENT_HANDLE" "stale" "$MEM_LOG"
             bg_killed=true
             break

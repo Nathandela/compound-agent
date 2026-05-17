@@ -1559,6 +1559,12 @@ func TestFeedImplementer_BgBackend_NoFatal(t *testing.T) {
 		"  echo \"backgrounded · deadbeef\"\n" +
 		"  exit 0\n" +
 		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"stop\" ] || [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  exit 0\n" +

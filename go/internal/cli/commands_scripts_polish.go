@@ -933,33 +933,15 @@ ARCHITECT_HEADER_EOF
     echo "Read this file for product vision: $SPEC_FILE"
   } > "$prompt_file"
 
-  if [ "$CA_BACKEND" = "bg" ]; then
-    # bg backend: dispatch architect as a bg session, poll to terminal, collect output.
-    local arch_label="polish_architect_${cycle_num}"
-    if bg_dispatch_reviewer_polish "$arch_label" "$MODEL" "$prompt_file"; then
-      local safe_label
-      safe_label=$(printf '%s' "$arch_label" | tr '-' '_' | tr '.' '_')
-      local arch_handle
-      eval "arch_handle=\${BG_POLISH_HANDLE_${safe_label}:-}"
-      if [ -n "$arch_handle" ]; then
-        local elapsed=0
-        while [ "$elapsed" -lt "$REVIEW_TIMEOUT" ]; do
-          local poll_result
-          poll_result=$(bg_poll_reviewer "$arch_handle")
-          if [ "$poll_result" = "done" ]; then
-            break
-          fi
-          sleep "${BG_POLL_INTERVAL:-15}"
-          elapsed=$(( elapsed + ${BG_POLL_INTERVAL:-15} ))
-        done
-        bg_collect_reviewer "$arch_handle" "$architect_log"
-      fi
-    fi
-  else
-    agent_invoke "$MODEL" \
-      --verbose \
-      -p - < "$prompt_file" > "$architect_log" 2>"$cycle_dir/polish-architect.stderr" || true
-  fi
+  # The polish architect runs bd create --type=epic / bd dep add and makes
+  # NO code edits. bd is keyed to the main repo path and is UNREACHABLE from the
+  # git worktree that claude --bg auto-isolates into (spike G2). The architect
+  # MUST therefore run on the SYNCHRONOUS agent_invoke path regardless of
+  # CA_BACKEND, so its bd writes land in the main tree's Dolt. (agent_invoke
+  # falls through to a synchronous claude call even under CA_BACKEND=bg.)
+  agent_invoke "$MODEL" \
+    --verbose \
+    -p - < "$prompt_file" > "$architect_log" 2>"$cycle_dir/polish-architect.stderr" || true
 
   # Extract created epic IDs
   POLISH_EPICS=""

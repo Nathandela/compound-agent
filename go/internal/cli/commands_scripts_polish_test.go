@@ -966,15 +966,32 @@ func TestPolishCommand_AuditFleetBgPBackendUnchanged(t *testing.T) {
 	}
 }
 
-// TestPolishCommand_ArchitectBgCapable verifies that run_polish_architect
-// uses bg_dispatch_reviewer / wait under bg backend.
-func TestPolishCommand_ArchitectBgCapable(t *testing.T) {
+// TestPolishCommand_ArchitectRunsSynchronously verifies that run_polish_architect
+// always runs on the synchronous agent_invoke path and is NOT dispatched as a bg
+// session. The polish architect only runs bd create/dep operations (no code
+// edits); bd is unreachable from a bg worktree (spike G2), so a bg dispatch
+// would lose its epic writes. This test was previously
+// TestPolishCommand_ArchitectBgCapable, which asserted the now-superseded
+// "architect dispatches via bg_dispatch_reviewer under bg backend" behavior;
+// it is corrected here to pin the design decision in learning_agent-52r1 (fix C).
+func TestPolishCommand_ArchitectRunsSynchronously(t *testing.T) {
 	t.Parallel()
 	arch := polishScriptPolishArchitect()
 
-	// Architect must be bg-capable: dispatch via bg_dispatch_reviewer OR agent_invoke based on CA_BACKEND
-	if !strings.Contains(arch, "CA_BACKEND") {
-		t.Error("polish architect must check CA_BACKEND to select bg vs p invocation")
+	archIdx := strings.Index(arch, "run_polish_architect()")
+	if archIdx < 0 {
+		t.Fatal("run_polish_architect() not found")
+	}
+	body := arch[archIdx:]
+	if closeIdx := strings.Index(body, "\n}\n"); closeIdx > 0 {
+		body = body[:closeIdx]
+	}
+
+	if !strings.Contains(body, "agent_invoke ") {
+		t.Error("polish architect must invoke agent_invoke (synchronous path) so bd writes reach the main-tree Dolt")
+	}
+	if strings.Contains(body, "bg_dispatch_reviewer_polish") {
+		t.Error("polish architect must NOT bg-dispatch — bd is unreachable from a bg worktree (G2)")
 	}
 }
 
@@ -1156,6 +1173,12 @@ func TestT5_BgCollectReviewer_Polish_NoRmIfWorktreeHasCommits(t *testing.T) {
 		"  echo \"backgrounded · deadbeef\"\n" +
 		"  exit 0\n" +
 		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -1238,6 +1261,12 @@ func TestT5_BgCollectReviewer_Polish_RmIfNoWorktreeCommits(t *testing.T) {
 		"  echo \"backgrounded · deadbeef\"\n" +
 		"  exit 0\n" +
 		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -1300,6 +1329,12 @@ func TestT5_BgCollectReviewer_Polish_SnapshotMissing_NoRm(t *testing.T) {
 		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
 		"if [ \"$1\" = \"--bg\" ]; then\n" +
 		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
 		"  exit 0\n" +
 		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +

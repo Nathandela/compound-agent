@@ -55,8 +55,21 @@ is unchanged. gemini/codex reviewers are unaffected and stay as-is.
 - **One accepted framework deviation:** a worktree-harvest step inside
   `agent_collect` (merge `worktree-<n>` into the working branch, reconcile
   beads in the main tree, then `claude rm`) — forced by `--bg` git isolation.
-- New mandatory operator prerequisite: one-time bypass-disclaimer accept;
-  `ca` preflight must fail loudly if absent.
+- New mandatory operator prerequisites (bg backend only; `ca` preflight must
+  fail loudly if either is absent):
+  1. one-time bypass-disclaimer accept (`claude --dangerously-skip-permissions`);
+  2. `worktree.bgIsolation: none` — forced by G2: `bd` is keyed to the main
+     repo path and is unreachable from the worktree `claude --bg`
+     auto-isolates into. Detection is best-effort (`claude config get
+     worktree.bgIsolation`, falling back to settings-JSON precedence
+     `.claude/settings.local.json` → project `.claude/settings.json` →
+     `~/.claude/settings.json`) and errs toward failing loud when it cannot
+     confirm `none`. Skipped for `--backend p`.
+- **Second accepted framework deviation:** the polish architect (which only
+  runs `bd create --type=epic` / `bd dep add` and makes no code edits) always
+  runs on the **synchronous** `agent_invoke` path regardless of `CA_BACKEND`.
+  A bg dispatch would isolate it into a worktree where its `bd` epic writes
+  are lost (G2); the reviewer fleet is unaffected and still bg-dispatched.
 - The improve loop is removed entirely (separate, unrelated to billing;
   reduces generator surface).
 - Durability hedge: `--backend p` remains fully supported — Anthropic has
