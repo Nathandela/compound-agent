@@ -988,8 +988,8 @@ func TestPolishCommand_InnerLoopPropagatesCABackend(t *testing.T) {
 	if !strings.Contains(inner, "CA_BACKEND") {
 		t.Error("run_inner_loop must export/propagate CA_BACKEND to inner bash invocation")
 	}
-	// Must use CA_BACKEND=... bash or export CA_BACKEND pattern
-	if !strings.Contains(inner, `CA_BACKEND="${CA_BACKEND:-p}" bash`) &&
+	// Must use CA_BACKEND=... bash or export CA_BACKEND pattern (T6: default is now bg)
+	if !strings.Contains(inner, `CA_BACKEND="${CA_BACKEND:-bg}" bash`) &&
 		!strings.Contains(inner, "export CA_BACKEND") {
 		t.Error("run_inner_loop must propagate CA_BACKEND as env var to bash inner.sh")
 	}
@@ -1022,7 +1022,7 @@ func TestPolishCommand_InnerLoopBashSyntaxWithBgSeam(t *testing.T) {
 // supports the bg backend (not just p).
 func TestPolishCommand_SeamHandlesBgBackend(t *testing.T) {
 	t.Parallel()
-	seam := polishScriptSeam()
+	seam := polishScriptSeam("bg", false)
 
 	// Must handle bg backend, not just p
 	if !strings.Contains(seam, "bg)") {
@@ -1096,7 +1096,7 @@ func buildBgCollectReviewerPolishScript(
 		t.Fatalf("write state.json: %v", err)
 	}
 
-	seam := polishScriptSeam()
+	seam := polishScriptSeam("bg", false)
 	report := filepath.Join(t.TempDir(), "report.md")
 	script := "#!/usr/bin/env bash\n" +
 		"set -euo pipefail\n" +
@@ -1151,6 +1151,11 @@ func TestT5_BgCollectReviewer_Polish_NoRmIfWorktreeHasCommits(t *testing.T) {
 	// Build claude stub.
 	claudeStub := filepath.Join(stubDir, "claude")
 	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -1178,10 +1183,13 @@ func TestT5_BgCollectReviewer_Polish_NoRmIfWorktreeHasCommits(t *testing.T) {
 	cmd.Dir = repoDir
 	out, _ := cmd.CombinedOutput()
 
-	// Assert: claude rm must NOT have been called (worktree has commits).
+	// Assert: claude rm must NOT have been called for the reviewer session (pol1test).
+	// Note: the preflight probe may rm its own session (deadbeef); we check
+	// specifically that the actual reviewer session handle was NOT rm'd.
 	rmLog := filepath.Join(stubDir, "claude-rm.log")
-	if _, statErr := os.Stat(rmLog); statErr == nil {
-		t.Errorf("claude rm was invoked despite reviewer worktree having commits (polish) — data-loss guard broken\nscript output:\n%s", out)
+	rmLogData, _ := os.ReadFile(rmLog)
+	if strings.Contains(string(rmLogData), handle) {
+		t.Errorf("claude rm was invoked for reviewer %q despite worktree having commits (polish) — data-loss guard broken\nscript output:\n%s", handle, out)
 	}
 
 	// Assert: HUMAN_REQUIRED must be logged.
@@ -1225,6 +1233,11 @@ func TestT5_BgCollectReviewer_Polish_RmIfNoWorktreeCommits(t *testing.T) {
 	// Build claude stub.
 	claudeStub := filepath.Join(stubDir, "claude")
 	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -1252,10 +1265,11 @@ func TestT5_BgCollectReviewer_Polish_RmIfNoWorktreeCommits(t *testing.T) {
 	cmd.Dir = repoDir
 	out, _ := cmd.CombinedOutput()
 
-	// Assert: claude rm MUST have been called (reviewer made no commits — safe teardown).
+	// Assert: claude rm MUST have been called for the reviewer session (pol2test).
 	rmLog := filepath.Join(stubDir, "claude-rm.log")
-	if _, statErr := os.Stat(rmLog); statErr != nil {
-		t.Errorf("claude rm was NOT invoked for reviewer with no worktree commits (polish) — teardown must proceed\nscript output:\n%s", out)
+	rmLogData, _ := os.ReadFile(rmLog)
+	if !strings.Contains(string(rmLogData), handle) {
+		t.Errorf("claude rm was NOT invoked for reviewer %q with no worktree commits (polish) — teardown must proceed\nscript output:\n%s", handle, out)
 	}
 }
 
@@ -1283,6 +1297,11 @@ func TestT5_BgCollectReviewer_Polish_SnapshotMissing_NoRm(t *testing.T) {
 	// Build claude stub.
 	claudeStub := filepath.Join(stubDir, "claude")
 	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -1310,10 +1329,13 @@ func TestT5_BgCollectReviewer_Polish_SnapshotMissing_NoRm(t *testing.T) {
 	cmd.Dir = repoDir
 	out, _ := cmd.CombinedOutput()
 
-	// Assert: claude rm must NOT be called when snapshot is missing.
+	// Assert: claude rm must NOT be called for the reviewer session when snapshot is missing.
+	// Note: the preflight probe may rm its own session (deadbeef); we check
+	// specifically that the actual reviewer session handle was NOT rm'd.
 	rmLog := filepath.Join(stubDir, "claude-rm.log")
-	if _, statErr := os.Stat(rmLog); statErr == nil {
-		t.Errorf("claude rm was invoked despite missing snapshot (polish) — safe-default violated (data-loss risk)\nscript output:\n%s", out)
+	rmLogData, _ := os.ReadFile(rmLog)
+	if strings.Contains(string(rmLogData), handle) {
+		t.Errorf("claude rm was invoked for reviewer %q despite missing snapshot (polish) — safe-default violated (data-loss risk)\nscript output:\n%s", handle, out)
 	}
 
 	// Assert: HUMAN_REQUIRED must be logged.

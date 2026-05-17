@@ -510,7 +510,7 @@ func TestLoopCommand_CompactPctValidation(t *testing.T) {
 // --session-id (spike G1: --bg manages its own session id).
 func TestBgBackend_DispatchNoBg(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	// Find the bg) branch of agent_dispatch
 	bgIdx := strings.Index(seam, "bg)")
@@ -556,7 +556,7 @@ func TestBgBackend_DispatchNoBg(t *testing.T) {
 // --dangerously-skip-permissions, --permission-mode auto, --model, --bg.
 func TestBgBackend_DispatchClaudeFlags(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	dispatchIdx := strings.Index(seam, "agent_dispatch()")
 	if dispatchIdx < 0 {
@@ -593,7 +593,7 @@ func TestBgBackend_DispatchClaudeFlags(t *testing.T) {
 // session id from the "backgrounded · <id>" line and validates it.
 func TestBgBackend_HandleIdParsing(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	dispatchIdx := strings.Index(seam, "agent_dispatch()")
 	if dispatchIdx < 0 {
@@ -627,7 +627,7 @@ func TestBgBackend_HandleIdParsing(t *testing.T) {
 // This is the R-BG + S12 contract: unknown state MUST NOT be treated as terminal.
 func TestBgBackend_PollTerminalStates(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	pollIdx := strings.Index(seam, "agent_poll()")
 	if pollIdx < 0 {
@@ -678,7 +678,7 @@ func TestBgBackend_PollTerminalStates(t *testing.T) {
 // TestBgBackend_PollStateJsonPath verifies the exact path used to read state.json.
 func TestBgBackend_PollStateJsonPath(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	pollIdx := strings.Index(seam, "agent_poll()")
 	if pollIdx < 0 {
@@ -703,7 +703,7 @@ func TestBgBackend_PollStateJsonPath(t *testing.T) {
 // Also verifies fallback to .linkScanPath transcript (S3).
 func TestBgBackend_CollectInvertedMarker(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	collectIdx := strings.Index(seam, "agent_collect()")
 	if collectIdx < 0 {
@@ -747,7 +747,7 @@ func TestBgBackend_CollectInvertedMarker(t *testing.T) {
 // $tracefile from the transcript for ca watch / diagnostics.
 func TestBgBackend_CollectPopulatesTracefile(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	collectIdx := strings.Index(seam, "agent_collect()")
 	if collectIdx < 0 {
@@ -776,7 +776,7 @@ func TestBgBackend_CollectPopulatesTracefile(t *testing.T) {
 // (spike G4: ~1s, effective).
 func TestBgBackend_StopUsesClaude(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	stopIdx := strings.Index(seam, "agent_stop()")
 	if stopIdx < 0 {
@@ -811,7 +811,7 @@ func TestBgBackend_StopUsesClaude(t *testing.T) {
 // defined in the same seam block.
 func TestT3_CleanupHasHarvestLogic(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	cleanupIdx := strings.Index(seam, "agent_cleanup()")
 	if cleanupIdx < 0 {
@@ -859,7 +859,7 @@ func TestT3_CleanupHasHarvestLogic(t *testing.T) {
 // Scans the full seam since _harvest_fail is defined alongside agent_cleanup.
 func TestT3_CleanupHarvestFailNoRm(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	// Must abort on conflict (R-HARVEST-FAIL).
 	if !strings.Contains(seam, "git merge --abort") {
@@ -890,7 +890,7 @@ func TestT3_CleanupHarvestFailNoRm(t *testing.T) {
 // by diffing before/after (R-HARVEST worktree association).
 func TestT3_DispatchSnapshotsWorktrees(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	dispatchIdx := strings.Index(seam, "agent_dispatch()")
 	if dispatchIdx < 0 {
@@ -983,7 +983,7 @@ func TestT3_CleanupAcceptsMarkerArg(t *testing.T) {
 // (R-PLEGACY: p backend must be byte-identical to pre-migration).
 func TestT3_PBackendCleanupUnchanged(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	cleanupIdx := strings.Index(seam, "agent_cleanup()")
 	if cleanupIdx < 0 {
@@ -1070,9 +1070,10 @@ func TestT3_HarvestIntegration_Success(t *testing.T) {
 		t.Errorf("agent commit not found on main after harvest:\n%s\nscript output:\n%s", gitLogBytes, out)
 	}
 
-	// Assert: claude rm was invoked.
-	if _, statErr := os.Stat(rmLogFile); statErr != nil {
-		t.Errorf("claude rm was NOT invoked after successful harvest (expected teardown)\nscript output:\n%s", out)
+	// Assert: claude rm was invoked for the session handle (t1).
+	rmLogData, _ := os.ReadFile(rmLogFile)
+	if !strings.Contains(string(rmLogData), "t1") {
+		t.Errorf("claude rm was NOT invoked for session t1 after successful harvest (expected teardown)\nscript output:\n%s", out)
 	}
 
 	// Assert: no HUMAN_REQUIRED in harvest log.
@@ -1119,9 +1120,12 @@ func TestT3_HarvestIntegration_Conflict(t *testing.T) {
 		t.Errorf("harvest merge commit found on main after conflict — merge should have been aborted:\n%s\nscript output:\n%s", gitLogBytes, out)
 	}
 
-	// Assert: claude rm was NOT invoked.
-	if _, statErr := os.Stat(rmLogFile); statErr == nil {
-		t.Errorf("claude rm WAS invoked after harvest failure — must not delete worktree (R-HARVEST-FAIL)\nscript output:\n%s", out)
+	// Assert: claude rm was NOT invoked for the session handle (t1).
+	// Note: the preflight probe may rm its own session (deadbeef); check specifically
+	// that the actual session handle was NOT rm'd.
+	rmLogData, _ := os.ReadFile(rmLogFile)
+	if strings.Contains(string(rmLogData), "t1") {
+		t.Errorf("claude rm WAS invoked for session t1 after harvest failure — must not delete worktree (R-HARVEST-FAIL)\nscript output:\n%s", out)
 	}
 
 	// Assert: HUMAN_REQUIRED recorded.
@@ -1235,10 +1239,13 @@ func TestT3_LoopLevel_NonCompleteReachesCase(t *testing.T) {
 		t.Errorf("case \"$MARKER\" failed branch did not run after non-complete cleanup\noutput:\n%s", out)
 	}
 
-	// claude rm must NOT have been invoked (worktree retained per R-HARVEST-FAIL).
+	// claude rm must NOT have been invoked for session t1 (worktree retained per R-HARVEST-FAIL).
+	// Note: the preflight probe may rm its own session (deadbeef); check specifically
+	// that the actual session handle was NOT rm'd.
 	rmLog := filepath.Join(stubDir, "claude-rm.log")
-	if _, statErr := os.Stat(rmLog); statErr == nil {
-		t.Errorf("claude rm was invoked on non-complete marker path — worktree must be retained\noutput:\n%s", out)
+	rmLogData, _ := os.ReadFile(rmLog)
+	if strings.Contains(string(rmLogData), "t1") {
+		t.Errorf("claude rm was invoked for session t1 on non-complete marker path — worktree must be retained\noutput:\n%s", out)
 	}
 }
 
@@ -1249,10 +1256,15 @@ func TestT3_LoopLevel_NonCompleteReachesCase(t *testing.T) {
 func buildLoopLevelTestScript(t *testing.T, repoDir, stubDir, logFile, marker string) string {
 	t.Helper()
 
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	claudeStub := filepath.Join(stubDir, "claude")
 	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -1405,11 +1417,16 @@ func setupGitRepoForConflict(t *testing.T, repoDir string) {
 func buildHarvestTestScript(t *testing.T, repoDir, stubDir, logFile, marker string) string {
 	t.Helper()
 
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	// Stub claude: records invocations, always exits 0.
 	claudeStub := filepath.Join(stubDir, "claude")
 	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -1559,7 +1576,7 @@ func TestBgBackend_StaleWatchdogBgAware(t *testing.T) {
 // for the bg backend calls agent_stop (which delegates to "claude stop").
 func TestBgBackend_MemoryWatchdogUsesAgentStop(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	// The memory watchdog kill in the bg branch must use agent_stop
 	// OR the start_memory_watchdog in the main loop is replaced by a bg-aware variant.
@@ -1592,7 +1609,7 @@ func TestBgBackend_MemoryWatchdogUsesAgentStop(t *testing.T) {
 // are byte-identical after adding the bg backend (R-PLEGACY regression).
 func TestBgBackend_PBackendUnchanged(t *testing.T) {
 	t.Parallel()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	// p backend dispatch must still have the full claude -p pipeline
 	dispatchIdx := strings.Index(seam, "agent_dispatch()")
@@ -2011,7 +2028,7 @@ func TestT4_KillLadder_HasStopThenRmThenSweep(t *testing.T) {
 		t.Error("kill ladder function (bg_kill_ladder) must be defined in the generated script (R-WATCHDOG)")
 	}
 	// The ladder must call agent_stop (step 1).
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 	memSafety := loopScriptMemorySafety()
 	ladder := seam + memSafety
 	if !strings.Contains(ladder, "bg_kill_ladder") {
@@ -2123,6 +2140,11 @@ func TestT4_KillLadder_Runtime_NoRmIfWorktreePresent(t *testing.T) {
 	// Build claude stub that records rm invocations.
 	claudeStub := filepath.Join(stubDir, "claude")
 	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -2139,7 +2161,7 @@ func TestT4_KillLadder_Runtime_NoRmIfWorktreePresent(t *testing.T) {
 	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
 
 	// Build a script that invokes bg_kill_ladder directly with a fake handle.
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 	memSafety := loopScriptMemorySafety()
 	script := "#!/usr/bin/env bash\n" +
 		"set -euo pipefail\n" +
@@ -2167,10 +2189,13 @@ func TestT4_KillLadder_Runtime_NoRmIfWorktreePresent(t *testing.T) {
 	cmd.Dir = repoDir
 	out, _ := cmd.CombinedOutput() // allow non-zero (HUMAN_REQUIRED path)
 
-	// Assert: claude rm must NOT have been called (un-harvested worktree present).
+	// Assert: claude rm must NOT have been called for the session handle (t1).
+	// Note: the preflight probe may rm its own session (deadbeef); we check
+	// specifically that the actual session handle was NOT rm'd.
 	rmLog := filepath.Join(stubDir, "claude-rm.log")
-	if _, statErr := os.Stat(rmLog); statErr == nil {
-		t.Errorf("claude rm was invoked despite un-harvested worktree — data-loss guard broken\nscript output:\n%s", out)
+	rmLogData, _ := os.ReadFile(rmLog)
+	if strings.Contains(string(rmLogData), "t1") {
+		t.Errorf("claude rm was invoked for session t1 despite un-harvested worktree — data-loss guard broken\nscript output:\n%s", out)
 	}
 
 	// Assert: HUMAN_REQUIRED logged instead.
@@ -2211,6 +2236,11 @@ func TestT4_KillLadder_Runtime_RmIfNoWorktree(t *testing.T) {
 
 	claudeStub := filepath.Join(stubDir, "claude")
 	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -2226,7 +2256,7 @@ func TestT4_KillLadder_Runtime_RmIfNoWorktree(t *testing.T) {
 	memLog := filepath.Join(t.TempDir(), "mem.log")
 	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
 
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 	memSafety := loopScriptMemorySafety()
 	script := "#!/usr/bin/env bash\n" +
 		"set -euo pipefail\n" +
@@ -2254,10 +2284,11 @@ func TestT4_KillLadder_Runtime_RmIfNoWorktree(t *testing.T) {
 	cmd.Dir = repoDir
 	out, _ := cmd.CombinedOutput()
 
-	// Assert: claude rm MUST have been called (no un-harvested work).
+	// Assert: claude rm MUST have been called for the session handle (t1).
 	rmLog := filepath.Join(stubDir, "claude-rm.log")
-	if _, statErr := os.Stat(rmLog); statErr != nil {
-		t.Errorf("claude rm was NOT invoked for session with no worktree — teardown must proceed\noutput:\n%s", out)
+	rmLogData, _ := os.ReadFile(rmLog)
+	if !strings.Contains(string(rmLogData), "t1") {
+		t.Errorf("claude rm was NOT invoked for session t1 with no worktree — teardown must proceed\noutput:\n%s", out)
 	}
 }
 
@@ -2344,6 +2375,11 @@ func TestT4_CleanupOrphans_Runtime_NoRmOrphanWithWorktree(t *testing.T) {
 
 	claudeStub := filepath.Join(stubDir, "claude")
 	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
 		"subcmd=\"$1\"; shift\n" +
 		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
 		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
@@ -2358,7 +2394,7 @@ func TestT4_CleanupOrphans_Runtime_NoRmOrphanWithWorktree(t *testing.T) {
 
 	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
 	memSafety := loopScriptMemorySafety()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam("bg", false)
 
 	// Script: call cleanup_orphans with a fake CLAUDE_JOBS_DIR and REPO_ROOT override.
 	script := "#!/usr/bin/env bash\n" +
@@ -2405,10 +2441,13 @@ func TestT4_CleanupOrphans_Runtime_NoRmOrphanWithWorktree(t *testing.T) {
 	cmd.Dir = repoDir
 	out, _ := cmd.CombinedOutput()
 
-	// Assert: claude rm must NOT have been called (un-harvested worktree).
+	// Assert: claude rm must NOT have been called for the orphan session handle (orphan1).
+	// Note: the preflight probe may rm its own session (deadbeef); we check
+	// specifically that the actual orphan session was NOT rm'd.
 	rmLog := filepath.Join(stubDir, "claude-rm.log")
-	if _, statErr := os.Stat(rmLog); statErr == nil {
-		t.Errorf("cleanup_orphans called claude rm on orphan with un-harvested worktree — data-loss guard broken\noutput:\n%s", out)
+	rmLogData, _ := os.ReadFile(rmLog)
+	if strings.Contains(string(rmLogData), "orphan1") {
+		t.Errorf("cleanup_orphans called claude rm on orphan1 with un-harvested worktree — data-loss guard broken\noutput:\n%s", out)
 	}
 	// Assert: HUMAN_REQUIRED logged.
 	harvest, _ := os.ReadFile(harvestLog)
@@ -2491,7 +2530,7 @@ func TestT4_CaWatch_BgDataSourceDocumented(t *testing.T) {
 	// (which agent_collect populates from the transcript at end-of-session).
 	if !strings.Contains(script, "ca watch") && !strings.Contains(script, "bg.*watch") {
 		// The documentation lives in comments; check the seam.
-		seam := loopScriptSeam()
+		seam := loopScriptSeam("bg", false)
 		if !strings.Contains(seam, "ca watch") {
 			t.Error("bg ca watch data source must be documented in the generated script or seam comments")
 		}

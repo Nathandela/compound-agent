@@ -107,12 +107,15 @@ ca reviewer list           # List enabled reviewers
 ## Loop command
 
 ```bash
-ca loop                    # Generate infinity loop script for autonomous processing
+ca loop                    # Generate infinity loop script (default backend: bg = claude --bg)
 ca loop --epics "epic-1,epic-2"
 ca loop --output my-loop.sh
 ca loop --max-retries 5
 ca loop --model claude-opus-4-7[1m]
+ca loop --backend bg       # Default: claude --bg (subscription-billed)
+ca loop --backend p        # Legacy: claude -p (pay-per-token)
 ca loop --force            # Overwrite existing script
+# Env override (when --backend not set): CA_BACKEND=p ca loop
 ```
 
 ## Watch command
@@ -140,12 +143,14 @@ ca health                  # Check project health and dependencies
 ## Polish command
 
 ```bash
-ca polish                  # Generate polish loop script for iterative refinement
+ca polish                  # Generate polish loop script (default backend: bg = claude --bg)
 ca polish --spec-file "docs/specs/my-spec.md"
 ca polish --meta-epic "meta-epic-id"
 ca polish --reviewers "claude-sonnet,claude-opus,gemini,codex"
 ca polish --cycles 2
 ca polish --model claude-opus-4-7[1m]
+ca polish --backend bg     # Default: claude --bg (subscription-billed)
+ca polish --backend p      # Legacy: claude -p (pay-per-token)
 ca polish --force          # Overwrite existing script
 ```
 

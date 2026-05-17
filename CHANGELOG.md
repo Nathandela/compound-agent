@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Default loop/polish/review backend is now `claude --bg` (subscription-billed)**: `ca loop` and `ca polish` default to the bg backend (`claude --bg`). The legacy `claude -p` path remains fully supported via `--backend p` or `CA_BACKEND=p`. Precedence: explicit `--backend` flag > `CA_BACKEND` env > default (bg). The bg backend runs sessions as background jobs polled via `state.json`, auto-isolates each session into a git worktree (harvested before cleanup), and uses the existing `EPIC_COMPLETE`/`HUMAN_REQUIRED:`/`EPIC_FAILED` protocol unchanged.
+- **`--backend bg|p` flag added to `ca loop` and `ca polish`**: Explicit backend selection. Default is `bg`. `--backend p` restores the legacy `claude -p` streaming pipeline byte-for-byte.
+- **Bootstrap-disclaimer preflight added to bg-backend scripts**: Generated scripts with `--backend bg` (or default) now run a `bootstrap_preflight` step before the epic loop starts. If the `--dangerously-skip-permissions` bypass disclaimer has not been accepted on the machine, the preflight exits non-zero immediately with remediation: `Run 'claude --dangerously-skip-permissions' once interactively to accept the disclaimer, then re-run.` The preflight is fast and idempotent; it is skipped entirely for `--backend p`.
+- **Worktree harvest**: with the bg backend, each `claude --bg` session auto-isolates into a git worktree (`worktree-<name>` branch). After terminal state, the loop merges the worktree into the working branch before `claude rm`. On harvest failure (merge conflict, missing marker), the worktree is retained, the epic is marked `HUMAN_REQUIRED`, and `claude rm` is skipped to preserve work.
+- **`ca watch` bg data source**: `ca watch` follows the `.latest` symlink updated by the harvest/collect step to a trace file in `.compound-agent/agent_logs/`.
+- **Polish inner-loop backend propagation**: the polish loop now propagates `CA_BACKEND` to the inner infinity loop via `CA_BACKEND="${CA_BACKEND:-bg}" bash "$inner_script"`.
+
 ### Removed
 
 - **Improve loop (`ca improve`, `ca loop --improve`, `ca watch --improve`)**: Removed the improve loop command and all associated flags and shell-script plumbing. The feature is superseded; this removal is unrelated to the bg backend migration.

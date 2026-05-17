@@ -14,6 +14,7 @@ import (
 // polishCmdOptions captures all flag values for the polish command.
 type polishCmdOptions struct {
 	output, model, specFile, metaEpic, reviewers string
+	backend                                      string
 	cycles, compactPct                           int
 	force                                        bool
 }
@@ -38,12 +39,16 @@ func polishCmd() *cobra.Command {
 	cmd.Flags().StringVar(&o.reviewers, "reviewers", "claude-sonnet,claude-opus,gemini,codex", "Comma-separated reviewers")
 	cmd.Flags().BoolVarP(&o.force, "force", "f", false, "Overwrite existing script")
 	cmd.Flags().IntVar(&o.compactPct, "compact-pct", 0, "Context auto-compaction threshold % (0=use Claude Code default, suggested: 50)")
+	cmd.Flags().StringVar(&o.backend, "backend", "bg", "Claude execution backend: bg (default) or p (legacy claude -p)")
 	return cmd
 }
 
 func runPolish(cmd *cobra.Command, o *polishCmdOptions) error {
 	if o.compactPct < 0 || o.compactPct > 100 {
 		return fmt.Errorf("--compact-pct must be 0-100, got %d", o.compactPct)
+	}
+	if o.backend != "bg" && o.backend != "p" {
+		return fmt.Errorf("--backend must be 'bg' or 'p', got %q", o.backend)
 	}
 	if o.specFile == "" {
 		return fmt.Errorf("--spec-file is required")
@@ -62,13 +67,16 @@ func runPolish(cmd *cobra.Command, o *polishCmdOptions) error {
 		return err
 	}
 
+	backendExplicit := cmd.Flags().Changed("backend")
 	script := generatePolishScript(polishGenerateOptions{
-		cycles:     o.cycles,
-		compactPct: o.compactPct,
-		model:      o.model,
-		specFile:   o.specFile,
-		metaEpic:   o.metaEpic,
-		reviewers:  reviewerList,
+		cycles:          o.cycles,
+		compactPct:      o.compactPct,
+		model:           o.model,
+		specFile:        o.specFile,
+		metaEpic:        o.metaEpic,
+		reviewers:       reviewerList,
+		backend:         o.backend,
+		backendExplicit: backendExplicit,
 	})
 
 	if err := os.MkdirAll(filepath.Dir(o.output), 0755); err != nil {
@@ -85,12 +93,14 @@ func runPolish(cmd *cobra.Command, o *polishCmdOptions) error {
 
 // polishGenerateOptions holds all options for generating the polish script.
 type polishGenerateOptions struct {
-	cycles     int
-	compactPct int
-	model      string
-	specFile   string
-	metaEpic   string
-	reviewers  []string
+	cycles          int
+	compactPct      int
+	model           string
+	specFile        string
+	metaEpic        string
+	reviewers       []string
+	backend         string // "bg" or "p"
+	backendExplicit bool   // true if user passed --backend explicitly
 }
 
 func generatePolishScript(opts polishGenerateOptions) string {
@@ -98,7 +108,7 @@ func generatePolishScript(opts polishGenerateOptions) string {
 		polishScriptCrashHandler() +
 		polishScriptTimeout() +
 		polishScriptPrerequisites() +
-		polishScriptSeam() +
+		polishScriptSeam(opts.backend, opts.backendExplicit) +
 		polishScriptReviewerDetection() +
 		polishScriptAuditPrompt() +
 		polishScriptRunAudit() +
@@ -113,11 +123,16 @@ func generatePolishScript(opts polishGenerateOptions) string {
 // Includes agent_invoke (p backend), bg_dispatch_reviewer, bg_poll_reviewer,
 // and bg_collect_reviewer (bg backend) for the audit fleet and architect.
 // CA_BACKEND mirrors the loop script seam.
-func polishScriptSeam() string { //nolint:funlen // bash template string
+func polishScriptSeam(backend string, explicit bool) string { //nolint:funlen // bash template string
+	caBackendLine := loopScriptCABackendLine(backend, explicit)
+	var preflight string
+	if backend == "bg" {
+		preflight = loopScriptBootstrapPreflight()
+	}
 	return `# --- Backend Seam (R-SEAM) ---
 # CA_BACKEND selects the claude execution backend: "p" (legacy) or "bg".
-CA_BACKEND=${CA_BACKEND:-p}
-
+` + caBackendLine + `
+` + preflight + `
 # BG_POLL_INTERVAL: seconds between state.json polls for reviewer bg sessions.
 BG_POLL_INTERVAL=${BG_POLL_INTERVAL:-15}
 
@@ -1006,11 +1021,10 @@ run_inner_loop() {
     return 1
   }
 
-  log "Cycle $cycle_num: running inner infinity loop (CA_BACKEND=${CA_BACKEND:-p})"
+  log "Cycle $cycle_num: running inner infinity loop (CA_BACKEND=${CA_BACKEND:-bg})"
   local inner_rc=0
-  # Propagate CA_BACKEND to the inner loop so it uses the same backend (R-FRAMEWORK).
-  # T6 --backend flag will also flow here once available; for now env propagation is sufficient.
-  CA_BACKEND="${CA_BACKEND:-p}" bash "$inner_script" >"$cycle_dir/inner-loop.stdout" 2>"$cycle_dir/inner-loop.stderr" || inner_rc=$?
+  # Propagate CA_BACKEND to the inner loop so it uses the same backend (R-FRAMEWORK, T6).
+  CA_BACKEND="${CA_BACKEND:-bg}" bash "$inner_script" >"$cycle_dir/inner-loop.stdout" 2>"$cycle_dir/inner-loop.stderr" || inner_rc=$?
 
   if [ "$inner_rc" -eq 2 ]; then
     log "ERROR: Inner loop completed zero epics in cycle $cycle_num (epics may be blocked)"

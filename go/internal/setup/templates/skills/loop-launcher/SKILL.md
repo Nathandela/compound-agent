@@ -32,6 +32,7 @@ ca loop --epics "id1,id2,id3" \
   --max-review-cycles 3 \
   --max-retries 1 \
   --force
+# Default backend is bg (claude --bg, subscription-billed). Use --backend p for legacy claude -p.
 ```
 
 ### Polish Loop
@@ -42,6 +43,7 @@ ca polish --spec-file "docs/specs/your-spec.md" \
   --cycles 2 \
   --model "claude-opus-4-7[1m]" \
   --force
+# Default backend is bg. Use --backend p for legacy claude -p.
 ```
 
 ### Flags Reference — Infinity Loop (`ca loop`)
@@ -50,6 +52,7 @@ ca polish --spec-file "docs/specs/your-spec.md" \
 |------|---------|-------------|
 | `--epics` | (auto-discover) | Comma-separated epic IDs |
 | `--model` | `claude-opus-4-7[1m]` | Model for implementation sessions |
+| `--backend` | `bg` | Execution backend: `bg` (claude --bg, subscription-billed) or `p` (legacy claude -p) |
 | `--reviewers` | (none) | Comma-separated: `claude-sonnet,claude-opus,gemini,codex` |
 | `--review-every` | `0` (end-only) | Review after every N epics |
 | `--max-review-cycles` | `3` | Max review/fix iterations |
@@ -67,13 +70,27 @@ ca polish --spec-file "docs/specs/your-spec.md" \
 | `--spec-file` | (required) | Path to the spec for reviewer context |
 | `--cycles` | `3` | Number of polish cycles |
 | `--model` | `claude-opus-4-7[1m]` | Model for polish architect sessions |
+| `--backend` | `bg` | Execution backend: `bg` (claude --bg, subscription-billed) or `p` (legacy claude -p) |
 | `--reviewers` | `claude-sonnet,claude-opus,gemini,codex` | Comma-separated audit fleet |
 | `-o, --output` | `.compound-agent/polish-loop.sh` | Output script path |
 | `--force` | (off) | Overwrite existing script |
 
+### Backend and Environment Precedence
+
+```
+Precedence: explicit --backend flag > CA_BACKEND env > default (bg)
+```
+
+- `ca loop --backend bg` → hardcodes `CA_BACKEND=bg` (env override ignored)
+- `ca loop --backend p` → hardcodes `CA_BACKEND=p` (env override ignored)
+- `ca loop` (no flag) → emits `CA_BACKEND=${CA_BACKEND:-bg}` (env override allowed; default bg)
+- `CA_BACKEND=p ca loop` (no flag) → uses p at runtime via env override
+
 ## Launching
 
 Always launch in a screen session. Never run loops in the foreground.
+
+**Why screen?** Screen provides two things: (1) durability — the orchestrator keeps running if your terminal disconnects; and (2) `ca watch` source — the screen session stdout/stderr is the live data source for `ca watch`. Note that screen wraps the *orchestrator shell*, not Claude itself. With the bg backend, `claude --bg` sessions run as separate jobs and survive regardless of the screen session; the screen session is for the loop's coordination logic.
 
 ### Single loop
 ```bash
@@ -105,13 +122,14 @@ Use readable names: `compound-loop-projectname`, `polish-loop-projectname-cycle2
 Before launching:
 1. **Verify `ca` is the Go binary** (not the old TypeScript CLI): run `ca loop --help` and confirm it shows Cobra-style output (`Usage: ca loop [flags]`). If you see `Usage: ca [options] [command]` (Commander.js format), the binary is stale — reinstall with `npm install compound-agent@latest` or use the local Go build at `go/dist/ca`.
 2. Verify `ca polish --help` succeeds (command exists). If it fails, same stale binary issue.
-3. Verify all epics are status=open: `bd show <id>` for each
-4. Verify `claude` CLI is available and authenticated
-5. Verify `bd` CLI is available
-6. Sync beads: `bd dolt push`
-7. Dry-run infinity loop: `LOOP_DRY_RUN=1 bash .compound-agent/infinity-loop.sh`
-8. Dry-run polish loop: `POLISH_DRY_RUN=1 bash .compound-agent/polish-loop.sh`
-9. Verify screen is available: `command -v screen`
+3. **Accept the bypass-permissions disclaimer (bg backend, one-time per machine)**: The default bg backend requires `--dangerously-skip-permissions`. Run `claude --dangerously-skip-permissions` once interactively to accept the disclaimer. This is a one-time step per machine; the generated script's bootstrap preflight detects if it is missing and fails with remediation instructions before the loop starts.
+4. Verify all epics are status=open: `bd show <id>` for each
+5. Verify `claude` CLI is available and authenticated
+6. Verify `bd` CLI is available
+7. Sync beads: `bd dolt push`
+8. Dry-run infinity loop: `LOOP_DRY_RUN=1 bash .compound-agent/infinity-loop.sh`
+9. Dry-run polish loop: `POLISH_DRY_RUN=1 bash .compound-agent/polish-loop.sh`
+10. Verify screen is available: `command -v screen`
 
 Full pre-flight checklist with monitoring protocol: `architect/references/infinity-loop/pre-flight.md`.
 
@@ -193,17 +211,29 @@ Present a structured report like this:
 | `.compound-agent/agent_logs/.loop-status.json` | Current epic, attempt, status | Always -- primary status |
 | `.compound-agent/agent_logs/loop-execution.jsonl` | Completed epics with result, duration | Always -- progress history |
 | `.compound-agent/agent_logs/.latest` | Symlink to active trace file | Stall detection |
-| `.compound-agent/agent_logs/trace_<id>-<ts>.jsonl` | Raw stream-json per session | Deep debugging only |
+| `.compound-agent/agent_logs/trace_<id>-<ts>.jsonl` | Raw stream-json per session (p backend) | Deep debugging only |
 | `.compound-agent/agent_logs/loop_<id>-<ts>.log` | Extracted assistant text per session | Investigating a specific epic |
 | `.compound-agent/agent_logs/memory_<id>-<ts>.log` | Memory watchdog readings | Suspecting OOM |
 | `.compound-agent/agent_logs/.polish-status.json` | Polish loop cycle/status | During polish loops |
 | `.compound-agent/agent_logs/polish-cycle-<N>/` | Per-cycle audit findings and reports | Polish loop review |
+| `~/.claude/jobs/<id>/state.json` | bg session state: `.state`, `.output`, `.inFlight` | bg backend — session status |
+| `~/.claude/jobs/<id>/` | bg session job dir (transcript at `.linkScanPath`) | bg backend — deep debugging |
+
+**`ca watch` and the bg backend**: `ca watch` follows the symlink at `.compound-agent/agent_logs/.latest` which points to the active trace file. Under the bg backend, the trace file is updated during harvest. For live session progress under bg, use `ca watch` after harvest completes, or inspect `~/.claude/jobs/<id>/state.json` directly.
+
+**Worktree harvest**: with the bg backend, each `claude --bg` session auto-isolates into a git worktree on branch `worktree-<name>`. After the session reaches terminal state, the loop harvests the worktree (merges `worktree-<name>` into the working branch) before cleanup (`claude stop && claude rm`). If harvest fails (e.g., merge conflict), the worktree is RETAINED and the epic is marked `HUMAN_REQUIRED` — the loop never destroys unmerged work.
 
 ## Gotchas
 
 ### Critical
 
-- **Always include `--dangerously-skip-permissions --permission-mode auto --verbose` in non-interactive claude invocations.** Without `--dangerously-skip-permissions`, claude hangs on permission prompts. Without `--verbose`, `--output-format stream-json` silently exits 1. The `ca loop` generator includes all three — if a generated script is missing them, the binary is stale.
+- **Accept the bypass-permissions disclaimer before the first bg loop run.** Run `claude --dangerously-skip-permissions` once interactively on each machine. The bootstrap preflight in the generated script detects the un-accepted disclaimer and exits non-zero with remediation instructions rather than entering the loop. This is a one-time step per machine.
+
+- **Always include `--dangerously-skip-permissions --permission-mode auto` in non-interactive claude invocations.** Without `--dangerously-skip-permissions`, claude hangs on permission prompts. The `ca loop` generator includes these — if a generated script is missing them, the binary is stale.
+
+- **bg backend worktree isolation**: With the default bg backend, each `claude --bg` session creates a git worktree on branch `worktree-<name>`. All agent commits land there. The loop harvests (merges) the worktree into your working branch before cleanup. If you need the legacy in-tree behavior, use `--backend p` or `CA_BACKEND=p`.
+
+- **Legacy p backend opt-in**: Use `ca loop --backend p` or `ca polish --backend p` to retain the legacy `claude -p` streaming pipeline. The p and bg backends are byte-identical at the epic-framework level (same epic queue, same `EPIC_COMPLETE`/`HUMAN_REQUIRED:`/`EPIC_FAILED` protocol, same retry logic). Switch only the backend if needed; the rest of the script is unchanged.
 
 - **Always use a quoted heredoc (`<<'DELIM'`) for prompt templates containing markdown.** Triple backticks in markdown code blocks are interpreted as bash command substitution in unquoted heredocs (`<<DELIM`). This causes `bash` to spawn and hang silently. Use `<<'DELIM'` and inject variables with `sed` instead.
 

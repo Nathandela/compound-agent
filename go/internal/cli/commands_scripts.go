@@ -21,6 +21,7 @@ import (
 // loopCmdOptions captures all flag values for the loop command.
 type loopCmdOptions struct {
 	output, model, epics, reviewers, reviewModel string
+	backend                                      string
 	maxRetries, reviewEvery, maxReviewCycles     int
 	compactPct                                   int
 	force, reviewBlocking                        bool
@@ -49,12 +50,16 @@ func loopCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&o.reviewBlocking, "review-blocking", false, "Fail loop if review not approved after max cycles")
 	cmd.Flags().StringVar(&o.reviewModel, "review-model", "claude-opus-4-7[1m]", "Model for implementer fix sessions")
 	cmd.Flags().IntVar(&o.compactPct, "compact-pct", 0, "Context auto-compaction threshold % (0=use Claude Code default, suggested: 50)")
+	cmd.Flags().StringVar(&o.backend, "backend", "bg", "Claude execution backend: bg (default) or p (legacy claude -p)")
 	return cmd
 }
 
 func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 	if o.compactPct < 0 || o.compactPct > 100 {
 		return fmt.Errorf("--compact-pct must be 0-100, got %d", o.compactPct)
+	}
+	if o.backend != "bg" && o.backend != "p" {
+		return fmt.Errorf("--backend must be 'bg' or 'p', got %q", o.backend)
 	}
 	output := o.output
 	if output == "" {
@@ -66,7 +71,15 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 		}
 	}
 
-	opts := loopGenerateOptions{maxRetries: o.maxRetries, model: o.model, epics: o.epics, compactPct: o.compactPct}
+	backendExplicit := cmd.Flags().Changed("backend")
+	opts := loopGenerateOptions{
+		maxRetries:      o.maxRetries,
+		model:           o.model,
+		epics:           o.epics,
+		compactPct:      o.compactPct,
+		backend:         o.backend,
+		backendExplicit: backendExplicit,
+	}
 
 	if o.reviewers != "" {
 		reviewerList := strings.Split(o.reviewers, ",")
@@ -94,11 +107,13 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 
 // loopGenerateOptions holds all options for generating the loop script.
 type loopGenerateOptions struct {
-	maxRetries int
-	compactPct int
-	model      string
-	epics      string
-	review     *loopReviewOptions
+	maxRetries      int
+	compactPct      int
+	model           string
+	epics           string
+	backend         string // "bg" or "p"
+	backendExplicit bool   // true if user passed --backend explicitly
+	review          *loopReviewOptions
 }
 
 func generateLoopScript(opts loopGenerateOptions) string {
@@ -126,7 +141,7 @@ func generateLoopScript(opts loopGenerateOptions) string {
 	}
 
 	helpers := loopScriptHelpers()
-	seam := loopScriptSeam()
+	seam := loopScriptSeam(opts.backend, opts.backendExplicit)
 	preLoop := loopScriptPreLoop()
 	whileHeader := loopScriptWhileHeader()
 	epicProcessing := loopScriptEpicProcessing()
@@ -813,13 +828,113 @@ log_result() {
 //	agent_invoke <model> <flags...> -- -- <prompt-args...> > <outfile>
 //	  Synchronous claude invocation (text output, used by reviewer/implementer/architect).
 //	  <flags...> are passed verbatim; prompt is read from stdin or provided via -p.
-func loopScriptSeam() string { //nolint:funlen // bash template string
+// loopScriptCABackendLine returns the CA_BACKEND shell assignment for the generated script.
+// Precedence: explicit --backend flag > CA_BACKEND env > default (bg).
+func loopScriptCABackendLine(backend string, explicit bool) string {
+	if explicit {
+		// Explicit flag: hardcode the value; env override does not apply.
+		return "CA_BACKEND=" + backend
+	}
+	// No explicit flag: env overrides; default is now bg (R-DEFAULT).
+	return "CA_BACKEND=${CA_BACKEND:-bg}"
+}
+
+// loopScriptBootstrapPreflight returns the bash bootstrap_preflight function and its
+// call site. Only included when the bg backend is active (R-BOOTSTRAP, S6).
+//
+// Design: run a minimal probe with --dangerously-skip-permissions. Positive-signal
+// detection: parse an 8-hex session id from a "backgrounded · <id>" line (ANSI-stripped).
+// If a session id is found, disclaimer is accepted — tear down the probe session
+// (stop + harvest-safety rm) and return 0. If no id is parsed (refusal or dispatch
+// failure), fail LOUD with remediation and exit 1. This is robust to CLI wording
+// changes because the DECISION is driven by "did we get a session id", not by the
+// brittle English refusal string.
+func loopScriptBootstrapPreflight() string {
+	return `
+# --- Bootstrap Preflight (R-BOOTSTRAP) ---
+# Detects whether the bypass-permissions disclaimer has been accepted on this machine.
+# Positive-signal: parse 8-hex session id from "backgrounded · <id>" line.
+# Accepted  => tear down the probe session cleanly (stop + harvest-safety rm), return 0.
+# No id     => disclaimer not accepted (or dispatch failed) => fail LOUD, exit 1.
+# set -e safe: all external commands guarded with || true; local is fine in bash functions.
+bootstrap_preflight() {
+  # Step 1: pre-probe worktree snapshot (same pattern as agent_dispatch / T3).
+  local pre_snapshot
+  pre_snapshot=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
+
+  # Step 2: run the probe.
+  local probe_out
+  probe_out=$(claude --bg --dangerously-skip-permissions \
+    --model claude-haiku-4-5 "ping" 2>&1 || true)
+
+  # Step 3: ANSI-strip and parse 8-hex session id (positive-signal detection).
+  local probe_id
+  probe_id=$(printf '%s' "$probe_out" | sed 's/\x1b\[[0-9;]*m//g' | \
+    grep -oE 'backgrounded[[:space:]]*[·•][[:space:]]*([0-9a-f]{8})' | \
+    grep -oE '[0-9a-f]{8}' | head -1 || true)
+
+  if printf '%s' "$probe_id" | grep -qE '^[0-9a-f]{8}$' 2>/dev/null; then
+    # Disclaimer ACCEPTED. Tear down the probe session without leaking it.
+    # Harvest-safety: a "ping" probe makes no commits, but check defensively.
+    local cur_snapshot
+    cur_snapshot=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
+    local has_new_wt=false
+    while IFS= read -r wt_path; do
+      [ -z "$wt_path" ] && continue
+      if ! printf '%s\n' "$pre_snapshot" | grep -qF "$wt_path" 2>/dev/null; then
+        # Defensively check if the new worktree has commits.
+        local wt_commits
+        wt_commits=$(git -C "$wt_path" log --oneline -1 2>/dev/null || true)
+        if [ -n "$wt_commits" ]; then
+          has_new_wt=true
+          break
+        fi
+      fi
+    done <<PREFLIGHTEOF
+$cur_snapshot
+PREFLIGHTEOF
+
+    claude stop "$probe_id" 2>/dev/null || true
+    if [ "$has_new_wt" = true ]; then
+      # Probe worktree has commits: cannot safely rm — log and leave for manual recovery.
+      log "WARN: bootstrap_preflight: probe session $probe_id has an unexpected worktree with commits — HUMAN_REQUIRED: inspect then: claude rm $probe_id"
+    else
+      # No un-harvested worktree: safe to rm.
+      claude rm "$probe_id" 2>/dev/null || true
+    fi
+    return 0
+  fi
+
+  # No session id parsed: disclaimer not accepted (or dispatch failed).
+  log "FATAL: bootstrap_preflight: claude --bg did not return a bg session id."
+  # Enrich message if the known refusal string is present (non-decisive; informational only).
+  if printf '%s' "$probe_out" | grep -qF 'bypassPermissions requires accepting the disclaimer' 2>/dev/null; then
+    log "  Cause: bypass-permissions disclaimer not yet accepted on this machine."
+  else
+    log "  Cause: probe output did not contain a valid session id (dispatch failure or disclaimer not accepted)."
+    log "  Probe output was: $probe_out"
+  fi
+  log "  Remediation: run 'claude --dangerously-skip-permissions' once interactively on this machine to accept the"
+  log "  bypass-permissions disclaimer, then re-run."
+  exit 1
+}
+bootstrap_preflight
+
+`
+}
+
+func loopScriptSeam(backend string, explicit bool) string { //nolint:funlen // bash template string
+	caBackendLine := loopScriptCABackendLine(backend, explicit)
+	var preflight string
+	if backend == "bg" {
+		preflight = loopScriptBootstrapPreflight()
+	}
 	return `# --- Backend Seam (R-SEAM) ---
 # CA_BACKEND selects the claude execution backend: "p" (legacy) or "bg" (default).
 # "p"  = claude -p streaming subshell (legacy, R-PLEGACY)
 # "bg" = claude --bg background session polled via state.json (R-BG)
-CA_BACKEND=${CA_BACKEND:-p}
-
+` + caBackendLine + `
+` + preflight + `
 # BG_POLL_INTERVAL: seconds between state.json polls for the bg backend.
 BG_POLL_INTERVAL=${BG_POLL_INTERVAL:-15}
 

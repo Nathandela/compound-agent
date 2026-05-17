@@ -143,9 +143,15 @@ ca loop --reviewers claude-sonnet --review-every 3
 
 `ca loop` generates a bash script that processes your beads epics sequentially, running the full cook-it cycle on each one. No human intervention required between epics.
 
+The default backend is `claude --bg` (subscription-billed; requires accepting the bypass-permissions disclaimer once: `claude --dangerously-skip-permissions`). Use `--backend p` or `CA_BACKEND=p` for the legacy `claude -p` (pay-per-token) path.
+
 ```bash
-# Generate script for all ready epics
+# Generate script for all ready epics (bg backend by default)
 ca loop
+
+# Explicit backend selection
+ca loop --backend bg     # bg (default): subscription-billed
+ca loop --backend p      # p: legacy pay-per-token
 
 # With periodic review every 3 epics
 ca loop --reviewers claude-sonnet --review-every 3
@@ -153,9 +159,11 @@ ca loop --reviewers claude-sonnet --review-every 3
 # Target specific epics
 ca loop --epics "beads-abc,beads-def,beads-ghi" --max-retries 2
 
-# Run it
-./.compound-agent/infinity-loop.sh
+# Run it (always use screen for durability)
+screen -dmS compound-loop bash ./.compound-agent/infinity-loop.sh
 ```
+
+**One-time bootstrap (bg backend)**: run `claude --dangerously-skip-permissions` once interactively to accept the bypass-permissions disclaimer. The generated script's bootstrap preflight detects a missing disclaimer and exits with remediation instructions before starting the loop.
 
 The loop respects beads dependency graphs — it only processes epics whose dependencies are complete. If an epic fails after `--max-retries` attempts, it stops and reports before proceeding.
 
@@ -272,7 +280,9 @@ The CLI binary is `ca` (alias: `compound-agent`).
 
 | Command | Description |
 |---------|-------------|
-| `ca loop` | Generate infinity loop script for autonomous epic processing |
+| `ca loop` | Generate infinity loop script (default: `claude --bg`, subscription-billed) |
+| `ca loop --backend bg` | Default bg backend: `claude --bg` (subscription-billed) |
+| `ca loop --backend p` | Legacy p backend: `claude -p` (pay-per-token) |
 | `ca loop --epics "id1,id2,id3"` | Target specific epic IDs (comma-separated) |
 | `ca loop -o <path>` | Custom output path (default: `./.compound-agent/infinity-loop.sh`) |
 | `ca loop --max-retries <n>` | Max retries per epic on failure (default: 1) |
@@ -285,7 +295,9 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca watch` | Tail and pretty-print live trace from loop sessions |
 | `ca watch --epic <id>` | Watch a specific epic trace |
 | `ca watch --no-follow` | Print existing trace and exit (no live tail) |
-| `ca polish` | Generate polish loop script for iterative refinement |
+| `ca polish` | Generate polish loop script (default: `claude --bg`, subscription-billed) |
+| `ca polish --backend bg` | Default bg backend: `claude --bg` (subscription-billed) |
+| `ca polish --backend p` | Legacy p backend: `claude -p` (pay-per-token) |
 | `ca polish --spec-file <path>` | Specify the spec file for polish review |
 | `ca polish --reviewers <names>` | Comma-separated reviewer models |
 | `ca polish --cycles <n>` | Number of polish cycles (default: 1) |
