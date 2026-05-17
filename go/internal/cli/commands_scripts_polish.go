@@ -110,15 +110,19 @@ func generatePolishScript(opts polishGenerateOptions) string {
 }
 
 // polishScriptSeam returns the backend seam for the polish script.
-// Only agent_invoke is needed here (no PGID-based watchdog in the polish script).
-// CA_BACKEND mirrors the loop script seam; p backend passes through to claude.
-func polishScriptSeam() string {
+// Includes agent_invoke (p backend), bg_dispatch_reviewer, bg_poll_reviewer,
+// and bg_collect_reviewer (bg backend) for the audit fleet and architect.
+// CA_BACKEND mirrors the loop script seam.
+func polishScriptSeam() string { //nolint:funlen // bash template string
 	return `# --- Backend Seam (R-SEAM) ---
-# CA_BACKEND selects the claude execution backend. Only "p" is implemented here.
+# CA_BACKEND selects the claude execution backend: "p" (legacy) or "bg".
 CA_BACKEND=${CA_BACKEND:-p}
 
+# BG_POLL_INTERVAL: seconds between state.json polls for reviewer bg sessions.
+BG_POLL_INTERVAL=${BG_POLL_INTERVAL:-15}
+
 # agent_invoke <model> [extra-flags...] -- [prompt-args...]
-# Synchronous claude invocation for reviewers and polish architect.
+# Synchronous claude invocation for reviewers and polish architect (p backend).
 # p backend: passes all flags through to claude unchanged.
 agent_invoke() {
   local model="$1"; shift
@@ -130,8 +134,204 @@ agent_invoke() {
              --model "$model" \
              "$@"
       ;;
+    bg)
+      # bg backend: agent_invoke is not used for direct calls in the polish script;
+      # audit/architect use bg_dispatch_reviewer_polish + bg_poll_reviewer + bg_collect_reviewer.
+      # If called directly (e.g. from legacy call sites), fall through to p for safety.
+      claude --dangerously-skip-permissions \
+             --permission-mode auto \
+             --output-format text \
+             --model "$model" \
+             "$@"
+      ;;
     *) log "FATAL: unknown CA_BACKEND=$CA_BACKEND"; exit 1 ;;
   esac
+}
+
+# bg_dispatch_reviewer_polish <label> <model> <prompt_file> -> sets BG_POLISH_HANDLE_<label>
+# Dispatches claude --bg for a single-shot polish reviewer or architect turn.
+# Writes a pre-dispatch worktree snapshot (T3 infra) keyed to short_id so that
+# bg_collect_reviewer can identify the session's worktree via set-diff and perform
+# the commit-safety check (T3/T4 invariant: structural check before every claude rm).
+bg_dispatch_reviewer_polish() {
+  local label="$1" model="$2" prompt_file="$3"
+  # Snapshot the current worktree set BEFORE dispatching (T3 infra: identify new worktree later).
+  local pre_snapshot
+  pre_snapshot=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
+  local raw_output
+  raw_output=$(claude --bg \
+    --dangerously-skip-permissions \
+    --permission-mode auto \
+    --model "$model" \
+    "$(cat "$prompt_file")" 2>&1 || true)
+  local short_id
+  short_id=$(printf '%s' "$raw_output" | sed 's/\x1b\[[0-9;]*m//g' | \
+    grep -oE 'backgrounded[[:space:]]*[·•][[:space:]]*([0-9a-f]{8})' | \
+    grep -oE '[0-9a-f]{8}' | head -1 || true)
+  if [ -z "$short_id" ] || ! printf '%s' "$short_id" | grep -qE '^[0-9a-f]{8}$'; then
+    log "WARN: bg polish dispatch failed for $label: could not parse short id"
+    return 1
+  fi
+  # Write pre-dispatch snapshot keyed to short_id (T3 infra: bg_collect_reviewer uses this
+  # to identify the reviewer's worktree via set-diff and run the commit-safety check).
+  local snapshot_dir
+  snapshot_dir="$(git rev-parse --show-toplevel 2>/dev/null || true)/.ca-worktree-snapshots"
+  if [ -n "$snapshot_dir" ] && [ "$snapshot_dir" != "/.ca-worktree-snapshots" ]; then
+    mkdir -p "$snapshot_dir" 2>/dev/null || true
+    printf '%s\n' "$pre_snapshot" > "$snapshot_dir/$short_id.txt" 2>/dev/null || true
+  fi
+  local safe_label
+  safe_label=$(printf '%s' "$label" | tr '-' '_' | tr '.' '_')
+  eval "BG_POLISH_HANDLE_${safe_label}=$short_id"
+  log "bg polish session dispatched: label=$label short_id=$short_id"
+  return 0
+}
+
+# bg_poll_reviewer <short_id> -> "running" | "done"
+# Defensive terminal set (S12: unknown/partial state -> running; never false-terminal).
+bg_poll_reviewer() {
+  local handle="$1"
+  local state_file="$HOME/.claude/jobs/$handle/state.json"
+  if [ ! -f "$state_file" ]; then
+    echo "running"; return 0
+  fi
+  local state in_flight
+  if [ "$HAS_JQ" = true ]; then
+    state=$(jq -r '.state // empty' "$state_file" 2>/dev/null || true)
+    in_flight=$(jq -r '.inFlight.tasks // 1' "$state_file" 2>/dev/null || echo 1)
+  else
+    state=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('state','') or '')
+except Exception:
+    pass
+" "$state_file" 2>/dev/null || true)
+    in_flight=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('inFlight',{}).get('tasks',1))
+except Exception:
+    print(1)
+" "$state_file" 2>/dev/null || echo 1)
+  fi
+  case "$state" in
+    done|completed|failed|stopped|error|cancel)
+      if [ "${in_flight:-1}" -eq 0 ] 2>/dev/null; then
+        echo "done"
+      else
+        echo "running"
+      fi
+      ;;
+    *) echo "running" ;;
+  esac
+}
+
+# bg_collect_reviewer <short_id> <report_file>
+# Extracts output from state.json into report_file; tears down ephemeral bg session.
+bg_collect_reviewer() {
+  local handle="$1" report="$2"
+  local state_file="$HOME/.claude/jobs/$handle/state.json"
+  local output_text=""
+  if [ -f "$state_file" ]; then
+    if [ "$HAS_JQ" = true ]; then
+      output_text=$(jq -r '
+        (.output.result // .output // "") |
+        if type == "string" then . else "" end
+      ' "$state_file" 2>/dev/null || true)
+      if [ -z "$output_text" ]; then
+        output_text=$(jq -r '.detail // ""' "$state_file" 2>/dev/null || true)
+      fi
+      if [ -z "$output_text" ]; then
+        local link_scan_path
+        link_scan_path=$(jq -r '.linkScanPath // ""' "$state_file" 2>/dev/null || true)
+        if [ -n "$link_scan_path" ] && [ -f "$link_scan_path" ]; then
+          output_text=$(jq -j '
+            select(.type == "assistant") |
+            .message.content[]? |
+            select(.type == "text") |
+            .text // empty
+          ' "$link_scan_path" 2>/dev/null | tail -c 8192 || true)
+        fi
+      fi
+    else
+      output_text=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    o = d.get('output','')
+    if isinstance(o, dict):
+        o = o.get('result','')
+    print(o or d.get('detail','') or '')
+except Exception:
+    pass
+" "$state_file" 2>/dev/null || true)
+    fi
+  fi
+  printf '%s\n' "$output_text" > "$report"
+  # Teardown: structural worktree-commit check before claude rm (T3/T4 invariant).
+  # claude --bg ALWAYS auto-creates a worktree; claude rm ALWAYS destroys it.
+  # If the reviewer committed (e.g. misbehaved), rm would silently destroy that work.
+  # Use the pre-dispatch snapshot (written by bg_dispatch_reviewer_polish) to find the worktree.
+  #
+  # SAFE DEFAULT: if the snapshot file does not exist (e.g. a dispatch path forgot to write one,
+  # or git rev-parse failed), we do NOT fall through to claude rm. Instead we call claude stop
+  # (safe: idempotent) and log HUMAN_REQUIRED, leaving the session for human inspection.
+  # claude rm is only invoked when: snapshot exists AND worktree-commit check proves no commits.
+  claude stop "$handle" 2>/dev/null || true
+  local _repo_root _snap_dir _snap_file _pre_wts _cur_wts _has_commits _snap_found
+  _repo_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  _snap_dir="${_repo_root:+$_repo_root/.ca-worktree-snapshots}"
+  _snap_file="${_snap_dir:+$_snap_dir/$handle.txt}"
+  _pre_wts=""
+  _has_commits=false
+  _snap_found=false
+  if [ -n "$_snap_file" ] && [ -f "$_snap_file" ]; then
+    _snap_found=true
+    _pre_wts=$(cat "$_snap_file" 2>/dev/null || true)
+    _cur_wts=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
+    local _wt_path=""
+    while IFS= read -r _wt; do
+      [ -z "$_wt" ] && continue
+      if ! printf '%s\n' "$_pre_wts" | grep -qF "$_wt"; then
+        _wt_path="$_wt"
+        break
+      fi
+    done <<COLLECTEOF
+$_cur_wts
+COLLECTEOF
+    if [ -n "$_wt_path" ]; then
+      # Worktree found: check for commits ahead of main (reviewer should make none).
+      local _base_sha
+      _base_sha=$(git rev-parse HEAD 2>/dev/null || true)
+      local _ahead
+      _ahead=$(git -C "$_wt_path" log "${_base_sha}..HEAD" --oneline 2>/dev/null | head -1 || true)
+      if [ -n "$_ahead" ]; then
+        _has_commits=true
+      fi
+    fi
+  fi
+  if [ "$_has_commits" = true ]; then
+    # Snapshot exists and worktree has commits: skip rm, require human inspection.
+    local _hr_msg="HUMAN_REQUIRED: reviewer bg session $handle has committed worktree changes — left for inspection (skip claude rm)"
+    log "$_hr_msg"
+    if [ -n "${HARVEST_LOG:-}" ]; then
+      printf '%s\n' "$_hr_msg" >> "${HARVEST_LOG}" 2>/dev/null || true
+    fi
+  elif [ "$_snap_found" = false ]; then
+    # Snapshot missing: safe default — do NOT claude rm. Cannot verify worktree safety.
+    local _hr_msg="HUMAN_REQUIRED: reviewer bg session $handle — no pre-dispatch snapshot, cannot verify worktree safety, left for inspection"
+    log "$_hr_msg"
+    if [ -n "${HARVEST_LOG:-}" ]; then
+      printf '%s\n' "$_hr_msg" >> "${HARVEST_LOG}" 2>/dev/null || true
+    fi
+  else
+    # Snapshot exists and no worktree commits: safe to rm.
+    claude rm "$handle" 2>/dev/null || true
+    rm -f "$_snap_file" 2>/dev/null || true
+  fi
 }
 
 `
@@ -457,6 +657,9 @@ AUDIT_PROMPT_EOF
 }
 
 // polishScriptRunAudit returns the run_polish_audit function with PID tracking and timeouts.
+// Under bg backend: claude reviewers are dispatched as bg sessions (bg_dispatch_reviewer_polish),
+// collected via bg_poll_reviewer + bg_collect_reviewer. Gemini/codex remain sync PIDs.
+// Mixed-fleet barrier waits both (R-FLEET).
 func polishScriptRunAudit() string { //nolint:funlen // bash template string
 	return `# --- Spawn Reviewers ---
 run_polish_audit() {
@@ -470,6 +673,7 @@ run_polish_audit() {
 
   log "Cycle $cycle_num: spawning reviewers"
   local pids=""
+  local bg_handles=""
   for reviewer in $AVAILABLE_REVIEWERS; do
     local report="$cycle_dir/$reviewer-report.md"
     local model_name=""
@@ -487,25 +691,83 @@ run_polish_audit() {
 
     case "$reviewer" in
       (claude-opus|claude-sonnet)
-        (portable_timeout "$REVIEW_TIMEOUT" agent_invoke "$model_name" \
-          -p - < "$prompt_file" > "$report" 2>"$cycle_dir/$reviewer.stderr" || true) &
+        if [ "$CA_BACKEND" = "bg" ]; then
+          # bg backend: dispatch async, collect via poll (R-FLEET mixed barrier).
+          local safe_label
+          safe_label=$(printf '%s' "$reviewer" | tr '-' '_')
+          if bg_dispatch_reviewer_polish "$reviewer" "$model_name" "$prompt_file"; then
+            local handle
+            eval "handle=\${BG_POLISH_HANDLE_${safe_label}:-}"
+            if [ -n "$handle" ]; then
+              bg_handles="$bg_handles $reviewer:$handle:$report"
+            fi
+          else
+            log "WARN: bg dispatch failed for $reviewer -- skipping"
+          fi
+        else
+          # p backend: synchronous via agent_invoke (R-PLEGACY).
+          (portable_timeout "$REVIEW_TIMEOUT" agent_invoke "$model_name" \
+            -p - < "$prompt_file" > "$report" 2>"$cycle_dir/$reviewer.stderr" || true) &
+          pids="$pids $!"
+          log "Spawned $reviewer (PID $!)"
+        fi
         ;;
       (gemini)
         (portable_timeout "$REVIEW_TIMEOUT" gemini --yolo \
           < "$prompt_file" \
           > "$report" 2>"$cycle_dir/$reviewer.stderr" || true) &
+        pids="$pids $!"
+        log "Spawned $reviewer (PID $!)"
         ;;
       (codex)
         (portable_timeout "$REVIEW_TIMEOUT" codex exec --full-auto \
           -o "$report" -- - < "$prompt_file" 2>"$cycle_dir/$reviewer.stderr" || true) &
+        pids="$pids $!"
+        log "Spawned $reviewer (PID $!)"
         ;;
     esac
-    pids="$pids $!"
-    log "Spawned $reviewer (PID $!)"
   done
 
-  log "Waiting for all reviewers to complete"
-  for pid in $pids; do wait "$pid" 2>/dev/null || true; done
+  # Mixed-fleet barrier: poll bg Claude handles + wait sync gemini/codex pids (R-FLEET).
+  if [ -n "$bg_handles" ]; then
+    local elapsed=0
+    while [ -n "$bg_handles" ] && [ "$elapsed" -lt "$REVIEW_TIMEOUT" ]; do
+      local remaining_handles=""
+      for entry in $bg_handles; do
+        local rev handle rpt
+        rev=$(printf '%s' "$entry" | cut -d: -f1)
+        handle=$(printf '%s' "$entry" | cut -d: -f2)
+        rpt=$(printf '%s' "$entry" | cut -d: -f3)
+        local poll_result
+        poll_result=$(bg_poll_reviewer "$handle")
+        if [ "$poll_result" = "done" ]; then
+          log "$rev bg reviewer done (handle=$handle)"
+          bg_collect_reviewer "$handle" "$rpt"
+        else
+          remaining_handles="$remaining_handles $entry"
+        fi
+      done
+      bg_handles="${remaining_handles# }"
+      if [ -n "$bg_handles" ]; then
+        sleep "${BG_POLL_INTERVAL:-15}"
+        elapsed=$(( elapsed + ${BG_POLL_INTERVAL:-15} ))
+      fi
+    done
+    if [ -n "$bg_handles" ]; then
+      log "WARN: bg reviewer timeout after ${elapsed}s -- collecting remaining"
+      for entry in $bg_handles; do
+        local rev handle rpt
+        rev=$(printf '%s' "$entry" | cut -d: -f1)
+        handle=$(printf '%s' "$entry" | cut -d: -f2)
+        rpt=$(printf '%s' "$entry" | cut -d: -f3)
+        bg_collect_reviewer "$handle" "$rpt"
+      done
+    fi
+  fi
+  if [ -n "$pids" ]; then
+    log "Waiting for sync reviewers to complete: $pids"
+    for pid in $pids; do wait "$pid" 2>/dev/null || true; done
+  fi
   log "All reviewers completed for cycle $cycle_num"
 }
 
@@ -656,9 +918,33 @@ ARCHITECT_HEADER_EOF
     echo "Read this file for product vision: $SPEC_FILE"
   } > "$prompt_file"
 
-  agent_invoke "$MODEL" \
-    --verbose \
-    -p - < "$prompt_file" > "$architect_log" 2>"$cycle_dir/polish-architect.stderr" || true
+  if [ "$CA_BACKEND" = "bg" ]; then
+    # bg backend: dispatch architect as a bg session, poll to terminal, collect output.
+    local arch_label="polish_architect_${cycle_num}"
+    if bg_dispatch_reviewer_polish "$arch_label" "$MODEL" "$prompt_file"; then
+      local safe_label
+      safe_label=$(printf '%s' "$arch_label" | tr '-' '_' | tr '.' '_')
+      local arch_handle
+      eval "arch_handle=\${BG_POLISH_HANDLE_${safe_label}:-}"
+      if [ -n "$arch_handle" ]; then
+        local elapsed=0
+        while [ "$elapsed" -lt "$REVIEW_TIMEOUT" ]; do
+          local poll_result
+          poll_result=$(bg_poll_reviewer "$arch_handle")
+          if [ "$poll_result" = "done" ]; then
+            break
+          fi
+          sleep "${BG_POLL_INTERVAL:-15}"
+          elapsed=$(( elapsed + ${BG_POLL_INTERVAL:-15} ))
+        done
+        bg_collect_reviewer "$arch_handle" "$architect_log"
+      fi
+    fi
+  else
+    agent_invoke "$MODEL" \
+      --verbose \
+      -p - < "$prompt_file" > "$architect_log" 2>"$cycle_dir/polish-architect.stderr" || true
+  fi
 
   # Extract created epic IDs
   POLISH_EPICS=""
@@ -720,9 +1006,11 @@ run_inner_loop() {
     return 1
   }
 
-  log "Cycle $cycle_num: running inner infinity loop"
+  log "Cycle $cycle_num: running inner infinity loop (CA_BACKEND=${CA_BACKEND:-p})"
   local inner_rc=0
-  bash "$inner_script" >"$cycle_dir/inner-loop.stdout" 2>"$cycle_dir/inner-loop.stderr" || inner_rc=$?
+  # Propagate CA_BACKEND to the inner loop so it uses the same backend (R-FRAMEWORK).
+  # T6 --backend flag will also flow here once available; for now env propagation is sufficient.
+  CA_BACKEND="${CA_BACKEND:-p}" bash "$inner_script" >"$cycle_dir/inner-loop.stdout" 2>"$cycle_dir/inner-loop.stderr" || inner_rc=$?
 
   if [ "$inner_rc" -eq 2 ]; then
     log "ERROR: Inner loop completed zero epics in cycle $cycle_num (epics may be blocked)"

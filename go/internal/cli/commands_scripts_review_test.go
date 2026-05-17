@@ -10,6 +10,39 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// buildBgCollectReviewerLoopScript builds a bash test script that invokes
+// bg_collect_reviewer from the loop script's bg reviewer helpers.
+// It stubs claude, sets up state.json, and optionally a worktree with a commit.
+func buildBgCollectReviewerLoopScript(
+	t *testing.T,
+	repoDir, stubDir, harvestLog, handle string,
+) string {
+	t.Helper()
+	// Fake $HOME with a state.json for the handle.
+	fakeHome := t.TempDir()
+	jobDir := filepath.Join(fakeHome, ".claude", "jobs", handle)
+	if err := os.MkdirAll(jobDir, 0o755); err != nil {
+		t.Fatalf("mkdir job dir: %v", err)
+	}
+	stateJSON := `{"state":"done","inFlight":{"tasks":0},"output":"review complete"}`
+	if err := os.WriteFile(filepath.Join(jobDir, "state.json"), []byte(stateJSON), 0o644); err != nil {
+		t.Fatalf("write state.json: %v", err)
+	}
+
+	helpers := loopScriptBgReviewHelpers()
+	report := filepath.Join(t.TempDir(), "report.md")
+	script := "#!/usr/bin/env bash\n" +
+		"set -euo pipefail\n" +
+		"export PATH=\"" + stubDir + ":$PATH\"\n" +
+		"export HOME=\"" + fakeHome + "\"\n" +
+		"export HARVEST_LOG=\"" + harvestLog + "\"\n" +
+		"HAS_JQ=false\n" +
+		"log() { echo \"[LOG] $*\" >&2; }\n" +
+		helpers + "\n" +
+		"bg_collect_reviewer \"" + handle + "\" \"" + report + "\"\n"
+	return script
+}
+
 // executeBashSyntaxCheck runs bash -n on a file to verify syntax.
 // Requires bash to be available (always on Unix; on Windows only with Git Bash).
 func executeBashSyntaxCheck(t *testing.T, path string) (string, error) {
@@ -938,6 +971,212 @@ func TestLoopCommand_PeriodicTriggerInsideSuccessBranch(t *testing.T) {
 	}
 }
 
+// ===== T5: R-REVIEW, R-FLEET, R-FRAMEWORK tests =====
+
+// TestLoopScriptSpawnReviewers_BgCycle1NoPSessionID verifies that under bg backend
+// cycle 1 does NOT pass --session-id (spike G1: --bg ignores --session-id).
+func TestLoopScriptSpawnReviewers_BgCycle1NoPSessionID(t *testing.T) {
+	t.Parallel()
+	spawner := loopScriptSpawnReviewers()
+
+	// The bg cycle-1 path must use plain claude --bg (no --session-id)
+	if !strings.Contains(spawner, "bg_dispatch_reviewer") {
+		t.Error("expected bg_dispatch_reviewer helper for bg backend review dispatch")
+	}
+	// The p path still uses --session-id
+	if !strings.Contains(spawner, `--session-id "$sid"`) {
+		t.Error("expected --session-id in p backend cycle-1 path")
+	}
+}
+
+// TestLoopScriptSpawnReviewers_BgCapturesSessionId verifies that after cycle 1 bg dispatch,
+// the .sessionId is read from state.json and persisted in sessions.json.
+func TestLoopScriptSpawnReviewers_BgCapturesSessionId(t *testing.T) {
+	t.Parallel()
+	spawner := loopScriptSpawnReviewers()
+
+	// Must read .sessionId from ~/.claude/jobs/<short>/state.json
+	if !strings.Contains(spawner, ".sessionId") {
+		t.Error("expected .sessionId extraction from state.json for bg cycle-1 capture")
+	}
+	// Must persist into sessions.json
+	if !strings.Contains(spawner, "sessions.json") {
+		t.Error("expected sessions.json update after bg cycle-1 sessionId capture")
+	}
+}
+
+// TestLoopScriptSpawnReviewers_BgCycle2UsesResume verifies that cycle 2+ under bg
+// uses `claude --bg --resume <sessionId>` (not --session-id).
+func TestLoopScriptSpawnReviewers_BgCycle2UsesResume(t *testing.T) {
+	t.Parallel()
+	spawner := loopScriptSpawnReviewers()
+
+	// Must have --bg --resume path for cycle 2+
+	if !strings.Contains(spawner, `--bg --resume`) {
+		t.Error("expected claude --bg --resume for cycle 2+ under bg backend")
+	}
+}
+
+// TestLoopScriptSpawnReviewers_BgPollsToTerminal verifies that bg reviewer dispatch
+// polls state.json to terminal (not just waits for a sync PID).
+func TestLoopScriptSpawnReviewers_BgPollsToTerminal(t *testing.T) {
+	t.Parallel()
+	spawner := loopScriptSpawnReviewers()
+
+	// Must poll state.json for reviewer bg sessions
+	if !strings.Contains(spawner, "bg_poll_reviewer") {
+		t.Error("expected bg_poll_reviewer helper for polling reviewer bg sessions to terminal")
+	}
+}
+
+// TestLoopScriptSpawnReviewers_BgCollectsOutput verifies that after polling to terminal,
+// output is extracted from state.json (.output/.detail) into the report file.
+func TestLoopScriptSpawnReviewers_BgCollectsOutput(t *testing.T) {
+	t.Parallel()
+	spawner := loopScriptSpawnReviewers()
+
+	// Must collect output from state.json into the report file
+	if !strings.Contains(spawner, "bg_collect_reviewer") {
+		t.Error("expected bg_collect_reviewer helper to extract state.json output into report file")
+	}
+}
+
+// TestLoopScriptSpawnReviewers_MixedFleetBarrier verifies that the barrier waits
+// both bg Claude handles (via polling) and gemini/codex PIDs (via wait $pid).
+func TestLoopScriptSpawnReviewers_MixedFleetBarrier(t *testing.T) {
+	t.Parallel()
+	spawner := loopScriptSpawnReviewers()
+
+	// Gemini/codex still use sync & + wait $pid
+	if !strings.Contains(spawner, "for pid in $pids") {
+		t.Error("expected PID-based wait for gemini/codex in mixed-fleet barrier")
+	}
+	// Claude bg handles tracked separately and polled
+	if !strings.Contains(spawner, "bg_handles") {
+		t.Error("expected bg_handles tracking for claude bg reviewer sessions")
+	}
+}
+
+// TestLoopScriptSpawnReviewers_BgTeardown verifies that reviewer bg sessions are
+// torn down (stop + rm) after their output is collected (ephemeral, not harvested).
+func TestLoopScriptSpawnReviewers_BgTeardown(t *testing.T) {
+	t.Parallel()
+	spawner := loopScriptSpawnReviewers()
+
+	// Must stop and rm reviewer bg sessions after collecting output
+	if !strings.Contains(spawner, "claude stop") {
+		t.Error("expected claude stop for reviewer bg session teardown")
+	}
+	if !strings.Contains(spawner, "claude rm") {
+		t.Error("expected claude rm for reviewer bg session teardown")
+	}
+}
+
+// TestLoopScriptSessionIDManagement_BgSkipsUuidgen verifies that under bg, sessions.json
+// is initialized with empty slots (not pre-generated UUIDs — bg assigns its own).
+func TestLoopScriptSessionIDManagement_BgSkipsUuidgen(t *testing.T) {
+	t.Parallel()
+	mgmt := loopScriptSessionIDManagement()
+
+	// The p path uses uuidgen; bg must NOT pre-generate a UUID (spike G1 correction).
+	// The bg path should leave the slot empty for cycle-1 capture.
+	if !strings.Contains(mgmt, "CA_BACKEND") {
+		t.Error("expected CA_BACKEND check in init_review_sessions to differentiate p vs bg UUID handling")
+	}
+}
+
+// TestLoopScriptBgReviewHelpers verifies that bg_dispatch_reviewer, bg_poll_reviewer,
+// bg_collect_reviewer helpers are defined in the spawn_reviewers output.
+func TestLoopScriptBgReviewHelpers_Defined(t *testing.T) {
+	t.Parallel()
+	spawner := loopScriptSpawnReviewers()
+
+	helpers := []string{
+		"bg_dispatch_reviewer()",
+		"bg_poll_reviewer()",
+		"bg_collect_reviewer()",
+	}
+	for _, h := range helpers {
+		if !strings.Contains(spawner, h) {
+			t.Errorf("expected helper function %q defined in spawn_reviewers", h)
+		}
+	}
+}
+
+// TestLoopScriptBgReviewHelpers_S12Guard verifies that bg_poll_reviewer treats
+// unknown/partial .state as still-running (S12 guard, R-BG).
+func TestLoopScriptBgReviewHelpers_S12Guard(t *testing.T) {
+	t.Parallel()
+	spawner := loopScriptSpawnReviewers()
+
+	// Defensive terminal set: done|completed|failed|stopped|error|cancel
+	terminalSet := "done|completed|failed|stopped|error|cancel"
+	if !strings.Contains(spawner, terminalSet) {
+		t.Errorf("expected defensive terminal set %q in bg_poll_reviewer (S12 guard)", terminalSet)
+	}
+}
+
+// TestLoopScriptBgReviewHelpers_PBackendUnchanged verifies that the p backend path
+// in spawn_reviewers is byte-identical to the pre-T5 implementation (R-PLEGACY).
+func TestLoopScriptSpawnReviewers_PBackendUnchanged(t *testing.T) {
+	t.Parallel()
+	spawner := loopScriptSpawnReviewers()
+
+	// p backend cycle-1: agent_invoke with --session-id
+	if !strings.Contains(spawner, `portable_timeout "$REVIEW_TIMEOUT" agent_invoke "$model_name"`) {
+		t.Error("expected p backend cycle-1 to use portable_timeout agent_invoke with model_name")
+	}
+	// p backend cycle-1: --session-id flag
+	if !strings.Contains(spawner, `--session-id "$sid"`) {
+		t.Error("expected p backend cycle-1 to pass --session-id")
+	}
+	// p backend cycle-2+: --resume flag
+	if !strings.Contains(spawner, `--resume "$sid"`) {
+		t.Error("expected p backend cycle-2+ to use --resume")
+	}
+	// p backend: -p flag for prompt
+	if !strings.Contains(spawner, `-p "$(cat "$prompt_file")"`) {
+		t.Error("expected p backend to use -p flag with prompt file content")
+	}
+}
+
+// TestLoopScriptImplementerPhase_PBackendUnchanged verifies that the implementer phase
+// still uses agent_invoke with -p for the p backend (R-PLEGACY).
+func TestLoopScriptImplementerPhase_PBackendUnchanged(t *testing.T) {
+	t.Parallel()
+	impl := loopScriptImplementerPhase()
+
+	if !strings.Contains(impl, `portable_timeout "$REVIEW_TIMEOUT" agent_invoke "$REVIEW_MODEL"`) {
+		t.Error("expected implementer to use portable_timeout agent_invoke REVIEW_MODEL")
+	}
+	if !strings.Contains(impl, `-p "$impl_prompt"`) {
+		t.Error("expected implementer to use -p flag with impl_prompt")
+	}
+}
+
+// TestLoopCommand_ReviewerBashSyntaxWithBgSeam verifies that the generated loop script
+// (with reviewers) passes bash -n syntax check under the full seam (bg-capable).
+func TestLoopCommand_ReviewerBashSyntaxWithBgSeam(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "loop-with-reviewers.sh")
+
+	_, err := executeCommand(root, "loop", "-o", outPath,
+		"--reviewers", "claude-sonnet,claude-opus,gemini,codex",
+		"--review-every", "2")
+	if err != nil {
+		t.Fatalf("loop --reviewers failed: %v", err)
+	}
+
+	out, bashErr := executeBashSyntaxCheck(t, outPath)
+	if bashErr != nil {
+		t.Errorf("bash -n syntax check failed:\n%s\n%v", out, bashErr)
+	}
+}
+
 func TestLoopCommand_RejectsExtraPositionalArgs(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
@@ -956,5 +1195,304 @@ func TestLoopCommand_RejectsExtraPositionalArgs(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "unknown command") {
 		t.Errorf("expected cobra 'unknown command' error, got: %v", err)
+	}
+}
+
+// TestT5_BgCollectReviewer_Loop_NoRmIfWorktreeHasCommits is a runtime test that
+// verifies bg_collect_reviewer (loop script) does NOT call claude rm when the
+// reviewer's bg worktree has commits ahead of main, logging HUMAN_REQUIRED instead.
+// The report is still collected so the review cycle logic is unaffected.
+// R-HARVEST-FAIL, T3/T4 invariant: structural worktree check before every claude rm.
+func TestT5_BgCollectReviewer_Loop_NoRmIfWorktreeHasCommits(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+	handle := "rev1test"
+
+	// Init git repo with initial commit.
+	setupGitRepoForHarvest(t, repoDir)
+
+	// Write pre-dispatch snapshot BEFORE adding the reviewer worktree.
+	preSnapshot := captureWorktreePathsBeforeWorktree(t, repoDir)
+	snapshotDir := filepath.Join(repoDir, ".ca-worktree-snapshots")
+	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+		t.Fatalf("mkdir snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, handle+".txt"), []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	// Add a worktree with a commit (simulating reviewer that misbehaved and committed).
+	wtDir := filepath.Join(repoDir, ".claude", "worktrees", handle)
+	mustGit(t, repoDir, "worktree", "add", "-b", "worktree-"+handle, wtDir)
+	writeFile(t, wtDir, "reviewer-output.txt", "review notes")
+	mustGit(t, wtDir, "add", "reviewer-output.txt")
+	mustGit(t, wtDir, "commit", "-m", "reviewer: unexpectedly committed")
+
+	// Build claude stub that records rm invocations.
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
+	script := buildBgCollectReviewerLoopScript(t, repoDir, stubDir, harvestLog, handle)
+	scriptPath := filepath.Join(t.TempDir(), "collect-loop-commit.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput()
+
+	// Assert: claude rm must NOT have been called (worktree has commits).
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	if _, statErr := os.Stat(rmLog); statErr == nil {
+		t.Errorf("claude rm was invoked despite reviewer worktree having commits — data-loss guard broken\nscript output:\n%s", out)
+	}
+
+	// Assert: HUMAN_REQUIRED must be logged.
+	harvest, _ := os.ReadFile(harvestLog)
+	combined := string(harvest) + string(out)
+	if !strings.Contains(combined, "HUMAN_REQUIRED") {
+		t.Errorf("HUMAN_REQUIRED must be logged when reviewer worktree has commits\noutput:\n%s", combined)
+	}
+}
+
+// TestT5_BgCollectReviewer_Loop_NoRmIfWorktreeHasCommits_Cycle2 is a runtime test
+// that verifies bg_collect_reviewer (loop script) does NOT call claude rm for a
+// cycle-2+ resumed session handle whose worktree has commits, when a snapshot was
+// written by the cycle-2+ dispatch path (via _bg_snapshot_worktrees).
+// This closes the residual data-loss gap: cycle-1 fix covered the cycle-1 path;
+// this test covers the cycle-2+ resumed-dispatch path with the same invariant.
+func TestT5_BgCollectReviewer_Loop_NoRmIfWorktreeHasCommits_Cycle2(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+	// Use a distinct handle to simulate a cycle-2+ resumed session new short_id.
+	handle := "rev3c2test"
+
+	setupGitRepoForHarvest(t, repoDir)
+
+	// Simulate the cycle-2+ path: capture pre-snapshot, add worktree+commit, then
+	// write snapshot (as _bg_snapshot_worktrees does after parsing the new short_id).
+	preSnapshot := captureWorktreePathsBeforeWorktree(t, repoDir)
+	// Add a worktree with a commit (reviewer misbehaved and committed).
+	wtDir := filepath.Join(repoDir, ".claude", "worktrees", handle)
+	mustGit(t, repoDir, "worktree", "add", "-b", "worktree-"+handle, wtDir)
+	writeFile(t, wtDir, "reviewer-c2-output.txt", "cycle-2 review notes")
+	mustGit(t, wtDir, "add", "reviewer-c2-output.txt")
+	mustGit(t, wtDir, "commit", "-m", "reviewer: unexpectedly committed in cycle 2")
+	// Write snapshot (keyed to handle) AFTER worktree was created, but with the
+	// pre-dispatch snapshot content — exactly what _bg_snapshot_worktrees does.
+	snapshotDir := filepath.Join(repoDir, ".ca-worktree-snapshots")
+	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+		t.Fatalf("mkdir snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, handle+".txt"), []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	// Build claude stub that records rm invocations.
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
+	script := buildBgCollectReviewerLoopScript(t, repoDir, stubDir, harvestLog, handle)
+	scriptPath := filepath.Join(t.TempDir(), "collect-loop-c2-commit.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput()
+
+	// Assert: claude rm must NOT have been called (worktree has commits).
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	if _, statErr := os.Stat(rmLog); statErr == nil {
+		t.Errorf("claude rm was invoked despite cycle-2 reviewer worktree having commits — data-loss guard broken\nscript output:\n%s", out)
+	}
+
+	// Assert: HUMAN_REQUIRED must be logged.
+	harvest, _ := os.ReadFile(harvestLog)
+	combined := string(harvest) + string(out)
+	if !strings.Contains(combined, "HUMAN_REQUIRED") {
+		t.Errorf("HUMAN_REQUIRED must be logged for cycle-2 reviewer worktree with commits\noutput:\n%s", combined)
+	}
+}
+
+// TestT5_BgCollectReviewer_Loop_SnapshotMissing_NoRm verifies the safe-default
+// invariant: when the pre-dispatch snapshot file does NOT exist, bg_collect_reviewer
+// does NOT call claude rm (cannot verify worktree safety), logs HUMAN_REQUIRED,
+// and still writes the reviewer report. This structurally closes the data-loss gap
+// even if a future dispatch path forgets to write the snapshot.
+func TestT5_BgCollectReviewer_Loop_SnapshotMissing_NoRm(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+	handle := "rev4nosnap"
+
+	setupGitRepoForHarvest(t, repoDir)
+	// Deliberately do NOT write a snapshot file for this handle.
+
+	// Build claude stub.
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
+	script := buildBgCollectReviewerLoopScript(t, repoDir, stubDir, harvestLog, handle)
+	scriptPath := filepath.Join(t.TempDir(), "collect-loop-nosnap.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput()
+
+	// Assert: claude rm must NOT be called when snapshot is missing.
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	if _, statErr := os.Stat(rmLog); statErr == nil {
+		t.Errorf("claude rm was invoked despite missing snapshot — safe-default violated (data-loss risk)\nscript output:\n%s", out)
+	}
+
+	// Assert: HUMAN_REQUIRED must be logged.
+	harvest, _ := os.ReadFile(harvestLog)
+	combined := string(harvest) + string(out)
+	if !strings.Contains(combined, "HUMAN_REQUIRED") {
+		t.Errorf("HUMAN_REQUIRED must be logged when snapshot is missing\noutput:\n%s", combined)
+	}
+}
+
+// TestT5_BgCollectReviewer_Loop_RmIfNoWorktreeCommits is a runtime test that
+// verifies bg_collect_reviewer (loop script) DOES call claude rm when the
+// reviewer's worktree has no commits ahead of main (normal/expected case).
+func TestT5_BgCollectReviewer_Loop_RmIfNoWorktreeCommits(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+	handle := "rev2test"
+
+	// Init git repo, write snapshot, add a worktree but NO commit (clean reviewer).
+	setupGitRepoForHarvest(t, repoDir)
+	preSnapshot := captureWorktreePathsBeforeWorktree(t, repoDir)
+	snapshotDir := filepath.Join(repoDir, ".ca-worktree-snapshots")
+	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+		t.Fatalf("mkdir snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, handle+".txt"), []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+	// Add a worktree but do NOT commit anything (reviewer only read, didn't commit).
+	wtDir := filepath.Join(repoDir, ".claude", "worktrees", handle)
+	mustGit(t, repoDir, "worktree", "add", "-b", "worktree-"+handle, wtDir)
+
+	// Build claude stub.
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
+	script := buildBgCollectReviewerLoopScript(t, repoDir, stubDir, harvestLog, handle)
+	scriptPath := filepath.Join(t.TempDir(), "collect-loop-noop.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput()
+
+	// Assert: claude rm MUST have been called (reviewer made no commits — safe teardown).
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	if _, statErr := os.Stat(rmLog); statErr != nil {
+		t.Errorf("claude rm was NOT invoked for reviewer with no worktree commits — teardown must proceed\nscript output:\n%s", out)
 	}
 }
