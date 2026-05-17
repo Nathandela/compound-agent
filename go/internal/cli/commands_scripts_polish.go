@@ -1016,7 +1016,7 @@ run_inner_loop() {
     compact_flag="--compact-pct $CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"
   fi
   # shellcheck disable=SC2086
-  $ca_cmd loop --epics "$epic_csv" --model "$MODEL" --force $compact_flag -o "$inner_script" 2>"$cycle_dir/ca-loop-gen.stderr" || {
+  $ca_cmd loop --epics "$epic_csv" --model "$MODEL" --force --backend "$CA_BACKEND" $compact_flag -o "$inner_script" 2>"$cycle_dir/ca-loop-gen.stderr" || {
     log "ERROR: failed to generate inner loop script"
     return 1
   }

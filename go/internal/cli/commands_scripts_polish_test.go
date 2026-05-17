@@ -1345,3 +1345,86 @@ func TestT5_BgCollectReviewer_Polish_SnapshotMissing_NoRm(t *testing.T) {
 		t.Errorf("HUMAN_REQUIRED must be logged when snapshot is missing (polish)\noutput:\n%s", combined)
 	}
 }
+
+// ===== P1-2: run_inner_loop --backend propagation =====
+
+// TestPolishScriptInnerLoop_PassesBackendFlag verifies that run_inner_loop passes
+// --backend "$CA_BACKEND" to the inner ca loop invocation, so the generated inner
+// script hard-codes the correct backend. Fail-before: the old code omitted --backend,
+// causing the inner loop to default to bg even under ca polish --backend p.
+func TestPolishScriptInnerLoop_PassesBackendFlag(t *testing.T) {
+	t.Parallel()
+	inner := polishScriptInnerLoop()
+
+	// The ca loop invocation must include --backend "$CA_BACKEND"
+	if !strings.Contains(inner, `--backend "$CA_BACKEND"`) {
+		t.Error("run_inner_loop must pass --backend \"$CA_BACKEND\" to inner ca loop invocation — omitting it silently hard-codes bg even under ca polish --backend p")
+	}
+}
+
+// TestPolishCommand_BackendP_InnerLoopPassesBackendP verifies that a polish script
+// generated with --backend p contains --backend p in the inner ca loop call,
+// so the generated inner script uses the p seam (no bootstrap_preflight).
+// Fail-before: old code omitted --backend entirely from the ca loop call.
+func TestPolishCommand_BackendP_InnerLoopPassesBackendP(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish-p.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--backend", "p",
+		"--spec-file", "docs/SPEC.md",
+		"--meta-epic", "ME1")
+	if err != nil {
+		t.Fatalf("polish --backend p failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The inner ca loop call must include --backend "$CA_BACKEND" (not just the env propagation).
+	if !strings.Contains(script, `--backend "$CA_BACKEND"`) {
+		t.Error("polish --backend p: inner ca loop call must include --backend \"$CA_BACKEND\" so the generated inner script uses the p seam")
+	}
+
+	// Under --backend p, the generated polish script must NOT invoke bootstrap_preflight
+	// unconditionally (it should be absent, since p seam omits it).
+	if strings.Contains(script, "bootstrap_preflight\n") {
+		t.Error("polish --backend p: generated polish script must not call bootstrap_preflight (only bg seam includes it)")
+	}
+}
+
+// TestPolishCommand_BackendBg_InnerLoopPassesBackendBg verifies that the default
+// (bg) backend also passes --backend "$CA_BACKEND" to the inner ca loop call,
+// preserving bg behavior unchanged.
+func TestPolishCommand_BackendBg_InnerLoopPassesBackendBg(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish-bg.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/SPEC.md",
+		"--meta-epic", "ME1")
+	if err != nil {
+		t.Fatalf("polish (default bg) failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The inner ca loop call must still include --backend "$CA_BACKEND" under default bg.
+	if !strings.Contains(script, `--backend "$CA_BACKEND"`) {
+		t.Error("polish (default bg): inner ca loop call must include --backend \"$CA_BACKEND\"")
+	}
+
+	// Under default bg, bootstrap_preflight should be present.
+	if !strings.Contains(script, "bootstrap_preflight") {
+		t.Error("polish (default bg): generated polish script must call bootstrap_preflight")
+	}
+}

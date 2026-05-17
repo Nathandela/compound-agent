@@ -813,21 +813,25 @@ log_result() {
 
 // loopScriptSeam returns the backend seam functions (agent_dispatch, agent_poll,
 // agent_collect, agent_stop, agent_cleanup, agent_invoke) and the CA_BACKEND
-// selector. Only the "p" backend is implemented here; "bg" is added in T2.
+// selector. Both "p" and "bg" backends are fully implemented.
 //
-// Seam contract (p backend):
+// Seam contract:
 //
 //	agent_dispatch <logfile> <tracefile> <model> <prompt>
-//	  Runs claude -p in a background subshell; sets AGENT_HANDLE to the subshell PID.
-//	  Pipeline: claude ... -p "$prompt" 2>stderr | tee tracefile | extract_text > logfile
+//	  p backend:  runs claude -p in a background subshell; sets AGENT_HANDLE to the subshell PID.
+//	             Pipeline: claude ... -p "$prompt" 2>stderr | tee tracefile | extract_text > logfile
+//	  bg backend: dispatches claude --bg; parses 8-hex session id; sets AGENT_HANDLE to id.
 //
-//	agent_poll <handle>          -- "running" if PID alive, "done" otherwise
+//	agent_poll <handle>          -- "running" | "done" | "failed"
 //	agent_collect <handle> <logfile> <tracefile> -- delegates to detect_marker
-//	agent_stop <handle>          -- kill -TERM process group, then PID
-//	agent_cleanup <handle>       -- noop for p backend
-//	agent_invoke <model> <flags...> -- -- <prompt-args...> > <outfile>
-//	  Synchronous claude invocation (text output, used by reviewer/implementer/architect).
-//	  <flags...> are passed verbatim; prompt is read from stdin or provided via -p.
+//	agent_stop <handle>          -- kill -TERM (p) or signal-file (bg)
+//	agent_cleanup <handle>       -- noop for p; worktree harvest for bg
+//	agent_invoke <model> [flags...] [prompt-args...]
+//	  Synchronous claude invocation (--output-format text) for reviewers, implementer, architect.
+//	  p backend:  passes all args through to claude unchanged.
+//	  bg backend: falls through to the same synchronous invocation as p (agent_invoke is not
+//	             used for the main bg dispatch/poll/harvest path; this case ensures callers
+//	             such as feed_implementer work under CA_BACKEND=bg without FATAL).
 // loopScriptCABackendLine returns the CA_BACKEND shell assignment for the generated script.
 // Precedence: explicit --backend flag > CA_BACKEND env > default (bg).
 func loopScriptCABackendLine(backend string, explicit bool) string {
@@ -1298,16 +1302,29 @@ _harvest_fail() {
   fi
 }
 
-# agent_invoke <model> [extra-flags...] -- [prompt-args...]
+# agent_invoke <model> [flags...] [prompt-args...]
 # Synchronous claude invocation for reviewers, implementer, and polish architect.
 # Executes claude --dangerously-skip-permissions --permission-mode auto --output-format text
 # with the given model and extra flags, passing remaining args to claude directly.
-# Caller provides redirection (> outfile 2>stderr) and optional & for backgrounding.
-# p backend: passes all args through to claude unchanged.
+# Caller provides redirection (> outfile 2>&1) and optional & for backgrounding.
+# p backend:  passes all args through to claude unchanged.
+# bg backend: falls through to the same synchronous invocation as p.
+#             agent_invoke is not used for the main bg dispatch/poll/harvest path;
+#             this case ensures callers such as feed_implementer work under CA_BACKEND=bg.
 agent_invoke() {
   local model="$1"; shift
   case "$CA_BACKEND" in
     p)
+      claude --dangerously-skip-permissions \
+             --permission-mode auto \
+             --output-format text \
+             --model "$model" \
+             "$@"
+      ;;
+    bg)
+      # bg backend: agent_invoke is not used for the main dispatch/poll/harvest path.
+      # Fall through to synchronous invocation so callers (e.g. feed_implementer) work
+      # under CA_BACKEND=bg without FATAL.
       claude --dangerously-skip-permissions \
              --permission-mode auto \
              --output-format text \

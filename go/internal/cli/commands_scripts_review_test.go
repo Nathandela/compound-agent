@@ -1496,3 +1496,130 @@ func TestT5_BgCollectReviewer_Loop_RmIfNoWorktreeCommits(t *testing.T) {
 		t.Errorf("claude rm was NOT invoked for reviewer with no worktree commits — teardown must proceed\nscript output:\n%s", out)
 	}
 }
+
+// ===== P1-1: agent_invoke bg) case + feed_implementer under CA_BACKEND=bg =====
+
+// TestLoopScriptSeam_AgentInvoke_HasBgCase verifies that the loop seam's agent_invoke
+// shell function contains a bg) branch (not just p)), so feed_implementer does not
+// FATAL under CA_BACKEND=bg. Fail-before: the old code had only p) + *) FATAL.
+func TestLoopScriptSeam_AgentInvoke_HasBgCase(t *testing.T) {
+	t.Parallel()
+	// Generate the seam under both backends and verify bg) is present in both.
+	for _, backend := range []string{"p", "bg"} {
+		seam := loopScriptSeam(backend, true)
+		if !strings.Contains(seam, "bg)") {
+			t.Errorf("loopScriptSeam(%q): agent_invoke missing bg) case — feed_implementer will FATAL under CA_BACKEND=bg", backend)
+		}
+		// Verify the bg) branch falls through to a claude invocation (not just exit 1).
+		bgIdx := strings.Index(seam, "bg)")
+		if bgIdx < 0 {
+			continue
+		}
+		bgSnippet := seam[bgIdx : bgIdx+300]
+		if !strings.Contains(bgSnippet, "claude") {
+			t.Errorf("loopScriptSeam(%q): bg) branch in agent_invoke does not invoke claude", backend)
+		}
+	}
+}
+
+// TestFeedImplementer_BgBackend_NoFatal is a runtime test verifying that feed_implementer
+// under CA_BACKEND=bg does NOT exit with non-zero (FATAL) and reaches the
+// implementer-report path. Uses a stubbed claude that returns fake output.
+// Fail-before: the old agent_invoke had only p) + *) FATAL, so CA_BACKEND=bg would
+// immediately FATAL inside feed_implementer's portable_timeout agent_invoke call.
+func TestFeedImplementer_BgBackend_NoFatal(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	stubDir := t.TempDir()
+	cycleDir := t.TempDir()
+	repoDir := t.TempDir()
+
+	// Minimal git repo so bootstrap_preflight's git worktree list calls succeed.
+	setupGitRepoForHarvest(t, repoDir)
+
+	// Write a fake reviewer report so feed_implementer has something to process.
+	reviewReport := filepath.Join(cycleDir, "claude-sonnet.md")
+	if err := os.WriteFile(reviewReport, []byte("P1: Fix the bug.\n"), 0o644); err != nil {
+		t.Fatalf("write reviewer report: %v", err)
+	}
+
+	// Claude stub: answer --bg with a fake session id (for bootstrap_preflight probe),
+	// and answer any other synchronous invocation (implementer) with FIXES_APPLIED.
+	// Also handle stop/rm for the probe teardown.
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		"# Stub: handle --bg probe for bootstrap_preflight, then answer implementer.\n" +
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"stop\" ] || [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"echo \"FIXES_APPLIED\"\n" +
+		"exit 0\n"
+	if err := os.WriteFile(claudeStub, []byte(stubContent), 0o755); err != nil {
+		t.Fatalf("write claude stub: %v", err)
+	}
+
+	// Build a minimal bash script that includes the implementer phase and runs it
+	// under CA_BACKEND=bg with the stubbed claude.
+	// Only include the seam (for agent_invoke) and the implementer phase itself.
+	// Provide the minimal variables feed_implementer needs without pulling in the
+	// full loopScriptReviewConfig (which references LOG_DIR).
+	impl := loopScriptImplementerPhase()
+	// Use the bg seam so agent_invoke has the bg) case under test. bootstrap_preflight
+	// is included because the bg seam always calls it; the claude stub answers --bg
+	// with a valid fake session id so preflight succeeds.
+	seam := loopScriptSeam("bg", true)
+
+	implementerReport := filepath.Join(cycleDir, "implementer.md")
+
+	script := "#!/usr/bin/env bash\n" +
+		"set -euo pipefail\n" +
+		"export PATH=\"" + stubDir + ":$PATH\"\n" +
+		// Minimal variables that feed_implementer reads directly.
+		"CA_BACKEND=bg\n" +
+		"AVAILABLE_REVIEWERS=\"claude-sonnet\"\n" +
+		"REVIEW_MODEL=\"claude-sonnet-4-6\"\n" +
+		"REVIEW_TIMEOUT=30\n" +
+		"log() { echo \"[LOG] $*\" >&2; }\n" +
+		// portable_timeout stub: just run the command directly (no real timeout binary needed).
+		"portable_timeout() { local _t=\"$1\"; shift; \"$@\"; }\n" +
+		seam + "\n" +
+		impl + "\n" +
+		"feed_implementer \"" + cycleDir + "\"\n"
+
+	scriptPath := filepath.Join(t.TempDir(), "feed-implementer-bg-test.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Dir = repoDir
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	out, runErr := cmd.CombinedOutput()
+
+	// Must NOT exit non-zero (old code would FATAL on *) branch).
+	if runErr != nil {
+		t.Errorf("feed_implementer under CA_BACKEND=bg exited non-zero (old code would FATAL on *) branch):\n%s\nerr=%v", out, runErr)
+	}
+
+	// implementer report must exist and contain FIXES_APPLIED (implementer-report path reachable).
+	reportData, readErr := os.ReadFile(implementerReport)
+	if readErr != nil {
+		t.Errorf("implementer report not created (implementer-report path unreachable):\n%s", out)
+	} else if !strings.Contains(string(reportData), "FIXES_APPLIED") {
+		t.Errorf("implementer report does not contain FIXES_APPLIED:\nreport=%q\nscript output=%s", string(reportData), out)
+	}
+}
