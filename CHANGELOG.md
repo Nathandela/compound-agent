@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.0] - 2026-05-17
+
+### Upgrading (action required for the default path)
+
+- `ca loop` / `ca polish` now default to the `claude --bg` backend. The bg
+  backend **fails loud (exit 1) at startup** unless **both** operator
+  prerequisites are met: (1) the `--dangerously-skip-permissions` bypass
+  disclaimer is accepted on the machine, and (2) Claude's
+  `worktree.bgIsolation` setting is `none`. If you cannot set these, pin the
+  legacy behavior with `--backend p` (or `CA_BACKEND=p`) — that path is
+  byte-for-byte unchanged.
+
 ### Changed
 
 - **Default loop/polish/review backend is now `claude --bg` (subscription-billed)**: `ca loop` and `ca polish` default to the bg backend (`claude --bg`). The legacy `claude -p` path remains fully supported via `--backend p` or `CA_BACKEND=p`. Precedence: explicit `--backend` flag > `CA_BACKEND` env > default (bg). The bg backend runs sessions as background jobs polled via `state.json`, auto-isolates each session into a git worktree (harvested before cleanup), and uses the existing `EPIC_COMPLETE`/`HUMAN_REQUIRED:`/`EPIC_FAILED` protocol unchanged.
