@@ -107,26 +107,15 @@ ca reviewer list           # List enabled reviewers
 ## Loop command
 
 ```bash
-ca loop                    # Generate infinity loop script for autonomous processing
+ca loop                    # Generate infinity loop script (default backend: bg = claude --bg)
 ca loop --epics "epic-1,epic-2"
 ca loop --output my-loop.sh
 ca loop --max-retries 5
 ca loop --model claude-opus-4-7[1m]
+ca loop --backend bg       # Default: claude --bg (subscription-billed)
+ca loop --backend p        # Legacy: claude -p (pay-per-token)
 ca loop --force            # Overwrite existing script
-```
-
-## Improve command
-
-```bash
-ca improve                           # Generate improvement loop script
-ca improve --topics lint tests       # Run only specific topics
-ca improve --max-iters 3             # Max iterations per topic (default: 5)
-ca improve --time-budget 3600        # Total time budget in seconds (0=unlimited)
-ca improve --model claude-sonnet-4-6 # Choose model
-ca improve --output my-improve.sh    # Custom output path
-ca improve --force                   # Overwrite existing script
-ca improve --dry-run                 # Validate and print plan without generating
-ca improve init                      # Scaffold example improve/*.md program file
+# Env override (when --backend not set): CA_BACKEND=p ca loop
 ```
 
 ## Watch command
@@ -134,7 +123,6 @@ ca improve init                      # Scaffold example improve/*.md program fil
 ```bash
 ca watch                             # Tail live trace from latest loop session
 ca watch --epic <id>                 # Watch a specific epic trace
-ca watch --improve                   # Watch improvement loop traces
 ca watch --no-follow                 # Print existing trace and exit
 ```
 
@@ -155,12 +143,14 @@ ca health                  # Check project health and dependencies
 ## Polish command
 
 ```bash
-ca polish                  # Generate polish loop script for iterative refinement
+ca polish                  # Generate polish loop script (default backend: bg = claude --bg)
 ca polish --spec-file "docs/specs/my-spec.md"
 ca polish --meta-epic "meta-epic-id"
 ca polish --reviewers "claude-sonnet,claude-opus,gemini,codex"
 ca polish --cycles 2
 ca polish --model claude-opus-4-7[1m]
+ca polish --backend bg     # Default: claude --bg (subscription-billed)
+ca polish --backend p      # Legacy: claude -p (pay-per-token)
 ca polish --force          # Overwrite existing script
 ```
 

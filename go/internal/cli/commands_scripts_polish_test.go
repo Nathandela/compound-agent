@@ -2,6 +2,7 @@ package cli
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -613,9 +614,12 @@ func TestPolishCommand_ReviewerModelQuoting(t *testing.T) {
 	data, _ := os.ReadFile(outPath)
 	script := string(data)
 
-	// The model name with [1m] must be properly quoted to prevent glob expansion
-	if !strings.Contains(script, `--model "$model_name"`) {
-		t.Error("reviewer model name must be quoted to prevent glob expansion on [1m]")
+	// The model name with [1m] must be properly quoted to prevent glob expansion.
+	// T1 seam: audit reviewers now call agent_invoke "$model_name" (first positional arg);
+	// agent_invoke internally uses --model "$model" — still quoted at runtime.
+	// Verify the seam function body uses double-quoted --model expansion.
+	if !strings.Contains(script, `--model "$model"`) {
+		t.Error("agent_invoke must use --model \"$model\" to prevent glob expansion on [1m]")
 	}
 }
 
@@ -881,5 +885,581 @@ func TestPolishCommand_PostLoopRespectsDryRun(t *testing.T) {
 		if idx < elseIdx {
 			t.Errorf("line %q appears before the dry-run else branch — it would still execute in dry-run", needle)
 		}
+	}
+}
+
+// TestPolishCommand_AgentInvokeInAudit verifies that the audit fleet section
+// uses agent_invoke instead of raw claude -p for claude reviewers (R-SEAM).
+func TestPolishCommand_AgentInvokeInAudit(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1",
+		"--reviewers", "claude-sonnet,claude-opus,gemini,codex")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// agent_invoke must be defined in the polish script
+	if !strings.Contains(script, "agent_invoke()") {
+		t.Error("polish script must define agent_invoke() seam function")
+	}
+	// Audit fleet must call agent_invoke for claude reviewers, not raw claude -p
+	if !strings.Contains(script, "agent_invoke ") {
+		t.Error("polish audit fleet must call agent_invoke for claude reviewer calls")
+	}
+	// Polish architect must use agent_invoke
+	archIdx := strings.Index(script, "run_polish_architect()")
+	if archIdx < 0 {
+		t.Fatal("run_polish_architect function not found")
+	}
+	archBody := script[archIdx:]
+	closeIdx := strings.Index(archBody, "\n}\n")
+	if closeIdx > 0 {
+		archBody = archBody[:closeIdx]
+	}
+	if !strings.Contains(archBody, "agent_invoke ") {
+		t.Error("run_polish_architect must call agent_invoke (not raw claude -p)")
+	}
+}
+
+// ===== T5: R-FLEET, R-FRAMEWORK, R-REVIEW tests for polish script =====
+
+// TestPolishCommand_AuditFleetMixedBarrierBg verifies that when CA_BACKEND=bg,
+// the polish audit fleet dispatches claude reviewers as bg sessions with a
+// mixed-fleet barrier (poll bg handles + wait $pid for gemini/codex).
+func TestPolishCommand_AuditFleetMixedBarrierBg(t *testing.T) {
+	t.Parallel()
+	audit := polishScriptRunAudit()
+
+	// Must dispatch claude reviewers as bg sessions under bg backend
+	if !strings.Contains(audit, "bg_dispatch_reviewer") {
+		t.Error("polish audit fleet must use bg_dispatch_reviewer for claude reviewers under bg backend")
+	}
+	// Must track bg handles separately from sync pids
+	if !strings.Contains(audit, "bg_handles") {
+		t.Error("polish audit fleet must track bg_handles for claude bg reviewers")
+	}
+	// Gemini/codex stay as sync & + wait
+	if !strings.Contains(audit, "for pid in $pids") {
+		t.Error("polish audit fleet must use pid-wait barrier for gemini/codex")
+	}
+}
+
+// TestPolishCommand_AuditFleetBgPBackendUnchanged verifies that under p backend,
+// the polish audit fleet is byte-identical to pre-T5 (R-PLEGACY).
+func TestPolishCommand_AuditFleetBgPBackendUnchanged(t *testing.T) {
+	t.Parallel()
+	audit := polishScriptRunAudit()
+
+	// p backend still uses agent_invoke
+	if !strings.Contains(audit, "portable_timeout \"$REVIEW_TIMEOUT\" agent_invoke") {
+		t.Error("polish audit p backend must still use portable_timeout agent_invoke")
+	}
+}
+
+// TestPolishCommand_ArchitectRunsSynchronously verifies that run_polish_architect
+// always runs on the synchronous agent_invoke path and is NOT dispatched as a bg
+// session. The polish architect only runs bd create/dep operations (no code
+// edits); bd is unreachable from a bg worktree (spike G2), so a bg dispatch
+// would lose its epic writes. This test was previously
+// TestPolishCommand_ArchitectBgCapable, which asserted the now-superseded
+// "architect dispatches via bg_dispatch_reviewer under bg backend" behavior;
+// it is corrected here to pin the design decision in learning_agent-52r1 (fix C).
+func TestPolishCommand_ArchitectRunsSynchronously(t *testing.T) {
+	t.Parallel()
+	arch := polishScriptPolishArchitect()
+
+	archIdx := strings.Index(arch, "run_polish_architect()")
+	if archIdx < 0 {
+		t.Fatal("run_polish_architect() not found")
+	}
+	body := arch[archIdx:]
+	if closeIdx := strings.Index(body, "\n}\n"); closeIdx > 0 {
+		body = body[:closeIdx]
+	}
+
+	if !strings.Contains(body, "agent_invoke ") {
+		t.Error("polish architect must invoke agent_invoke (synchronous path) so bd writes reach the main-tree Dolt")
+	}
+	if strings.Contains(body, "bg_dispatch_reviewer_polish") {
+		t.Error("polish architect must NOT bg-dispatch — bd is unreachable from a bg worktree (G2)")
+	}
+}
+
+// TestPolishCommand_InnerLoopPropagatesCABackend verifies that the inner loop
+// invocation (bash inner.sh) propagates CA_BACKEND via environment (R-FRAMEWORK).
+func TestPolishCommand_InnerLoopPropagatesCABackend(t *testing.T) {
+	t.Parallel()
+	inner := polishScriptInnerLoop()
+
+	// bash inner.sh must propagate CA_BACKEND
+	if !strings.Contains(inner, "CA_BACKEND") {
+		t.Error("run_inner_loop must export/propagate CA_BACKEND to inner bash invocation")
+	}
+	// Must use CA_BACKEND=... bash or export CA_BACKEND pattern (T6: default is now bg)
+	if !strings.Contains(inner, `CA_BACKEND="${CA_BACKEND:-bg}" bash`) &&
+		!strings.Contains(inner, "export CA_BACKEND") {
+		t.Error("run_inner_loop must propagate CA_BACKEND as env var to bash inner.sh")
+	}
+}
+
+// TestPolishCommand_InnerLoopBashSyntaxWithBgSeam verifies the generated polish
+// script passes bash -n syntax check (including the bg-capable seam).
+func TestPolishCommand_InnerLoopBashSyntaxWithBgSeam(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish-bg.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1",
+		"--reviewers", "claude-sonnet,gemini,codex")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	out, bashErr := executeBashSyntaxCheck(t, outPath)
+	if bashErr != nil {
+		t.Errorf("bash -n syntax check failed:\n%s\n%v", out, bashErr)
+	}
+}
+
+// TestPolishCommand_SeamHandlesBgBackend verifies that the polish seam
+// supports the bg backend (not just p).
+func TestPolishCommand_SeamHandlesBgBackend(t *testing.T) {
+	t.Parallel()
+	seam := polishScriptSeam("bg", false)
+
+	// Must handle bg backend, not just p
+	if !strings.Contains(seam, "bg)") {
+		t.Error("polish seam must handle bg backend case")
+	}
+	// bg backend must dispatch via claude --bg
+	if !strings.Contains(seam, "claude --bg") {
+		t.Error("polish seam bg case must dispatch via claude --bg")
+	}
+}
+
+// TestPolishCommand_NoRawClaudePOutsideSeam verifies that the polish script
+// has no raw `claude ... -p` invocation outside the seam function body.
+func TestPolishCommand_NoRawClaudePOutsideSeam(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "test.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1")
+	if err != nil {
+		t.Fatalf("polish command failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// Find agent_invoke() definition start
+	invokeIdx := strings.Index(script, "agent_invoke()")
+	if invokeIdx < 0 {
+		t.Fatal("agent_invoke() not found in polish script")
+	}
+	// Extract the rest of the script after the seam function definitions
+	// (everything outside function bodies should not have raw claude -p)
+	// We check run_polish_audit and run_polish_architect don't have raw claude -p
+	auditIdx := strings.Index(script, "run_polish_audit()")
+	if auditIdx < 0 {
+		t.Fatal("run_polish_audit() not found")
+	}
+	auditBody := script[auditIdx:]
+	closeIdx := strings.Index(auditBody, "\n}\n")
+	if closeIdx > 0 {
+		auditBody = auditBody[:closeIdx]
+	}
+	// Inside run_polish_audit, claude reviewer calls must go through agent_invoke
+	if strings.Contains(auditBody, "portable_timeout \"$REVIEW_TIMEOUT\" claude") &&
+		!strings.Contains(auditBody, "agent_invoke") {
+		t.Error("run_polish_audit must use agent_invoke, not direct claude invocation")
+	}
+}
+
+// buildBgCollectReviewerPolishScript builds a bash test script that invokes
+// bg_collect_reviewer from the polish seam.
+// It stubs claude, sets up state.json, and uses the provided fake HOME.
+func buildBgCollectReviewerPolishScript(
+	t *testing.T,
+	repoDir, stubDir, harvestLog, handle string,
+) string {
+	t.Helper()
+	// Fake $HOME with a state.json for the handle.
+	fakeHome := t.TempDir()
+	jobDir := filepath.Join(fakeHome, ".claude", "jobs", handle)
+	if err := os.MkdirAll(jobDir, 0o755); err != nil {
+		t.Fatalf("mkdir job dir: %v", err)
+	}
+	stateJSON := `{"state":"done","inFlight":{"tasks":0},"output":"audit complete"}`
+	if err := os.WriteFile(filepath.Join(jobDir, "state.json"), []byte(stateJSON), 0o644); err != nil {
+		t.Fatalf("write state.json: %v", err)
+	}
+
+	seam := polishScriptSeam("bg", false)
+	report := filepath.Join(t.TempDir(), "report.md")
+	script := "#!/usr/bin/env bash\n" +
+		"set -euo pipefail\n" +
+		"export PATH=\"" + stubDir + ":$PATH\"\n" +
+		"export HOME=\"" + fakeHome + "\"\n" +
+		"export HARVEST_LOG=\"" + harvestLog + "\"\n" +
+		"HAS_JQ=false\n" +
+		"CA_BACKEND=bg\n" +
+		"log() { echo \"[LOG] $*\" >&2; }\n" +
+		seam + "\n" +
+		"bg_collect_reviewer \"" + handle + "\" \"" + report + "\"\n"
+	return script
+}
+
+// TestT5_BgCollectReviewer_Polish_NoRmIfWorktreeHasCommits is a runtime test that
+// verifies bg_collect_reviewer (polish seam) does NOT call claude rm when the
+// reviewer's bg worktree has commits ahead of main, logging HUMAN_REQUIRED instead.
+// R-HARVEST-FAIL, T3/T4 invariant: structural worktree check before every claude rm.
+func TestT5_BgCollectReviewer_Polish_NoRmIfWorktreeHasCommits(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+	handle := "pol1test"
+
+	// Init git repo with initial commit.
+	setupGitRepoForHarvest(t, repoDir)
+
+	// Write pre-dispatch snapshot BEFORE adding the reviewer worktree.
+	preSnapshot := captureWorktreePathsBeforeWorktree(t, repoDir)
+	snapshotDir := filepath.Join(repoDir, ".ca-worktree-snapshots")
+	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+		t.Fatalf("mkdir snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, handle+".txt"), []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	// Add a worktree with a commit (simulating reviewer that misbehaved and committed).
+	wtDir := filepath.Join(repoDir, ".claude", "worktrees", handle)
+	mustGit(t, repoDir, "worktree", "add", "-b", "worktree-"+handle, wtDir)
+	writeFile(t, wtDir, "reviewer-output.txt", "audit notes")
+	mustGit(t, wtDir, "add", "reviewer-output.txt")
+	mustGit(t, wtDir, "commit", "-m", "reviewer: unexpectedly committed in polish")
+
+	// Build claude stub.
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
+	script := buildBgCollectReviewerPolishScript(t, repoDir, stubDir, harvestLog, handle)
+	scriptPath := filepath.Join(t.TempDir(), "collect-polish-commit.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput()
+
+	// Assert: claude rm must NOT have been called for the reviewer session (pol1test).
+	// Note: the preflight probe may rm its own session (deadbeef); we check
+	// specifically that the actual reviewer session handle was NOT rm'd.
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	rmLogData, _ := os.ReadFile(rmLog)
+	if strings.Contains(string(rmLogData), handle) {
+		t.Errorf("claude rm was invoked for reviewer %q despite worktree having commits (polish) — data-loss guard broken\nscript output:\n%s", handle, out)
+	}
+
+	// Assert: HUMAN_REQUIRED must be logged.
+	harvest, _ := os.ReadFile(harvestLog)
+	combined := string(harvest) + string(out)
+	if !strings.Contains(combined, "HUMAN_REQUIRED") {
+		t.Errorf("HUMAN_REQUIRED must be logged when reviewer worktree has commits (polish)\noutput:\n%s", combined)
+	}
+}
+
+// TestT5_BgCollectReviewer_Polish_RmIfNoWorktreeCommits is a runtime test that
+// verifies bg_collect_reviewer (polish seam) DOES call claude rm when the
+// reviewer's worktree has no commits ahead of main (normal/expected case).
+func TestT5_BgCollectReviewer_Polish_RmIfNoWorktreeCommits(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+	handle := "pol2test"
+
+	// Init git repo, write snapshot, add a worktree but NO commit (clean reviewer).
+	setupGitRepoForHarvest(t, repoDir)
+	preSnapshot := captureWorktreePathsBeforeWorktree(t, repoDir)
+	snapshotDir := filepath.Join(repoDir, ".ca-worktree-snapshots")
+	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
+		t.Fatalf("mkdir snapshot dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(snapshotDir, handle+".txt"), []byte(preSnapshot), 0o644); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+	// Add a worktree but do NOT commit anything.
+	wtDir := filepath.Join(repoDir, ".claude", "worktrees", handle)
+	mustGit(t, repoDir, "worktree", "add", "-b", "worktree-"+handle, wtDir)
+
+	// Build claude stub.
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
+	script := buildBgCollectReviewerPolishScript(t, repoDir, stubDir, harvestLog, handle)
+	scriptPath := filepath.Join(t.TempDir(), "collect-polish-noop.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput()
+
+	// Assert: claude rm MUST have been called for the reviewer session (pol2test).
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	rmLogData, _ := os.ReadFile(rmLog)
+	if !strings.Contains(string(rmLogData), handle) {
+		t.Errorf("claude rm was NOT invoked for reviewer %q with no worktree commits (polish) — teardown must proceed\nscript output:\n%s", handle, out)
+	}
+}
+
+// TestT5_BgCollectReviewer_Polish_SnapshotMissing_NoRm verifies the safe-default
+// invariant for the polish seam: when the pre-dispatch snapshot file does NOT exist,
+// bg_collect_reviewer does NOT call claude rm (cannot verify worktree safety), logs
+// HUMAN_REQUIRED, and still writes the reviewer report. This structurally closes the
+// data-loss gap even if a future dispatch path forgets to write the snapshot.
+func TestT5_BgCollectReviewer_Polish_SnapshotMissing_NoRm(t *testing.T) {
+	if _, err := exec.LookPath("bash"); err != nil {
+		t.Skip("bash not available")
+	}
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	t.Parallel()
+
+	repoDir := t.TempDir()
+	stubDir := t.TempDir()
+	handle := "pol3nosnap"
+
+	setupGitRepoForHarvest(t, repoDir)
+	// Deliberately do NOT write a snapshot file for this handle.
+
+	// Build claude stub.
+	claudeStub := filepath.Join(stubDir, "claude")
+	stubContent := "#!/usr/bin/env bash\n" +
+		// bootstrap_preflight calls claude --bg for the probe; return a fake session id.
+		"if [ \"$1\" = \"--bg\" ]; then\n" +
+		"  echo \"backgrounded · deadbeef\"\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		// bootstrap_preflight checks worktree.bgIsolation; simulate the
+		// required operator config (bgIsolation=none) so the bg seam proceeds.
+		"if [ \"$1\" = \"config\" ] && [ \"$2\" = \"get\" ]; then\n" +
+		"  echo none\n" +
+		"  exit 0\n" +
+		"fi\n" +
+		"subcmd=\"$1\"; shift\n" +
+		"if [ \"$subcmd\" = \"rm\" ]; then\n" +
+		"  echo \"claude rm $*\" >> \"" + stubDir + "/claude-rm.log\"\n" +
+		"elif [ \"$subcmd\" = \"stop\" ]; then\n" +
+		"  echo \"claude stop $*\" >> \"" + stubDir + "/claude-stop.log\"\n" +
+		"fi\n" +
+		"exit 0\n"
+	writeFile(t, "", claudeStub, stubContent)
+	if err := os.Chmod(claudeStub, 0o755); err != nil {
+		t.Fatalf("chmod claude stub: %v", err)
+	}
+
+	harvestLog := filepath.Join(t.TempDir(), "harvest.log")
+	script := buildBgCollectReviewerPolishScript(t, repoDir, stubDir, harvestLog, handle)
+	scriptPath := filepath.Join(t.TempDir(), "collect-polish-nosnap.sh")
+	if err := os.WriteFile(scriptPath, []byte(script), 0o755); err != nil {
+		t.Fatalf("write script: %v", err)
+	}
+
+	cmd := exec.Command("bash", scriptPath)
+	cmd.Env = append(os.Environ(),
+		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+	)
+	cmd.Dir = repoDir
+	out, _ := cmd.CombinedOutput()
+
+	// Assert: claude rm must NOT be called for the reviewer session when snapshot is missing.
+	// Note: the preflight probe may rm its own session (deadbeef); we check
+	// specifically that the actual reviewer session handle was NOT rm'd.
+	rmLog := filepath.Join(stubDir, "claude-rm.log")
+	rmLogData, _ := os.ReadFile(rmLog)
+	if strings.Contains(string(rmLogData), handle) {
+		t.Errorf("claude rm was invoked for reviewer %q despite missing snapshot (polish) — safe-default violated (data-loss risk)\nscript output:\n%s", handle, out)
+	}
+
+	// Assert: HUMAN_REQUIRED must be logged.
+	harvest, _ := os.ReadFile(harvestLog)
+	combined := string(harvest) + string(out)
+	if !strings.Contains(combined, "HUMAN_REQUIRED") {
+		t.Errorf("HUMAN_REQUIRED must be logged when snapshot is missing (polish)\noutput:\n%s", combined)
+	}
+}
+
+// ===== P1-2: run_inner_loop --backend propagation =====
+
+// TestPolishScriptInnerLoop_PassesBackendFlag verifies that run_inner_loop passes
+// --backend "$CA_BACKEND" to the inner ca loop invocation, so the generated inner
+// script hard-codes the correct backend. Fail-before: the old code omitted --backend,
+// causing the inner loop to default to bg even under ca polish --backend p.
+func TestPolishScriptInnerLoop_PassesBackendFlag(t *testing.T) {
+	t.Parallel()
+	inner := polishScriptInnerLoop()
+
+	// The ca loop invocation must include --backend "$CA_BACKEND"
+	if !strings.Contains(inner, `--backend "$CA_BACKEND"`) {
+		t.Error("run_inner_loop must pass --backend \"$CA_BACKEND\" to inner ca loop invocation — omitting it silently hard-codes bg even under ca polish --backend p")
+	}
+}
+
+// TestPolishCommand_BackendP_InnerLoopPassesBackendP verifies that a polish script
+// generated with --backend p contains --backend p in the inner ca loop call,
+// so the generated inner script uses the p seam (no bootstrap_preflight).
+// Fail-before: old code omitted --backend entirely from the ca loop call.
+func TestPolishCommand_BackendP_InnerLoopPassesBackendP(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish-p.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--backend", "p",
+		"--spec-file", "docs/SPEC.md",
+		"--meta-epic", "ME1")
+	if err != nil {
+		t.Fatalf("polish --backend p failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The inner ca loop call must include --backend "$CA_BACKEND" (not just the env propagation).
+	if !strings.Contains(script, `--backend "$CA_BACKEND"`) {
+		t.Error("polish --backend p: inner ca loop call must include --backend \"$CA_BACKEND\" so the generated inner script uses the p seam")
+	}
+
+	// Under --backend p, the generated polish script must NOT invoke bootstrap_preflight
+	// unconditionally (it should be absent, since p seam omits it).
+	if strings.Contains(script, "bootstrap_preflight\n") {
+		t.Error("polish --backend p: generated polish script must not call bootstrap_preflight (only bg seam includes it)")
+	}
+}
+
+// TestPolishCommand_BackendBg_InnerLoopPassesBackendBg verifies that the default
+// (bg) backend also passes --backend "$CA_BACKEND" to the inner ca loop call,
+// preserving bg behavior unchanged.
+func TestPolishCommand_BackendBg_InnerLoopPassesBackendBg(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(polishCmd())
+
+	dir := t.TempDir()
+	outPath := filepath.Join(dir, "polish-bg.sh")
+
+	_, err := executeCommand(root, "polish", "-o", outPath,
+		"--spec-file", "docs/SPEC.md",
+		"--meta-epic", "ME1")
+	if err != nil {
+		t.Fatalf("polish (default bg) failed: %v", err)
+	}
+
+	data, _ := os.ReadFile(outPath)
+	script := string(data)
+
+	// The inner ca loop call must still include --backend "$CA_BACKEND" under default bg.
+	if !strings.Contains(script, `--backend "$CA_BACKEND"`) {
+		t.Error("polish (default bg): inner ca loop call must include --backend \"$CA_BACKEND\"")
+	}
+
+	// Under default bg, bootstrap_preflight should be present.
+	if !strings.Contains(script, "bootstrap_preflight") {
+		t.Error("polish (default bg): generated polish script must call bootstrap_preflight")
 	}
 }

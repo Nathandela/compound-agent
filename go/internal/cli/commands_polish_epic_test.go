@@ -152,9 +152,8 @@ func checkCmdFlags(cmd *cobra.Command, violations *[]string) {
 func TestForceFlag_HasShortForm(t *testing.T) {
 	t.Parallel()
 	cmds := map[string]*cobra.Command{
-		"improve": improveCmd(),
-		"loop":    loopCmd(),
-		"polish":  polishCmd(),
+		"loop":   loopCmd(),
+		"polish": polishCmd(),
 	}
 
 	for name, cmd := range cmds {

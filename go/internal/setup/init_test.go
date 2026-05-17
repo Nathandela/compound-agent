@@ -565,7 +565,7 @@ func TestEnsureRootGitignore_MigratesStaleEntries(t *testing.T) {
 	dir := t.TempDir()
 
 	// Simulate old-style marker block with individual entries
-	stale := "# compound-agent managed\nagent_logs/\ninfinity-loop.sh\npolish-loop.sh\nimprovement-loop.sh\n"
+	stale := "# compound-agent managed\nagent_logs/\ninfinity-loop.sh\npolish-loop.sh\n"
 	os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(stale), 0644)
 
 	if err := EnsureRootGitignore(dir); err != nil {

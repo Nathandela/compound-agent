@@ -31,12 +31,6 @@ type loopReviewOptions struct {
 	reviewEvery     int
 }
 
-// loopImproveOptions holds improve-phase configuration for the loop script.
-type loopImproveOptions struct {
-	maxIters   int
-	timeBudget int // seconds, 0 = unlimited
-}
-
 // validateReviewers checks that all reviewer names are valid.
 func validateReviewers(reviewers []string) error {
 	valid := validLoopReviewerSet()
@@ -187,6 +181,9 @@ detect_reviewers() {
 }
 
 // loopScriptSessionIDManagement returns the session ID init function for Claude reviewers.
+// Under the p backend: pre-generates a UUID per reviewer (stored in sessions.json).
+// Under the bg backend: initialises an empty slot; the real .sessionId is captured
+// from state.json after cycle-1 dispatch (spike G1: --bg ignores --session-id).
 func loopScriptSessionIDManagement() string {
 	return `
 init_review_sessions() {
@@ -199,34 +196,39 @@ init_review_sessions() {
   for reviewer in $AVAILABLE_REVIEWERS; do
     case "$reviewer" in
       (claude-sonnet|claude-opus)
-        local existing=""
-        if [ "$HAS_JQ" = true ]; then
-          existing=$(cat "$sessions_file" | jq -r ".[\"$reviewer\"] // empty" 2>/dev/null)
-        else
-          existing=$(python3 -c "
+        # p backend: pre-generate a UUID if not already set.
+        # bg backend: leave slot empty; cycle-1 dispatch captures the bg-assigned .sessionId.
+        if [ "$CA_BACKEND" = "p" ]; then
+          local existing=""
+          if [ "$HAS_JQ" = true ]; then
+            existing=$(cat "$sessions_file" | jq -r ".[\"$reviewer\"] // empty" 2>/dev/null)
+          else
+            existing=$(python3 -c "
 import json, sys
 d = json.load(open(sys.argv[1]))
 print(d.get(sys.argv[2], ''))" "$sessions_file" "$reviewer" 2>/dev/null || echo "")
-        fi
-        if [ -z "$existing" ]; then
-          local sid
-          sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
-          if [ "$HAS_JQ" = true ]; then
-            local tmp
-            tmp=$(cat "$sessions_file" | jq --arg k "$reviewer" --arg v "$sid" '. + {($k): $v}' 2>/dev/null)
-            if [ -n "$tmp" ]; then
-              echo "$tmp" > "$sessions_file"
+          fi
+          if [ -z "$existing" ]; then
+            local sid
+            sid=$(uuidgen | tr '[:upper:]' '[:lower:]')
+            if [ "$HAS_JQ" = true ]; then
+              local tmp
+              tmp=$(cat "$sessions_file" | jq --arg k "$reviewer" --arg v "$sid" '. + {($k): $v}' 2>/dev/null)
+              if [ -n "$tmp" ]; then
+                echo "$tmp" > "$sessions_file"
+              else
+                log "WARN: jq failed to update sessions.json for $reviewer"
+              fi
             else
-              log "WARN: jq failed to update sessions.json for $reviewer"
-            fi
-          else
-            python3 -c "
+              python3 -c "
 import json, sys
 d = json.load(open(sys.argv[1]))
 d[sys.argv[2]] = sys.argv[3]
 json.dump(d, open(sys.argv[1], 'w'))" "$sessions_file" "$reviewer" "$sid" 2>/dev/null || true
+            fi
           fi
         fi
+        # bg backend: slot stays empty until cycle-1 bg_dispatch_reviewer writes the .sessionId.
         ;;
     esac
   done
@@ -283,9 +285,273 @@ print(d.get(sys.argv[2], ''))" "$sessions_file" "$reviewer" 2>/dev/null || echo 
 `
 }
 
+// loopScriptBgReviewHelpers returns the three bg-reviewer helper functions:
+//   - bg_dispatch_reviewer: dispatches claude --bg for a reviewer, captures short id,
+//     reads .sessionId from state.json, persists in sessions.json, writes pre-dispatch
+//     worktree snapshot (T3/T4 invariant: structural check precedes every claude rm).
+//   - bg_poll_reviewer: polls state.json to terminal (same defensive set as agent_poll; S12 guard).
+//   - bg_collect_reviewer: reads .output/.detail from state.json into the report file;
+//     checks for worktree commits before teardown (T3/T4 invariant); only claude rm when safe.
+func loopScriptBgReviewHelpers() string { //nolint:funlen // bash template string
+	return `
+# --- bg reviewer helpers (R-REVIEW, R-FLEET) ---
+# Reviewer bg sessions are advisory: --bg always auto-creates a worktree even for
+# read-only sessions. bg_collect_reviewer performs a structural worktree-commit check
+# before every claude rm (T3/T4 invariant): if the reviewer committed, skip rm and
+# log HUMAN_REQUIRED instead of silently destroying work.
+#
+# Safe-default invariant: if the pre-dispatch snapshot file is missing (e.g. a future
+# dispatch path forgot to write one), bg_collect_reviewer does NOT fall through to
+# claude rm. Instead it calls claude stop (safe) and logs HUMAN_REQUIRED, leaving the
+# session for human inspection. claude rm is only invoked when a snapshot exists AND
+# the worktree-commit check confirms no commits were made.
+
+# _bg_snapshot_worktrees <short_id> <pre_snapshot>
+# Writes the pre-dispatch worktree snapshot to .ca-worktree-snapshots/<short_id>.txt.
+# <pre_snapshot> must be captured BEFORE the claude --bg dispatch (git worktree list
+# output at that moment). <short_id> is parsed from the dispatch output afterwards.
+# Used by bg_dispatch_reviewer (cycle 1) and the cycle-2+ resume path to ensure every
+# bg session handle has a snapshot so bg_collect_reviewer can verify worktree safety.
+# No-op (|| true throughout) so set -e safe; must be called inside a function (T2).
+_bg_snapshot_worktrees() {
+  local _sid="$1" _pre="$2"
+  local _snap_dir
+  _snap_dir="$(git rev-parse --show-toplevel 2>/dev/null || true)/.ca-worktree-snapshots"
+  if [ -n "$_snap_dir" ] && [ "$_snap_dir" != "/.ca-worktree-snapshots" ]; then
+    mkdir -p "$_snap_dir" 2>/dev/null || true
+    printf '%s\n' "$_pre" > "$_snap_dir/$_sid.txt" 2>/dev/null || true
+  fi
+}
+
+# bg_dispatch_reviewer <reviewer> <model> <prompt_file> <sessions_file>
+# Dispatches claude --bg for a reviewer (cycle 1: no --session-id per spike G1).
+# Parses the 8-hex short id, reads .sessionId from state.json, persists in sessions.json.
+# Writes a pre-dispatch worktree snapshot (T3 infra) keyed to short_id so that
+# bg_collect_reviewer can identify the session's worktree via set-diff.
+# Sets BG_REVIEWER_HANDLE_<reviewer_safe> to the short id.
+bg_dispatch_reviewer() {
+  local reviewer="$1" model="$2" prompt_file="$3" sessions_file="$4"
+  # Dispatch claude --bg (no --session-id: spike G1 shows --bg ignores it).
+  # Snapshot BEFORE dispatch so the pre-dispatch state is captured (T3 infra).
+  local raw_output
+  # NOTE: _bg_snapshot_worktrees is called before dispatch to capture pre-launch state.
+  local pre_snapshot
+  pre_snapshot=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
+  raw_output=$(claude --bg \
+    --dangerously-skip-permissions \
+    --permission-mode auto \
+    --model "$model" \
+    "$(cat "$prompt_file")" 2>&1 || true)
+  # Strip ANSI; extract 8-hex short id from "backgrounded · <id>".
+  local short_id
+  short_id=$(printf '%s' "$raw_output" | sed 's/\x1b\[[0-9;]*m//g' | \
+    grep -oE 'backgrounded[[:space:]]*[·•][[:space:]]*([0-9a-f]{8})' | \
+    grep -oE '[0-9a-f]{8}' | head -1 || true)
+  if [ -z "$short_id" ] || ! printf '%s' "$short_id" | grep -qE '^[0-9a-f]{8}$'; then
+    log "WARN: bg reviewer dispatch failed for $reviewer: could not parse short id"
+    return 1
+  fi
+  # Read the full .sessionId from state.json (bg assigns its own session id).
+  local state_file="$HOME/.claude/jobs/$short_id/state.json"
+  local session_id=""
+  local deadline=$(( $(date +%s) + 10 ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    if [ -f "$state_file" ]; then
+      if [ "$HAS_JQ" = true ]; then
+        session_id=$(jq -r '.sessionId // empty' "$state_file" 2>/dev/null || true)
+      else
+        session_id=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('sessionId','') or '')
+except Exception:
+    pass
+" "$state_file" 2>/dev/null || true)
+      fi
+      [ -n "$session_id" ] && break
+    fi
+    sleep 1
+  done
+  # Persist sessionId in sessions.json for cycle 2+ resume.
+  if [ -n "$session_id" ]; then
+    if [ "$HAS_JQ" = true ]; then
+      local tmp
+      tmp=$(cat "$sessions_file" | jq --arg k "$reviewer" --arg v "$session_id" '. + {($k): $v}' 2>/dev/null)
+      [ -n "$tmp" ] && echo "$tmp" > "$sessions_file"
+    else
+      python3 -c "
+import json, sys
+d = json.load(open(sys.argv[1]))
+d[sys.argv[2]] = sys.argv[3]
+json.dump(d, open(sys.argv[1], 'w'))" "$sessions_file" "$reviewer" "$session_id" 2>/dev/null || true
+    fi
+  fi
+  # Write pre-dispatch snapshot keyed to short_id (T3 infra: bg_collect_reviewer uses this
+  # to identify the reviewer's worktree via set-diff and run the commit-safety check).
+  _bg_snapshot_worktrees "$short_id" "$pre_snapshot"
+  # Store short id for polling/teardown.
+  local safe_reviewer
+  safe_reviewer=$(printf '%s' "$reviewer" | tr '-' '_')
+  eval "BG_REVIEWER_HANDLE_${safe_reviewer}=$short_id"
+  log "bg reviewer dispatched: $reviewer short_id=$short_id session_id=${session_id:-<pending>}"
+  return 0
+}
+
+# bg_poll_reviewer <short_id> -> "running" | "done"
+# Defensive terminal set (S12: unknown/partial state -> running; never false-terminal).
+bg_poll_reviewer() {
+  local handle="$1"
+  local state_file="$HOME/.claude/jobs/$handle/state.json"
+  if [ ! -f "$state_file" ]; then
+    echo "running"; return 0
+  fi
+  local state in_flight
+  if [ "$HAS_JQ" = true ]; then
+    state=$(jq -r '.state // empty' "$state_file" 2>/dev/null || true)
+    in_flight=$(jq -r '.inFlight.tasks // 1' "$state_file" 2>/dev/null || echo 1)
+  else
+    state=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('state','') or '')
+except Exception:
+    pass
+" "$state_file" 2>/dev/null || true)
+    in_flight=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    print(d.get('inFlight',{}).get('tasks',1))
+except Exception:
+    print(1)
+" "$state_file" 2>/dev/null || echo 1)
+  fi
+  case "$state" in
+    done|completed|failed|stopped|error|cancel)
+      if [ "${in_flight:-1}" -eq 0 ] 2>/dev/null; then
+        echo "done"
+      else
+        echo "running"
+      fi
+      ;;
+    *) echo "running" ;;
+  esac
+}
+
+# bg_collect_reviewer <short_id> <report_file>
+# Extracts output from state.json .output (then .detail, then transcript) into report_file.
+# Tears down the ephemeral reviewer bg session (stop + rm; no harvest needed).
+bg_collect_reviewer() {
+  local handle="$1" report="$2"
+  local state_file="$HOME/.claude/jobs/$handle/state.json"
+  local output_text=""
+  if [ -f "$state_file" ]; then
+    if [ "$HAS_JQ" = true ]; then
+      output_text=$(jq -r '
+        (.output.result // .output // "") |
+        if type == "string" then . else "" end
+      ' "$state_file" 2>/dev/null || true)
+      if [ -z "$output_text" ]; then
+        output_text=$(jq -r '.detail // ""' "$state_file" 2>/dev/null || true)
+      fi
+      # Transcript fallback if .output/.detail empty.
+      if [ -z "$output_text" ]; then
+        local link_scan_path
+        link_scan_path=$(jq -r '.linkScanPath // ""' "$state_file" 2>/dev/null || true)
+        if [ -n "$link_scan_path" ] && [ -f "$link_scan_path" ]; then
+          output_text=$(jq -j '
+            select(.type == "assistant") |
+            .message.content[]? |
+            select(.type == "text") |
+            .text // empty
+          ' "$link_scan_path" 2>/dev/null | tail -c 8192 || true)
+        fi
+      fi
+    else
+      output_text=$(python3 -c "
+import sys, json
+try:
+    d = json.load(open(sys.argv[1]))
+    o = d.get('output','')
+    if isinstance(o, dict):
+        o = o.get('result','')
+    print(o or d.get('detail','') or '')
+except Exception:
+    pass
+" "$state_file" 2>/dev/null || true)
+    fi
+  fi
+  printf '%s\n' "$output_text" > "$report"
+  # Teardown: structural worktree-commit check before claude rm (T3/T4 invariant).
+  # claude --bg ALWAYS auto-creates a worktree; claude rm ALWAYS destroys it.
+  # If the reviewer committed (e.g. misbehaved), rm would silently destroy that work.
+  # Use the pre-dispatch snapshot (written by bg_dispatch_reviewer / cycle-2+ path) to find the worktree.
+  #
+  # SAFE DEFAULT: if the snapshot file does not exist (e.g. a dispatch path forgot to write one,
+  # or git rev-parse failed), we do NOT fall through to claude rm. Instead we call claude stop
+  # (safe: idempotent) and log HUMAN_REQUIRED, leaving the session for human inspection.
+  # claude rm is only invoked when: snapshot exists AND worktree-commit check proves no commits.
+  claude stop "$handle" 2>/dev/null || true
+  local _repo_root _snap_dir _snap_file _pre_wts _cur_wts _has_commits _snap_found
+  _repo_root=$(git rev-parse --show-toplevel 2>/dev/null || true)
+  _snap_dir="${_repo_root:+$_repo_root/.ca-worktree-snapshots}"
+  _snap_file="${_snap_dir:+$_snap_dir/$handle.txt}"
+  _pre_wts=""
+  _has_commits=false
+  _snap_found=false
+  if [ -n "$_snap_file" ] && [ -f "$_snap_file" ]; then
+    _snap_found=true
+    _pre_wts=$(cat "$_snap_file" 2>/dev/null || true)
+    _cur_wts=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
+    local _wt_path=""
+    while IFS= read -r _wt; do
+      [ -z "$_wt" ] && continue
+      if ! printf '%s\n' "$_pre_wts" | grep -qF "$_wt"; then
+        _wt_path="$_wt"
+        break
+      fi
+    done <<COLLECTEOF
+$_cur_wts
+COLLECTEOF
+    if [ -n "$_wt_path" ]; then
+      # Worktree found: check for commits ahead of main (reviewer should make none).
+      local _base_sha
+      _base_sha=$(git rev-parse HEAD 2>/dev/null || true)
+      local _ahead
+      _ahead=$(git -C "$_wt_path" log "${_base_sha}..HEAD" --oneline 2>/dev/null | head -1 || true)
+      if [ -n "$_ahead" ]; then
+        _has_commits=true
+      fi
+    fi
+  fi
+  if [ "$_has_commits" = true ]; then
+    # Snapshot exists and worktree has commits: skip rm, require human inspection.
+    local _hr_msg="HUMAN_REQUIRED: reviewer bg session $handle has committed worktree changes — left for inspection (skip claude rm)"
+    log "$_hr_msg"
+    if [ -n "${HARVEST_LOG:-}" ]; then
+      printf '%s\n' "$_hr_msg" >> "${HARVEST_LOG}" 2>/dev/null || true
+    fi
+  elif [ "$_snap_found" = false ]; then
+    # Snapshot missing: safe default — do NOT claude rm. Cannot verify worktree safety.
+    local _hr_msg="HUMAN_REQUIRED: reviewer bg session $handle — no pre-dispatch snapshot, cannot verify worktree safety, left for inspection"
+    log "$_hr_msg"
+    if [ -n "${HARVEST_LOG:-}" ]; then
+      printf '%s\n' "$_hr_msg" >> "${HARVEST_LOG}" 2>/dev/null || true
+    fi
+  else
+    # Snapshot exists and no worktree commits: safe to rm.
+    claude rm "$handle" 2>/dev/null || true
+    rm -f "$_snap_file" 2>/dev/null || true
+  fi
+}
+`
+}
+
 // loopScriptSpawnReviewers returns the spawn_reviewers function.
 func loopScriptSpawnReviewers() string { //nolint:funlen // bash template string
-	return loopScriptReadSessionID() + `
+	return loopScriptReadSessionID() + loopScriptBgReviewHelpers() + `
 spawn_reviewers() {
   local cycle="$1" cycle_dir="$2"
   local prompt
@@ -295,8 +561,11 @@ spawn_reviewers() {
   echo "$prompt" > "$prompt_file"
 
   local follow_up="Review the latest fixes. If all issues are resolved, output REVIEW_APPROVED alone on its own line. Otherwise output REVIEW_CHANGES_REQUESTED on its own line followed by your findings."
+  local follow_up_file="$cycle_dir/review-followup.txt"
+  echo "$follow_up" > "$follow_up_file"
 
   local pids=""
+  local bg_handles=""
   for reviewer in $AVAILABLE_REVIEWERS; do
     local report="$cycle_dir/$reviewer.md"
     case "$reviewer" in
@@ -304,22 +573,65 @@ spawn_reviewers() {
         local model_name
         if [ "$reviewer" = "claude-sonnet" ]; then model_name="claude-sonnet-4-6"
         else model_name="claude-opus-4-7[1m]"; fi
-        local sid=""
-        sid=$(read_session_id "$reviewer" "$REVIEW_DIR/sessions.json")
-        if [ "$cycle" -eq 1 ]; then
-          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
-            --dangerously-skip-permissions \
-            --permission-mode auto \
-            --output-format text --session-id "$sid" \
-            -p "$(cat "$prompt_file")" > "$report" 2>&1 || true) &
+        if [ "$CA_BACKEND" = "bg" ]; then
+          if [ "$cycle" -eq 1 ]; then
+            # Cycle 1: dispatch plain claude --bg (no --session-id; spike G1).
+            if bg_dispatch_reviewer "$reviewer" "$model_name" "$prompt_file" "$REVIEW_DIR/sessions.json"; then
+              local safe_reviewer
+              safe_reviewer=$(printf '%s' "$reviewer" | tr '-' '_')
+              local handle
+              eval "handle=\${BG_REVIEWER_HANDLE_${safe_reviewer}:-}"
+              if [ -n "$handle" ]; then
+                bg_handles="$bg_handles $reviewer:$handle:$report"
+              fi
+            fi
+          else
+            # Cycle 2+: resume the bg session via --bg --resume <sessionId>.
+            local sid=""
+            sid=$(read_session_id "$reviewer" "$REVIEW_DIR/sessions.json")
+            if [ -n "$sid" ]; then
+              # Capture pre-dispatch snapshot BEFORE resuming (T3 infra: same invariant as cycle 1).
+              # The resumed session gets a NEW short_id; we write the snapshot keyed to that id
+              # so bg_collect_reviewer can verify worktree safety before claude rm.
+              local c2_pre_snapshot
+              c2_pre_snapshot=$(git worktree list --porcelain 2>/dev/null | grep '^worktree ' | awk '{print $2}' || true)
+              local raw_output
+              raw_output=$(claude --bg \
+                --dangerously-skip-permissions \
+                --permission-mode auto \
+                --model "$model_name" \
+                --resume "$sid" \
+                "$(cat "$follow_up_file")" 2>&1 || true)
+              local short_id
+              short_id=$(printf '%s' "$raw_output" | sed 's/\x1b\[[0-9;]*m//g' | \
+                grep -oE 'backgrounded[[:space:]]*[·•][[:space:]]*([0-9a-f]{8})' | \
+                grep -oE '[0-9a-f]{8}' | head -1 || true)
+              if [ -n "$short_id" ]; then
+                # Write snapshot keyed to the new handle AFTER parsing short_id (T3 infra).
+                _bg_snapshot_worktrees "$short_id" "$c2_pre_snapshot"
+                bg_handles="$bg_handles $reviewer:$short_id:$report"
+              else
+                log "WARN: $reviewer cycle $cycle bg resume failed, output: $raw_output"
+              fi
+            else
+              log "WARN: $reviewer no session id for cycle $cycle resume -- skipping"
+            fi
+          fi
         else
-          (portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
-            --dangerously-skip-permissions \
-            --permission-mode auto \
-            --output-format text --resume "$sid" \
-            -p "$follow_up" > "$report" 2>&1 || true) &
+          # p backend: synchronous agent_invoke (R-PLEGACY -- byte-identical).
+          local sid=""
+          sid=$(read_session_id "$reviewer" "$REVIEW_DIR/sessions.json")
+          if [ "$cycle" -eq 1 ]; then
+            (portable_timeout "$REVIEW_TIMEOUT" agent_invoke "$model_name" \
+              --session-id "$sid" \
+              -p "$(cat "$prompt_file")" > "$report" 2>&1 || true) &
+          else
+            (portable_timeout "$REVIEW_TIMEOUT" agent_invoke "$model_name" \
+              --resume "$sid" \
+              -p "$follow_up" > "$report" 2>&1 || true) &
+          fi
+          pids="$pids $!"
         fi
-        pids="$pids $!"
         ;;
       (gemini)
         if [ "$cycle" -eq 1 ]; then
@@ -344,8 +656,48 @@ spawn_reviewers() {
     esac
     log "Spawned $reviewer (cycle $cycle) -> $report"
   done
-  log "Waiting for reviewers: $pids"
-  for pid in $pids; do wait "$pid" 2>/dev/null || true; done
+
+  # Mixed-fleet barrier: poll bg Claude handles to terminal, wait sync gemini/codex pids.
+  # This ensures no reviewer's result is read until all have finished (R-FLEET).
+  if [ -n "$bg_handles" ]; then
+    local elapsed=0
+    while [ -n "$bg_handles" ] && [ "$elapsed" -lt "$REVIEW_TIMEOUT" ]; do
+      local remaining_handles=""
+      for entry in $bg_handles; do
+        local rev handle rpt
+        rev=$(printf '%s' "$entry" | cut -d: -f1)
+        handle=$(printf '%s' "$entry" | cut -d: -f2)
+        rpt=$(printf '%s' "$entry" | cut -d: -f3)
+        local poll_result
+        poll_result=$(bg_poll_reviewer "$handle")
+        if [ "$poll_result" = "done" ]; then
+          log "$rev bg reviewer done (handle=$handle)"
+          bg_collect_reviewer "$handle" "$rpt"
+        else
+          remaining_handles="$remaining_handles $entry"
+        fi
+      done
+      bg_handles="${remaining_handles# }"
+      if [ -n "$bg_handles" ]; then
+        sleep "${BG_POLL_INTERVAL:-15}"
+        elapsed=$(( elapsed + ${BG_POLL_INTERVAL:-15} ))
+      fi
+    done
+    if [ -n "$bg_handles" ]; then
+      log "WARN: bg reviewer timeout after ${elapsed}s -- collecting remaining"
+      for entry in $bg_handles; do
+        local rev handle rpt
+        rev=$(printf '%s' "$entry" | cut -d: -f1)
+        handle=$(printf '%s' "$entry" | cut -d: -f2)
+        rpt=$(printf '%s' "$entry" | cut -d: -f3)
+        bg_collect_reviewer "$handle" "$rpt"
+      done
+    fi
+  fi
+  if [ -n "$pids" ]; then
+    log "Waiting for sync reviewers (gemini/codex): $pids"
+    for pid in $pids; do wait "$pid" 2>/dev/null || true; done
+  fi
   log "All reviewers finished (cycle $cycle)"
 }
 `
@@ -390,9 +742,7 @@ IMPL_PROMPT_FOOTER
   log "Running implementer session (prompt: $prompt_file)..."
   local impl_start
   impl_start=$(date +%s)
-  portable_timeout "$REVIEW_TIMEOUT" claude --model "$REVIEW_MODEL" --output-format text \
-         --dangerously-skip-permissions \
-         --permission-mode auto \
+  portable_timeout "$REVIEW_TIMEOUT" agent_invoke "$REVIEW_MODEL" \
          -p "$impl_prompt" > "$implementer_report" 2>&1 || true
   local impl_duration=$(( $(date +%s) - impl_start ))
   log "Implementer session complete (${impl_duration}s)"

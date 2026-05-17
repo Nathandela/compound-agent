@@ -143,9 +143,15 @@ ca loop --reviewers claude-sonnet --review-every 3
 
 `ca loop` generates a bash script that processes your beads epics sequentially, running the full cook-it cycle on each one. No human intervention required between epics.
 
+The default backend is `claude --bg` (subscription-billed; requires accepting the bypass-permissions disclaimer once: `claude --dangerously-skip-permissions`). Use `--backend p` or `CA_BACKEND=p` for the legacy `claude -p` (pay-per-token) path.
+
 ```bash
-# Generate script for all ready epics
+# Generate script for all ready epics (bg backend by default)
 ca loop
+
+# Explicit backend selection
+ca loop --backend bg     # bg (default): subscription-billed
+ca loop --backend p      # p: legacy pay-per-token
 
 # With periodic review every 3 epics
 ca loop --reviewers claude-sonnet --review-every 3
@@ -153,42 +159,15 @@ ca loop --reviewers claude-sonnet --review-every 3
 # Target specific epics
 ca loop --epics "beads-abc,beads-def,beads-ghi" --max-retries 2
 
-# Run it
-./.compound-agent/infinity-loop.sh
+# Run it (always use screen for durability)
+screen -dmS compound-loop bash ./.compound-agent/infinity-loop.sh
 ```
+
+**One-time bootstrap (bg backend)**: run `claude --dangerously-skip-permissions` once interactively to accept the bypass-permissions disclaimer. The generated script's bootstrap preflight detects a missing disclaimer and exits with remediation instructions before starting the loop.
 
 The loop respects beads dependency graphs — it only processes epics whose dependencies are complete. If an epic fails after `--max-retries` attempts, it stops and reports before proceeding.
 
 **Current maturity**: the loop works and has been used to ship real projects, including compound-agent itself. Two things still required human involvement: specifications had to be written before the loop started, and a human applied fixes after the first review pass surfaced real problems (missing error handling, a migration gap, insufficient test coverage). Fully unattended long-duration runs across many epics are the current area of hardening.
-
-## The improvement loop
-
-`ca improve` generates a bash script that iterates over `improve/*.md` program files, spawning Claude Code sessions to make focused improvements. Each program file defines what to improve, how to find work, and how to validate changes.
-
-```bash
-# Scaffold an example program file
-ca improve init
-# Creates improve/example.md with a linting template
-
-# Generate the improvement script
-ca improve
-
-# Filter to specific topics
-ca improve --topics lint tests --max-iters 3
-
-# Preview without generating
-ca improve --dry-run
-
-# Run the generated script
-./.compound-agent/improvement-loop.sh
-
-# Preview without executing Claude sessions
-IMPROVE_DRY_RUN=1 ./.compound-agent/improvement-loop.sh
-```
-
-Each iteration makes one focused improvement, commits it, and moves on. If an iteration finds nothing to improve or fails validation, it reverts cleanly and moves to the next topic. The loop tracks consecutive no-improvement results and stops early to avoid diminishing returns.
-
-Monitor progress with `ca watch --improve` to see live trace output from improvement sessions.
 
 ## Automatic hooks
 
@@ -301,7 +280,9 @@ The CLI binary is `ca` (alias: `compound-agent`).
 
 | Command | Description |
 |---------|-------------|
-| `ca loop` | Generate infinity loop script for autonomous epic processing |
+| `ca loop` | Generate infinity loop script (default: `claude --bg`, subscription-billed) |
+| `ca loop --backend bg` | Default bg backend: `claude --bg` (subscription-billed) |
+| `ca loop --backend p` | Legacy p backend: `claude -p` (pay-per-token) |
 | `ca loop --epics "id1,id2,id3"` | Target specific epic IDs (comma-separated) |
 | `ca loop -o <path>` | Custom output path (default: `./.compound-agent/infinity-loop.sh`) |
 | `ca loop --max-retries <n>` | Max retries per epic on failure (default: 1) |
@@ -311,18 +292,12 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca loop --max-review-cycles <n>` | Max review/fix iterations (default: 3) |
 | `ca loop --review-blocking` | Fail loop if review not approved after max cycles |
 | `ca loop --review-model <model>` | Model for implementer fix sessions (default: claude-opus-4-7[1m]) |
-| `ca improve` | Generate improvement loop script from `improve/*.md` programs |
-| `ca improve --topics <names...>` | Run only specific topics |
-| `ca improve --max-iters <n>` | Max iterations per topic (default: 5) |
-| `ca improve --time-budget <seconds>` | Total time budget, 0=unlimited (default: 0) |
-| `ca improve --dry-run` | Validate and print plan without generating |
-| `ca improve --force` | Overwrite existing script |
-| `ca improve init` | Scaffold an example `improve/*.md` program file |
 | `ca watch` | Tail and pretty-print live trace from loop sessions |
 | `ca watch --epic <id>` | Watch a specific epic trace |
-| `ca watch --improve` | Watch improvement loop traces |
 | `ca watch --no-follow` | Print existing trace and exit (no live tail) |
-| `ca polish` | Generate polish loop script for iterative refinement |
+| `ca polish` | Generate polish loop script (default: `claude --bg`, subscription-billed) |
+| `ca polish --backend bg` | Default bg backend: `claude --bg` (subscription-billed) |
+| `ca polish --backend p` | Legacy p backend: `claude -p` (pay-per-token) |
 | `ca polish --spec-file <path>` | Specify the spec file for polish review |
 | `ca polish --reviewers <names>` | Comma-separated reviewer models |
 | `ca polish --cycles <n>` | Number of polish cycles (default: 1) |
