@@ -1053,7 +1053,8 @@ func TestT3_HarvestIntegration_Success(t *testing.T) {
 
 	cmd := exec.Command("bash", harvestScript)
 	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
-		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com")
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+		"HOME="+t.TempDir(), "BG_POLL_INTERVAL=1")
 	cmd.Dir = repoDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -1110,7 +1111,8 @@ func TestT3_HarvestIntegration_Conflict(t *testing.T) {
 
 	cmd := exec.Command("bash", harvestScript)
 	cmd.Env = append(os.Environ(), "GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
-		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com")
+		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+		"HOME="+t.TempDir(), "BG_POLL_INTERVAL=1")
 	cmd.Dir = repoDir
 	out, _ := cmd.CombinedOutput() // non-zero exit OK — harvest-fail returns 1
 
@@ -1171,6 +1173,8 @@ func TestT3_LoopLevel_ConflictReachesCase(t *testing.T) {
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
 		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+		"HOME="+t.TempDir(),
+		"BG_POLL_INTERVAL=1",
 	)
 	cmd.Dir = repoDir
 	out, err := cmd.CombinedOutput()
@@ -1229,6 +1233,8 @@ func TestT3_LoopLevel_NonCompleteReachesCase(t *testing.T) {
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
 		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+		"HOME="+t.TempDir(),
+		"BG_POLL_INTERVAL=1",
 	)
 	cmd.Dir = repoDir
 	out, err := cmd.CombinedOutput()
@@ -1485,6 +1491,8 @@ func mustGit(t *testing.T, dir string, args ...string) {
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
 		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+		"HOME="+t.TempDir(),
+		"BG_POLL_INTERVAL=1",
 	)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("git %v: %v\n%s", args, err, out)
@@ -2230,7 +2238,7 @@ func TestT4_KillLadder_Runtime_NoRmIfWorktreePresent(t *testing.T) {
 	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
 		t.Fatalf("mkdir snapshot dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(snapshotDir, "t1.txt"), []byte(preSnapshot), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(snapshotDir, "11111111.txt"), []byte(preSnapshot), 0o644); err != nil {
 		t.Fatalf("write snapshot: %v", err)
 	}
 	// Add the worktree (simulating un-harvested work).
@@ -2277,7 +2285,7 @@ func TestT4_KillLadder_Runtime_NoRmIfWorktreePresent(t *testing.T) {
 		"log() { echo \"[LOG] $*\" >&2; }\n" +
 		memSafety + "\n" +
 		seam + "\n" +
-		"AGENT_HANDLE=t1\n" +
+		"AGENT_HANDLE=11111111\n" +
 		"MEM_LOG=\"" + memLog + "\"\n" +
 		"bg_kill_ladder \"$AGENT_HANDLE\" \"stale\" \"$MEM_LOG\"\n"
 
@@ -2290,17 +2298,20 @@ func TestT4_KillLadder_Runtime_NoRmIfWorktreePresent(t *testing.T) {
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
 		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+		"HOME="+t.TempDir(),
+		"BG_POLL_INTERVAL=1",
 	)
 	cmd.Dir = repoDir
 	out, _ := cmd.CombinedOutput() // allow non-zero (HUMAN_REQUIRED path)
 
-	// Assert: claude rm must NOT have been called for the session handle (t1).
+	// Assert: claude rm must NOT have been called for the session handle.
 	// Note: the preflight probe may rm its own session (deadbeef); we check
-	// specifically that the actual session handle was NOT rm'd.
+	// specifically that the actual session handle was NOT rm'd. Per-test
+	// unique handle avoids cross-test pkill collisions under parallel load.
 	rmLog := filepath.Join(stubDir, "claude-rm.log")
 	rmLogData, _ := os.ReadFile(rmLog)
-	if strings.Contains(string(rmLogData), "t1") {
-		t.Errorf("claude rm was invoked for session t1 despite un-harvested worktree — data-loss guard broken\nscript output:\n%s", out)
+	if strings.Contains(string(rmLogData), "11111111") {
+		t.Errorf("claude rm was invoked for session 11111111 despite un-harvested worktree — data-loss guard broken\nscript output:\n%s", out)
 	}
 
 	// Assert: HUMAN_REQUIRED logged instead.
@@ -2334,10 +2345,10 @@ func TestT4_KillLadder_Runtime_RmIfNoWorktree(t *testing.T) {
 	if err := os.MkdirAll(snapshotDir, 0o755); err != nil {
 		t.Fatalf("mkdir snapshot dir: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(snapshotDir, "t1.txt"), []byte(preSnapshot), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(snapshotDir, "22222222.txt"), []byte(preSnapshot), 0o644); err != nil {
 		t.Fatalf("write snapshot: %v", err)
 	}
-	// NOTE: no worktree added — session t1 has no un-harvested work.
+	// NOTE: no worktree added — session 22222222 has no un-harvested work.
 
 	claudeStub := filepath.Join(stubDir, "claude")
 	stubContent := "#!/usr/bin/env bash\n" +
@@ -2378,7 +2389,7 @@ func TestT4_KillLadder_Runtime_RmIfNoWorktree(t *testing.T) {
 		"log() { echo \"[LOG] $*\" >&2; }\n" +
 		memSafety + "\n" +
 		seam + "\n" +
-		"AGENT_HANDLE=t1\n" +
+		"AGENT_HANDLE=22222222\n" +
 		"MEM_LOG=\"" + memLog + "\"\n" +
 		"bg_kill_ladder \"$AGENT_HANDLE\" \"stale\" \"$MEM_LOG\"\n"
 
@@ -2391,15 +2402,18 @@ func TestT4_KillLadder_Runtime_RmIfNoWorktree(t *testing.T) {
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
 		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+		"HOME="+t.TempDir(),
+		"BG_POLL_INTERVAL=1",
 	)
 	cmd.Dir = repoDir
 	out, _ := cmd.CombinedOutput()
 
-	// Assert: claude rm MUST have been called for the session handle (t1).
+	// Assert: claude rm MUST have been called for the session handle.
+	// Per-test unique handle avoids cross-test pkill collisions under parallel load.
 	rmLog := filepath.Join(stubDir, "claude-rm.log")
 	rmLogData, _ := os.ReadFile(rmLog)
-	if !strings.Contains(string(rmLogData), "t1") {
-		t.Errorf("claude rm was NOT invoked for session t1 with no worktree — teardown must proceed\noutput:\n%s", out)
+	if !strings.Contains(string(rmLogData), "22222222") {
+		t.Errorf("claude rm was NOT invoked for session 22222222 with no worktree — teardown must proceed\noutput:\n%s", out)
 	}
 }
 
@@ -2441,6 +2455,8 @@ func runBootstrapPreflight(t *testing.T, repoDir, stubExtra string) (string, int
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
 		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+		"HOME="+t.TempDir(),
+		"BG_POLL_INTERVAL=1",
 	)
 	out, err := cmd.CombinedOutput()
 	code := 0
@@ -2674,7 +2690,7 @@ func TestT4_KillLadder_Runtime_NoRmIfSnapshotMissing(t *testing.T) {
 		"log() { echo \"[LOG] $*\" >&2; }\n" +
 		memSafety + "\n" +
 		seam + "\n" +
-		"AGENT_HANDLE=t1\n" +
+		"AGENT_HANDLE=33333333\n" +
 		"MEM_LOG=\"" + memLog + "\"\n" +
 		"bg_kill_ladder \"$AGENT_HANDLE\" \"stale\" \"$MEM_LOG\"\n"
 
@@ -2687,16 +2703,19 @@ func TestT4_KillLadder_Runtime_NoRmIfSnapshotMissing(t *testing.T) {
 	cmd.Env = append(os.Environ(),
 		"GIT_AUTHOR_NAME=Test", "GIT_AUTHOR_EMAIL=test@test.com",
 		"GIT_COMMITTER_NAME=Test", "GIT_COMMITTER_EMAIL=test@test.com",
+		"HOME="+t.TempDir(),
+		"BG_POLL_INTERVAL=1",
 	)
 	cmd.Dir = repoDir
 	out, _ := cmd.CombinedOutput()
 
-	// Assert: claude rm must NOT have been called for session t1 — snapshot
+	// Assert: claude rm must NOT have been called for the session handle — snapshot
 	// missing is unverifiable, so teardown must be refused (data-loss guard).
+	// Per-test unique handle avoids cross-test pkill collisions under parallel load.
 	rmLog := filepath.Join(stubDir, "claude-rm.log")
 	rmLogData, _ := os.ReadFile(rmLog)
-	if strings.Contains(string(rmLogData), "t1") {
-		t.Errorf("claude rm was invoked for session t1 despite MISSING snapshot — data-loss guard broken\nscript output:\n%s", out)
+	if strings.Contains(string(rmLogData), "33333333") {
+		t.Errorf("claude rm was invoked for session 33333333 despite MISSING snapshot — data-loss guard broken\nscript output:\n%s", out)
 	}
 
 	// Assert: HUMAN_REQUIRED logged instead.
