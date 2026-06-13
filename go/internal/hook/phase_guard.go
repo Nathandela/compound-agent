@@ -7,9 +7,28 @@ type PhaseGuardResult struct {
 	SpecificOutput *SpecificOutput `json:"hookSpecificOutput,omitempty"`
 }
 
-// ProcessPhaseGuard checks if Edit/Write is allowed without reading the phase skill.
+// phaseGuardedEditTools is the set of file-mutating tool names the phase gate
+// guards. Claude uses Edit/Write; the remaining names are Goose's native edit
+// tools, so guarding them only ADDS blocking for tools Claude never sends.
+var phaseGuardedEditTools = map[string]bool{
+	"Edit":                   true,
+	"Write":                  true,
+	"str_replace":            true,
+	"create_file":            true,
+	"text_editor":            true,
+	"developer__text_editor": true,
+	"str_replace_editor":     true,
+}
+
+// isPhaseGuardedEditTool reports whether name is a file-mutating tool the phase
+// gate should guard.
+func isPhaseGuardedEditTool(name string) bool {
+	return phaseGuardedEditTools[name]
+}
+
+// ProcessPhaseGuard checks if a file-mutating tool is allowed without reading the phase skill.
 func ProcessPhaseGuard(repoRoot, toolName string, toolInput map[string]interface{}) PhaseGuardResult {
-	if toolName != "Edit" && toolName != "Write" {
+	if !isPhaseGuardedEditTool(toolName) {
 		return PhaseGuardResult{}
 	}
 

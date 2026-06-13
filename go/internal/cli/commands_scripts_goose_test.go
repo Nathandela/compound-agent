@@ -79,6 +79,16 @@ func TestLoopCmd_GooseRequiresProviderModel(t *testing.T) {
 		t.Errorf("valid provider/model ollama/qwen2.5-coder:14b should succeed, got: %v", err)
 	}
 
+	// FIX-5: multi-segment model halves are valid (provider = before the first
+	// slash, model = everything after). E.g. an openrouter 3-segment ref.
+	root4 := &cobra.Command{Use: "ca"}
+	root4.AddCommand(loopCmd())
+	_, err = executeCommand(root4, "loop", "-o", filepath.Join(dir, "d.sh"),
+		"--implementer", "goose", "--model", "openrouter/anthropic/claude-3.5-sonnet")
+	if err != nil {
+		t.Errorf("multi-segment ref openrouter/anthropic/claude-3.5-sonnet should succeed, got: %v", err)
+	}
+
 	// Empty provider or model half must error.
 	for _, bad := range []string{"/deepseek-chat", "deepseek/", "/"} {
 		rootN := &cobra.Command{Use: "ca"}
@@ -88,6 +98,33 @@ func TestLoopCmd_GooseRequiresProviderModel(t *testing.T) {
 		if err == nil {
 			t.Errorf("expected error for malformed provider/model %q", bad)
 		}
+	}
+}
+
+// --- FIX-6: --implementer goose + --reviewers is rejected (Phase 3 not ready) ---
+
+func TestLoopCmd_GooseRejectsReviewers(t *testing.T) {
+	t.Parallel()
+	root := &cobra.Command{Use: "ca"}
+	root.AddCommand(loopCmd())
+	dir := t.TempDir()
+	_, err := executeCommand(root, "loop", "-o", filepath.Join(dir, "rev.sh"),
+		"--implementer", "goose", "--model", "deepseek/deepseek-chat",
+		"--reviewers", "claude-sonnet")
+	if err == nil {
+		t.Fatal("expected error: --reviewers is not supported with --implementer goose")
+	}
+	if !strings.Contains(err.Error(), "reviewers") || !strings.Contains(err.Error(), "goose") {
+		t.Errorf("error should explain reviewers are unsupported with goose, got: %v", err)
+	}
+
+	// Sanity: goose without --reviewers still succeeds.
+	root2 := &cobra.Command{Use: "ca"}
+	root2.AddCommand(loopCmd())
+	_, err = executeCommand(root2, "loop", "-o", filepath.Join(dir, "norev.sh"),
+		"--implementer", "goose", "--model", "deepseek/deepseek-chat")
+	if err != nil {
+		t.Errorf("goose without --reviewers should succeed, got: %v", err)
 	}
 }
 
@@ -189,6 +226,63 @@ func TestLoopCmd_GooseDispatchUsesGooseRun(t *testing.T) {
 	}
 }
 
+// extractShellFunc returns the body of `name() { ... }` from a bash script,
+// matching braces so nested blocks (subshells, if/then) are included. The
+// returned string is the content between the opening and the matching closing
+// brace (exclusive). Fails the test if the function is not found.
+func extractShellFunc(t *testing.T, script, name string) string {
+	t.Helper()
+	header := name + "() {"
+	start := strings.Index(script, header)
+	if start < 0 {
+		t.Fatalf("function %s not found", name)
+	}
+	i := start + len(header)
+	depth := 1
+	bodyStart := i
+	for i < len(script) {
+		switch script[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return script[bodyStart:i]
+			}
+		}
+		i++
+	}
+	t.Fatalf("unbalanced braces in function %s", name)
+	return ""
+}
+
+// --- FIX-7: agent_dispatch is async (background + PID handle), agent_invoke is sync ---
+
+func TestLoopCmd_GooseDispatchVsInvokeDistinction(t *testing.T) {
+	t.Parallel()
+	script := generateLoopScriptViaCmd(t, "--implementer", "goose", "--model", "deepseek/deepseek-chat")
+
+	dispatch := extractShellFunc(t, script, "agent_dispatch")
+	if !strings.Contains(dispatch, `goose run --no-session -i "$promptfile"`) {
+		t.Errorf("agent_dispatch must run 'goose run --no-session -i \"$promptfile\"', body:\n%s", dispatch)
+	}
+	if !strings.Contains(dispatch, "AGENT_HANDLE=$!") {
+		t.Errorf("agent_dispatch must set AGENT_HANDLE=$! (background PID handle), body:\n%s", dispatch)
+	}
+
+	invoke := extractShellFunc(t, script, "agent_invoke")
+	if strings.Contains(invoke, "AGENT_HANDLE=$!") {
+		t.Errorf("agent_invoke must be synchronous (no AGENT_HANDLE=$!), body:\n%s", invoke)
+	}
+	// Synchronous: no line backgrounds the goose run with a trailing '&'.
+	for _, line := range strings.Split(invoke, "\n") {
+		trimmed := strings.TrimRight(strings.TrimSpace(line), " ")
+		if strings.HasSuffix(trimmed, "&") && !strings.HasSuffix(trimmed, "&&") {
+			t.Errorf("agent_invoke must not background any command (trailing '&'), line: %q", line)
+		}
+	}
+}
+
 // --- Goose poll uses kill -0 ---
 
 func TestLoopCmd_GoosePollUsesKill0(t *testing.T) {
@@ -277,6 +371,19 @@ func TestLoopCmd_GoosePreflightOllamaContext(t *testing.T) {
 	}
 	if !strings.Contains(ollama, "ollama pull") {
 		t.Error("ollama goose preflight must reference 'ollama pull' remediation")
+	}
+	// FIX-3: the model-pulled check must capture the model list once and use a
+	// fixed-string (grep -Fq) match to avoid false "not pulled" failures from
+	// regex-special characters in the model ref (e.g. the colon in :14b).
+	if !strings.Contains(ollama, `_ollama_models="$(ollama list 2>/dev/null || true)"`) {
+		t.Error("ollama preflight must capture the model list once into _ollama_models")
+	}
+	if !strings.Contains(ollama, `grep -Fq -- "$GOOSE_MODEL"`) {
+		t.Error("ollama preflight must use a fixed-string match (grep -Fq -- \"$GOOSE_MODEL\")")
+	}
+	// The old, false-positive-prone pipeline must be gone.
+	if strings.Contains(ollama, `ollama list 2>/dev/null | grep -q "$GOOSE_MODEL"`) {
+		t.Error("ollama preflight must not use the unanchored 'ollama list | grep -q' pipeline")
 	}
 
 	api := generateLoopScriptViaCmd(t, "--implementer", "goose", "--model", "deepseek/deepseek-chat")

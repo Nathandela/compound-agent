@@ -1,9 +1,34 @@
 package templates
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
+
+// preToolUseCommand decodes the goose hooks.json and returns the (JSON-decoded)
+// shell command string of the first PreToolUse hook. Asserting against the
+// decoded command is robust: it matches the shell that actually runs, not the
+// doubly-escaped raw JSON bytes.
+func preToolUseCommand(t *testing.T, hooks string) string {
+	t.Helper()
+	var manifest struct {
+		Hooks struct {
+			PreToolUse []struct {
+				Hooks []struct {
+					Command string `json:"command"`
+				} `json:"hooks"`
+			} `json:"PreToolUse"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal([]byte(hooks), &manifest); err != nil {
+		t.Fatalf("goose hooks.json is not valid JSON: %v", err)
+	}
+	if len(manifest.Hooks.PreToolUse) == 0 || len(manifest.Hooks.PreToolUse[0].Hooks) == 0 {
+		t.Fatal("goose hooks.json has no PreToolUse command")
+	}
+	return manifest.Hooks.PreToolUse[0].Hooks[0].Command
+}
 
 // TestGooseHooksJSON_BlockingPhaseGate verifies the embedded Goose hooks
 // manifest exists, carries the BIN placeholder for substitution, declares the
@@ -25,6 +50,20 @@ func TestGooseHooksJSON_BlockingPhaseGate(t *testing.T) {
 	// PreToolUse must be a real blocking phase-gate, not a warning.
 	if !strings.Contains(hooks, "exit 2") && !strings.Contains(hooks, `"decision":"block"`) {
 		t.Error("Goose PreToolUse hook must block via exit 2 or decision:block")
+	}
+	// FIX-4: the PreToolUse matcher must be anchored and include text_editor.
+	if !strings.Contains(hooks, `"matcher": "^(Edit|Write|str_replace|create_file|text_editor)$"`) {
+		t.Error("Goose PreToolUse matcher must be anchored ^(Edit|Write|str_replace|create_file|text_editor)$")
+	}
+	// FIX-2: the extracted reason must be JSON-escaped before being printf'd into
+	// the {"decision":"block","reason":"..."} payload (backslash + quote escaping,
+	// then control chars stripped). Assert against the decoded shell command.
+	cmd := preToolUseCommand(t, hooks)
+	if !strings.Contains(cmd, `s/\\/\\\\/g`) || !strings.Contains(cmd, `s/"/\\"/g`) {
+		t.Errorf("Goose PreToolUse must JSON-escape the reason (backslash and quote escaping) before printf, got: %s", cmd)
+	}
+	if !strings.Contains(cmd, `tr -d '\n\r\t'`) {
+		t.Errorf("Goose PreToolUse must strip control chars from the reason, got: %s", cmd)
 	}
 }
 

@@ -67,9 +67,18 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 		return fmt.Errorf("--implementer must be 'claude' or 'goose', got %q", o.implementer)
 	}
 	if o.implementer == "goose" {
+		// provider = before the first slash, model = everything after. The model
+		// half may itself contain slashes (e.g. openrouter/anthropic/claude-3.5-sonnet),
+		// so only require at least one slash with non-empty halves; do not reject
+		// additional slashes.
 		provider, model, ok := strings.Cut(o.model, "/")
-		if !ok || provider == "" || model == "" || strings.Contains(model, "/") {
+		if !ok || provider == "" || model == "" {
 			return fmt.Errorf("--implementer goose requires --model as provider/model (e.g. ollama/qwen2.5-coder:14b, deepseek/deepseek-chat), got %q", o.model)
+		}
+		// Reviewers spawn agent_invoke with claude-only flags; under goose they
+		// would fail silently. The open-model review fleet is Phase 3.
+		if o.reviewers != "" {
+			return fmt.Errorf("--reviewers is not yet supported with --implementer goose (open-model review fleet is Phase 3); omit --reviewers or use --implementer claude")
 		}
 	}
 	output := o.output
@@ -1581,7 +1590,11 @@ goose_preflight() {
   if [ "$GOOSE_PROVIDER" = "ollama" ]; then
     command -v ollama >/dev/null || die "ollama CLI required for provider 'ollama'. Install: https://ollama.com/download"
     ollama list >/dev/null 2>&1 || die "ollama is not reachable. Start it with: ollama serve"
-    if ! ollama list 2>/dev/null | grep -q "$GOOSE_MODEL"; then
+    # Capture the model list once and match the model ref as a fixed string so
+    # regex-special characters (e.g. the colon in :14b) cannot cause a false
+    # "not pulled" failure.
+    _ollama_models="$(ollama list 2>/dev/null || true)"
+    if ! printf '%s\n' "$_ollama_models" | grep -Fq -- "$GOOSE_MODEL"; then
       die "ollama model '$GOOSE_MODEL' not pulled. Remediation: ollama pull $GOOSE_MODEL"
     fi
     # Goose silently ignores extensions/.goosehints unless context >= 32768.

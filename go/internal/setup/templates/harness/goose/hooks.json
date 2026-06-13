@@ -22,11 +22,11 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write|str_replace|create_file",
+        "matcher": "^(Edit|Write|str_replace|create_file|text_editor)$",
         "hooks": [
           {
             "type": "command",
-            "command": "out=$({{BIN}} hooks run phase-guard 2>/dev/null); if printf '%s' \"$out\" | grep -q 'PHASE GUARD'; then reason=$(printf '%s' \"$out\" | sed -e 's/.*\"additionalContext\":\"//' -e 's/\".*//'); printf '{\"decision\":\"block\",\"reason\":\"%s\"}' \"$reason\"; exit 2; fi; exit 0"
+            "command": "out=$({{BIN}} hooks run phase-guard 2>/dev/null); if printf '%s' \"$out\" | grep -q 'PHASE GUARD'; then reason=$(printf '%s' \"$out\" | sed -e 's/.*\"additionalContext\":\"//' -e 's/\".*//'); reason=$(printf '%s' \"$reason\" | sed -e 's/\\\\/\\\\\\\\/g' -e 's/\"/\\\\\"/g' | tr -d '\\n\\r\\t'); printf '{\"decision\":\"block\",\"reason\":\"%s\"}' \"$reason\"; exit 2; fi; exit 0"
           }
         ]
       }

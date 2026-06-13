@@ -1,6 +1,7 @@
 package setup
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -163,6 +164,32 @@ func TestSetup_HarnessGooseHooksJson_BlockingPhaseGate(t *testing.T) {
 	}
 	if !strings.Contains(content, "exit 2") && !strings.Contains(content, `"decision":"block"`) {
 		t.Error("goose PreToolUse must block via exit 2 or decision:block")
+	}
+	// FIX-4: anchored matcher including text_editor.
+	if !strings.Contains(content, `"matcher": "^(Edit|Write|str_replace|create_file|text_editor)$"`) {
+		t.Error("goose PreToolUse matcher must be anchored ^(Edit|Write|str_replace|create_file|text_editor)$")
+	}
+	// FIX-2: the reason must be JSON-escaped before being printf'd into the payload.
+	// Decode the JSON so we assert against the shell that actually runs (the
+	// installed file substitutes {{BIN}} but the PreToolUse command is unchanged).
+	var manifest struct {
+		Hooks struct {
+			PreToolUse []struct {
+				Hooks []struct {
+					Command string `json:"command"`
+				} `json:"hooks"`
+			} `json:"PreToolUse"`
+		} `json:"hooks"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatalf("installed goose hooks.json is not valid JSON: %v", err)
+	}
+	if len(manifest.Hooks.PreToolUse) == 0 || len(manifest.Hooks.PreToolUse[0].Hooks) == 0 {
+		t.Fatal("installed goose hooks.json has no PreToolUse command")
+	}
+	cmd := manifest.Hooks.PreToolUse[0].Hooks[0].Command
+	if !strings.Contains(cmd, `s/\\/\\\\/g`) || !strings.Contains(cmd, `s/"/\\"/g`) {
+		t.Errorf("goose PreToolUse must JSON-escape the reason before printf, got: %s", cmd)
 	}
 }
 
