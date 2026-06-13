@@ -36,6 +36,21 @@ var claudeMdReference string
 //go:embed plugin.json
 var pluginJSON string
 
+//go:embed harness/goose/hooks.json
+var gooseHooksJSON string
+
+//go:embed harness/goose/goosehints
+var gooseHints string
+
+//go:embed harness/goose/compound-cook-it.yaml
+var gooseRecipe string
+
+//go:embed harness/codex/config.toml
+var codexConfig string
+
+//go:embed harness/gemini/GEMINI.md
+var geminiMemory string
+
 // Markers for idempotent section detection.
 const (
 	CompoundAgentSectionHeader = "## Compound Agent Integration"
@@ -58,6 +73,31 @@ func ClaudeMdReference() string {
 // PluginJSON returns the plugin.json template with {{VERSION}} placeholder.
 func PluginJSON() string {
 	return pluginJSON
+}
+
+// GooseHooksJSON returns the Goose hooks manifest with the {{BIN}} placeholder.
+func GooseHooksJSON() string {
+	return gooseHooksJSON
+}
+
+// GooseHints returns the Goose .goosehints memory file.
+func GooseHints() string {
+	return gooseHints
+}
+
+// GooseRecipe returns the compound-cook-it Goose recipe YAML.
+func GooseRecipe() string {
+	return gooseRecipe
+}
+
+// CodexConfig returns the Codex config.toml with the {{VERSION}} placeholder.
+func CodexConfig() string {
+	return codexConfig
+}
+
+// GeminiMemory returns the GEMINI.md memory file.
+func GeminiMemory() string {
+	return geminiMemory
 }
 
 // AgentTemplates returns a map of filename -> content for agent .md files.

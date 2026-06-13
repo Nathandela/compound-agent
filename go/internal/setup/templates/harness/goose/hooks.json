@@ -1,0 +1,46 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{BIN}} prime 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{BIN}} hooks run user-prompt 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|str_replace|create_file",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "out=$({{BIN}} hooks run phase-guard 2>/dev/null); if printf '%s' \"$out\" | grep -q 'PHASE GUARD'; then reason=$(printf '%s' \"$out\" | sed -e 's/.*\"additionalContext\":\"//' -e 's/\".*//'); printf '{\"decision\":\"block\",\"reason\":\"%s\"}' \"$reason\"; exit 2; fi; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|str_replace|create_file|shell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "{{BIN}} hooks run post-tool-success 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

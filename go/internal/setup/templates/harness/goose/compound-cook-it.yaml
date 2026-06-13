@@ -1,0 +1,38 @@
+version: "1.0.0"
+title: compound-cook-it
+description: >
+  Drive a single epic through the compound-agent workflow: plan, work, review,
+  compound. Adapts the cook-it skill for Goose with open-model implementers.
+
+parameters:
+  - key: epic
+    input_type: string
+    requirement: optional
+    description: The epic id (bead) to implement. Empty means current plan.
+    default: ""
+
+instructions: |
+  You are executing one epic through the four compound-agent phases. Do not skip
+  a phase. Call `ca search` and `ca knowledge` before deciding anything non-trivial.
+
+prompt: |
+  Run the epic "{{ epic }}" through these phases in order:
+
+  1. plan: Read the spec and the plan. Call `ca search` and `ca knowledge` for
+     prior art. List the concrete changes and the verification contract.
+  2. work: Write the failing test(s) first, then the minimal code to pass them.
+     Keep changes lean and matching surrounding style.
+  3. review: Run the quality gates (tests, lint, build). Fix any failures. Do not
+     proceed until green.
+  4. compound: Run `ca learn` to capture any lesson worth keeping.
+
+  Goose does not auto-commit. When the epic is done you MUST:
+
+      git add -A && git commit -m "<message>" && git push
+
+  Then print exactly one marker on its own line:
+  - `EPIC_COMPLETE` when implemented, green, committed, and pushed.
+  - `HUMAN_REQUIRED: <reason>` when a human decision is needed.
+  - `EPIC_FAILED` when it cannot be completed after retries.
+
+  You MUST print `EPIC_COMPLETE` on success. Do not finish without a marker.

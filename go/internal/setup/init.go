@@ -31,6 +31,11 @@ type InitOptions struct {
 	// currently installed will delete workflow templates from disk.
 	// Without this flag, InitRepo errors rather than prune silently.
 	ConfirmPrune bool
+
+	// Targets selects which harness install targets to install. Empty means
+	// the default Claude full install (byte-identical to before this flag).
+	// When non-empty, ONLY the listed targets are installed.
+	Targets []HarnessTarget
 }
 
 // InitResult reports what init did.
@@ -57,6 +62,9 @@ type InitResult struct {
 	ClaudeMdUpdated     bool
 	PluginCreated       bool
 	PluginUpdated       bool
+
+	// Targets reports which harness install targets were installed.
+	Targets []HarnessTarget
 }
 
 // initDirectories creates the .claude/ directory structure and index.jsonl.
@@ -257,25 +265,89 @@ func InitRepo(repoRoot string, opts InitOptions) (*InitResult, error) {
 	}
 	opts.Profile = resolveProfile(opts.Profile)
 
+	// Validate harness targets BEFORE any filesystem writes so an unknown
+	// target leaves no half-written state.
+	for _, target := range opts.Targets {
+		if !isValidHarness(target) {
+			return nil, fmt.Errorf(
+				"unknown harness target %q (valid: %s)", target, harnessTargetList())
+		}
+	}
+
 	result := &InitResult{Success: true}
 
-	if err := initDirectories(repoRoot, result); err != nil {
-		return nil, err
-	}
+	// installClaude is true when no harness targets are listed (default,
+	// byte-identical to before this flag) or when claude is explicitly listed.
+	installClaude := len(opts.Targets) == 0 || harnessListed(opts.Targets, HarnessClaude)
 
-	if !opts.SkipHooks {
-		if err := initHooks(repoRoot, opts.BinaryPath, opts.Profile, result); err != nil {
+	if installClaude {
+		if err := installClaudeTarget(repoRoot, opts, result); err != nil {
 			return nil, err
 		}
 	}
 
-	if !opts.SkipTemplates {
-		if err := installTemplates(repoRoot, opts.Profile, opts.ConfirmPrune, result); err != nil {
+	if len(opts.Targets) > 0 {
+		if err := installHarnessTargets(repoRoot, opts, result); err != nil {
 			return nil, err
 		}
+		result.Targets = opts.Targets
 	}
 
 	return result, nil
+}
+
+// installClaudeTarget performs the default .claude install (directories, hooks,
+// templates). This is the unchanged legacy path; routing claude through it keeps
+// the default and `--harness claude` byte-identical.
+func installClaudeTarget(repoRoot string, opts InitOptions, result *InitResult) error {
+	if err := initDirectories(repoRoot, result); err != nil {
+		return err
+	}
+	if !opts.SkipHooks {
+		if err := initHooks(repoRoot, opts.BinaryPath, opts.Profile, result); err != nil {
+			return err
+		}
+	}
+	if !opts.SkipTemplates {
+		if err := installTemplates(repoRoot, opts.Profile, opts.ConfirmPrune, result); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// installHarnessTargets dispatches the non-claude harness installers. Claude is
+// handled separately by installClaudeTarget.
+func installHarnessTargets(repoRoot string, opts InitOptions, result *InitResult) error {
+	for _, target := range opts.Targets {
+		var err error
+		switch target {
+		case HarnessClaude:
+			// Already installed via installClaudeTarget.
+		case HarnessGoose:
+			err = installGoose(repoRoot, opts.BinaryPath, result)
+		case HarnessCodex:
+			err = installCodex(repoRoot, result)
+		case HarnessGemini:
+			err = installGemini(repoRoot, result)
+		default:
+			err = fmt.Errorf("unknown harness target %q", target)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// harnessListed reports whether target appears in the list.
+func harnessListed(targets []HarnessTarget, target HarnessTarget) bool {
+	for _, t := range targets {
+		if t == target {
+			return true
+		}
+	}
+	return false
 }
 
 // ArtifactRootPath returns the absolute path to the artifact root directory.

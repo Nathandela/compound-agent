@@ -22,6 +22,7 @@ import (
 type loopCmdOptions struct {
 	output, model, epics, reviewers, reviewModel string
 	backend                                      string
+	implementer                                  string
 	maxRetries, reviewEvery, maxReviewCycles     int
 	compactPct                                   int
 	force, reviewBlocking                        bool
@@ -41,7 +42,7 @@ func loopCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&o.output, "output", "o", ".compound-agent/infinity-loop.sh", "Output script path")
 	cmd.Flags().IntVar(&o.maxRetries, "max-retries", 1, "Max retries per epic on failure")
-	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-7[1m]", "Claude model to use")
+	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-7[1m]", "Model to use. For --implementer goose, a provider/model ref (e.g. ollama/qwen2.5-coder:14b, deepseek/deepseek-chat)")
 	cmd.Flags().BoolVarP(&o.force, "force", "f", false, "Overwrite existing script")
 	cmd.Flags().StringVar(&o.epics, "epics", "", "Comma-separated epic IDs to process")
 	cmd.Flags().StringVar(&o.reviewers, "reviewers", "", "Comma-separated reviewers (claude-sonnet,claude-opus,gemini,codex)")
@@ -51,6 +52,7 @@ func loopCmd() *cobra.Command {
 	cmd.Flags().StringVar(&o.reviewModel, "review-model", "claude-opus-4-7[1m]", "Model for implementer fix sessions")
 	cmd.Flags().IntVar(&o.compactPct, "compact-pct", 0, "Context auto-compaction threshold % (0=use Claude Code default, suggested: 50)")
 	cmd.Flags().StringVar(&o.backend, "backend", "bg", "Claude execution backend: bg (default) or p (legacy claude -p)")
+	cmd.Flags().StringVar(&o.implementer, "implementer", "claude", "Loop implementer: claude (default) or goose")
 	return cmd
 }
 
@@ -60,6 +62,15 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 	}
 	if o.backend != "bg" && o.backend != "p" {
 		return fmt.Errorf("--backend must be 'bg' or 'p', got %q", o.backend)
+	}
+	if o.implementer != "claude" && o.implementer != "goose" {
+		return fmt.Errorf("--implementer must be 'claude' or 'goose', got %q", o.implementer)
+	}
+	if o.implementer == "goose" {
+		provider, model, ok := strings.Cut(o.model, "/")
+		if !ok || provider == "" || model == "" || strings.Contains(model, "/") {
+			return fmt.Errorf("--implementer goose requires --model as provider/model (e.g. ollama/qwen2.5-coder:14b, deepseek/deepseek-chat), got %q", o.model)
+		}
 	}
 	output := o.output
 	if output == "" {
@@ -79,6 +90,7 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 		compactPct:      o.compactPct,
 		backend:         o.backend,
 		backendExplicit: backendExplicit,
+		implementer:     o.implementer,
 	}
 
 	if o.reviewers != "" {
@@ -113,6 +125,7 @@ type loopGenerateOptions struct {
 	epics           string
 	backend         string // "bg" or "p"
 	backendExplicit bool   // true if user passed --backend explicitly
+	implementer     string // "claude" (default/empty) or "goose"
 	review          *loopReviewOptions
 }
 
@@ -122,12 +135,18 @@ func generateLoopScript(opts loopGenerateOptions) string {
 	escapedEpicIDs := util.ShellEscape(strings.ReplaceAll(opts.epics, ",", " "))
 	bt := "`" // backtick for use in templates
 
-	config := loopScriptConfig(opts.maxRetries, escapedModel, escapedEpicIDs, opts.compactPct)
+	// Normalize implementer: empty defaults to claude (byte-identical default path).
+	impl := opts.implementer
+	if impl == "" {
+		impl = "claude"
+	}
+
+	config := loopScriptConfig(opts.maxRetries, escapedModel, escapedEpicIDs, opts.compactPct, impl)
 	crashHandler := loopScriptCrashHandler()
-	memorySafety := loopScriptMemorySafety()
+	memorySafety := loopScriptMemorySafetyImpl(impl)
 	parseJSON := loopScriptParseJSON()
 	epicSelector := loopScriptEpicSelector()
-	promptBuilder := loopScriptPromptBuilder(bt)
+	promptBuilder := loopScriptPromptBuilder(bt, impl)
 
 	var reviewSection string
 	if opts.review != nil {
@@ -141,10 +160,10 @@ func generateLoopScript(opts loopGenerateOptions) string {
 	}
 
 	helpers := loopScriptHelpers()
-	seam := loopScriptSeam(opts.backend, opts.backendExplicit)
+	seam := loopScriptSeamImpl(impl, opts.backend, opts.backendExplicit)
 	preLoop := loopScriptPreLoop()
 	whileHeader := loopScriptWhileHeader()
-	epicProcessing := loopScriptEpicProcessing()
+	epicProcessing := loopScriptEpicProcessingImpl(impl)
 
 	// Build review trigger fragments (empty strings if no reviewers).
 	var triggerInit, triggerPeriodic, triggerFinal string
@@ -167,7 +186,9 @@ func generateLoopScript(opts loopGenerateOptions) string {
 }
 
 // loopScriptConfig returns the header, config vars, helpers, and mkdir section.
-func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string, compactPct int) string {
+// implementer selects the CLI prerequisite line and the GOOSE_* config vars; the
+// claude (default) path is byte-identical to before.
+func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string, compactPct int, implementer string) string {
 	timestamp := time.Now().Format(time.RFC3339)
 
 	var b strings.Builder
@@ -202,7 +223,15 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string, compa
 	fmt.Fprintf(&b, "die() { log \"FATAL: $*\"; exit 1; }\n\n")
 
 	// CLI prerequisites
-	fmt.Fprintf(&b, "command -v claude >/dev/null || die \"claude CLI required\"\n")
+	if implementer == "goose" {
+		fmt.Fprintf(&b, "command -v goose >/dev/null || die \"goose CLI required\"\n")
+		// Derive provider/model from the provider/model reference in MODEL.
+		fmt.Fprintf(&b, "GOOSE_PROVIDER=${MODEL%%%%/*}\n")
+		fmt.Fprintf(&b, "GOOSE_MODEL=${MODEL#*/}\n")
+		fmt.Fprintf(&b, "export GOOSE_PROVIDER GOOSE_MODEL\n")
+	} else {
+		fmt.Fprintf(&b, "command -v claude >/dev/null || die \"claude CLI required\"\n")
+	}
 	fmt.Fprintf(&b, "command -v bd >/dev/null || die \"bd (beads) CLI required\"\n\n")
 
 	// JSON parser detection
@@ -234,10 +263,25 @@ trap _loop_cleanup EXIT
 `
 }
 
-// loopScriptMemorySafety returns the 4-layer memory defense: orphan cleanup,
-// memory gate, memory watchdog, stale output watchdog, and the bg kill ladder.
-func loopScriptMemorySafety() string { //nolint:funlen // bash template string
-	return `# --- Memory Safety (4-Layer Defense) ---
+// loopScriptMemorySafety returns the 4-layer memory defense for the claude path:
+// orphan cleanup, memory gate, memory watchdog, stale output watchdog, and the
+// bg kill ladder. Byte-identical to before (existing tests call this 0-arg form).
+func loopScriptMemorySafety() string {
+	return memorySafetyHead + memorySafetyCleanupBgTail + memorySafetyWatchdogs + memorySafetyBgKillLadder
+}
+
+// loopScriptMemorySafetyImpl returns the memory-safety helpers for the given
+// implementer. For goose the bg-specific orphan-sweep block and the bg_kill_ladder
+// function are omitted (goose is in-tree, PID-based). The claude path delegates to
+// loopScriptMemorySafety so it stays byte-identical.
+func loopScriptMemorySafetyImpl(implementer string) string {
+	if implementer == "goose" {
+		return memorySafetyHead + memorySafetyCleanupClose + memorySafetyWatchdogs
+	}
+	return loopScriptMemorySafety()
+}
+
+const memorySafetyHead = `# --- Memory Safety (4-Layer Defense) ---
 
 # cleanup_orphans() - Kill leftover test/build processes from THIS repo between sessions
 # (p backend: PID-based pgrep, scoped to repo cwd — R-PLEGACY byte-identical)
@@ -263,7 +307,17 @@ cleanup_orphans() {
     log "Cleaned up $killed orphan test processes"
     sleep 2  # Let OS reclaim memory
   fi
+`
 
+// memorySafetyCleanupClose closes cleanup_orphans for the goose (in-tree) path,
+// omitting the bg orphan-sweep block entirely.
+const memorySafetyCleanupClose = `}
+`
+
+// memorySafetyCleanupBgTail is the bg orphan-sweep block plus the cleanup_orphans
+// closing brace (claude path). Concatenating memorySafetyHead + this yields the
+// byte-identical claude cleanup_orphans body.
+const memorySafetyCleanupBgTail = `
   # bg backend: enumerate ~/.claude/jobs/ for stray sessions from prior crashed loop
   # attempts. Conservative policy (R-HARVEST-FAIL):
   #   - Only act on sessions that have a snapshot in .ca-worktree-snapshots/ (this repo).
@@ -346,7 +400,11 @@ SNAPEOF
     fi
   fi
 }
+`
 
+// memorySafetyWatchdogs holds get_memory_pct, check_memory, and the memory/stale
+// watchdogs (shared by both implementers; PID-based, harness-agnostic).
+const memorySafetyWatchdogs = `
 # get_memory_pct() - Return current free memory percentage on stdout (empty on failure)
 get_memory_pct() {
   if [ "$(uname)" = "Darwin" ]; then
@@ -450,7 +508,11 @@ stop_stale_watchdog() {
   fi
 }
 
-# bg_kill_ladder <handle> <reason> <mem_log>
+`
+
+// memorySafetyBgKillLadder is the bg-session escalation ladder (claude path only;
+// uses claude stop / claude rm and worktree harvest safety). Omitted for goose.
+const memorySafetyBgKillLadder = `# bg_kill_ladder <handle> <reason> <mem_log>
 # Three-stage escalation for a wedged bg session (R-WATCHDOG, G4):
 #   Stage 1: claude stop <handle>  (~1s, halts work — spike G4 verified)
 #            Wait BG_POLL_INTERVAL then re-poll; if terminal, done.
@@ -550,7 +612,6 @@ LADDEEOF
 }
 
 `
-}
 
 // loopScriptParseJSON returns the parse_json function with jq/python3 fallback.
 func loopScriptParseJSON() string {
@@ -675,8 +736,13 @@ for item in items:
 `
 }
 
-// loopScriptPromptBuilder returns the build_prompt bash function.
-func loopScriptPromptBuilder(bt string) string { //nolint:funlen // bash template string
+// loopScriptPromptBuilder returns the build_prompt bash function. For goose the
+// prompt drops the Claude-only slash command and adds an explicit git commit step
+// (goose does not auto-commit). The completion markers are identical (R2).
+func loopScriptPromptBuilder(bt, implementer string) string { //nolint:funlen // bash template string
+	if implementer == "goose" {
+		return loopScriptGoosePromptBuilder(bt)
+	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "# --- Prompt Builder ---\n")
 	fmt.Fprintf(&b, "build_prompt() {\n")
@@ -984,7 +1050,23 @@ bootstrap_preflight
 `
 }
 
-func loopScriptSeam(backend string, explicit bool) string { //nolint:funlen // bash template string
+// loopScriptSeam returns the claude backend seam (default implementer). Kept as a
+// 2-arg wrapper so the existing ~40 test call sites compile and pin claude bytes.
+func loopScriptSeam(backend string, explicit bool) string {
+	return loopScriptSeamImpl("claude", backend, explicit)
+}
+
+// loopScriptSeamImpl returns the agent seam for the given implementer. For "claude"
+// it returns the existing claude seam verbatim (byte-identical, R7). For "goose" it
+// returns the goose seam (in-tree, PID-polled, no worktree harvest).
+func loopScriptSeamImpl(implementer, backend string, explicit bool) string {
+	if implementer == "goose" {
+		return loopScriptGooseSeam(backend)
+	}
+	return loopScriptSeamClaude(backend, explicit)
+}
+
+func loopScriptSeamClaude(backend string, explicit bool) string { //nolint:funlen // bash template string
 	caBackendLine := loopScriptCABackendLine(backend, explicit)
 	var preflight string
 	if backend == "bg" {
@@ -1407,6 +1489,184 @@ agent_invoke() {
 `
 }
 
+// loopScriptGooseSeam returns the goose implementer seam. It mirrors the claude
+// seam contract (agent_dispatch/poll/collect/stop/cleanup/invoke) but drives
+// `goose run` in-tree with a PID handle. It emits CA_IMPLEMENTER=goose and sets
+// CA_BACKEND=p so the main loop takes the wait+watchdog path (goose uses a PID
+// handle like the claude p backend). No bootstrap_preflight, no worktree harvest.
+func loopScriptGooseSeam(backend string) string { //nolint:funlen // bash template string
+	// backend is accepted for signature parity with the claude seam; the goose
+	// path is always PID-based (CA_BACKEND=p) regardless of the value.
+	_ = backend
+	return `# --- Goose Implementer Seam (R-SEAM) ---
+# CA_IMPLEMENTER=goose drives epics with 'goose run' in-tree (no worktree harvest).
+# CA_BACKEND=p so the main loop takes the wait+watchdog path: AGENT_HANDLE is a PID.
+CA_IMPLEMENTER=goose
+CA_BACKEND=p
+` + loopScriptGoosePreflight() + `
+# AGENT_HANDLE is set by agent_dispatch to the background subshell PID.
+AGENT_HANDLE=""
+
+# agent_dispatch <logfile> <tracefile> <model> <prompt>
+# Runs 'goose run --no-session' in a background subshell. Goose stdout is plain
+# human-readable text, so it is tee'd straight to the tracefile AND logfile;
+# detect_marker greps the logfile directly (no stream-json extraction needed).
+agent_dispatch() {
+  local logfile="$1" tracefile="$2" model="$3" prompt="$4"
+  # Write the prompt to a temp file for 'goose run -i <promptfile>'.
+  local promptfile
+  promptfile=$(mktemp "${TMPDIR:-/tmp}/ca-goose-prompt.XXXXXX")
+  printf '%s' "$prompt" > "$promptfile"
+  # GOOSE_PROVIDER / GOOSE_MODEL are exported from config and select the model.
+  (
+    goose run --no-session -i "$promptfile" 2>"$logfile.stderr" | tee "$tracefile" > "$logfile"
+    rm -f "$promptfile" 2>/dev/null || true
+  ) &
+  AGENT_HANDLE=$!
+  # Phase 2 (recipe path), kept commented for reference:
+  #   goose run --no-session --recipe compound-cook-it --params epic="$EPIC_ID"
+}
+
+# agent_poll <handle> -> "running" | "done"
+# PID poll: alive => running, gone => done.
+agent_poll() {
+  local handle="$1"
+  kill -0 "$handle" 2>/dev/null && echo running || echo done
+}
+
+# agent_collect <handle> <logfile> <tracefile>
+# Noop: the dispatch pipeline already wrote plain-text stdout to logfile/tracefile,
+# which detect_marker greps directly. In-tree; no worktree harvest.
+agent_collect() {
+  : # goose: logfile/tracefile already populated by the dispatch pipeline
+}
+
+# agent_stop <handle>
+# Kill the background subshell (process group first, then the PID).
+agent_stop() {
+  local handle="$1"
+  kill -TERM -- -"$handle" 2>/dev/null || kill "$handle" 2>/dev/null || true
+}
+
+# agent_cleanup <handle> [marker]
+# Noop: goose is in-tree, there is no worktree to harvest and no session to remove.
+agent_cleanup() {
+  : # goose: in-tree, nothing to harvest
+  return 0
+}
+
+# agent_invoke <model> [flags...] [prompt-args...]
+# Synchronous goose invocation for reviewer/implementer/architect callers.
+agent_invoke() {
+  local model="$1"; shift
+  goose run --no-session "$@"
+}
+
+`
+}
+
+// loopScriptGoosePreflight returns the goose preflight bash function and call site.
+// It checks the goose CLI and provider readiness (ollama model pulled + context
+// length, or the API provider's key env var). It intentionally skips the
+// claude-bg-specific bypass-disclaimer probe and worktree.bgIsolation check.
+func loopScriptGoosePreflight() string {
+	return `
+# --- Goose Preflight (R6) ---
+# Verifies the goose CLI and the selected provider before entering the loop.
+# Ollama: provider reachable + model pulled + OLLAMA_CONTEXT_LENGTH >= 32768.
+# API providers (deepseek/glm/dashscope/openrouter/...): the API key env var is set.
+goose_preflight() {
+  command -v goose >/dev/null || die "goose CLI required. Install: https://block.github.io/goose/"
+
+  if [ "$GOOSE_PROVIDER" = "ollama" ]; then
+    command -v ollama >/dev/null || die "ollama CLI required for provider 'ollama'. Install: https://ollama.com/download"
+    ollama list >/dev/null 2>&1 || die "ollama is not reachable. Start it with: ollama serve"
+    if ! ollama list 2>/dev/null | grep -q "$GOOSE_MODEL"; then
+      die "ollama model '$GOOSE_MODEL' not pulled. Remediation: ollama pull $GOOSE_MODEL"
+    fi
+    # Goose silently ignores extensions/.goosehints unless context >= 32768.
+    if [ -z "${OLLAMA_CONTEXT_LENGTH:-}" ]; then
+      export OLLAMA_CONTEXT_LENGTH=32768
+      log "goose_preflight: OLLAMA_CONTEXT_LENGTH was unset; exporting 32768"
+    elif [ "$OLLAMA_CONTEXT_LENGTH" -lt 32768 ] 2>/dev/null; then
+      die "OLLAMA_CONTEXT_LENGTH=$OLLAMA_CONTEXT_LENGTH is too small; goose needs >= 32768 (export OLLAMA_CONTEXT_LENGTH=32768)"
+    fi
+  else
+    # API provider: require the provider's API key env var.
+    local key_var=""
+    case "$GOOSE_PROVIDER" in
+      deepseek)   key_var="DEEPSEEK_API_KEY" ;;
+      glm|zhipu)  key_var="GLM_API_KEY" ;;
+      dashscope|qwen) key_var="DASHSCOPE_API_KEY" ;;
+      openrouter) key_var="OPENROUTER_API_KEY" ;;
+      *)          key_var="$(printf '%s' "$GOOSE_PROVIDER" | tr '[:lower:]' '[:upper:]')_API_KEY" ;;
+    esac
+    if [ -z "$(eval "printf '%s' \"\${$key_var:-}\"")" ]; then
+      die "provider '$GOOSE_PROVIDER' requires the API key env var $key_var to be set"
+    fi
+  fi
+}
+goose_preflight
+`
+}
+
+// loopScriptGoosePromptBuilder returns the goose build_prompt bash function. It
+// inlines the compound workflow as plain instructions (no Claude slash command),
+// keeps the exact completion markers (R2), and adds an explicit git commit step
+// because goose does not auto-commit.
+func loopScriptGoosePromptBuilder(bt string) string { //nolint:funlen // bash template string
+	var b strings.Builder
+	fmt.Fprintf(&b, "# --- Prompt Builder (goose) ---\n")
+	fmt.Fprintf(&b, "build_prompt() {\n")
+	fmt.Fprintf(&b, "  local epic_id=\"$1\"\n")
+	fmt.Fprintf(&b, "  cat <<'PROMPT_HEADER'\n")
+	fmt.Fprintf(&b, "You are running in an autonomous infinity loop. Your task is to fully implement a beads epic.\n\n")
+	fmt.Fprintf(&b, "## Step 1: Load context\n")
+	fmt.Fprintf(&b, "Run these commands to understand the epic:\n")
+	fmt.Fprintf(&b, "PROMPT_HEADER\n")
+	fmt.Fprintf(&b, "  cat <<PROMPT_BODY\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%sbash\n", bt, bt, bt)
+	fmt.Fprintf(&b, "bd show $epic_id\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%s\n\n", bt, bt, bt)
+	fmt.Fprintf(&b, "Read the epic details carefully. Understand scope, acceptance criteria, and sub-tasks.\n\n")
+	fmt.Fprintf(&b, "## Step 2: Execute the compound workflow\n")
+	fmt.Fprintf(&b, "Work the epic through all phases (spec-dev is already done -- the epic exists):\n")
+	fmt.Fprintf(&b, "1. Plan: design the change and the tests.\n")
+	fmt.Fprintf(&b, "2. Work: write tests first, then the minimal implementation to pass them.\n")
+	fmt.Fprintf(&b, "3. Review: re-read the diff for correctness and simplicity; fix what you find.\n")
+	fmt.Fprintf(&b, "4. Compound: capture any lesson learned.\n\n")
+	fmt.Fprintf(&b, "## Step 3: On completion\n")
+	fmt.Fprintf(&b, "When all work is done and tests pass:\n")
+	fmt.Fprintf(&b, "1. Close the epic: \\%sbd close $epic_id\\%s\n", bt, bt)
+	fmt.Fprintf(&b, "2. Commit and push all changes (goose does NOT auto-commit, so do this explicitly):\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%sbash\n", bt, bt, bt)
+	fmt.Fprintf(&b, "git add -A && git commit -m \"feat($epic_id): implement epic\" && git push\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%s\n", bt, bt, bt)
+	fmt.Fprintf(&b, "3. Output this exact marker on its own line:\n\n")
+	fmt.Fprintf(&b, "EPIC_COMPLETE\n\n")
+	fmt.Fprintf(&b, "## Step 4: On failure\n")
+	fmt.Fprintf(&b, "If you cannot complete the epic after reasonable effort:\n")
+	fmt.Fprintf(&b, "1. Add a note: \\%sbd update $epic_id --notes \"Loop failed: <reason>\"\\%s\n", bt, bt)
+	fmt.Fprintf(&b, "2. Output this exact marker on its own line:\n\n")
+	fmt.Fprintf(&b, "EPIC_FAILED\n\n")
+	fmt.Fprintf(&b, "## Step 5: On human required\n")
+	fmt.Fprintf(&b, "If you hit a blocker that REQUIRES human action (account creation, API keys,\n")
+	fmt.Fprintf(&b, "external service setup, design decisions you cannot make, etc.):\n")
+	fmt.Fprintf(&b, "1. Add a note: \\%sbd update $epic_id --notes \"Human required: <reason>\"\\%s\n", bt, bt)
+	fmt.Fprintf(&b, "2. Output this exact marker followed by a short reason on the SAME line:\n\n")
+	fmt.Fprintf(&b, "HUMAN_REQUIRED: <reason>\n\n")
+	fmt.Fprintf(&b, "Example: HUMAN_REQUIRED: Need AWS credentials configured in .env\n\n")
+	fmt.Fprintf(&b, "## Rules\n")
+	fmt.Fprintf(&b, "- Do NOT ask questions -- there is no human. Make reasonable decisions.\n")
+	fmt.Fprintf(&b, "- Do NOT stop early -- complete the full workflow.\n")
+	fmt.Fprintf(&b, "- If tests fail, fix them. Retry up to 3 times before declaring failure.\n")
+	fmt.Fprintf(&b, "- Use HUMAN_REQUIRED only for true blockers that no amount of retrying can solve.\n")
+	fmt.Fprintf(&b, "- Commit incrementally as you make progress.\n")
+	fmt.Fprintf(&b, "PROMPT_BODY\n")
+	fmt.Fprintf(&b, "}\n\n")
+	return b.String()
+}
+
 // loopScriptPreLoop returns the variable initialization before the while loop.
 func loopScriptPreLoop() string {
 	return `# --- Main Loop ---
@@ -1455,6 +1715,79 @@ func loopScriptWhileHeader() string {
 func loopScriptEpicProcessing() string {
 	return loopScriptAttemptSetup() + loopScriptAttemptCases()
 }
+
+func loopScriptEpicProcessingImpl(implementer string) string {
+	if implementer == "goose" {
+		return loopScriptGooseAttemptSetup() + loopScriptAttemptCases()
+	}
+	return loopScriptEpicProcessing()
+}
+
+// loopScriptGooseAttemptSetup is the per-attempt body for the goose implementer.
+// Goose uses a PID handle (CA_BACKEND=p semantics): block on the background
+// subshell with the memory/stale watchdogs, then detect the marker in-tree. No
+// bg poll loop, no state.json, no worktree harvest (agent_cleanup is a noop).
+func loopScriptGooseAttemptSetup() string { //nolint:funlen // bash template string
+	return attemptSetupHead + `
+    # goose: block until the background subshell exits, using watchdogs for safety.
+    start_memory_watchdog "$AGENT_HANDLE" "$MEM_LOG"
+    start_stale_watchdog "$AGENT_HANDLE" "$TRACEFILE" "$MEM_LOG"
+    wait "$AGENT_HANDLE" 2>/dev/null || true
+    stop_stale_watchdog
+    stop_memory_watchdog
+
+    # Detect if watchdog killed the session
+    if [ -f "$MEM_LOG" ] && grep -q "STALE_WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
+      log "WARN: Session killed by stale output watchdog (see $MEM_LOG)"
+      cleanup_orphans
+    elif [ -f "$MEM_LOG" ] && grep -q "WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
+      log "WARN: Session killed by memory watchdog (see $MEM_LOG)"
+      cleanup_orphans
+    fi
+
+    # Append stderr to macro log
+    [ -f "$LOGFILE.stderr" ] && cat "$LOGFILE.stderr" >> "$LOGFILE" && rm -f "$LOGFILE.stderr"
+
+    # goose stdout is plain text already in LOGFILE/TRACEFILE; detect_marker reads it directly.
+    MARKER=$(detect_marker "$LOGFILE" "$TRACEFILE")
+
+    # goose: in-tree, no worktree to harvest. agent_cleanup is a noop.
+    agent_cleanup "$AGENT_HANDLE" "$MARKER"
+`
+}
+
+// attemptSetupHead is the per-attempt preamble shared by both implementers, ending
+// just after agent_dispatch sets AGENT_HANDLE.
+const attemptSetupHead = `  while [ $ATTEMPT -le $MAX_RETRIES ]; do
+    ATTEMPT=$((ATTEMPT + 1))
+    TS=$(timestamp)
+    LOGFILE="$LOG_DIR/loop_$EPIC_ID-$TS.log"
+    TRACEFILE="$LOG_DIR/trace_$EPIC_ID-$TS.jsonl"
+
+    write_status "running" "$EPIC_ID" "$ATTEMPT"
+
+    # Update .latest symlink for ca watch (before claude invocation so watch can discover it)
+    ln -sf "$(basename "$TRACEFILE")" "$LOG_DIR/.latest"
+
+    log "Attempt $ATTEMPT/$((MAX_RETRIES + 1)) for $EPIC_ID (log: $LOGFILE)"
+
+    # Clean stale phase state from previous epic or architect session
+    ca phase-check clean 2>/dev/null || true
+
+    if [ -n "${LOOP_DRY_RUN:-}" ]; then
+      log "[DRY RUN] Would run claude session for $EPIC_ID"
+      SUCCESS=true
+      break
+    fi
+
+    PROMPT=$(build_prompt "$EPIC_ID")
+
+    # Dispatch through backend seam; AGENT_HANDLE is set by agent_dispatch.
+    # p backend:  AGENT_HANDLE = background subshell PID (wait + watchdogs apply)
+    # bg backend: AGENT_HANDLE = 8-hex session id (poll loop applies; watchdogs are no-ops)
+    MEM_LOG="$LOG_DIR/memory_${EPIC_ID}-${TS}.log"
+    agent_dispatch "$LOGFILE" "$TRACEFILE" "$MODEL" "$PROMPT"
+`
 
 func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
 	return `  while [ $ATTEMPT -le $MAX_RETRIES ]; do

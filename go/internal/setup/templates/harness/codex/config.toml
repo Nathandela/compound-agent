@@ -1,0 +1,14 @@
+# Compound Agent - Codex configuration
+# Codex reads AGENTS.md natively for the lesson-capture workflow; this file
+# pins the project conventions that complement it.
+
+[compound-agent]
+version = "{{VERSION}}"
+
+# Completion markers the loop detects from Codex output.
+# Print exactly one on its own line when an epic terminates:
+#   EPIC_COMPLETE / HUMAN_REQUIRED: <reason> / EPIC_FAILED
+markers = ["EPIC_COMPLETE", "HUMAN_REQUIRED", "EPIC_FAILED"]
+
+# Codex does not auto-commit; the epic must commit and push explicitly:
+#   git add -A && git commit -m "<message>" && git push
