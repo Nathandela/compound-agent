@@ -359,6 +359,63 @@ func TestValidateReviewers_RejectsInvalid(t *testing.T) {
 	}
 }
 
+// TestAntigravityReviewer_NotActive asserts antigravity is NOT a selectable loop
+// reviewer. agy -p drops stdout in non-TTY, so its report is always empty; the
+// review loop treats an empty report as a reviewer error, and a cycle where all
+// reviewers errored is "treated as approved" -> an antigravity-only run could
+// falsely report approval. The reviewer wiring is therefore removed: antigravity
+// is rejected by --reviewers and absent from the generated review bash. The
+// antigravity HARNESS setup target (installAntigravity / AGENTS.md template)
+// stays as groundwork and is covered by setup tests, not here.
+func TestAntigravityReviewer_NotActive(t *testing.T) {
+	t.Parallel()
+	if validLoopReviewerSet()["antigravity"] {
+		t.Error("antigravity must NOT be a valid loop reviewer (false-approval risk)")
+	}
+	for _, n := range validLoopReviewerNames() {
+		if n == "antigravity" {
+			t.Error("antigravity must NOT appear in validLoopReviewerNames")
+		}
+	}
+	if err := validateReviewers([]string{"antigravity"}); err == nil {
+		t.Error("expected --reviewers antigravity to be rejected")
+	}
+	detection := loopScriptReviewerDetection()
+	if strings.Contains(detection, "agy") {
+		t.Error("antigravity detection case must be removed from reviewer detection")
+	}
+	spawn := loopScriptSpawnReviewers()
+	if strings.Contains(spawn, "agy") {
+		t.Error("antigravity spawn case (agy -p) must be removed from spawn_reviewers")
+	}
+}
+
+// TestValidLoopReviewerSet_ExactMembers asserts the valid loop-reviewer set is
+// exactly {claude-sonnet, claude-opus, gemini, codex} — no more, no less.
+func TestValidLoopReviewerSet_ExactMembers(t *testing.T) {
+	t.Parallel()
+	want := map[string]bool{
+		"claude-sonnet": true,
+		"claude-opus":   true,
+		"gemini":        true,
+		"codex":         true,
+	}
+	got := validLoopReviewerSet()
+	if len(got) != len(want) {
+		t.Errorf("valid loop reviewer set size = %d, want %d (set: %v)", len(got), len(want), got)
+	}
+	for name := range want {
+		if !got[name] {
+			t.Errorf("expected %q in valid loop reviewer set", name)
+		}
+	}
+	for name := range got {
+		if !want[name] {
+			t.Errorf("unexpected reviewer %q in valid loop reviewer set", name)
+		}
+	}
+}
+
 func TestLoopScriptReviewLoop_AnchoredApproval(t *testing.T) {
 	t.Parallel()
 	loop := loopScriptReviewLoop()

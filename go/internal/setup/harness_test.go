@@ -65,10 +65,19 @@ func TestParseHarnessTargets_CommaRepeatDedupeUnknownEmpty(t *testing.T) {
 	if !strings.Contains(err.Error(), "bogus") {
 		t.Errorf("error should name the bad value, got: %v", err)
 	}
-	for _, valid := range []string{"claude", "codex", "gemini", "goose"} {
+	for _, valid := range []string{"claude", "codex", "gemini", "goose", "antigravity"} {
 		if !strings.Contains(err.Error(), valid) {
 			t.Errorf("error should list valid value %q, got: %v", valid, err)
 		}
+	}
+
+	// Antigravity is a valid target (groundwork harness).
+	got, err = ParseHarnessTargets([]string{"antigravity"})
+	if err != nil {
+		t.Fatalf("antigravity input errored: %v", err)
+	}
+	if len(got) != 1 || got[0] != HarnessAntigravity {
+		t.Errorf("antigravity input expected [antigravity], got %v", got)
 	}
 }
 
@@ -350,6 +359,33 @@ func TestSetup_HarnessCodex_InstallsCodexOnly(t *testing.T) {
 	}
 }
 
+// The codex config.toml must carry the full soft phase-gate protocol so the
+// in-prompt gate has a memory-file complement: mandatory recall, phase gates,
+// the verification contract, the epic-completion markers, and the explicit commit
+// reminder (codex does not auto-commit).
+func TestSetup_HarnessCodex_ConfigCarriesCompoundProtocol(t *testing.T) {
+	dir := newHarnessRepo(t)
+
+	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessCodex}}); err != nil {
+		t.Fatalf("--harness codex InitRepo: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".codex", "config.toml"))
+	if err != nil {
+		t.Fatalf("read installed .codex/config.toml: %v", err)
+	}
+	content := string(data)
+	for _, want := range []string{
+		"ca search", "ca phase-check", "ca verify-gates",
+		"Phase Gate", "Verification Contract",
+		"EPIC_COMPLETE", "EPIC_FAILED", "HUMAN_REQUIRED",
+		"git add -A", "git commit", "git push",
+	} {
+		if !strings.Contains(content, want) {
+			t.Errorf("installed codex config.toml missing protocol element %q", want)
+		}
+	}
+}
+
 func TestSetup_HarnessGemini_InstallsGeminiOnly(t *testing.T) {
 	dir := newHarnessRepo(t)
 
@@ -379,6 +415,33 @@ func TestSetup_HarnessGemini_WritesSingleFile(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".gemini", "GEMINI.md")); err == nil {
 		t.Error("redundant .gemini/GEMINI.md mirror must not be written")
+	}
+}
+
+// The GEMINI.md must carry the full soft phase-gate protocol so the in-prompt
+// gate works for the gemini loop implementer: mandatory recall, phase gates, the
+// verification contract, the completion markers, and the explicit-commit reminder
+// (gemini does not auto-commit). Mirrors TestSetup_HarnessCodex_ConfigCarriesCompoundProtocol.
+func TestSetup_HarnessGemini_MemoryCarriesCompoundProtocol(t *testing.T) {
+	dir := newHarnessRepo(t)
+
+	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessGemini}}); err != nil {
+		t.Fatalf("--harness gemini InitRepo: %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, "GEMINI.md"))
+	if err != nil {
+		t.Fatalf("read installed GEMINI.md: %v", err)
+	}
+	got := string(data)
+	for _, want := range []string{
+		"Mandatory Recall",
+		"Phase Gate", "Verification Contract",
+		"EPIC_COMPLETE", "EPIC_FAILED", "HUMAN_REQUIRED",
+		"git add -A",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("installed GEMINI.md missing protocol element %q", want)
+		}
 	}
 }
 
@@ -440,6 +503,107 @@ func TestSetup_HarnessUnknown_RejectedBeforeWrites(t *testing.T) {
 	_, err := ParseHarnessTargets([]string{"frobnicate"})
 	if err == nil {
 		t.Fatal("unknown harness target should be rejected")
+	}
+}
+
+// Antigravity is groundwork: it writes its protocol into AGENTS.md (its native
+// memory file) and nothing else. The AGENTS.md must carry the full soft
+// phase-gate protocol plus the gemini-CLI deprecation/sunset note. No codex,
+// goose, gemini, or .claude assets are written for an antigravity-only target.
+func TestSetup_HarnessAntigravity_InstallsAgentsOnly(t *testing.T) {
+	dir := newHarnessRepo(t)
+
+	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessAntigravity}}); err != nil {
+		t.Fatalf("--harness antigravity InitRepo: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("expected AGENTS.md for antigravity target: %v", err)
+	}
+	got := string(data)
+	for _, want := range []string{
+		"ca search", "ca phase-check", "ca verify-gates",
+		"Phase Gate", "Verification Contract",
+		"EPIC_COMPLETE", "EPIC_FAILED", "HUMAN_REQUIRED",
+		"git add -A", "git commit", "git push",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("installed antigravity AGENTS.md missing protocol element %q", want)
+		}
+	}
+	// Gemini deprecation/sunset note must be present.
+	if !strings.Contains(got, "2026-06-18") && !strings.Contains(got, "deprecat") {
+		t.Errorf("antigravity AGENTS.md missing gemini deprecation/sunset note")
+	}
+
+	// No other harness assets for an antigravity-only target.
+	for _, p := range []string{
+		filepath.Join(dir, ".codex", "config.toml"),
+		filepath.Join(dir, ".goosehints"),
+		filepath.Join(dir, "GEMINI.md"),
+		filepath.Join(dir, ".claude", "agents", "compound"),
+	} {
+		if _, err := os.Stat(p); err == nil {
+			t.Errorf("antigravity-only target should not create %s", p)
+		}
+	}
+}
+
+func TestSetup_HarnessAntigravity_Idempotent(t *testing.T) {
+	dir := newHarnessRepo(t)
+
+	opts := InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessAntigravity}}
+	if _, err := InitRepo(dir, opts); err != nil {
+		t.Fatalf("first antigravity InitRepo: %v", err)
+	}
+	agentsPath := filepath.Join(dir, "AGENTS.md")
+	first, err := os.ReadFile(agentsPath)
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	if _, err := InitRepo(dir, opts); err != nil {
+		t.Fatalf("second antigravity InitRepo: %v", err)
+	}
+	second, err := os.ReadFile(agentsPath)
+	if err != nil {
+		t.Fatalf("read AGENTS.md (2nd): %v", err)
+	}
+	if string(first) != string(second) {
+		t.Error("antigravity install is not idempotent: AGENTS.md changed on second run")
+	}
+}
+
+// Co-install collision guard: codex (which appends the lesson section to
+// AGENTS.md) and antigravity (which appends its protocol section to AGENTS.md)
+// must coexist in one AGENTS.md, plus a separate codex config.toml, with no
+// install error and no section clobbering the other.
+func TestSetup_HarnessCodexAntigravity_NoConflict(t *testing.T) {
+	dir := newHarnessRepo(t)
+
+	targets := []HarnessTarget{HarnessCodex, HarnessAntigravity}
+	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: targets}); err != nil {
+		t.Fatalf("--harness codex,antigravity InitRepo: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	got := string(data)
+	// Lesson section (from codex's UpdateAgentsMd) AND antigravity protocol.
+	if !strings.Contains(got, "## Compound Agent Integration") {
+		t.Error("co-install AGENTS.md missing the codex lesson section header")
+	}
+	if !strings.Contains(got, "## Compound Agent Protocol (Antigravity)") {
+		t.Error("co-install AGENTS.md missing the antigravity protocol section header")
+	}
+	if !strings.Contains(got, "EPIC_COMPLETE") {
+		t.Error("co-install AGENTS.md missing antigravity epic-completion marker")
+	}
+	// Codex config still written.
+	if _, err := os.Stat(filepath.Join(dir, ".codex", "config.toml")); err != nil {
+		t.Errorf("co-install expected .codex/config.toml: %v", err)
 	}
 }
 

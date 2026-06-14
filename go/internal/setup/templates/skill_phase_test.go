@@ -152,3 +152,27 @@ func TestPhaseSkills_FrontmatterHasRequiredFields(t *testing.T) {
 		}
 	}
 }
+
+// TestLoopLauncherSkill_DocumentsCodexImplementer verifies the loop-launcher
+// SKILL.md documents the --implementer codex engine: the flag value, the plain
+// model name (no provider/ slash), and a usage example.
+func TestLoopLauncherSkill_DocumentsCodexImplementer(t *testing.T) {
+	skills := PhaseSkills()
+	content, ok := skills["loop-launcher"]
+	if !ok {
+		t.Fatal("missing loop-launcher skill")
+	}
+	// The --implementer flag must be documented with all four engines.
+	if !strings.Contains(content, "--implementer") {
+		t.Error("loop-launcher SKILL.md must document the --implementer flag")
+	}
+	for _, engine := range []string{"claude", "goose", "codex", "gemini"} {
+		if !strings.Contains(content, engine) {
+			t.Errorf("loop-launcher SKILL.md must mention implementer engine %q", engine)
+		}
+	}
+	// A concrete codex example with its plain default model.
+	if !strings.Contains(content, "--implementer codex --model gpt-5.5-codex") {
+		t.Error("loop-launcher SKILL.md must show 'ca loop --implementer codex --model gpt-5.5-codex'")
+	}
+}

@@ -91,7 +91,9 @@ func setupCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&confirmPrune, "confirm-prune", false,
 		"Acknowledge that a lower profile will prune existing workflow templates from disk")
 	cmd.Flags().StringSliceVar(&harness, "harness", nil,
-		"Install only these harness targets (comma-separated and/or repeatable): claude, codex, gemini, goose. Omit for the default Claude install.")
+		"Install only these harness targets (comma-separated and/or repeatable): claude, codex, gemini, goose, antigravity. "+
+			"The standalone gemini CLI tool sunsets 2026-06-18; antigravity is its successor (shipped as groundwork). "+
+			"Omit for the default Claude install.")
 	return cmd
 }
 

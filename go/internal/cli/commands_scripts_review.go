@@ -8,6 +8,12 @@ import (
 )
 
 // validLoopReviewerSet returns a map of valid reviewer names for validation.
+// antigravity is deliberately NOT a selectable reviewer: agy -p drops stdout in
+// non-TTY/subprocess, so its report is always empty. The review loop treats an
+// empty report as a reviewer error and a cycle where all reviewers errored is
+// "treated as approved", so an antigravity-only (or all-errored) run could
+// FALSELY report approval. The antigravity HARNESS setup target stays as
+// groundwork; only the broken reviewer wiring is removed.
 func validLoopReviewerSet() map[string]bool {
 	return map[string]bool{
 		"claude-sonnet": true,
@@ -69,6 +75,38 @@ func validateReviewers(reviewers []string) error {
 	for _, r := range reviewers {
 		if !valid[r] {
 			return fmt.Errorf("invalid reviewer %q, valid: %s", r, strings.Join(validLoopReviewerNames(), ", "))
+		}
+	}
+	return nil
+}
+
+// validCodexGeminiReviewerSet returns the reviewer names valid when the loop
+// implementer is codex or gemini. These engines redefine the agent_invoke shell
+// function to run codex/gemini (NOT claude), so the claude-sonnet/claude-opus
+// reviewer branches -- which dispatch through agent_invoke -- would run the wrong
+// CLI with a claude-only model name, yielding empty/error reports and a review
+// cycle that can pass without a real review (codex review P2). Only the gemini and
+// codex reviewer branches invoke their own CLIs directly and are safe, so the
+// valid set is exactly {gemini, codex}.
+func validCodexGeminiReviewerSet() map[string]bool {
+	return map[string]bool{"gemini": true, "codex": true}
+}
+
+// validCodexGeminiReviewerNames returns the valid codex/gemini reviewer names in
+// stable order (for error messages).
+func validCodexGeminiReviewerNames() []string {
+	return []string{"gemini", "codex"}
+}
+
+// validateCodexGeminiReviewers checks that every reviewer is a CLI-direct reviewer
+// safe for the codex/gemini implementers (i.e. in {gemini, codex}). claude-sonnet
+// and claude-opus are rejected because their dispatch goes through agent_invoke,
+// which on these seams runs codex/gemini rather than claude.
+func validateCodexGeminiReviewers(reviewers []string) error {
+	valid := validCodexGeminiReviewerSet()
+	for _, r := range reviewers {
+		if !valid[r] {
+			return fmt.Errorf("invalid reviewer %q for codex/gemini implementer, valid: %s", r, strings.Join(validCodexGeminiReviewerNames(), ", "))
 		}
 	}
 	return nil

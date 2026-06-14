@@ -15,14 +15,15 @@ import (
 type HarnessTarget string
 
 const (
-	HarnessClaude HarnessTarget = "claude"
-	HarnessCodex  HarnessTarget = "codex"
-	HarnessGemini HarnessTarget = "gemini"
-	HarnessGoose  HarnessTarget = "goose"
+	HarnessClaude      HarnessTarget = "claude"
+	HarnessCodex       HarnessTarget = "codex"
+	HarnessGemini      HarnessTarget = "gemini"
+	HarnessGoose       HarnessTarget = "goose"
+	HarnessAntigravity HarnessTarget = "antigravity"
 )
 
 // validHarnessTargets lists the accepted --harness values in stable order.
-var validHarnessTargets = []HarnessTarget{HarnessClaude, HarnessCodex, HarnessGemini, HarnessGoose}
+var validHarnessTargets = []HarnessTarget{HarnessClaude, HarnessCodex, HarnessGemini, HarnessGoose, HarnessAntigravity}
 
 // ParseHarnessTargets parses comma-separated and/or repeated --harness values
 // into a deduped, order-preserving slice of targets. Empty input returns no
@@ -154,6 +155,30 @@ func installCodex(repoRoot string, result *InitResult) error {
 // Idempotent.
 func installGemini(repoRoot string, result *InitResult) error {
 	return reconcileHarnessFile(filepath.Join(repoRoot, "GEMINI.md"), templates.GeminiMemory(), result)
+}
+
+// installAntigravity installs the Antigravity target: it appends the compound
+// protocol section to AGENTS.md (Antigravity's native memory file). The section
+// uses its own header so it coexists with the shared lesson section that
+// codex/claude write to AGENTS.md, and re-runs are idempotent via the header
+// guard. Groundwork only: antigravity is not yet a loop --implementer.
+func installAntigravity(repoRoot string, result *InitResult) error {
+	agentsPath := filepath.Join(repoRoot, "AGENTS.md")
+	section := templates.AntigravityMemory()
+
+	existing, err := os.ReadFile(agentsPath)
+	if err == nil {
+		if strings.Contains(string(existing), templates.AntigravitySectionHeader) {
+			return nil // Already installed.
+		}
+		content := strings.TrimRight(string(existing), "\n") + "\n\n" + section
+		return os.WriteFile(agentsPath, []byte(content), 0644)
+	}
+	if !os.IsNotExist(err) {
+		return fmt.Errorf("read AGENTS.md: %w", err)
+	}
+	result.FilesCreated = append(result.FilesCreated, agentsPath)
+	return os.WriteFile(agentsPath, []byte(section), 0644)
 }
 
 // reconcileHarnessFile writes content to path (creating or updating) and records

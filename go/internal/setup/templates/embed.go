@@ -63,6 +63,9 @@ var codexConfig string
 //go:embed harness/gemini/GEMINI.md
 var geminiMemory string
 
+//go:embed harness/antigravity/AGENTS.md
+var antigravityMemory string
+
 // Markers for idempotent section detection.
 const (
 	CompoundAgentSectionHeader = "## Compound Agent Integration"
@@ -70,6 +73,8 @@ const (
 	ClaudeRefEndMarker         = "<!-- compound-agent:claude-ref:end -->"
 	AgentsSectionStartMarker   = "<!-- compound-agent:start -->"
 	AgentsSectionEndMarker     = "<!-- compound-agent:end -->"
+	AntigravityStartMarker     = "<!-- compound-agent:antigravity:start -->"
+	AntigravityEndMarker       = "<!-- compound-agent:antigravity:end -->"
 )
 
 // AgentsMdTemplate returns the AGENTS.md section template.
@@ -129,6 +134,17 @@ func CodexConfig() string {
 func GeminiMemory() string {
 	return geminiMemory
 }
+
+// AntigravityMemory returns the Antigravity AGENTS.md protocol section. It is
+// appended (not whole-file written) so it coexists with the shared lesson
+// section that codex/claude write to AGENTS.md.
+func AntigravityMemory() string {
+	return antigravityMemory
+}
+
+// AntigravitySectionHeader marks the Antigravity protocol section for idempotent
+// append detection.
+const AntigravitySectionHeader = "## Compound Agent Protocol (Antigravity)"
 
 // AgentTemplates returns a map of filename -> content for agent .md files.
 func AgentTemplates() map[string]string {

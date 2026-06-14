@@ -300,6 +300,7 @@ func markerPairs() []markerPair {
 	return []markerPair{
 		{templates.AgentsSectionStartMarker, templates.AgentsSectionEndMarker},
 		{templates.ClaudeRefStartMarker, templates.ClaudeRefEndMarker},
+		{templates.AntigravityStartMarker, templates.AntigravityEndMarker},
 	}
 }
 

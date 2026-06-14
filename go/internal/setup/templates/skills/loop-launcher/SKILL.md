@@ -33,6 +33,11 @@ ca loop --epics "id1,id2,id3" \
   --max-retries 1 \
   --force
 # Default backend is bg (claude --bg, subscription-billed). Use --backend p for legacy claude -p.
+# Default implementer is claude. Alternative engines (PID-based, in-tree, plain model names):
+#   ca loop --implementer codex --model gpt-5.5-codex     # codex exec; auth = ChatGPT login (codex login)
+#   ca loop --implementer gemini --model gemini-3.1-pro   # gemini -p --yolo; auth = GEMINI_API_KEY env var
+# codex/gemini take a PLAIN model name (no provider/ slash); only --implementer goose uses provider/model.
+# Antigravity (agy) is groundwork-only and not yet a functional loop engine; the gemini CLI sunsets 2026-06-18.
 ```
 
 ### Polish Loop
@@ -51,7 +56,8 @@ ca polish --spec-file "docs/specs/your-spec.md" \
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--epics` | (auto-discover) | Comma-separated epic IDs |
-| `--model` | `claude-opus-4-7[1m]` | Model for implementation sessions |
+| `--model` | `claude-opus-4-7[1m]` | Model for implementation sessions. Plain name for codex/gemini; `provider/model` for goose |
+| `--implementer` | `claude` | Implementer engine: `claude` \| `goose` \| `codex` \| `gemini`. codex/gemini are PID-based, in-tree, plain model names. `antigravity` is `ca setup --harness` groundwork only, not yet a loop engine; the gemini CLI sunsets 2026-06-18 (antigravity is its successor) |
 | `--backend` | `bg` | Execution backend: `bg` (claude --bg, subscription-billed) or `p` (legacy claude -p) |
 | `--reviewers` | (none) | Comma-separated: `claude-sonnet,claude-opus,gemini,codex` |
 | `--review-every` | `0` (end-only) | Review after every N epics |

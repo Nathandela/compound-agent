@@ -46,7 +46,7 @@ func loopCmd() *cobra.Command {
 	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-7[1m]", "Model to use. For --implementer goose, a provider/model ref (e.g. ollama/qwen2.5-coder:14b, deepseek/deepseek-chat)")
 	cmd.Flags().BoolVarP(&o.force, "force", "f", false, "Overwrite existing script")
 	cmd.Flags().StringVar(&o.epics, "epics", "", "Comma-separated epic IDs to process")
-	cmd.Flags().StringVar(&o.reviewers, "reviewers", "", "Comma-separated reviewers (claude: claude-sonnet,claude-opus,gemini,codex; goose: security,correctness,quality)")
+	cmd.Flags().StringVar(&o.reviewers, "reviewers", "", "Comma-separated reviewers (claude: claude-sonnet,claude-opus,gemini,codex; codex/gemini: gemini,codex; goose: security,correctness,quality)")
 	cmd.Flags().IntVar(&o.reviewEvery, "review-every", 0, "Review every N completed epics (0=end-only)")
 	cmd.Flags().IntVar(&o.maxReviewCycles, "max-review-cycles", 3, "Max review/fix iterations")
 	cmd.Flags().BoolVar(&o.reviewBlocking, "review-blocking", false, "Fail loop if review not approved after max cycles")
@@ -54,8 +54,29 @@ func loopCmd() *cobra.Command {
 	cmd.Flags().StringVar(&o.reviewModels, "review-models", "", "Per-reviewer open-model pins for --implementer goose (e.g. security=ollama/qwen2.5-coder:14b,quality=glm/glm-4-plus)")
 	cmd.Flags().IntVar(&o.compactPct, "compact-pct", 0, "Context auto-compaction threshold % (0=use Claude Code default, suggested: 50)")
 	cmd.Flags().StringVar(&o.backend, "backend", "bg", "Claude execution backend: bg (default) or p (legacy claude -p)")
-	cmd.Flags().StringVar(&o.implementer, "implementer", "claude", "Loop implementer: claude (default) or goose")
+	cmd.Flags().StringVar(&o.implementer, "implementer", "claude", "Loop implementer: claude (default), goose, codex, or gemini (codex/gemini use plain model names; antigravity coming as gemini successor, groundwork only)")
 	return cmd
+}
+
+// validImplementerSet returns the accepted --implementer values. claude and goose
+// are the original engines; codex and gemini are PID-based engines that drive their
+// own CLI in-tree (like goose) using PLAIN model names. Mirrors validHarnessTargets.
+func validImplementerSet() map[string]bool {
+	return map[string]bool{"claude": true, "goose": true, "codex": true, "gemini": true}
+}
+
+// defaultImplementerModel returns the default PLAIN model name for codex/gemini
+// when --model is not passed explicitly. claude/goose keep their own handling
+// (the global flag default / the required provider/model ref), so they return false.
+func defaultImplementerModel(implementer string) (string, bool) {
+	switch implementer {
+	case "codex":
+		return "gpt-5.5-codex", true
+	case "gemini":
+		return "gemini-3.1-pro", true
+	default:
+		return "", false
+	}
 }
 
 func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
@@ -65,8 +86,23 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 	if o.backend != "bg" && o.backend != "p" {
 		return fmt.Errorf("--backend must be 'bg' or 'p', got %q", o.backend)
 	}
-	if o.implementer != "claude" && o.implementer != "goose" {
-		return fmt.Errorf("--implementer must be 'claude' or 'goose', got %q", o.implementer)
+	if !validImplementerSet()[o.implementer] {
+		return fmt.Errorf("--implementer must be 'claude', 'goose', 'codex', or 'gemini', got %q", o.implementer)
+	}
+	// codex/gemini use PLAIN model names with their own defaults. When --model is not
+	// passed explicitly, swap the claude default for the engine default (overridable).
+	if !cmd.Flags().Changed("model") {
+		if def, ok := defaultImplementerModel(o.implementer); ok {
+			o.model = def
+		}
+	}
+	// The review fix-session feeds REVIEW_MODEL to the implementer engine (codex/gemini),
+	// so its claude default is invalid there too. Swap it for the engine default unless
+	// --review-model was passed explicitly.
+	if !cmd.Flags().Changed("review-model") {
+		if def, ok := defaultImplementerModel(o.implementer); ok {
+			o.reviewModel = def
+		}
 	}
 	if o.reviewModels != "" && o.implementer != "goose" {
 		return fmt.Errorf("--review-models only applies to --implementer goose")
@@ -104,10 +140,15 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 
 	if o.reviewers != "" {
 		reviewerList := strings.Split(o.reviewers, ",")
-		// The goose implementer uses an open-model review fleet of subrecipes with
-		// specialty reviewer names; claude uses the CLI-named reviewers.
+		// Reviewer names are validated per-implementer:
+		//   - goose: open-model review fleet of subrecipes (specialty names).
+		//   - codex/gemini: only the CLI-direct reviewers {gemini, codex}. A claude
+		//     reviewer would dispatch through agent_invoke, which on these seams runs
+		//     codex/gemini (NOT claude), so it is rejected (codex review P2).
+		//   - claude: the full CLI-named reviewer set.
 		var reviewModels map[string]string
-		if opts.implementer == "goose" {
+		switch opts.implementer {
+		case "goose":
 			if err := validateGooseReviewers(reviewerList); err != nil {
 				return err
 			}
@@ -116,8 +157,14 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 				return err
 			}
 			reviewModels = parsed
-		} else if err := validateReviewers(reviewerList); err != nil {
-			return err
+		case "codex", "gemini":
+			if err := validateCodexGeminiReviewers(reviewerList); err != nil {
+				return err
+			}
+		default:
+			if err := validateReviewers(reviewerList); err != nil {
+				return err
+			}
 		}
 		opts.review = &loopReviewOptions{
 			reviewers: reviewerList, maxReviewCycles: o.maxReviewCycles,
@@ -147,7 +194,7 @@ type loopGenerateOptions struct {
 	epics           string
 	backend         string // "bg" or "p"
 	backendExplicit bool   // true if user passed --backend explicitly
-	implementer     string // "claude" (default/empty) or "goose"
+	implementer     string // "claude" (default/empty), goose, codex, or gemini
 	review          *loopReviewOptions
 }
 
@@ -224,10 +271,15 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string, compa
 	fmt.Fprintf(&b, "# Infinity Loop - Generated by: ca loop\n")
 	fmt.Fprintf(&b, "# Date: %s\n", timestamp)
 	// Header is parameterized on the implementer: the claude (default) path stays
-	// byte-identical, while the goose path describes goose sessions.
-	if implementer == "goose" {
+	// byte-identical, while goose/codex/gemini describe their own sessions.
+	switch implementer {
+	case "goose":
 		fmt.Fprintf(&b, "# Autonomously processes beads epics via goose sessions.\n")
-	} else {
+	case "codex":
+		fmt.Fprintf(&b, "# Autonomously processes beads epics via codex sessions.\n")
+	case "gemini":
+		fmt.Fprintf(&b, "# Autonomously processes beads epics via gemini sessions.\n")
+	default:
 		fmt.Fprintf(&b, "# Autonomously processes beads epics via Claude Code sessions.\n")
 	}
 	fmt.Fprintf(&b, "#\n# Usage:\n#   .compound-agent/infinity-loop.sh\n")
@@ -257,7 +309,12 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string, compa
 	fmt.Fprintf(&b, "die() { log \"FATAL: $*\"; exit 1; }\n\n")
 
 	// CLI prerequisites
-	if implementer == "goose" {
+	switch implementer {
+	case "codex":
+		fmt.Fprintf(&b, "command -v codex >/dev/null || die \"codex CLI required\"\n")
+	case "gemini":
+		fmt.Fprintf(&b, "command -v gemini >/dev/null || die \"gemini CLI required\"\n")
+	case "goose":
 		fmt.Fprintf(&b, "command -v goose >/dev/null || die \"goose CLI required\"\n")
 		// Derive provider/model from the provider/model reference in MODEL.
 		fmt.Fprintf(&b, "GOOSE_PROVIDER=${MODEL%%%%/*}\n")
@@ -271,7 +328,7 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string, compa
 		fmt.Fprintf(&b, "if [ \"$GOOSE_PROVIDER\" = \"ollama\" ]; then\n")
 		fmt.Fprintf(&b, "  export GOOSE_TOOLSHIM=\"${GOOSE_TOOLSHIM:-1}\"  # no-clobber: respect a user-set value\n")
 		fmt.Fprintf(&b, "fi\n")
-	} else {
+	default:
 		fmt.Fprintf(&b, "command -v claude >/dev/null || die \"claude CLI required\"\n")
 	}
 	fmt.Fprintf(&b, "command -v bd >/dev/null || die \"bd (beads) CLI required\"\n\n")
@@ -317,10 +374,14 @@ func loopScriptMemorySafety() string {
 // function are omitted (goose is in-tree, PID-based). The claude path delegates to
 // loopScriptMemorySafety so it stays byte-identical.
 func loopScriptMemorySafetyImpl(implementer string) string {
-	if implementer == "goose" {
+	// goose, codex, and gemini are all PID-based (in-tree, no bg orphan-sweep, no
+	// bg_kill_ladder), so they share the goose-shaped memory-safety body.
+	switch implementer {
+	case "goose", "codex", "gemini":
 		return memorySafetyHead + memorySafetyCleanupClose + memorySafetyWatchdogs
+	default:
+		return loopScriptMemorySafety()
 	}
-	return loopScriptMemorySafety()
 }
 
 const memorySafetyHead = `# --- Memory Safety (4-Layer Defense) ---
@@ -782,8 +843,13 @@ for item in items:
 // prompt drops the Claude-only slash command and adds an explicit git commit step
 // (goose does not auto-commit). The completion markers are identical (R2).
 func loopScriptPromptBuilder(bt, implementer string) string { //nolint:funlen // bash template string
-	if implementer == "goose" {
+	switch implementer {
+	case "goose":
 		return loopScriptGoosePromptBuilder(bt)
+	case "codex":
+		return loopScriptCodexPromptBuilder(bt)
+	case "gemini":
+		return loopScriptGeminiPromptBuilder(bt)
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "# --- Prompt Builder ---\n")
@@ -1103,8 +1169,13 @@ func loopScriptSeam(backend string, explicit bool) string {
 // it returns the existing claude seam verbatim (byte-identical, R7). For "goose" it
 // returns the goose seam (in-tree, PID-polled, no worktree harvest).
 func loopScriptSeamImpl(implementer, backend string, explicit bool) string {
-	if implementer == "goose" {
+	switch implementer {
+	case "goose":
 		return loopScriptGooseSeam(backend)
+	case "codex":
+		return loopScriptCodexSeam(backend)
+	case "gemini":
+		return loopScriptGeminiSeam(backend)
 	}
 	return loopScriptSeamClaude(backend, explicit)
 }
@@ -1687,6 +1758,256 @@ goose_preflight
 `
 }
 
+// loopScriptCodexSeam returns the codex implementer seam. It mirrors the goose
+// seam contract (agent_dispatch/poll/collect/stop/cleanup/invoke) but drives
+// 'codex exec' in-tree with a PID handle. It emits CA_IMPLEMENTER=codex and sets
+// CA_BACKEND=p so the main loop takes the wait+watchdog path. Codex stdout is
+// plain text, so detect_marker greps the logfile directly (no stream-json
+// extraction, agent_collect is a noop). No bootstrap_preflight, no worktree harvest.
+func loopScriptCodexSeam(backend string) string { //nolint:funlen // bash template string
+	// backend is accepted for signature parity with the claude/goose seams; the
+	// codex path is always PID-based (CA_BACKEND=p) regardless of the value.
+	_ = backend
+	return `# --- Codex Implementer Seam (R-SEAM) ---
+# CA_IMPLEMENTER=codex drives epics with 'codex exec' in-tree (no worktree harvest).
+# CA_BACKEND=p so the main loop takes the wait+watchdog path: AGENT_HANDLE is a PID.
+CA_IMPLEMENTER=codex
+CA_BACKEND=p
+` + loopScriptCodexPreflight() + `
+# AGENT_HANDLE is set by agent_dispatch to the background subshell PID.
+AGENT_HANDLE=""
+
+# agent_dispatch <logfile> <tracefile> <model> <prompt>
+# Runs 'codex exec' in a background subshell. Codex takes the prompt as a positional
+# arg and emits plain human-readable text, so stdout is tee'd straight to the
+# tracefile AND logfile; detect_marker greps the logfile directly.
+# CRITICAL: stdin MUST be redirected from /dev/null or 'codex exec' blocks. Approval
+# is disabled via -c approval_policy="never" (the --full-auto/--ask-for-approval
+# global flags are rejected after 'exec').
+agent_dispatch() {
+  local logfile="$1" tracefile="$2" model="$3" prompt="$4"
+  # Enable job control (set -m) so the backgrounded subshell becomes its own
+  # process group leader: without a fresh group 'kill -- -$AGENT_HANDLE' in
+  # agent_stop and the watchdogs would target the loop instead of the codex child.
+  set -m
+  (
+    codex exec --sandbox workspace-write -c approval_policy="never" \
+      --skip-git-repo-check -C "$(pwd)" -m "$model" "$prompt" \
+      < /dev/null 2>"$logfile.stderr" | tee "$tracefile" > "$logfile"
+  ) &
+  AGENT_HANDLE=$!
+  set +m
+}
+
+# agent_poll <handle> -> "running" | "done"
+# PID poll: alive => running, gone => done.
+agent_poll() {
+  local handle="$1"
+  kill -0 "$handle" 2>/dev/null && echo running || echo done
+}
+
+# agent_collect <handle> <logfile> <tracefile>
+# Noop: the dispatch pipeline already wrote plain-text stdout to logfile/tracefile,
+# which detect_marker greps directly. In-tree; no worktree harvest.
+agent_collect() {
+  : # codex: logfile/tracefile already populated by the dispatch pipeline
+}
+
+# detect_marker_with_bd_state <epic_id> <logfile> <tracefile>
+# Wrapper around the byte-frozen detect_marker. Codex may close the epic via
+# 'bd close' yet exit without printing EPIC_COMPLETE; in that case fall back to the
+# beads epic status and upgrade to "complete" if the epic is closed. Never
+# downgrades a "failed" or "human:" marker.
+detect_marker_with_bd_state() {
+  local epic_id="$1" logfile="$2" tracefile="$3"
+  local marker
+  marker=$(detect_marker "$logfile" "$tracefile")
+  if [ "$marker" = "none" ]; then
+    local status
+    status=$(bd show "$epic_id" --json 2>/dev/null | parse_json '.status' 2>/dev/null || true)
+    if [ "$status" = "closed" ]; then
+      echo complete
+      return 0
+    fi
+  fi
+  echo "$marker"
+}
+
+# agent_stop <handle>
+# Kill the background subshell (process group first, then the PID).
+agent_stop() {
+  local handle="$1"
+  kill -TERM -- -"$handle" 2>/dev/null || kill "$handle" 2>/dev/null || true
+}
+
+# agent_cleanup <handle> [marker]
+# Noop: codex is in-tree, there is no worktree to harvest and no session to remove.
+agent_cleanup() {
+  : # codex: in-tree, nothing to harvest
+  return 0
+}
+
+# agent_invoke <model> [flags...] [prompt-args...]
+# Synchronous codex invocation for the review fix-session. The shared review path
+# calls 'agent_invoke "$REVIEW_MODEL" -p "$prompt"'; codex has no -p flag, so strip
+# the leading -p and pass the prompt positionally with stdin redirected.
+agent_invoke() {
+  local model="$1"; shift
+  local prompt=""
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -p) shift; prompt="$1" ;;
+      *)  prompt="$1" ;;
+    esac
+    shift
+  done
+  codex exec --sandbox workspace-write -c approval_policy="never" \
+    --skip-git-repo-check -m "$model" "$prompt" < /dev/null
+}
+
+`
+}
+
+// loopScriptCodexPreflight returns the codex preflight bash function and call site.
+// It checks the codex CLI and softly probes 'codex login status' (auth is ChatGPT
+// login, so a missing/expired session only warns -- the user may complete login
+// interactively). It intentionally skips the claude-bg bootstrap/disclaimer probe.
+func loopScriptCodexPreflight() string {
+	return `
+# --- Codex Preflight ---
+# Verifies the codex CLI before entering the loop. Auth is ChatGPT login, so the
+# login-status check is a soft warning (not a die): the user can run 'codex login'.
+codex_preflight() {
+  command -v codex >/dev/null || die "codex CLI required. Install: https://github.com/openai/codex"
+  if ! codex login status >/dev/null 2>&1; then
+    log "WARN: codex_preflight: 'codex login status' failed; run 'codex login' if dispatch fails on auth"
+  fi
+}
+codex_preflight
+`
+}
+
+// loopScriptGeminiSeam returns the gemini implementer seam. It mirrors the goose/codex
+// seam contract (agent_dispatch/poll/collect/stop/cleanup/invoke) but drives
+// 'gemini -p' in-tree with a PID handle. It emits CA_IMPLEMENTER=gemini and sets
+// CA_BACKEND=p so the main loop takes the wait+watchdog path. Gemini stdout is plain
+// text, so detect_marker greps the logfile directly (no stream-json extraction,
+// agent_collect is a noop). No bootstrap_preflight, no worktree harvest.
+func loopScriptGeminiSeam(backend string) string { //nolint:funlen // bash template string
+	// backend is accepted for signature parity with the claude/goose/codex seams; the
+	// gemini path is always PID-based (CA_BACKEND=p) regardless of the value.
+	_ = backend
+	return `# --- Gemini Implementer Seam (R-SEAM) ---
+# CA_IMPLEMENTER=gemini drives epics with 'gemini -p' in-tree (no worktree harvest).
+# CA_BACKEND=p so the main loop takes the wait+watchdog path: AGENT_HANDLE is a PID.
+CA_IMPLEMENTER=gemini
+CA_BACKEND=p
+` + loopScriptGeminiPreflight() + `
+# AGENT_HANDLE is set by agent_dispatch to the background subshell PID.
+AGENT_HANDLE=""
+
+# agent_dispatch <logfile> <tracefile> <model> <prompt>
+# Runs 'gemini -p' in a background subshell. Gemini takes the prompt via -p and emits
+# plain human-readable text, so stdout is tee'd straight to the tracefile AND logfile;
+# detect_marker greps the logfile directly. --yolo auto-approves tool use (non-interactive);
+# -m selects the plain model name.
+agent_dispatch() {
+  local logfile="$1" tracefile="$2" model="$3" prompt="$4"
+  # Enable job control (set -m) so the backgrounded subshell becomes its own
+  # process group leader: without a fresh group 'kill -- -$AGENT_HANDLE' in
+  # agent_stop and the watchdogs would target the loop instead of the gemini child.
+  set -m
+  (
+    gemini -p "$prompt" --yolo -m "$model" 2>"$logfile.stderr" | tee "$tracefile" > "$logfile"
+  ) &
+  AGENT_HANDLE=$!
+  set +m
+}
+
+# agent_poll <handle> -> "running" | "done"
+# PID poll: alive => running, gone => done.
+agent_poll() {
+  local handle="$1"
+  kill -0 "$handle" 2>/dev/null && echo running || echo done
+}
+
+# agent_collect <handle> <logfile> <tracefile>
+# Noop: the dispatch pipeline already wrote plain-text stdout to logfile/tracefile,
+# which detect_marker greps directly. In-tree; no worktree harvest.
+agent_collect() {
+  : # gemini: logfile/tracefile already populated by the dispatch pipeline
+}
+
+# detect_marker_with_bd_state <epic_id> <logfile> <tracefile>
+# Wrapper around the byte-frozen detect_marker. Gemini may close the epic via
+# 'bd close' yet exit without printing EPIC_COMPLETE; in that case fall back to the
+# beads epic status and upgrade to "complete" if the epic is closed. Never
+# downgrades a "failed" or "human:" marker.
+detect_marker_with_bd_state() {
+  local epic_id="$1" logfile="$2" tracefile="$3"
+  local marker
+  marker=$(detect_marker "$logfile" "$tracefile")
+  if [ "$marker" = "none" ]; then
+    local status
+    status=$(bd show "$epic_id" --json 2>/dev/null | parse_json '.status' 2>/dev/null || true)
+    if [ "$status" = "closed" ]; then
+      echo complete
+      return 0
+    fi
+  fi
+  echo "$marker"
+}
+
+# agent_stop <handle>
+# Kill the background subshell (process group first, then the PID).
+agent_stop() {
+  local handle="$1"
+  kill -TERM -- -"$handle" 2>/dev/null || kill "$handle" 2>/dev/null || true
+}
+
+# agent_cleanup <handle> [marker]
+# Noop: gemini is in-tree, there is no worktree to harvest and no session to remove.
+agent_cleanup() {
+  : # gemini: in-tree, nothing to harvest
+  return 0
+}
+
+# agent_invoke <model> [flags...] [prompt-args...]
+# Synchronous gemini invocation for the review fix-session. The shared review path
+# calls 'agent_invoke "$REVIEW_MODEL" -p "$prompt"'; gemini takes -p natively, so the
+# flags pass through after selecting the model and enabling non-interactive --yolo.
+agent_invoke() {
+  local model="$1"; shift
+  gemini --yolo -m "$model" "$@"
+}
+
+`
+}
+
+// loopScriptGeminiPreflight returns the gemini preflight bash function and call site.
+// It checks the gemini CLI and requires GEMINI_API_KEY (auth is the API key env var),
+// then softly warns that the default gemini-3.1-pro may not be served by the current
+// CLI (the user can override with --model). It intentionally skips the claude-bg
+// bootstrap/disclaimer probe.
+func loopScriptGeminiPreflight() string {
+	return `
+# --- Gemini Preflight ---
+# Verifies the gemini CLI and auth before entering the loop. Auth is the API key
+# env var GEMINI_API_KEY (a hard die if unset). The default model gemini-3.1-pro may
+# not be served by the current gemini CLI yet, so warn (not die): override --model.
+gemini_preflight() {
+  command -v gemini >/dev/null || die "gemini CLI required. Install: https://github.com/google-gemini/gemini-cli"
+  if [ -z "${GEMINI_API_KEY:-}" ]; then
+    die "gemini requires the API key env var GEMINI_API_KEY to be set"
+  fi
+  if [ "$MODEL" = "gemini-3.1-pro" ]; then
+    log "WARN: gemini_preflight: model gemini-3.1-pro may not be served by the current gemini CLI; override with --model if dispatch fails"
+  fi
+}
+gemini_preflight
+`
+}
+
 // loopScriptGoosePromptBuilder returns the goose build_prompt bash function. It
 // inlines the compound workflow (no Claude slash command) and drives the ca
 // primitives the cook-it recipe wires -- ca search / ca knowledge for prior art,
@@ -1727,6 +2048,140 @@ func loopScriptGoosePromptBuilder(bt string) string { //nolint:funlen // bash te
 	fmt.Fprintf(&b, "When all work is done and tests pass:\n")
 	fmt.Fprintf(&b, "1. Close the epic: \\%sbd close $epic_id\\%s\n", bt, bt)
 	fmt.Fprintf(&b, "2. Commit and push all changes (goose does NOT auto-commit, so do this explicitly):\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%sbash\n", bt, bt, bt)
+	fmt.Fprintf(&b, "git add -A && git commit -m \"feat($epic_id): implement epic\" && git push\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%s\n", bt, bt, bt)
+	fmt.Fprintf(&b, "3. Output this exact marker on its own line:\n\n")
+	fmt.Fprintf(&b, "EPIC_COMPLETE\n\n")
+	fmt.Fprintf(&b, "## Step 4: On failure\n")
+	fmt.Fprintf(&b, "If you cannot complete the epic after reasonable effort:\n")
+	fmt.Fprintf(&b, "1. Add a note: \\%sbd update $epic_id --notes \"Loop failed: <reason>\"\\%s\n", bt, bt)
+	fmt.Fprintf(&b, "2. Output this exact marker on its own line:\n\n")
+	fmt.Fprintf(&b, "EPIC_FAILED\n\n")
+	fmt.Fprintf(&b, "## Step 5: On human required\n")
+	fmt.Fprintf(&b, "If you hit a blocker that REQUIRES human action (account creation, API keys,\n")
+	fmt.Fprintf(&b, "external service setup, design decisions you cannot make, etc.):\n")
+	fmt.Fprintf(&b, "1. Add a note: \\%sbd update $epic_id --notes \"Human required: <reason>\"\\%s\n", bt, bt)
+	fmt.Fprintf(&b, "2. Output this exact marker followed by a short reason on the SAME line:\n\n")
+	fmt.Fprintf(&b, "HUMAN_REQUIRED: <reason>\n\n")
+	fmt.Fprintf(&b, "Example: HUMAN_REQUIRED: Need AWS credentials configured in .env\n\n")
+	fmt.Fprintf(&b, "## Rules\n")
+	fmt.Fprintf(&b, "- Do NOT ask questions -- there is no human. Make reasonable decisions.\n")
+	fmt.Fprintf(&b, "- Do NOT stop early -- complete the full workflow.\n")
+	fmt.Fprintf(&b, "- If tests fail, fix them. Retry up to 3 times before declaring failure.\n")
+	fmt.Fprintf(&b, "- Use HUMAN_REQUIRED only for true blockers that no amount of retrying can solve.\n")
+	fmt.Fprintf(&b, "- Commit incrementally as you make progress.\n")
+	fmt.Fprintf(&b, "PROMPT_BODY\n")
+	fmt.Fprintf(&b, "}\n\n")
+	return b.String()
+}
+
+// loopScriptCodexPromptBuilder returns the codex build_prompt bash function. It
+// mirrors loopScriptGoosePromptBuilder: the inlined compound workflow, the ca
+// primitives ladder (search/knowledge/phase-check/learn/verify-gates), the exact
+// completion markers (R2), and the explicit git commit step because codex does not
+// auto-commit. Only the header comment differs (codex, not goose).
+func loopScriptCodexPromptBuilder(bt string) string { //nolint:funlen // bash template string
+	var b strings.Builder
+	fmt.Fprintf(&b, "# --- Prompt Builder (codex) ---\n")
+	fmt.Fprintf(&b, "build_prompt() {\n")
+	fmt.Fprintf(&b, "  local epic_id=\"$1\"\n")
+	fmt.Fprintf(&b, "  cat <<'PROMPT_HEADER'\n")
+	fmt.Fprintf(&b, "You are running in an autonomous infinity loop. Your task is to fully implement a beads epic.\n\n")
+	fmt.Fprintf(&b, "## Step 1: Load context\n")
+	fmt.Fprintf(&b, "Run these commands to understand the epic:\n")
+	fmt.Fprintf(&b, "PROMPT_HEADER\n")
+	fmt.Fprintf(&b, "  cat <<PROMPT_BODY\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%sbash\n", bt, bt, bt)
+	fmt.Fprintf(&b, "bd show $epic_id\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%s\n\n", bt, bt, bt)
+	fmt.Fprintf(&b, "Read the epic details carefully. Understand scope, acceptance criteria, and sub-tasks.\n\n")
+	fmt.Fprintf(&b, "## Step 2: Execute the compound workflow\n")
+	fmt.Fprintf(&b, "Work the epic through all phases (spec-dev is already done -- the epic exists).\n")
+	fmt.Fprintf(&b, "Initialize phase state once with \\%sca phase-check init $epic_id\\%s, then for each\n", bt, bt)
+	fmt.Fprintf(&b, "phase run \\%sca phase-check start <phase>\\%s, look up prior art with\n", bt, bt)
+	fmt.Fprintf(&b, "\\%sca search \"<goal>\"\\%s and \\%sca knowledge \"<goal>\"\\%s before doing the work, and\n", bt, bt, bt, bt)
+	fmt.Fprintf(&b, "gate the transition before moving on.\n")
+	fmt.Fprintf(&b, "1. Plan: run \\%sca search\\%s and \\%sca knowledge\\%s for prior art, then design the\n", bt, bt, bt, bt)
+	fmt.Fprintf(&b, "   change and the tests. GATE: \\%sca phase-check gate post-plan\\%s.\n", bt, bt)
+	fmt.Fprintf(&b, "2. Work: run \\%sca search\\%s and \\%sca knowledge\\%s for prior art, then write the\n", bt, bt, bt, bt)
+	fmt.Fprintf(&b, "   failing test(s) first and the minimal code to pass them. GATE:\n")
+	fmt.Fprintf(&b, "   \\%sca phase-check gate gate-3\\%s.\n", bt, bt)
+	fmt.Fprintf(&b, "3. Review: run \\%sca search\\%s for known recurring issues, run the quality gates\n", bt, bt)
+	fmt.Fprintf(&b, "   (test, lint, build), and fix what you find. GATE: \\%sca phase-check gate gate-4\\%s.\n", bt, bt)
+	fmt.Fprintf(&b, "4. Compound: run \\%sca learn\\%s to capture any lesson worth keeping. FINAL GATE:\n", bt, bt)
+	fmt.Fprintf(&b, "   run \\%sca verify-gates $epic_id\\%s (must pass), then \\%sca phase-check gate final\\%s.\n\n", bt, bt, bt, bt)
+	fmt.Fprintf(&b, "## Step 3: On completion\n")
+	fmt.Fprintf(&b, "When all work is done and tests pass:\n")
+	fmt.Fprintf(&b, "1. Close the epic: \\%sbd close $epic_id\\%s\n", bt, bt)
+	fmt.Fprintf(&b, "2. Commit and push all changes (codex does NOT auto-commit, so do this explicitly):\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%sbash\n", bt, bt, bt)
+	fmt.Fprintf(&b, "git add -A && git commit -m \"feat($epic_id): implement epic\" && git push\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%s\n", bt, bt, bt)
+	fmt.Fprintf(&b, "3. Output this exact marker on its own line:\n\n")
+	fmt.Fprintf(&b, "EPIC_COMPLETE\n\n")
+	fmt.Fprintf(&b, "## Step 4: On failure\n")
+	fmt.Fprintf(&b, "If you cannot complete the epic after reasonable effort:\n")
+	fmt.Fprintf(&b, "1. Add a note: \\%sbd update $epic_id --notes \"Loop failed: <reason>\"\\%s\n", bt, bt)
+	fmt.Fprintf(&b, "2. Output this exact marker on its own line:\n\n")
+	fmt.Fprintf(&b, "EPIC_FAILED\n\n")
+	fmt.Fprintf(&b, "## Step 5: On human required\n")
+	fmt.Fprintf(&b, "If you hit a blocker that REQUIRES human action (account creation, API keys,\n")
+	fmt.Fprintf(&b, "external service setup, design decisions you cannot make, etc.):\n")
+	fmt.Fprintf(&b, "1. Add a note: \\%sbd update $epic_id --notes \"Human required: <reason>\"\\%s\n", bt, bt)
+	fmt.Fprintf(&b, "2. Output this exact marker followed by a short reason on the SAME line:\n\n")
+	fmt.Fprintf(&b, "HUMAN_REQUIRED: <reason>\n\n")
+	fmt.Fprintf(&b, "Example: HUMAN_REQUIRED: Need AWS credentials configured in .env\n\n")
+	fmt.Fprintf(&b, "## Rules\n")
+	fmt.Fprintf(&b, "- Do NOT ask questions -- there is no human. Make reasonable decisions.\n")
+	fmt.Fprintf(&b, "- Do NOT stop early -- complete the full workflow.\n")
+	fmt.Fprintf(&b, "- If tests fail, fix them. Retry up to 3 times before declaring failure.\n")
+	fmt.Fprintf(&b, "- Use HUMAN_REQUIRED only for true blockers that no amount of retrying can solve.\n")
+	fmt.Fprintf(&b, "- Commit incrementally as you make progress.\n")
+	fmt.Fprintf(&b, "PROMPT_BODY\n")
+	fmt.Fprintf(&b, "}\n\n")
+	return b.String()
+}
+
+// loopScriptGeminiPromptBuilder returns the gemini build_prompt bash function. It
+// mirrors loopScriptCodexPromptBuilder: the inlined compound workflow, the ca
+// primitives ladder (search/knowledge/phase-check/learn/verify-gates), the exact
+// completion markers (R2), and the explicit git commit step because gemini does not
+// auto-commit. Only the header comment differs (gemini, not codex).
+func loopScriptGeminiPromptBuilder(bt string) string { //nolint:funlen // bash template string
+	var b strings.Builder
+	fmt.Fprintf(&b, "# --- Prompt Builder (gemini) ---\n")
+	fmt.Fprintf(&b, "build_prompt() {\n")
+	fmt.Fprintf(&b, "  local epic_id=\"$1\"\n")
+	fmt.Fprintf(&b, "  cat <<'PROMPT_HEADER'\n")
+	fmt.Fprintf(&b, "You are running in an autonomous infinity loop. Your task is to fully implement a beads epic.\n\n")
+	fmt.Fprintf(&b, "## Step 1: Load context\n")
+	fmt.Fprintf(&b, "Run these commands to understand the epic:\n")
+	fmt.Fprintf(&b, "PROMPT_HEADER\n")
+	fmt.Fprintf(&b, "  cat <<PROMPT_BODY\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%sbash\n", bt, bt, bt)
+	fmt.Fprintf(&b, "bd show $epic_id\n")
+	fmt.Fprintf(&b, "\\%s\\%s\\%s\n\n", bt, bt, bt)
+	fmt.Fprintf(&b, "Read the epic details carefully. Understand scope, acceptance criteria, and sub-tasks.\n\n")
+	fmt.Fprintf(&b, "## Step 2: Execute the compound workflow\n")
+	fmt.Fprintf(&b, "Work the epic through all phases (spec-dev is already done -- the epic exists).\n")
+	fmt.Fprintf(&b, "Initialize phase state once with \\%sca phase-check init $epic_id\\%s, then for each\n", bt, bt)
+	fmt.Fprintf(&b, "phase run \\%sca phase-check start <phase>\\%s, look up prior art with\n", bt, bt)
+	fmt.Fprintf(&b, "\\%sca search \"<goal>\"\\%s and \\%sca knowledge \"<goal>\"\\%s before doing the work, and\n", bt, bt, bt, bt)
+	fmt.Fprintf(&b, "gate the transition before moving on.\n")
+	fmt.Fprintf(&b, "1. Plan: run \\%sca search\\%s and \\%sca knowledge\\%s for prior art, then design the\n", bt, bt, bt, bt)
+	fmt.Fprintf(&b, "   change and the tests. GATE: \\%sca phase-check gate post-plan\\%s.\n", bt, bt)
+	fmt.Fprintf(&b, "2. Work: run \\%sca search\\%s and \\%sca knowledge\\%s for prior art, then write the\n", bt, bt, bt, bt)
+	fmt.Fprintf(&b, "   failing test(s) first and the minimal code to pass them. GATE:\n")
+	fmt.Fprintf(&b, "   \\%sca phase-check gate gate-3\\%s.\n", bt, bt)
+	fmt.Fprintf(&b, "3. Review: run \\%sca search\\%s for known recurring issues, run the quality gates\n", bt, bt)
+	fmt.Fprintf(&b, "   (test, lint, build), and fix what you find. GATE: \\%sca phase-check gate gate-4\\%s.\n", bt, bt)
+	fmt.Fprintf(&b, "4. Compound: run \\%sca learn\\%s to capture any lesson worth keeping. FINAL GATE:\n", bt, bt)
+	fmt.Fprintf(&b, "   run \\%sca verify-gates $epic_id\\%s (must pass), then \\%sca phase-check gate final\\%s.\n\n", bt, bt, bt, bt)
+	fmt.Fprintf(&b, "## Step 3: On completion\n")
+	fmt.Fprintf(&b, "When all work is done and tests pass:\n")
+	fmt.Fprintf(&b, "1. Close the epic: \\%sbd close $epic_id\\%s\n", bt, bt)
+	fmt.Fprintf(&b, "2. Commit and push all changes (gemini does NOT auto-commit, so do this explicitly):\n")
 	fmt.Fprintf(&b, "\\%s\\%s\\%sbash\n", bt, bt, bt)
 	fmt.Fprintf(&b, "git add -A && git commit -m \"feat($epic_id): implement epic\" && git push\n")
 	fmt.Fprintf(&b, "\\%s\\%s\\%s\n", bt, bt, bt)
@@ -1805,10 +2260,14 @@ func loopScriptEpicProcessing() string {
 }
 
 func loopScriptEpicProcessingImpl(implementer string) string {
-	if implementer == "goose" {
+	// goose, codex, and gemini share the PID wait+watchdog per-attempt body
+	// (loopScriptGooseAttemptSetup is engine-agnostic apart from comments).
+	switch implementer {
+	case "goose", "codex", "gemini":
 		return loopScriptGooseAttemptSetup() + loopScriptAttemptCases()
+	default:
+		return loopScriptEpicProcessing()
 	}
-	return loopScriptEpicProcessing()
 }
 
 // loopScriptGooseAttemptSetup is the per-attempt body for the goose implementer.

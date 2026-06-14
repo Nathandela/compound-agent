@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-06-14
+
+Adds `codex` and `gemini` as full loop implementers alongside `claude` (default)
+and `goose`, plus antigravity migration groundwork. Purely additive: the default
+`ca setup` and `ca loop --implementer claude|goose` paths are byte-for-byte
+unchanged and guarded by regression tests. The codex implementer invocation and
+the review loop were live-verified, and the whole change passed a `codex review`
+loop to a clean pass.
+
+### Added
+
+- **`ca loop --implementer codex`**: drive the loop with Codex (OpenAI). PID-based, in-tree engine (`CA_BACKEND=p`, own process group). Dispatch uses `codex exec --sandbox workspace-write -c approval_policy="never" --skip-git-repo-check`. Default model `gpt-5.5-codex` (plain model name, no `provider/` slash; override with `--model`). Preflight checks the codex CLI and login status.
+- **`ca loop --implementer gemini`**: drive the loop with the Gemini CLI. PID-based, in-tree engine. Dispatch uses `gemini -p "<prompt>" --yolo`. Default model `gemini-3.1-pro` (override with `--model`). Preflight checks the gemini CLI and `GEMINI_API_KEY`.
+- **Soft, in-prompt phase-gate for codex/gemini**: the compound protocol (`ca search`/`ca knowledge` before phases, `ca learn` after corrections, `ca phase-check` gate flow, Verification Contract, the three completion markers, explicit commit/push) is ported into the codex (`AGENTS.md`) and gemini (`GEMINI.md`) memory files. Codex `PreToolUse` and Antigravity `decision:deny` hooks can hard-block as a future enhancement.
+- **Implementer review reuse**: codex/gemini implementers reuse the existing CLI-reviewer dispatch. Valid reviewers for codex/gemini are `{codex, gemini}` (the CLI-direct branches); claude reviewers are rejected for these implementers because they route through the implementer-specific `agent_invoke`.
+- **`ca setup --harness antigravity`**: installs the `AGENTS.md` memory file for the Antigravity (`agy`) CLI, the successor to the Gemini CLI.
+- **Loop skill**: `templates/skills/loop-launcher/SKILL.md` now documents `--implementer codex` and `--implementer gemini` trigger scripts and the implementer/CLI syntax that ships with the plugin.
+
+### Notes
+
+- The standalone gemini CLI is sunset on 2026-06-18 in favor of the Antigravity CLI (`agy`). Antigravity is shipped here as groundwork only (a `--harness antigravity` setup target + this note), not as a functional loop implementer or reviewer: `agy` currently authenticates via OAuth keyring only (no API-key env), and `agy -p` drops stdout in non-TTY/subprocess contexts, which breaks marker capture. The full agy loop and reviewer are deferred until those are resolved.
+- A `codex review` loop over the implementation surfaced and fixed two real issues before release: a scaffolded antigravity reviewer that could falsely report approval (removed from the active reviewer set), and the claude-reviewer cross-wiring above.
+
 ## [2.9.1] - 2026-06-14
 
 Hardening and live-verification of the Goose harness shipped in 2.9.0, against
