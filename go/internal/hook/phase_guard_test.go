@@ -78,6 +78,36 @@ func TestProcessPhaseGuard_GooseEditToolsGuarded(t *testing.T) {
 	}
 }
 
+// TestProcessPhaseGuard_ToolshimWriteEditGuarded verifies that Goose's toolshim
+// collapses developer__text_editor to the bare names "write" and "edit" on the
+// local-model path (no native tool_calls), and that these names trigger the
+// phase gate under the same out-of-phase state that guards Edit/Write. Claude
+// never sends bare write/edit, so this only ADDS blocking for the toolshim path.
+func TestProcessPhaseGuard_ToolshimWriteEditGuarded(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writePhaseState(t, dir, PhaseState{
+		CookitActive: true,
+		EpicID:       "test",
+		CurrentPhase: "work",
+		PhaseIndex:   3,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	})
+
+	for _, tool := range []string{"write", "edit"} {
+		result := ProcessPhaseGuard(dir, tool, map[string]interface{}{})
+		if result.SpecificOutput == nil {
+			t.Errorf("expected phase guard warning for toolshim edit tool %q", tool)
+			continue
+		}
+		if result.SpecificOutput.HookEventName != "PreToolUse" {
+			t.Errorf("tool %q: got event %q, want PreToolUse", tool, result.SpecificOutput.HookEventName)
+		}
+	}
+}
+
 func TestProcessPhaseGuard_SkillNotRead(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()

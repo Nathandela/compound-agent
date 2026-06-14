@@ -623,6 +623,54 @@ func TestLoopCmd_GoosePreflightOllamaContext(t *testing.T) {
 	}
 }
 
+// --- GOOSE_TOOLSHIM is wired for ollama (local models emit no native tool_calls) ---
+
+func TestLoopCmd_GooseOllamaExportsToolshim(t *testing.T) {
+	t.Parallel()
+	script := generateLoopScriptViaCmd(t, "--implementer", "goose", "--model", "ollama/qwen2.5-coder:14b")
+	// The toolshim export is gated on the runtime-derived $GOOSE_PROVIDER so the
+	// generator stays simple and the bash conditional decides at runtime.
+	if !strings.Contains(script, `if [ "$GOOSE_PROVIDER" = "ollama" ]`) {
+		t.Error("goose script must guard the toolshim export on [ \"$GOOSE_PROVIDER\" = \"ollama\" ]")
+	}
+	// No-clobber export using parameter-default expansion.
+	if !strings.Contains(script, `export GOOSE_TOOLSHIM="${GOOSE_TOOLSHIM:-1}"`) {
+		t.Error(`goose script must emit export GOOSE_TOOLSHIM="${GOOSE_TOOLSHIM:-1}"`)
+	}
+	// The explanatory rationale must be present.
+	if !strings.Contains(script, "local ollama models do not emit native tool_calls") {
+		t.Error("goose script must explain why ollama needs GOOSE_TOOLSHIM (local models do not emit native tool_calls)")
+	}
+}
+
+// --- Non-ollama (API) providers get no unconditional toolshim export ---
+
+func TestLoopCmd_GooseNonOllamaNoToolshim(t *testing.T) {
+	t.Parallel()
+	script := generateLoopScriptViaCmd(t, "--implementer", "goose", "--model", "deepseek/deepseek-chat")
+	// There must be no unconditional/forced toolshim export. The runtime guard
+	// keyed on $GOOSE_PROVIDER may still be present (bash decides at runtime), but
+	// a bare `export GOOSE_TOOLSHIM=1` would force it on for deepseek.
+	if strings.Contains(script, "export GOOSE_TOOLSHIM=1") {
+		t.Error("non-ollama goose script must NOT contain an unconditional export GOOSE_TOOLSHIM=1")
+	}
+}
+
+// --- The toolshim export is no-clobber: a user-set value wins ---
+
+func TestLoopCmd_GooseToolshimNoClobber(t *testing.T) {
+	t.Parallel()
+	script := generateLoopScriptViaCmd(t, "--implementer", "goose", "--model", "ollama/qwen2.5-coder:14b")
+	// Parameter-default expansion (${GOOSE_TOOLSHIM:-1}) preserves a user-set value
+	// instead of force-setting 1, which a bare `GOOSE_TOOLSHIM=1` would clobber.
+	if !strings.Contains(script, "${GOOSE_TOOLSHIM:-1}") {
+		t.Error("toolshim export must use no-clobber default expansion ${GOOSE_TOOLSHIM:-1}")
+	}
+	if strings.Contains(script, "export GOOSE_TOOLSHIM=1\n") {
+		t.Error("toolshim export must not use a bare clobbering export GOOSE_TOOLSHIM=1")
+	}
+}
+
 // --- detect_marker is identical for goose and claude (R2) ---
 
 func TestLoopCmd_GooseDetectMarkerUnchanged(t *testing.T) {

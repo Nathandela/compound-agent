@@ -67,3 +67,10 @@ Goose does NOT auto-commit. Before printing `EPIC_COMPLETE` you MUST run:
     git add -A && git commit -m "<message>" && git push
 
 Run `bd close <epic>` for the epic in the main tree (not inside a worktree).
+
+## Local Models (ollama)
+
+Local ollama models do not emit native tool_calls, so goose dispatches no tools
+unless `GOOSE_TOOLSHIM=1`. The generated loop script sets it automatically for the
+ollama provider (no-clobber: a value you export yourself wins). API providers emit
+native tool_calls and need no toolshim.

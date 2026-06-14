@@ -22,7 +22,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "developer__text_editor|Edit|Write|str_replace|create_file|text_editor",
+        "matcher": "developer__text_editor|Edit|Write|str_replace|create_file|text_editor|str_replace_editor|write|edit",
         "hooks": [
           {
             "type": "command",

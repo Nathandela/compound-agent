@@ -270,8 +270,9 @@ func dispatchPhaseGuard(stdin io.Reader, hookName string) (interface{}, int, boo
 		return handleErrorResult(hookName, err), 0, true
 	}
 	var data struct {
-		ToolName  string                 `json:"tool_name"`
-		ToolInput map[string]interface{} `json:"tool_input"`
+		ToolName   string                 `json:"tool_name"`
+		ToolInput  map[string]interface{} `json:"tool_input"`
+		WorkingDir string                 `json:"working_dir"`
 	}
 	if err = json.Unmarshal([]byte(input.raw), &data); err != nil {
 		return handleErrorResult(hookName, err), 0, true
@@ -284,10 +285,37 @@ func dispatchPhaseGuard(stdin io.Reader, hookName string) (interface{}, int, boo
 	}
 	repoRoot := util.GetRepoRoot()
 	if hookName == "phase-guard" {
+		repoRoot = resolvePhaseGuardRoot(repoRoot, data.WorkingDir)
 		return ProcessPhaseGuard(repoRoot, data.ToolName, data.ToolInput), 0, false
 	}
 	ProcessReadTracker(repoRoot, data.ToolName, data.ToolInput)
 	return map[string]interface{}{}, 0, false
+}
+
+// resolvePhaseGuardRoot returns the repo root for the phase-guard gate, with an
+// additive fallback to the working_dir Goose sends on stdin. Goose's toolshim
+// path runs from a foreign cwd and does not set COMPOUND_AGENT_ROOT, so the bare
+// util.GetRepoRoot() resolves to a directory with no phase state and the gate
+// silently no-ops. The fallback fires ONLY when all three guards hold: env is
+// unset, the resolved cwd has no .compound-agent dir, and working_dir does have
+// one. Claude is unaffected: it runs from project root (cwd has .compound-agent)
+// and sends no working_dir, so the fallback never triggers. The guards
+// short-circuit so the os.Stat on working_dir only runs when both prior
+// conditions hold.
+func resolvePhaseGuardRoot(repoRoot, workingDir string) string {
+	if os.Getenv("COMPOUND_AGENT_ROOT") != "" {
+		return repoRoot
+	}
+	if _, err := os.Stat(filepath.Join(repoRoot, stateArtifactDir)); err == nil {
+		return repoRoot
+	}
+	if workingDir == "" {
+		return repoRoot
+	}
+	if _, err := os.Stat(filepath.Join(workingDir, stateArtifactDir)); err == nil {
+		return workingDir
+	}
+	return repoRoot
 }
 
 func dispatchStopAudit(stdin io.Reader, hookName string) (interface{}, int, bool) {

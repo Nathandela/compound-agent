@@ -67,6 +67,44 @@ func TestRunHook_PhaseGuard_RealGoosePreToolUseStdin(t *testing.T) {
 	}
 }
 
+// TestRunHook_PhaseGuard_WorkingDirFallback verifies the additive root-resolution
+// fallback in dispatchPhaseGuard: when COMPOUND_AGENT_ROOT is unset and the
+// process cwd has no .compound-agent dir, the phase-guard hook falls back to the
+// working_dir Goose sends on stdin. Real Goose runs from a foreign cwd and sends
+// working_dir, so without this fallback the gate resolves to the wrong root, finds
+// no state, and no-ops. Claude is unaffected: it runs from project root (cwd has
+// .compound-agent) and sends no working_dir, so the fallback never fires.
+//
+// Cannot use t.Parallel: it t.Chdirs the process to a foreign TempDir (Go 1.26).
+func TestRunHook_PhaseGuard_WorkingDirFallback(t *testing.T) {
+	// Clear any ambient COMPOUND_AGENT_ROOT so the fallback is reachable.
+	t.Setenv("COMPOUND_AGENT_ROOT", "")
+	// Chdir to a foreign cwd with no .compound-agent dir.
+	t.Chdir(t.TempDir())
+
+	// The real repo root, in a separate dir, carries the out-of-phase state.
+	dir2 := t.TempDir()
+	writePhaseState(t, dir2, PhaseState{
+		CookitActive: true,
+		EpicID:       "test",
+		CurrentPhase: "work",
+		PhaseIndex:   3,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	})
+
+	var out bytes.Buffer
+	payload := `{"tool_name":"write","tool_input":{"path":"x.go"},"working_dir":"` + dir2 + `"}`
+	stdin := io.NopCloser(strings.NewReader(payload))
+	if code := RunHook("phase-guard", stdin, &out); code != 0 {
+		t.Fatalf("phase-guard exit code = %d, want 0", code)
+	}
+	if !strings.Contains(out.String(), "PHASE GUARD") {
+		t.Errorf("expected PHASE GUARD payload via working_dir fallback, got: %s", out.String())
+	}
+}
+
 func TestRunHook_UnknownHook(t *testing.T) {
 	var out bytes.Buffer
 	stdin := io.NopCloser(strings.NewReader("{}"))

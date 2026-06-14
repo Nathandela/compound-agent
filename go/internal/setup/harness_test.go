@@ -263,8 +263,8 @@ func TestSetup_HarnessGooseHooksJson_BlockingPhaseGate(t *testing.T) {
 	// R5: the matcher must target Goose's namespaced edit tool
 	// developer__text_editor (the old Claude-only matcher would never fire under
 	// real Goose), staying an unanchored alternation for custom-MCP edit tools.
-	if !strings.Contains(content, `"matcher": "developer__text_editor|Edit|Write|str_replace|create_file|text_editor"`) {
-		t.Error("goose PreToolUse matcher must target developer__text_editor (namespaced) plus Claude-style alternates")
+	if !strings.Contains(content, `"matcher": "developer__text_editor|Edit|Write|str_replace|create_file|text_editor|str_replace_editor|write|edit"`) {
+		t.Error("goose PreToolUse matcher must target developer__text_editor (namespaced) plus Claude-style and toolshim alternates")
 	}
 	// FIX-2: the reason must be JSON-escaped before being printf'd into the payload.
 	// Decode the JSON so we assert against the shell that actually runs (the

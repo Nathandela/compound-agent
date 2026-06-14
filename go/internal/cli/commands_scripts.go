@@ -46,7 +46,7 @@ func loopCmd() *cobra.Command {
 	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-7[1m]", "Model to use. For --implementer goose, a provider/model ref (e.g. ollama/qwen2.5-coder:14b, deepseek/deepseek-chat)")
 	cmd.Flags().BoolVarP(&o.force, "force", "f", false, "Overwrite existing script")
 	cmd.Flags().StringVar(&o.epics, "epics", "", "Comma-separated epic IDs to process")
-	cmd.Flags().StringVar(&o.reviewers, "reviewers", "", "Comma-separated reviewers (claude-sonnet,claude-opus,gemini,codex)")
+	cmd.Flags().StringVar(&o.reviewers, "reviewers", "", "Comma-separated reviewers (claude: claude-sonnet,claude-opus,gemini,codex; goose: security,correctness,quality)")
 	cmd.Flags().IntVar(&o.reviewEvery, "review-every", 0, "Review every N completed epics (0=end-only)")
 	cmd.Flags().IntVar(&o.maxReviewCycles, "max-review-cycles", 3, "Max review/fix iterations")
 	cmd.Flags().BoolVar(&o.reviewBlocking, "review-blocking", false, "Fail loop if review not approved after max cycles")
@@ -263,6 +263,14 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string, compa
 		fmt.Fprintf(&b, "GOOSE_PROVIDER=${MODEL%%%%/*}\n")
 		fmt.Fprintf(&b, "GOOSE_MODEL=${MODEL#*/}\n")
 		fmt.Fprintf(&b, "export GOOSE_PROVIDER GOOSE_MODEL\n")
+		// local ollama models do not emit native tool_calls, so goose dispatches no
+		// tools unless GOOSE_TOOLSHIM=1. Gate on the runtime-derived provider; the
+		// no-clobber default expansion respects a user-set value.
+		fmt.Fprintf(&b, "# local ollama models do not emit native tool_calls; goose dispatches no\n")
+		fmt.Fprintf(&b, "# tools without the toolshim, so enable it for the ollama provider only.\n")
+		fmt.Fprintf(&b, "if [ \"$GOOSE_PROVIDER\" = \"ollama\" ]; then\n")
+		fmt.Fprintf(&b, "  export GOOSE_TOOLSHIM=\"${GOOSE_TOOLSHIM:-1}\"  # no-clobber: respect a user-set value\n")
+		fmt.Fprintf(&b, "fi\n")
 	} else {
 		fmt.Fprintf(&b, "command -v claude >/dev/null || die \"claude CLI required\"\n")
 	}

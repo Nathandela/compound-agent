@@ -1629,3 +1629,23 @@ func TestFeedImplementer_BgBackend_NoFatal(t *testing.T) {
 		t.Errorf("implementer report does not contain FIXES_APPLIED:\nreport=%q\nscript output=%s", string(reportData), out)
 	}
 }
+
+// TestLoopCmd_ReviewersHelpMentionsGooseReviewers verifies the --reviewers flag
+// help text lists the goose fleet reviewer names, not just the claude reviewer
+// names. The goose specialty names are the source of truth from
+// validGooseReviewerNames(): security, correctness, quality. This is help-text
+// only and does not affect the generated script bytes (the byte-identical guard
+// strips the Date header and compares script content + seam impls, never help).
+func TestLoopCmd_ReviewersHelpMentionsGooseReviewers(t *testing.T) {
+	t.Parallel()
+	lc := loopCmd()
+	f := lc.Flags().Lookup("reviewers")
+	if f == nil {
+		t.Fatal("expected --reviewers flag to be defined")
+	}
+	for _, name := range validGooseReviewerNames() {
+		if !strings.Contains(f.Usage, name) {
+			t.Errorf("expected --reviewers help to mention goose reviewer %q, got: %q", name, f.Usage)
+		}
+	}
+}

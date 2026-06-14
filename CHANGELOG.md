@@ -9,6 +9,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.1] - 2026-06-14
+
+Hardening and live-verification of the Goose harness shipped in 2.9.0, against
+real Goose 1.37 + ollama qwen2.5-coder:14b. Fixes the phase-gate on the
+local-model path and wires the toolshim. The default `ca setup` (no `--harness`)
+and `ca loop --implementer claude` paths remain byte-for-byte unchanged.
+
+### Fixed
+
+- **Phase-gate now fires for local (toolshim) models.** Goose's toolshim (used for local models that do not emit native `tool_calls`) collapses `developer__text_editor` down to the bare names `write`/`edit`, which the phase-guard did not recognize, so the gate silently no-opped on exactly the local-model path it targets. `write` and `edit` are now guarded in both `phase_guard.go` and the goose `hooks.json` PreToolUse matcher (plus `str_replace_editor` for matcher/map symmetry). Verified live: an out-of-phase edit inside a Goose subrecipe is now genuinely blocked and the subagent obeys the deny reason.
+- **Phase-gate repo-root fallback.** The phase-guard now falls back to the `working_dir` Goose sends on stdin when `COMPOUND_AGENT_ROOT` is unset and the current directory has no `.compound-agent`, closing a latent no-op when the hook process runs from a foreign cwd. Additive and Claude-path-neutral (Claude runs from the project root and sends no `working_dir`).
+- **`GOOSE_TOOLSHIM=1` is set automatically for the ollama provider** in the generated loop script (no-clobber: a user-set value wins). Without it, local ollama models dispatch no tools and the goose implementer is inert. Documented in `.goosehints`.
+- `ca loop --reviewers` help text now lists the goose specialty reviewers (`security,correctness,quality`) alongside the claude reviewers.
+
+### Verified (live)
+
+- The PreToolUse phase-gate fires inside Goose `sub_recipes` (run as in-process subagents); cwd and `working_dir` correctly resolve to the repo root, and with the fix an out-of-phase edit is blocked.
+- End-to-end `ca loop --implementer goose` mechanics: script generation, dispatch in its own process group, tool dispatch under the toolshim, marker detection with bd-state fallback, retry, clean termination, and process cleanup with no orphaned processes.
+
+### Known issues (pre-existing shared-loop behavior, not goose-specific)
+
+- The loop stops on the first epic that exhausts its retries, so later targeted epics are not attempted.
+- An intentional non-zero exit on epic failure is logged as `CRASH` by the cleanup trap, so an expected failure shows as `status:crashed` in telemetry.
+- A failed epic can leave partial work uncommitted while the end-of-loop push still runs.
+- On a 16GB host a resident ~9.5GB local model trips the default memory thresholds (`MIN_FREE_MEMORY_PCT=20`), and `OLLAMA_CONTEXT_LENGTH` cannot resize an already-loaded model.
+
 ## [2.9.0] - 2026-06-14
 
 This release adds an opt-in Goose harness so the infinity loop can run on

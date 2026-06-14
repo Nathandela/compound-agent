@@ -43,7 +43,14 @@ func TestGooseHooksJSON_PreToolUseMatcherFiresOnGooseTools(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PreToolUse matcher %q is not a valid regex: %v", matcher, err)
 	}
-	for _, tool := range []string{"developer__text_editor", "Edit", "Write"} {
+	// developer__text_editor / Edit / Write are the namespaced + Claude-style
+	// names; write / edit are Goose toolshim's collapsed local-model names; and
+	// str_replace_editor closes the audit symmetry gap (it is in the Go map but
+	// was missing from this matcher).
+	for _, tool := range []string{
+		"developer__text_editor", "Edit", "Write",
+		"write", "edit", "str_replace_editor",
+	} {
 		if !re.MatchString(tool) {
 			t.Errorf("PreToolUse matcher %q does not fire on tool %q", matcher, tool)
 		}
@@ -144,8 +151,8 @@ func TestGooseHooksJSON_BlockingPhaseGate(t *testing.T) {
 	// developer__text_editor (the old Claude-only matcher would never fire under
 	// real Goose). The matcher stays an unanchored alternation so it also fires on
 	// custom-MCP edit tools.
-	if !strings.Contains(hooks, `"matcher": "developer__text_editor|Edit|Write|str_replace|create_file|text_editor"`) {
-		t.Error("Goose PreToolUse matcher must target developer__text_editor (namespaced) plus Claude-style alternates")
+	if !strings.Contains(hooks, `"matcher": "developer__text_editor|Edit|Write|str_replace|create_file|text_editor|str_replace_editor|write|edit"`) {
+		t.Error("Goose PreToolUse matcher must target developer__text_editor (namespaced) plus Claude-style and toolshim alternates")
 	}
 	// FIX-2: the extracted reason must be JSON-escaped before being printf'd into
 	// the {"decision":"block","reason":"..."} payload (backslash + quote escaping,
