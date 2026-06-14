@@ -166,7 +166,7 @@ func TestLoopLauncherSkill_DocumentsCodexImplementer(t *testing.T) {
 	if !strings.Contains(content, "--implementer") {
 		t.Error("loop-launcher SKILL.md must document the --implementer flag")
 	}
-	for _, engine := range []string{"claude", "goose", "codex", "gemini"} {
+	for _, engine := range []string{"claude", "goose", "codex", "agy"} {
 		if !strings.Contains(content, engine) {
 			t.Errorf("loop-launcher SKILL.md must mention implementer engine %q", engine)
 		}

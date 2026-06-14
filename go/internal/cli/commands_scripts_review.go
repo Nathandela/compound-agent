@@ -8,24 +8,22 @@ import (
 )
 
 // validLoopReviewerSet returns a map of valid reviewer names for validation.
-// antigravity is deliberately NOT a selectable reviewer: agy -p drops stdout in
-// non-TTY/subprocess, so its report is always empty. The review loop treats an
-// empty report as a reviewer error and a cycle where all reviewers errored is
-// "treated as approved", so an antigravity-only (or all-errored) run could
-// FALSELY report approval. The antigravity HARNESS setup target stays as
-// groundwork; only the broken reviewer wiring is removed.
+// agy is the functional CLI-direct reviewer that replaced the removed gemini
+// reviewer: the Antigravity CLI (agy) captures stdout in non-TTY/subprocess, so its
+// report is real (unlike the old dead antigravity groundwork). The legacy gemini
+// and antigravity reviewer names are no longer valid.
 func validLoopReviewerSet() map[string]bool {
 	return map[string]bool{
 		"claude-sonnet": true,
 		"claude-opus":   true,
-		"gemini":        true,
+		"agy":           true,
 		"codex":         true,
 	}
 }
 
 // validLoopReviewerNames returns the valid reviewer names as a slice.
 func validLoopReviewerNames() []string {
-	return []string{"claude-sonnet", "claude-opus", "gemini", "codex"}
+	return []string{"claude-sonnet", "claude-opus", "agy", "codex"}
 }
 
 // loopReviewOptions holds review-phase configuration for the loop script.
@@ -80,33 +78,33 @@ func validateReviewers(reviewers []string) error {
 	return nil
 }
 
-// validCodexGeminiReviewerSet returns the reviewer names valid when the loop
-// implementer is codex or gemini. These engines redefine the agent_invoke shell
-// function to run codex/gemini (NOT claude), so the claude-sonnet/claude-opus
+// validCodexAgyReviewerSet returns the reviewer names valid when the loop
+// implementer is codex or agy. These engines redefine the agent_invoke shell
+// function to run codex/agy (NOT claude), so the claude-sonnet/claude-opus
 // reviewer branches -- which dispatch through agent_invoke -- would run the wrong
 // CLI with a claude-only model name, yielding empty/error reports and a review
-// cycle that can pass without a real review (codex review P2). Only the gemini and
+// cycle that can pass without a real review (codex review P2). Only the agy and
 // codex reviewer branches invoke their own CLIs directly and are safe, so the
-// valid set is exactly {gemini, codex}.
-func validCodexGeminiReviewerSet() map[string]bool {
-	return map[string]bool{"gemini": true, "codex": true}
+// valid set is exactly {agy, codex}.
+func validCodexAgyReviewerSet() map[string]bool {
+	return map[string]bool{"agy": true, "codex": true}
 }
 
-// validCodexGeminiReviewerNames returns the valid codex/gemini reviewer names in
+// validCodexAgyReviewerNames returns the valid codex/agy reviewer names in
 // stable order (for error messages).
-func validCodexGeminiReviewerNames() []string {
-	return []string{"gemini", "codex"}
+func validCodexAgyReviewerNames() []string {
+	return []string{"agy", "codex"}
 }
 
-// validateCodexGeminiReviewers checks that every reviewer is a CLI-direct reviewer
-// safe for the codex/gemini implementers (i.e. in {gemini, codex}). claude-sonnet
+// validateCodexAgyReviewers checks that every reviewer is a CLI-direct reviewer
+// safe for the codex/agy implementers (i.e. in {agy, codex}). claude-sonnet
 // and claude-opus are rejected because their dispatch goes through agent_invoke,
-// which on these seams runs codex/gemini rather than claude.
-func validateCodexGeminiReviewers(reviewers []string) error {
-	valid := validCodexGeminiReviewerSet()
+// which on these seams runs codex/agy rather than claude.
+func validateCodexAgyReviewers(reviewers []string) error {
+	valid := validCodexAgyReviewerSet()
 	for _, r := range reviewers {
 		if !valid[r] {
-			return fmt.Errorf("invalid reviewer %q for codex/gemini implementer, valid: %s", r, strings.Join(validCodexGeminiReviewerNames(), ", "))
+			return fmt.Errorf("invalid reviewer %q for codex/agy implementer, valid: %s", r, strings.Join(validCodexAgyReviewerNames(), ", "))
 		}
 	}
 	return nil
@@ -237,13 +235,13 @@ detect_reviewers() {
           AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS $reviewer"
         fi
         ;;
-      (gemini)
-        if ! command -v gemini >/dev/null 2>&1; then
-          log "WARN: gemini CLI not found, skipping gemini"
-        elif ! portable_timeout 10 gemini --version >/dev/null 2>&1; then
-          log "WARN: gemini CLI not healthy, skipping gemini (health check failed)"
+      (agy)
+        if ! command -v agy >/dev/null 2>&1; then
+          log "WARN: agy CLI not found, skipping agy"
+        elif ! portable_timeout 10 agy --version >/dev/null 2>&1; then
+          log "WARN: agy CLI not healthy, skipping agy (health check failed)"
         else
-          AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS gemini"
+          AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS agy"
         fi
         ;;
       (codex)
@@ -729,13 +727,13 @@ spawn_reviewers() {
           pids="$pids $!"
         fi
         ;;
-      (gemini)
+      (agy)
         if [ "$cycle" -eq 1 ]; then
-          (portable_timeout "$REVIEW_TIMEOUT" gemini \
-            -p "$(cat "$prompt_file")" --yolo > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" agy \
+            -p "$(cat "$prompt_file")" --dangerously-skip-permissions --model "$REVIEW_MODEL" --print-timeout 1h > "$report" 2>&1 || true) &
         else
-          (portable_timeout "$REVIEW_TIMEOUT" gemini --resume latest \
-            -p "$follow_up" --yolo > "$report" 2>&1 || true) &
+          (portable_timeout "$REVIEW_TIMEOUT" agy -c \
+            -p "$follow_up" --dangerously-skip-permissions > "$report" 2>&1 || true) &
         fi
         pids="$pids $!"
         ;;
@@ -753,7 +751,7 @@ spawn_reviewers() {
     log "Spawned $reviewer (cycle $cycle) -> $report"
   done
 
-  # Mixed-fleet barrier: poll bg Claude handles to terminal, wait sync gemini/codex pids.
+  # Mixed-fleet barrier: poll bg Claude handles to terminal, wait sync agy/codex pids.
   # This ensures no reviewer's result is read until all have finished (R-FLEET).
   if [ -n "$bg_handles" ]; then
     local elapsed=0
@@ -791,7 +789,7 @@ spawn_reviewers() {
     fi
   fi
   if [ -n "$pids" ]; then
-    log "Waiting for sync reviewers (gemini/codex): $pids"
+    log "Waiting for sync reviewers (agy/codex): $pids"
     for pid in $pids; do wait "$pid" 2>/dev/null || true; done
   fi
   log "All reviewers finished (cycle $cycle)"
@@ -881,7 +879,7 @@ func loopScriptGooseReviewerModel(reviewModels map[string]string) string {
 // satisfy the same contract as the claude review helpers so the shared cycle
 // loop (loopScriptReviewLoopInit + loopScriptReviewLoopCycle) aggregates their
 // verdicts unchanged. The fleet is read-only: it only emits 'goose run --recipe'
-// and never claude/gemini/codex flags.
+// and never claude/agy/codex flags.
 //
 // reviewModels pins individual reviewers to their own provider/model ref so the
 // fleet is genuinely heterogeneous; spawn_reviewers exports a per-reviewer
@@ -1061,7 +1059,7 @@ func loopScriptReviewLoopCycle() string { //nolint:funlen // bash template strin
         reviewers_errored=$((reviewers_errored + 1))
       elif tr -d '\r' < "$report" | grep -q "^REVIEW_APPROVED$"; then
         log "$reviewer: APPROVED"
-      elif grep -qi "rate limit\|Rate limit\|API.*[Ee]rror\|API_KEY\|GEMINI_API_KEY\|authentication" "$report"; then
+      elif grep -qi "rate limit\|Rate limit\|API.*[Ee]rror\|API_KEY\|authentication" "$report"; then
         log "$reviewer: ERROR (API/auth issue, not a code review rejection)"
         log "  -> $(head -1 "$report")"
         reviewers_errored=$((reviewers_errored + 1))

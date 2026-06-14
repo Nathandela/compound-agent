@@ -12,7 +12,7 @@ The polish loop (`ca polish`) generates a standalone bash script that iterates N
 | Model | `--model <model>` | claude-opus-4-7[1m] | Claude model for sessions |
 | Spec file | `--spec-file <path>` | (required) | Spec file for audit context |
 | Meta-epic | `--meta-epic <id>` | (required) | Parent meta-epic ID |
-| Reviewers | `--reviewers <names>` | claude-sonnet,claude-opus,gemini,codex | Audit fleet |
+| Reviewers | `--reviewers <names>` | claude-sonnet,claude-opus,agy,codex | Audit fleet |
 | Output | `-o, --output <path>` | ./.compound-agent/polish-loop.sh | Script output path |
 | Force | `--force` | false | Overwrite existing script |
 
@@ -20,7 +20,7 @@ The polish loop (`ca polish`) generates a standalone bash script that iterates N
 
 Each polish cycle runs four steps:
 
-1. **Audit fleet**: Spawns all configured reviewers (Claude, Gemini, Codex) to evaluate the full codebase against the Build Great Things pre-ship checklist. Each reviewer produces a P0/P1/P2 findings report.
+1. **Audit fleet**: Spawns all configured reviewers (Claude, agy, Codex) to evaluate the full codebase against the Build Great Things pre-ship checklist. Each reviewer produces a P0/P1/P2 findings report.
 
 2. **Synthesize report**: Combines all reviewer reports into a single `docs/specs/polish-report-cycle-N.md`.
 
@@ -43,9 +43,9 @@ Run the infinity loop first, then the polish loop:
 
 ```bash
 # Generate both scripts
-ca loop --epics "E1,E2,E3" --reviewers "claude-sonnet,gemini" --force
+ca loop --epics "E1,E2,E3" --reviewers "claude-sonnet,agy" --force
 ca polish --spec-file "docs/specs/my-spec.md" --meta-epic "my-meta-epic" \
-  --reviewers "claude-sonnet,claude-opus,gemini" --cycles 3 --force
+  --reviewers "claude-sonnet,claude-opus,agy" --cycles 3 --force
 
 # Run in sequence
 bash .compound-agent/infinity-loop.sh && bash .compound-agent/polish-loop.sh

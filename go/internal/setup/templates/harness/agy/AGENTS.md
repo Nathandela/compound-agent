@@ -2,12 +2,12 @@
 ## Compound Agent Protocol (Antigravity)
 
 This project uses compound-agent for session memory and structured epic execution
-via CLI commands. Antigravity reads this `AGENTS.md` file at session start.
+via CLI commands. The Antigravity CLI (`agy`) reads this `AGENTS.md` file at
+session start.
 
-> Deprecation note: the standalone gemini CLI is deprecated and sunsets 2026-06-18.
-> Antigravity is its successor. The `--implementer gemini` loop engine still runs
-> on the current gemini CLI; antigravity is groundwork only and is not yet a
-> functional loop engine.
+> `agy` is the functional loop engine for this harness. The standalone gemini CLI
+> has been removed; `agy` replaces it for the `--implementer agy` and `--harness
+> agy` paths.
 
 ### CLI Commands (ALWAYS USE THESE)
 

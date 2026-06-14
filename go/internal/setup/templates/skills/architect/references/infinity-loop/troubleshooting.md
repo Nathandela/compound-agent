@@ -66,7 +66,7 @@ ls .compound-agent/agent_logs/reviews/
 
 **Symptom**: Configured 4 reviewers but logs show only Claude models were used.
 
-**Root cause**: Gemini/Codex CLIs not installed or not authenticated. `detect_reviewers()` logs per-reviewer warnings.
+**Root cause**: agy/Codex CLIs not installed or not authenticated. `detect_reviewers()` logs per-reviewer warnings.
 
 **Fix**: Install and authenticate missing CLIs, or remove them from `--reviewers` to avoid noise.
 

@@ -15,23 +15,37 @@ import (
 type HarnessTarget string
 
 const (
-	HarnessClaude      HarnessTarget = "claude"
-	HarnessCodex       HarnessTarget = "codex"
-	HarnessGemini      HarnessTarget = "gemini"
-	HarnessGoose       HarnessTarget = "goose"
-	HarnessAntigravity HarnessTarget = "antigravity"
+	HarnessClaude HarnessTarget = "claude"
+	HarnessCodex  HarnessTarget = "codex"
+	HarnessGoose  HarnessTarget = "goose"
+	HarnessAgy    HarnessTarget = "agy"
 )
 
-// validHarnessTargets lists the accepted --harness values in stable order.
-var validHarnessTargets = []HarnessTarget{HarnessClaude, HarnessCodex, HarnessGemini, HarnessGoose, HarnessAntigravity}
+// validHarnessTargets lists the canonical accepted --harness values in stable
+// order. The legacy gemini and antigravity names are accepted as deprecated
+// aliases (see ParseHarnessTargets) but are not part of the canonical set.
+var validHarnessTargets = []HarnessTarget{HarnessClaude, HarnessCodex, HarnessAgy, HarnessGoose}
+
+// deprecatedHarnessAliases maps legacy --harness names to their canonical
+// replacement. The standalone gemini CLI has been removed and the antigravity
+// groundwork target folded into agy, so both normalize to agy.
+var deprecatedHarnessAliases = map[HarnessTarget]HarnessTarget{
+	"gemini":      HarnessAgy,
+	"antigravity": HarnessAgy,
+}
 
 // ParseHarnessTargets parses comma-separated and/or repeated --harness values
 // into a deduped, order-preserving slice of targets. Empty input returns no
 // targets (the caller then performs the default Claude install). Unknown values
 // produce an error that names the bad value and lists the valid set, before any
 // filesystem writes occur.
-func ParseHarnessTargets(raw []string) ([]HarnessTarget, error) {
+//
+// The legacy gemini and antigravity names are still accepted: they normalize to
+// agy and each surfaces a deprecation warning in the returned warnings slice so
+// the caller can thread it into the install result.
+func ParseHarnessTargets(raw []string) ([]HarnessTarget, []string, error) {
 	var out []HarnessTarget
+	var warnings []string
 	seen := make(map[HarnessTarget]bool)
 	for _, item := range raw {
 		for _, part := range strings.Split(item, ",") {
@@ -40,8 +54,12 @@ func ParseHarnessTargets(raw []string) ([]HarnessTarget, error) {
 				continue
 			}
 			target := HarnessTarget(strings.ToLower(name))
-			if !isValidHarness(target) {
-				return nil, fmt.Errorf(
+			if canonical, deprecated := deprecatedHarnessAliases[target]; deprecated {
+				warnings = append(warnings, fmt.Sprintf(
+					"--harness %q is deprecated; using %q instead", name, canonical))
+				target = canonical
+			} else if !isValidHarness(target) {
+				return nil, nil, fmt.Errorf(
 					"unknown --harness target %q (valid: %s)",
 					name, harnessTargetList())
 			}
@@ -51,7 +69,7 @@ func ParseHarnessTargets(raw []string) ([]HarnessTarget, error) {
 			}
 		}
 	}
-	return out, nil
+	return out, warnings, nil
 }
 
 // isValidHarness reports whether target is a known install target.
@@ -150,21 +168,14 @@ func installCodex(repoRoot string, result *InitResult) error {
 	return reconcileHarnessFile(filepath.Join(codexDir, "config.toml"), cfg, result)
 }
 
-// installGemini installs the Gemini target: a single GEMINI.md memory file at
-// the repo root, which Gemini reads directly (like installCodex's AGENTS.md).
-// Idempotent.
-func installGemini(repoRoot string, result *InitResult) error {
-	return reconcileHarnessFile(filepath.Join(repoRoot, "GEMINI.md"), templates.GeminiMemory(), result)
-}
-
-// installAntigravity installs the Antigravity target: it appends the compound
-// protocol section to AGENTS.md (Antigravity's native memory file). The section
-// uses its own header so it coexists with the shared lesson section that
-// codex/claude write to AGENTS.md, and re-runs are idempotent via the header
-// guard. Groundwork only: antigravity is not yet a loop --implementer.
-func installAntigravity(repoRoot string, result *InitResult) error {
+// installAgy installs the agy (Antigravity CLI) target: it appends the compound
+// protocol section to AGENTS.md (agy's native memory file). The section uses its
+// own header so it coexists with the shared lesson section that codex/claude
+// write to AGENTS.md, and re-runs are idempotent via the header guard. agy is
+// the functional loop engine that replaces the removed standalone gemini CLI.
+func installAgy(repoRoot string, result *InitResult) error {
 	agentsPath := filepath.Join(repoRoot, "AGENTS.md")
-	section := templates.AntigravityMemory()
+	section := templates.AgyMemory()
 
 	existing, err := os.ReadFile(agentsPath)
 	if err == nil {

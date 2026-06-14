@@ -26,16 +26,17 @@ func TestSetup_HarnessMultiple_Repeatable(t *testing.T) {
 	root.AddCommand(setupCmd())
 
 	out, err := executeCommand(root, "setup", "--repo-root", dir, "--skip-hooks",
-		"--harness", "claude", "--harness", "gemini")
+		"--harness", "claude", "--harness", "agy")
 	if err != nil {
-		t.Fatalf("setup --harness claude --harness gemini failed: %v\n%s", err, out)
+		t.Fatalf("setup --harness claude --harness agy failed: %v\n%s", err, out)
 	}
 
 	if _, err := os.Stat(filepath.Join(dir, ".claude", "agents", "compound")); err != nil {
 		t.Errorf("expected .claude templates: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "GEMINI.md")); err != nil {
-		t.Errorf("expected GEMINI.md: %v", err)
+	// The agy harness appends the compound protocol to AGENTS.md (no standalone GEMINI.md).
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Errorf("expected AGENTS.md: %v", err)
 	}
 }
 

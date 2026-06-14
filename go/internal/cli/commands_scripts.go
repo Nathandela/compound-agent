@@ -46,7 +46,7 @@ func loopCmd() *cobra.Command {
 	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-7[1m]", "Model to use. For --implementer goose, a provider/model ref (e.g. ollama/qwen2.5-coder:14b, deepseek/deepseek-chat)")
 	cmd.Flags().BoolVarP(&o.force, "force", "f", false, "Overwrite existing script")
 	cmd.Flags().StringVar(&o.epics, "epics", "", "Comma-separated epic IDs to process")
-	cmd.Flags().StringVar(&o.reviewers, "reviewers", "", "Comma-separated reviewers (claude: claude-sonnet,claude-opus,gemini,codex; codex/gemini: gemini,codex; goose: security,correctness,quality)")
+	cmd.Flags().StringVar(&o.reviewers, "reviewers", "", "Comma-separated reviewers (claude: claude-sonnet,claude-opus,agy,codex; codex/agy: agy,codex; goose: security,correctness,quality)")
 	cmd.Flags().IntVar(&o.reviewEvery, "review-every", 0, "Review every N completed epics (0=end-only)")
 	cmd.Flags().IntVar(&o.maxReviewCycles, "max-review-cycles", 3, "Max review/fix iterations")
 	cmd.Flags().BoolVar(&o.reviewBlocking, "review-blocking", false, "Fail loop if review not approved after max cycles")
@@ -54,25 +54,45 @@ func loopCmd() *cobra.Command {
 	cmd.Flags().StringVar(&o.reviewModels, "review-models", "", "Per-reviewer open-model pins for --implementer goose (e.g. security=ollama/qwen2.5-coder:14b,quality=glm/glm-4-plus)")
 	cmd.Flags().IntVar(&o.compactPct, "compact-pct", 0, "Context auto-compaction threshold % (0=use Claude Code default, suggested: 50)")
 	cmd.Flags().StringVar(&o.backend, "backend", "bg", "Claude execution backend: bg (default) or p (legacy claude -p)")
-	cmd.Flags().StringVar(&o.implementer, "implementer", "claude", "Loop implementer: claude (default), goose, codex, or gemini (codex/gemini use plain model names; antigravity coming as gemini successor, groundwork only)")
+	cmd.Flags().StringVar(&o.implementer, "implementer", "claude", "Loop implementer: claude (default), goose, codex, or agy (codex/agy use plain model names; agy is the Antigravity CLI)")
 	return cmd
 }
 
 // validImplementerSet returns the accepted --implementer values. claude and goose
-// are the original engines; codex and gemini are PID-based engines that drive their
+// are the original engines; codex and agy are PID-based engines that drive their
 // own CLI in-tree (like goose) using PLAIN model names. Mirrors validHarnessTargets.
 func validImplementerSet() map[string]bool {
-	return map[string]bool{"claude": true, "goose": true, "codex": true, "gemini": true}
+	return map[string]bool{"claude": true, "goose": true, "codex": true, "agy": true}
 }
 
-// defaultImplementerModel returns the default PLAIN model name for codex/gemini
+// deprecatedImplementerAliases maps legacy --implementer names to their canonical
+// replacement. The standalone gemini CLI has been removed and the antigravity
+// groundwork target folded into agy, so both gemini and antigravity normalize to
+// agy (the Antigravity CLI). The canonical valid set lists only agy. Mirrors
+// deprecatedHarnessAliases on the harness side.
+var deprecatedImplementerAliases = map[string]string{
+	"gemini":      "agy",
+	"antigravity": "agy",
+}
+
+// normalizeImplementer resolves a deprecated --implementer alias to its canonical
+// name and returns a one-line deprecation warning when an alias was used. Unknown
+// or already-canonical values pass through unchanged with an empty warning.
+func normalizeImplementer(implementer string) (canonical, warning string) {
+	if c, ok := deprecatedImplementerAliases[implementer]; ok {
+		return c, fmt.Sprintf("--implementer %q is deprecated; using %q instead", implementer, c)
+	}
+	return implementer, ""
+}
+
+// defaultImplementerModel returns the default PLAIN model name for codex/agy
 // when --model is not passed explicitly. claude/goose keep their own handling
 // (the global flag default / the required provider/model ref), so they return false.
 func defaultImplementerModel(implementer string) (string, bool) {
 	switch implementer {
 	case "codex":
 		return "gpt-5.5-codex", true
-	case "gemini":
+	case "agy":
 		return "gemini-3.1-pro", true
 	default:
 		return "", false
@@ -86,17 +106,23 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 	if o.backend != "bg" && o.backend != "p" {
 		return fmt.Errorf("--backend must be 'bg' or 'p', got %q", o.backend)
 	}
-	if !validImplementerSet()[o.implementer] {
-		return fmt.Errorf("--implementer must be 'claude', 'goose', 'codex', or 'gemini', got %q", o.implementer)
+	// Normalize deprecated aliases (e.g. gemini -> agy) before validation so the
+	// canonical engine drives the rest of the run. Surface the deprecation note.
+	if canonical, warning := normalizeImplementer(o.implementer); warning != "" {
+		cmd.PrintErrln("[warn] " + warning)
+		o.implementer = canonical
 	}
-	// codex/gemini use PLAIN model names with their own defaults. When --model is not
+	if !validImplementerSet()[o.implementer] {
+		return fmt.Errorf("--implementer must be 'claude', 'goose', 'codex', or 'agy', got %q", o.implementer)
+	}
+	// codex/agy use PLAIN model names with their own defaults. When --model is not
 	// passed explicitly, swap the claude default for the engine default (overridable).
 	if !cmd.Flags().Changed("model") {
 		if def, ok := defaultImplementerModel(o.implementer); ok {
 			o.model = def
 		}
 	}
-	// The review fix-session feeds REVIEW_MODEL to the implementer engine (codex/gemini),
+	// The review fix-session feeds REVIEW_MODEL to the implementer engine (codex/agy),
 	// so its claude default is invalid there too. Swap it for the engine default unless
 	// --review-model was passed explicitly.
 	if !cmd.Flags().Changed("review-model") {
@@ -142,9 +168,9 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 		reviewerList := strings.Split(o.reviewers, ",")
 		// Reviewer names are validated per-implementer:
 		//   - goose: open-model review fleet of subrecipes (specialty names).
-		//   - codex/gemini: only the CLI-direct reviewers {gemini, codex}. A claude
+		//   - codex/agy: only the CLI-direct reviewers {agy, codex}. A claude
 		//     reviewer would dispatch through agent_invoke, which on these seams runs
-		//     codex/gemini (NOT claude), so it is rejected (codex review P2).
+		//     codex/agy (NOT claude), so it is rejected (codex review P2).
 		//   - claude: the full CLI-named reviewer set.
 		var reviewModels map[string]string
 		switch opts.implementer {
@@ -157,8 +183,8 @@ func runLoop(cmd *cobra.Command, o *loopCmdOptions) error {
 				return err
 			}
 			reviewModels = parsed
-		case "codex", "gemini":
-			if err := validateCodexGeminiReviewers(reviewerList); err != nil {
+		case "codex", "agy":
+			if err := validateCodexAgyReviewers(reviewerList); err != nil {
 				return err
 			}
 		default:
@@ -194,7 +220,7 @@ type loopGenerateOptions struct {
 	epics           string
 	backend         string // "bg" or "p"
 	backendExplicit bool   // true if user passed --backend explicitly
-	implementer     string // "claude" (default/empty), goose, codex, or gemini
+	implementer     string // "claude" (default/empty), goose, codex, or agy
 	review          *loopReviewOptions
 }
 
@@ -271,14 +297,14 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string, compa
 	fmt.Fprintf(&b, "# Infinity Loop - Generated by: ca loop\n")
 	fmt.Fprintf(&b, "# Date: %s\n", timestamp)
 	// Header is parameterized on the implementer: the claude (default) path stays
-	// byte-identical, while goose/codex/gemini describe their own sessions.
+	// byte-identical, while goose/codex/agy describe their own sessions.
 	switch implementer {
 	case "goose":
 		fmt.Fprintf(&b, "# Autonomously processes beads epics via goose sessions.\n")
 	case "codex":
 		fmt.Fprintf(&b, "# Autonomously processes beads epics via codex sessions.\n")
-	case "gemini":
-		fmt.Fprintf(&b, "# Autonomously processes beads epics via gemini sessions.\n")
+	case "agy":
+		fmt.Fprintf(&b, "# Autonomously processes beads epics via agy sessions.\n")
 	default:
 		fmt.Fprintf(&b, "# Autonomously processes beads epics via Claude Code sessions.\n")
 	}
@@ -312,8 +338,8 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string, compa
 	switch implementer {
 	case "codex":
 		fmt.Fprintf(&b, "command -v codex >/dev/null || die \"codex CLI required\"\n")
-	case "gemini":
-		fmt.Fprintf(&b, "command -v gemini >/dev/null || die \"gemini CLI required\"\n")
+	case "agy":
+		fmt.Fprintf(&b, "command -v agy >/dev/null || die \"agy CLI required\"\n")
 	case "goose":
 		fmt.Fprintf(&b, "command -v goose >/dev/null || die \"goose CLI required\"\n")
 		// Derive provider/model from the provider/model reference in MODEL.
@@ -374,10 +400,10 @@ func loopScriptMemorySafety() string {
 // function are omitted (goose is in-tree, PID-based). The claude path delegates to
 // loopScriptMemorySafety so it stays byte-identical.
 func loopScriptMemorySafetyImpl(implementer string) string {
-	// goose, codex, and gemini are all PID-based (in-tree, no bg orphan-sweep, no
+	// goose, codex, and agy are all PID-based (in-tree, no bg orphan-sweep, no
 	// bg_kill_ladder), so they share the goose-shaped memory-safety body.
 	switch implementer {
-	case "goose", "codex", "gemini":
+	case "goose", "codex", "agy":
 		return memorySafetyHead + memorySafetyCleanupClose + memorySafetyWatchdogs
 	default:
 		return loopScriptMemorySafety()
@@ -848,8 +874,8 @@ func loopScriptPromptBuilder(bt, implementer string) string { //nolint:funlen //
 		return loopScriptGoosePromptBuilder(bt)
 	case "codex":
 		return loopScriptCodexPromptBuilder(bt)
-	case "gemini":
-		return loopScriptGeminiPromptBuilder(bt)
+	case "agy":
+		return loopScriptAgyPromptBuilder(bt)
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "# --- Prompt Builder ---\n")
@@ -1174,8 +1200,8 @@ func loopScriptSeamImpl(implementer, backend string, explicit bool) string {
 		return loopScriptGooseSeam(backend)
 	case "codex":
 		return loopScriptCodexSeam(backend)
-	case "gemini":
-		return loopScriptGeminiSeam(backend)
+	case "agy":
+		return loopScriptAgySeam(backend)
 	}
 	return loopScriptSeamClaude(backend, explicit)
 }
@@ -1887,38 +1913,39 @@ codex_preflight
 `
 }
 
-// loopScriptGeminiSeam returns the gemini implementer seam. It mirrors the goose/codex
-// seam contract (agent_dispatch/poll/collect/stop/cleanup/invoke) but drives
-// 'gemini -p' in-tree with a PID handle. It emits CA_IMPLEMENTER=gemini and sets
-// CA_BACKEND=p so the main loop takes the wait+watchdog path. Gemini stdout is plain
+// loopScriptAgySeam returns the agy (Antigravity CLI) implementer seam. It mirrors
+// the goose/codex seam contract (agent_dispatch/poll/collect/stop/cleanup/invoke) but
+// drives 'agy -p' in-tree with a PID handle. It emits CA_IMPLEMENTER=agy and sets
+// CA_BACKEND=p so the main loop takes the wait+watchdog path. Agy stdout is plain
 // text, so detect_marker greps the logfile directly (no stream-json extraction,
 // agent_collect is a noop). No bootstrap_preflight, no worktree harvest.
-func loopScriptGeminiSeam(backend string) string { //nolint:funlen // bash template string
+func loopScriptAgySeam(backend string) string { //nolint:funlen // bash template string
 	// backend is accepted for signature parity with the claude/goose/codex seams; the
-	// gemini path is always PID-based (CA_BACKEND=p) regardless of the value.
+	// agy path is always PID-based (CA_BACKEND=p) regardless of the value.
 	_ = backend
-	return `# --- Gemini Implementer Seam (R-SEAM) ---
-# CA_IMPLEMENTER=gemini drives epics with 'gemini -p' in-tree (no worktree harvest).
+	return `# --- Agy Implementer Seam (R-SEAM) ---
+# CA_IMPLEMENTER=agy drives epics with 'agy -p' in-tree (no worktree harvest).
 # CA_BACKEND=p so the main loop takes the wait+watchdog path: AGENT_HANDLE is a PID.
-CA_IMPLEMENTER=gemini
+CA_IMPLEMENTER=agy
 CA_BACKEND=p
-` + loopScriptGeminiPreflight() + `
+` + loopScriptAgyPreflight() + `
 # AGENT_HANDLE is set by agent_dispatch to the background subshell PID.
 AGENT_HANDLE=""
 
 # agent_dispatch <logfile> <tracefile> <model> <prompt>
-# Runs 'gemini -p' in a background subshell. Gemini takes the prompt via -p and emits
-# plain human-readable text, so stdout is tee'd straight to the tracefile AND logfile;
-# detect_marker greps the logfile directly. --yolo auto-approves tool use (non-interactive);
-# -m selects the plain model name.
+# Runs 'agy -p' in a background subshell. Agy takes the prompt via -p and emits plain
+# human-readable text, so stdout is tee'd straight to the tracefile AND logfile;
+# detect_marker greps the logfile directly. --dangerously-skip-permissions auto-approves
+# tool use (non-interactive), --model selects the plain model name, and --print-timeout
+# raises the print-mode wait cap above the short default for a full epic.
 agent_dispatch() {
   local logfile="$1" tracefile="$2" model="$3" prompt="$4"
   # Enable job control (set -m) so the backgrounded subshell becomes its own
   # process group leader: without a fresh group 'kill -- -$AGENT_HANDLE' in
-  # agent_stop and the watchdogs would target the loop instead of the gemini child.
+  # agent_stop and the watchdogs would target the loop instead of the agy child.
   set -m
   (
-    gemini -p "$prompt" --yolo -m "$model" 2>"$logfile.stderr" | tee "$tracefile" > "$logfile"
+    agy -p "$prompt" --dangerously-skip-permissions --model "$model" --print-timeout 1h 2>"$logfile.stderr" | tee "$tracefile" > "$logfile"
   ) &
   AGENT_HANDLE=$!
   set +m
@@ -1935,11 +1962,11 @@ agent_poll() {
 # Noop: the dispatch pipeline already wrote plain-text stdout to logfile/tracefile,
 # which detect_marker greps directly. In-tree; no worktree harvest.
 agent_collect() {
-  : # gemini: logfile/tracefile already populated by the dispatch pipeline
+  : # agy: logfile/tracefile already populated by the dispatch pipeline
 }
 
 # detect_marker_with_bd_state <epic_id> <logfile> <tracefile>
-# Wrapper around the byte-frozen detect_marker. Gemini may close the epic via
+# Wrapper around the byte-frozen detect_marker. Agy may close the epic via
 # 'bd close' yet exit without printing EPIC_COMPLETE; in that case fall back to the
 # beads epic status and upgrade to "complete" if the epic is closed. Never
 # downgrades a "failed" or "human:" marker.
@@ -1966,45 +1993,42 @@ agent_stop() {
 }
 
 # agent_cleanup <handle> [marker]
-# Noop: gemini is in-tree, there is no worktree to harvest and no session to remove.
+# Noop: agy is in-tree, there is no worktree to harvest and no session to remove.
 agent_cleanup() {
-  : # gemini: in-tree, nothing to harvest
+  : # agy: in-tree, nothing to harvest
   return 0
 }
 
 # agent_invoke <model> [flags...] [prompt-args...]
-# Synchronous gemini invocation for the review fix-session. The shared review path
-# calls 'agent_invoke "$REVIEW_MODEL" -p "$prompt"'; gemini takes -p natively, so the
-# flags pass through after selecting the model and enabling non-interactive --yolo.
+# Synchronous agy invocation for the review fix-session. The shared review path calls
+# 'agent_invoke "$REVIEW_MODEL" -p "$prompt"'; agy takes -p natively, so the flags pass
+# through after selecting the model and enabling non-interactive auto-approval.
 agent_invoke() {
   local model="$1"; shift
-  gemini --yolo -m "$model" "$@"
+  agy --dangerously-skip-permissions --model "$model" "$@"
 }
 
 `
 }
 
-// loopScriptGeminiPreflight returns the gemini preflight bash function and call site.
-// It checks the gemini CLI and requires GEMINI_API_KEY (auth is the API key env var),
-// then softly warns that the default gemini-3.1-pro may not be served by the current
-// CLI (the user can override with --model). It intentionally skips the claude-bg
-// bootstrap/disclaimer probe.
-func loopScriptGeminiPreflight() string {
+// loopScriptAgyPreflight returns the agy preflight bash function and call site. It
+// checks the agy CLI (a hard die if missing) and softly notes that the default
+// gemini-3.1-pro may not be served (the user can override with --model). Auth is
+// OAuth via the Antigravity app, so there is NO API-key env var to check. It
+// intentionally skips the claude-bg bootstrap/disclaimer probe.
+func loopScriptAgyPreflight() string {
 	return `
-# --- Gemini Preflight ---
-# Verifies the gemini CLI and auth before entering the loop. Auth is the API key
-# env var GEMINI_API_KEY (a hard die if unset). The default model gemini-3.1-pro may
-# not be served by the current gemini CLI yet, so warn (not die): override --model.
-gemini_preflight() {
-  command -v gemini >/dev/null || die "gemini CLI required. Install: https://github.com/google-gemini/gemini-cli"
-  if [ -z "${GEMINI_API_KEY:-}" ]; then
-    die "gemini requires the API key env var GEMINI_API_KEY to be set"
-  fi
+# --- Agy Preflight ---
+# Verifies the agy CLI before entering the loop. Auth is OAuth via the Antigravity
+# app (no API-key env var). The default model gemini-3.1-pro may not be served yet,
+# so warn (not die): override with --model if dispatch fails.
+agy_preflight() {
+  command -v agy >/dev/null || die "agy CLI required. Install the Antigravity CLI (agy)."
   if [ "$MODEL" = "gemini-3.1-pro" ]; then
-    log "WARN: gemini_preflight: model gemini-3.1-pro may not be served by the current gemini CLI; override with --model if dispatch fails"
+    log "WARN: agy_preflight: model gemini-3.1-pro may not be served by agy; override with --model if dispatch fails"
   fi
 }
-gemini_preflight
+agy_preflight
 `
 }
 
@@ -2143,14 +2167,14 @@ func loopScriptCodexPromptBuilder(bt string) string { //nolint:funlen // bash te
 	return b.String()
 }
 
-// loopScriptGeminiPromptBuilder returns the gemini build_prompt bash function. It
+// loopScriptAgyPromptBuilder returns the agy build_prompt bash function. It
 // mirrors loopScriptCodexPromptBuilder: the inlined compound workflow, the ca
 // primitives ladder (search/knowledge/phase-check/learn/verify-gates), the exact
-// completion markers (R2), and the explicit git commit step because gemini does not
-// auto-commit. Only the header comment differs (gemini, not codex).
-func loopScriptGeminiPromptBuilder(bt string) string { //nolint:funlen // bash template string
+// completion markers (R2), and the explicit git commit step because agy does not
+// auto-commit. Only the header comment differs (agy, not codex).
+func loopScriptAgyPromptBuilder(bt string) string { //nolint:funlen // bash template string
 	var b strings.Builder
-	fmt.Fprintf(&b, "# --- Prompt Builder (gemini) ---\n")
+	fmt.Fprintf(&b, "# --- Prompt Builder (agy) ---\n")
 	fmt.Fprintf(&b, "build_prompt() {\n")
 	fmt.Fprintf(&b, "  local epic_id=\"$1\"\n")
 	fmt.Fprintf(&b, "  cat <<'PROMPT_HEADER'\n")
@@ -2181,7 +2205,7 @@ func loopScriptGeminiPromptBuilder(bt string) string { //nolint:funlen // bash t
 	fmt.Fprintf(&b, "## Step 3: On completion\n")
 	fmt.Fprintf(&b, "When all work is done and tests pass:\n")
 	fmt.Fprintf(&b, "1. Close the epic: \\%sbd close $epic_id\\%s\n", bt, bt)
-	fmt.Fprintf(&b, "2. Commit and push all changes (gemini does NOT auto-commit, so do this explicitly):\n")
+	fmt.Fprintf(&b, "2. Commit and push all changes (agy does NOT auto-commit, so do this explicitly):\n")
 	fmt.Fprintf(&b, "\\%s\\%s\\%sbash\n", bt, bt, bt)
 	fmt.Fprintf(&b, "git add -A && git commit -m \"feat($epic_id): implement epic\" && git push\n")
 	fmt.Fprintf(&b, "\\%s\\%s\\%s\n", bt, bt, bt)
@@ -2260,10 +2284,10 @@ func loopScriptEpicProcessing() string {
 }
 
 func loopScriptEpicProcessingImpl(implementer string) string {
-	// goose, codex, and gemini share the PID wait+watchdog per-attempt body
+	// goose, codex, and agy share the PID wait+watchdog per-attempt body
 	// (loopScriptGooseAttemptSetup is engine-agnostic apart from comments).
 	switch implementer {
-	case "goose", "codex", "gemini":
+	case "goose", "codex", "agy":
 		return loopScriptGooseAttemptSetup() + loopScriptAttemptCases()
 	default:
 		return loopScriptEpicProcessing()

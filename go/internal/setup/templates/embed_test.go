@@ -15,7 +15,7 @@ func TestAgentTemplates(t *testing.T) {
 	expected := []string{
 		"repo-analyst.md", "memory-analyst.md", "audit.md",
 		"doc-gardener.md", "cct-subagent.md", "drift-detector.md",
-		"external-reviewer-gemini.md", "external-reviewer-codex.md",
+		"external-reviewer-agy.md", "external-reviewer-codex.md",
 		"lessons-reviewer.md", "lint-classifier.md",
 	}
 	for _, name := range expected {

@@ -6,8 +6,8 @@ import (
 )
 
 // TestLoopLauncherSkill_DocumentsAltImplementers asserts the loop-launcher
-// SKILL.md documents the codex/gemini implementer trigger scripts and the
-// antigravity (agy) groundwork note. DESIGN-only: string content, no behavior.
+// SKILL.md documents the codex/agy implementer trigger scripts and the
+// deprecated gemini/antigravity aliases. DESIGN-only: string content, no behavior.
 func TestLoopLauncherSkill_DocumentsAltImplementers(t *testing.T) {
 	t.Parallel()
 	skill, ok := PhaseSkills()["loop-launcher"]
@@ -16,7 +16,7 @@ func TestLoopLauncherSkill_DocumentsAltImplementers(t *testing.T) {
 	}
 	for _, want := range []string{
 		"--implementer codex",
-		"--implementer gemini",
+		"--implementer agy",
 		"agy",
 		"antigravity",
 	} {

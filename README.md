@@ -145,7 +145,7 @@ ca loop --reviewers claude-sonnet --review-every 3
 
 `ca loop` generates a bash script that processes your beads epics sequentially, running the full cook-it cycle on each one. No human intervention required between epics.
 
-`--implementer` selects the engine that runs each epic: **claude** (default), **goose**, **codex**, or **gemini**. With the default claude implementer, the backend is `claude --bg` (subscription-billed; requires accepting the bypass-permissions disclaimer once: `claude --dangerously-skip-permissions`); use `--backend p` or `CA_BACKEND=p` for the legacy `claude -p` (pay-per-token) path. **goose** runs open/local models via Goose (e.g. `--model ollama/qwen2.5-coder:14b` or `deepseek/deepseek-chat`; for the ollama provider the loop auto-exports `GOOSE_TOOLSHIM=1`). **codex** drives the OpenAI Codex CLI (default model `gpt-5.5-codex`, dispatched via `codex exec`). **gemini** drives the Gemini CLI (default model `gemini-3.1-pro`, dispatched via `gemini -p --yolo`). For the codex and gemini implementers, valid `--reviewers` are `codex` and `gemini`.
+`--implementer` selects the engine that runs each epic: **claude** (default), **goose**, **codex**, or **agy**. With the default claude implementer, the backend is `claude --bg` (subscription-billed; requires accepting the bypass-permissions disclaimer once: `claude --dangerously-skip-permissions`); use `--backend p` or `CA_BACKEND=p` for the legacy `claude -p` (pay-per-token) path. **goose** runs open/local models via Goose (e.g. `--model ollama/qwen2.5-coder:14b` or `deepseek/deepseek-chat`; for the ollama provider the loop auto-exports `GOOSE_TOOLSHIM=1`). **codex** drives the OpenAI Codex CLI (default model `gpt-5.5-codex`, dispatched via `codex exec`). **agy** drives the Antigravity CLI (default model `gemini-3.1-pro`, dispatched via `agy -p --dangerously-skip-permissions --model`; OAuth auth, no API-key env var). For the codex and agy implementers, valid `--reviewers` are `codex` and `agy`.
 
 ```bash
 # Generate script for all ready epics (bg backend by default)
@@ -284,7 +284,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | Command | Description |
 |---------|-------------|
 | `ca loop` | Generate infinity loop script (default: `claude --bg`, subscription-billed) |
-| `ca loop --implementer <name>` | Engine that runs each epic: `claude` (default), `goose`, `codex`, `gemini` |
+| `ca loop --implementer <name>` | Engine that runs each epic: `claude` (default), `goose`, `codex`, `agy` |
 | `ca loop --model <model>` | Implementer model (e.g. `ollama/qwen2.5-coder:14b`, `gpt-5.5-codex`, `gemini-3.1-pro`) |
 | `ca loop --backend bg` | Default bg backend: `claude --bg` (subscription-billed) |
 | `ca loop --backend p` | Legacy p backend: `claude -p` (pay-per-token) |
@@ -292,7 +292,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | `ca loop -o <path>` | Custom output path (default: `./.compound-agent/infinity-loop.sh`) |
 | `ca loop --max-retries <n>` | Max retries per epic on failure (default: 1) |
 | `ca loop --force` | Overwrite existing script |
-| `ca loop --reviewers <names...>` | Enable review phase with specified reviewers (claude-sonnet, claude-opus, gemini, codex) |
+| `ca loop --reviewers <names...>` | Enable review phase with specified reviewers (claude-sonnet, claude-opus, agy, codex) |
 | `ca loop --review-every <n>` | Review every N completed epics (0 = end-only, default: 0) |
 | `ca loop --max-review-cycles <n>` | Max review/fix iterations (default: 3) |
 | `ca loop --review-blocking` | Fail loop if review not approved after max cycles |
@@ -325,7 +325,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | Command | Description |
 |---------|-------------|
 | `ca setup` | One-shot setup (hooks + templates) |
-| `ca setup --harness antigravity` | Groundwork: install an `AGENTS.md` for the `agy` CLI (the Gemini CLI successor); no functional antigravity loop/reviewer yet |
+| `ca setup --harness agy` | Install an `AGENTS.md` for the Antigravity CLI (`agy`), the functional loop engine that replaces the standalone gemini CLI |
 | `ca setup --skip-hooks` | Setup without installing hooks |
 | `ca setup --json` | Output result as JSON |
 | `ca setup claude` | Install Claude Code hooks only |
@@ -372,7 +372,7 @@ A: Yes, completely. Embeddings run locally via the `ca-embed` Rust daemon (nomic
 A: ~278MB for the embedding model (one-time download, shared across projects) plus negligible space for lessons.
 
 **Q: Can I use it with other AI coding tools?**
-A: The CLI (`ca`) works standalone with any tool. Full hook integration is available for Claude Code and Gemini CLI. The Gemini CLI is being sunset (~2026-06-18) in favor of Antigravity; `ca setup --harness antigravity` installs groundwork (an `AGENTS.md` for the `agy` CLI) ahead of that migration.
+A: The CLI (`ca`) works standalone with any tool. Full hook integration is available for Claude Code. The Antigravity CLI (`agy`) is now the engine that replaces the standalone gemini CLI (whose usage was removed); `ca setup --harness agy` installs an `AGENTS.md` for it and `ca loop --implementer agy` drives the loop with it.
 
 **Q: What happens if the embedding model isn't available?**
 A: Search gracefully falls back to keyword-only mode. Other commands that require embeddings will tell you what's missing. Run `ca doctor` to diagnose issues.

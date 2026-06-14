@@ -1149,7 +1149,8 @@ func TestT3_HarvestIntegration_Conflict(t *testing.T) {
 //
 // Before fix: agent_cleanup returned 1 on conflict, aborting the script before case ran.
 // After fix:  agent_cleanup returns 0 and reassigns MARKER to human:harvest-conflict,
-//             so case "$MARKER" correctly triggers the human:* branch.
+//
+//	so case "$MARKER" correctly triggers the human:* branch.
 func TestT3_LoopLevel_ConflictReachesCase(t *testing.T) {
 	if _, err := exec.LookPath("bash"); err != nil {
 		t.Skip("bash not available")
@@ -1764,7 +1765,7 @@ func TestBgBackend_BashSyntaxWithBgBackend(t *testing.T) {
 	}{
 		{"no-reviewers", []string{"loop", "-o", filepath.Join(dir, "bg-basic.sh")}},
 		{"with-reviewers", []string{"loop", "-o", filepath.Join(dir, "bg-review.sh"),
-			"--reviewers", "claude-sonnet,gemini", "--review-every", "2"}},
+			"--reviewers", "claude-sonnet,agy", "--review-every", "2"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -1969,7 +1970,7 @@ func TestLoopCommand_SeamAgentInvoke(t *testing.T) {
 	outPath := filepath.Join(dir, "loop.sh")
 
 	_, err := executeCommand(root, "loop", "-o", outPath,
-		"--reviewers", "claude-sonnet,gemini",
+		"--reviewers", "claude-sonnet,agy",
 	)
 	if err != nil {
 		t.Fatalf("loop --reviewers failed: %v", err)
@@ -2993,7 +2994,7 @@ func TestSeamScript_BashSyntax(t *testing.T) {
 	}{
 		{"no-reviewers", []string{"loop", "-o", filepath.Join(dir, "seam-basic.sh")}},
 		{"with-reviewers", []string{"loop", "-o", filepath.Join(dir, "seam-review.sh"),
-			"--reviewers", "claude-sonnet,claude-opus,gemini,codex", "--review-every", "2"}},
+			"--reviewers", "claude-sonnet,claude-opus,agy,codex", "--review-every", "2"}},
 	}
 
 	for _, tt := range tests {

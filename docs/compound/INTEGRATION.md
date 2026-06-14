@@ -98,9 +98,8 @@ Compound-agent integrates with multiple coding harnesses. Select one at setup wi
 |---------|--------|-------|
 | **Claude Code** | Full loop + reviewers | Default implementer for `ca loop`. |
 | **goose** | Full loop | Runs open and local models (for example `--model ollama/qwen2.5-coder:14b`). Sets `GOOSE_TOOLSHIM=1` automatically for ollama models. |
-| **codex** | Full loop | Default model `gpt-5.5-codex`, driven via `codex exec`. Valid reviewers are codex and gemini. |
-| **gemini** | Full loop | Default model `gemini-3.1-pro`, driven via `gemini -p --yolo`. Valid reviewers are codex and gemini. The Gemini CLI is being migrated to its successor, the `agy` CLI (see antigravity). |
-| **antigravity** | Groundwork only | Installs AGENTS.md for the `agy` CLI, the Gemini CLI successor. No functional loop or reviewer yet. |
+| **codex** | Full loop | Default model `gpt-5.5-codex`, driven via `codex exec`. Valid reviewers are codex and agy. |
+| **agy** | Full loop + reviewer | The Antigravity CLI, successor to the standalone gemini CLI (whose usage was removed). Default model `gemini-3.1-pro`, driven via `agy -p --dangerously-skip-permissions --model` (OAuth auth, no API-key env var). Installs AGENTS.md. Valid reviewers are codex and agy. The deprecated `gemini` and `antigravity` aliases still resolve to `agy` with a warning. |
 
 Implementers are selected per loop with `ca loop --implementer <name>`. See CLI_REFERENCE.md for the full flag matrix.
 

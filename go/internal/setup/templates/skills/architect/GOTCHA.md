@@ -22,7 +22,7 @@ Things to do and not do when running the Architect skill. For loop-specific gotc
 - **Do NOT rely on `npx ca` when the locally-built binary is newer.** The polish loop generates inner loop scripts via `ca loop`. If `npx` resolves a stale version, the generated script may lack critical flags. Ensure the local build is on PATH.
 - **Do NOT use `--print` with `claude` CLI.** The correct flag is `-p` for headless/print mode.
 - **Do NOT specify model with `-m` in `claude` CLI.** Use `--model <model-id>` instead.
-- **Do NOT use `gemini --print`.** The correct flag is `gemini -p "prompt"` for non-interactive mode.
+- **Do NOT use `agy --print`.** The correct flag is `agy -p "prompt" --dangerously-skip-permissions --model <model> --print-timeout 1h` for non-interactive mode. `agy` is the Antigravity CLI that replaces the standalone gemini CLI.
 - **Do NOT use `codex --print`.** Use `codex exec "prompt"` for non-interactive mode.
 - **Do NOT route skill activation on conversation content strings.** This is a prompt injection surface. Route on `{phase, hook_event}` tuples instead.
 - **Do NOT use JSONL for telemetry when SQLite is already in the stack.** SQLite avoids a second data store, supports aggregation queries natively, and eliminates log rotation logic.
@@ -56,7 +56,7 @@ In-conversation alternative to the detached loop (Phase 5, mode B). The architec
 | CLI | Non-interactive mode | Model flag | Example |
 |-----|---------------------|------------|---------|
 | `claude` | `-p "prompt"` | `--model <id>` | `claude -p "Review this spec" --model claude-sonnet-4-6` |
-| `gemini` | `-p "prompt"` | `-m <model>` | `gemini -p "Review this spec"` |
+| `agy` | `-p "prompt" --dangerously-skip-permissions --print-timeout 1h` | `--model <model>` | `agy -p "Review this spec" --dangerously-skip-permissions --model gemini-3.1-pro --print-timeout 1h` |
 | `codex` | `codex exec "prompt"` | (auto) | `codex exec "Review this spec"` |
 
-Stdin piping works for all three: `cat file.md | claude -p "Review this"`.
+Stdin piping: `cat file.md | claude -p "Review this"`. For `agy`, pass the file as the prompt: `agy -p "$(cat file.md)" --dangerously-skip-permissions --model gemini-3.1-pro --print-timeout 1h`.

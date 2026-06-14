@@ -17,9 +17,9 @@ func flockExclusive(f *os.File) error {
 	return windows.LockFileEx(
 		windows.Handle(f.Fd()),
 		windows.LOCKFILE_EXCLUSIVE_LOCK,
-		0,          // reserved
-		1,          // lock 1 byte
-		0,          // high-order bytes
+		0, // reserved
+		1, // lock 1 byte
+		0, // high-order bytes
 		ol,
 	)
 }

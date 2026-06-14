@@ -9,6 +9,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-06-14
+
+Replaces the standalone Google gemini CLI with the Antigravity CLI (`agy`) as the
+loop implementer, reviewer, and `ca setup --harness` target. The `antigravity`
+groundwork target from 2.10.0 is folded into a single functional name: `agy`. The
+default implementer (`claude`) and the `goose`/`codex` paths are unchanged.
+
+### Added
+
+- **`ca loop --implementer agy`**: drive the loop with the Antigravity CLI. PID-based,
+  in-tree engine. Dispatch uses `agy -p "<prompt>" --dangerously-skip-permissions
+  --model "<model>" --print-timeout 1h`; a follow-up cycle continues the same
+  conversation via `agy -c -p "<follow-up>" --dangerously-skip-permissions`. Default
+  model `gemini-3.1-pro` (override with `--model`). Auth is OAuth via the Antigravity
+  app, so there is no API-key env var; preflight only checks `command -v agy`.
+- **`ca setup --harness agy`**: installs the `AGENTS.md` memory file for the Antigravity
+  CLI. This is now a functional harness, not groundwork.
+- **`agy` reviewer**: the agy implementer reuses the existing CLI-reviewer dispatch.
+  Valid reviewers for the codex and agy implementers are `{codex, agy}`. The first
+  review cycle runs `agy -p "$(cat ...)" --dangerously-skip-permissions --model
+  "$REVIEW_MODEL" --print-timeout 1h` and resume cycles run `agy -c -p ...`.
+
+### Changed
+
+- **`gemini` implementer/harness/reviewer renamed to `agy`** as the canonical name.
+  The standalone gemini CLI usage (`gemini -p --yolo`, `GEMINI_API_KEY`,
+  `gemini --resume latest`) is removed; the agy dispatch contract above replaces it.
+  The `antigravity` groundwork harness target from 2.10.0 is folded into `agy`.
+- **Deprecated aliases**: `gemini` and `antigravity` are still accepted as deprecated
+  aliases for both `--implementer` and `--harness`; they normalize to `agy` and emit a
+  one-line deprecation warning. Help text, valid-sets, and docs list only `agy`.
+
+### Notes
+
+- The standalone gemini CLI is sunset on 2026-06-18. The Antigravity CLI (`agy`) is its
+  successor and is now the engine that drives the loop, reviewers, and the harness
+  memory file, so the deferred OAuth/stdout blockers noted in 2.10.0 are resolved.
+
 ## [2.11.0] - 2026-06-14
 
 Two additive workflow changes: per-epic specs become file-backed (the spec file

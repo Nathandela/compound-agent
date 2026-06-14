@@ -13,7 +13,7 @@ The infinity loop (`ca loop`) generates a standalone bash script that autonomous
 | Max retries | `--max-retries <n>` | 1 | Retries per epic on failure |
 | Output | `-o, --output <path>` | .compound-agent/infinity-loop.sh | Script output path |
 | Force | `--force` | false | Overwrite existing script |
-| Reviewers | `--reviewers <names>` | none | Comma-separated: claude-sonnet,claude-opus,gemini,codex |
+| Reviewers | `--reviewers <names>` | none | Comma-separated: claude-sonnet,claude-opus,agy,codex |
 | Review cadence | `--review-every <n>` | 0 (end-only) | Review every N completed epics |
 | Review cycles | `--max-review-cycles <n>` | 3 | Max review/fix iterations |
 | Review blocking | `--review-blocking` | false | Fail loop if review not approved |
@@ -48,7 +48,7 @@ mkdir -p .beads && echo "$LOOP_SESSION" > .beads/loop-session-name
 ### Full review fleet
 ```bash
 ca loop --epics "E1,E2,E3" \
-  --reviewers "claude-sonnet,claude-opus,gemini,codex" \
+  --reviewers "claude-sonnet,claude-opus,agy,codex" \
   --max-review-cycles 3 \
   --review-blocking \
   --force
@@ -57,7 +57,7 @@ ca loop --epics "E1,E2,E3" \
 ### Conservative (review every 2 epics, blocking)
 ```bash
 ca loop --epics "E1,E2,E3,E4" \
-  --reviewers "claude-sonnet,gemini" \
+  --reviewers "claude-sonnet,agy" \
   --review-every 2 \
   --review-blocking \
   --max-retries 2 \

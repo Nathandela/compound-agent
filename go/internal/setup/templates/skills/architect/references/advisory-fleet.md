@@ -19,7 +19,7 @@ The advisory fleet solicits independent architectural perspectives from external
 
 Advisors are **non-blocking** -- they inform the human's decision at the gate but cannot veto it. The fleet runs once (no multi-cycle iteration like the review fleet).
 
-**Why external models**: Different model families have different training biases and blind spots. A Gemini advisor might catch scaling concerns that Claude overlooked. A Codex advisor might flag implementation complexity from a different angle. Model diversity produces richer advisory signal than same-model subagents with different prompts.
+**Why external models**: Different model families have different training biases and blind spots. An agy advisor might catch scaling concerns that Claude overlooked. A Codex advisor might flag implementation complexity from a different angle. Model diversity produces richer advisory signal than same-model subagents with different prompts.
 
 **Execution model**: The advisory fleet runs within an interactive Claude Code session using native tool parallelism. Each advisor is a background Bash call (`run_in_background: true`) — Claude gets notified when each finishes, then reads the reports and synthesizes.
 
@@ -30,7 +30,7 @@ Four evaluation lenses, each assigned to a different model when available:
 | # | Lens | Focus | Default CLI | Model Flag |
 |---|------|-------|-------------|------------|
 | 1 | **Security & Reliability** | Attack surfaces, failure modes, data integrity, recovery, trust boundaries | claude | `--model claude-sonnet-4-6` |
-| 2 | **Scalability & Performance** | Bottlenecks, growth patterns, resource consumption, data volume, latency | gemini | (none needed) |
+| 2 | **Scalability & Performance** | Bottlenecks, growth patterns, resource consumption, data volume, latency | agy | (none needed) |
 | 3 | **Organizational & Delivery** | Team boundaries, delivery risk, coordination cost, cognitive load, deployment order | codex | (none needed) |
 | 4 | **Simplicity & Alternatives** | Over-engineering, simpler alternatives, premature abstraction, YAGNI violations | claude | `--model claude-opus-4-7` |
 
@@ -70,12 +70,12 @@ When fewer than 4 CLIs are available, assign multiple lenses to the same CLI:
 
 | Available CLIs | Assignment |
 |---------------|------------|
-| claude + gemini + codex | claude: Security + Simplicity, gemini: Scalability, codex: Organizational |
-| claude + gemini | claude: Security + Simplicity, gemini: Scalability + Organizational |
+| claude + agy + codex | claude: Security + Simplicity, agy: Scalability, codex: Organizational |
+| claude + agy | claude: Security + Simplicity, agy: Scalability + Organizational |
 | claude + codex | claude: Security + Simplicity + Scalability, codex: Organizational |
-| gemini + codex | gemini: Security + Scalability, codex: Organizational + Simplicity |
+| agy + codex | agy: Security + Scalability, codex: Organizational + Simplicity |
 | claude only | claude: all 4 lenses in a single prompt |
-| gemini only | gemini: all 4 lenses in a single prompt |
+| agy only | agy: all 4 lenses in a single prompt |
 | codex only | codex: all 4 lenses in a single prompt |
 
 When a single CLI handles multiple lenses, combine them into one call with clearly labeled sections in the prompt (e.g., "## Lens 1: Security & Reliability ... ## Lens 2: Simplicity & Alternatives ..."). See the [combined-lens prompt variant](#combined-lens-variant) below.
@@ -89,7 +89,7 @@ The advisory fleet uses Claude Code's native tool parallelism — no script file
 Run a single Bash call to check which CLIs are installed and healthy:
 
 ```bash
-for cli in claude gemini codex; do
+for cli in claude agy codex; do
   if command -v "$cli" >/dev/null 2>&1 && "$cli" --version >/dev/null 2>&1; then
     echo "$cli: available"
   else
@@ -119,10 +119,11 @@ claude --model claude-sonnet-4-6 \
   > /tmp/advisory/security-report.md 2>&1
 ```
 
-**Gemini**:
+**Agy**:
 ```bash
-gemini --yolo \
-  -p "$(cat /tmp/advisory/scalability-prompt.md)" \
+agy -p "$(cat /tmp/advisory/scalability-prompt.md)" \
+  --dangerously-skip-permissions \
+  --print-timeout 1h \
   > /tmp/advisory/scalability-report.md 2>/tmp/advisory/scalability-stderr.log
 ```
 
@@ -155,7 +156,7 @@ These are the same patterns validated by the review fleet (see `review-fleet.md`
 | CLI | Flags | Why |
 |-----|-------|-----|
 | claude | `--dangerously-skip-permissions --output-format text` | Without skip-permissions, Claude pauses for confirmations with no human. `text` mode for parseable output. Note: `2>&1` merges stderr into the report — first line may contain a harmless "no stdin data" warning; ignore it during synthesis. |
-| gemini | `--yolo` | Autonomous execution (Gemini's skip-permissions equivalent). |
+| agy | `-p "<prompt>" --dangerously-skip-permissions --print-timeout 1h` | Antigravity CLI, the gemini CLI successor. Autonomous execution via `--dangerously-skip-permissions`; OAuth auth (no API-key env). `--print-timeout 1h` raises the print-mode wait cap. |
 | codex | `exec --full-auto -o <file> -- - < <prompt>` | `-p` is `--profile` not prompt. Positional arg or stdin for prompt. `-o` for clean output (stdout has UI chrome). |
 
 ### Timeout
@@ -198,7 +199,7 @@ The per-lens prompt template has these design properties:
 - **Confidence signal**: Each advisor states HIGH/MEDIUM/LOW confidence. Low confidence from the Simplicity advisor (devil's advocate) is actually a positive signal -- it means the spec is hard to argue against.
 - **Spec-only context**: Advisors see only the spec content, not project files. This is intentional -- they evaluate the architecture on its merits without being anchored by implementation details. If the spec references external files, include the relevant excerpts inline.
 
-**Context window note**: If the spec exceeds ~4,000 tokens (large EARS table + multiple Mermaid diagrams + full scenario table), consider trimming the scenario table from the advisor prompts to stay within Gemini and Codex input limits. The EARS requirements and architecture diagrams carry the most signal for architectural review.
+**Context window note**: If the spec exceeds ~4,000 tokens (large EARS table + multiple Mermaid diagrams + full scenario table), consider trimming the scenario table from the advisor prompts to stay within agy and Codex input limits. The EARS requirements and architecture diagrams carry the most signal for architectural review.
 
 ## Synthesis Format
 

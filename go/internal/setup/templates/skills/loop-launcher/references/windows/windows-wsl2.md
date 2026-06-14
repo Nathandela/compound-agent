@@ -77,7 +77,7 @@ VS Code: use the "WSL" remote extension to open the repo directly inside WSL2.
 
 ```bash
 # Generate the script (inside WSL2)
-ca loop --epics "E1,E2,E3" --reviewers "claude-sonnet,gemini" --force
+ca loop --epics "E1,E2,E3" --reviewers "claude-sonnet,agy" --force
 
 # Dry-run
 LOOP_DRY_RUN=1 bash .compound-agent/infinity-loop.sh
@@ -167,7 +167,7 @@ The polish loop works identically inside WSL2. Generate and run as documented in
 ```bash
 ca polish --spec-file "docs/specs/my-spec.md" \
   --meta-epic "meta-epic-id" \
-  --reviewers "claude-sonnet,claude-opus,gemini,codex" \
+  --reviewers "claude-sonnet,claude-opus,agy,codex" \
   --cycles 2 --force
 
 # Dry-run
@@ -177,7 +177,7 @@ POLISH_DRY_RUN=1 bash .compound-agent/polish-loop.sh
 tmux new-session -d -s polish-loop 'bash .compound-agent/polish-loop.sh'
 ```
 
-Reviewer CLIs (`gemini`, `codex`) must also be installed inside WSL2 for the polish audit fleet to work.
+Reviewer CLIs (`agy`, `codex`) must also be installed inside WSL2 for the polish audit fleet to work.
 
 ## Troubleshooting
 

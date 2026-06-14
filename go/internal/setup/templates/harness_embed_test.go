@@ -401,14 +401,23 @@ func TestCodexConfig(t *testing.T) {
 	}
 }
 
-// TestGeminiMemory verifies the embedded GEMINI.md memory file exists and
-// mirrors the compound integration.
-func TestGeminiMemory(t *testing.T) {
-	mem := GeminiMemory()
+// TestAgyMemory verifies the embedded agy AGENTS.md protocol section exists,
+// mirrors the compound integration, and carries the idempotency markers and
+// section header used for the append-only install.
+func TestAgyMemory(t *testing.T) {
+	mem := AgyMemory()
 	if mem == "" {
-		t.Fatal("GEMINI.md template is empty")
+		t.Fatal("agy AGENTS.md template is empty")
 	}
 	if !strings.Contains(mem, "Compound Agent") {
-		t.Error("GEMINI.md missing Compound Agent section")
+		t.Error("agy AGENTS.md missing Compound Agent section")
+	}
+	if !strings.Contains(mem, AntigravitySectionHeader) {
+		t.Error("agy AGENTS.md missing the section header used for idempotent append")
+	}
+	for _, marker := range []string{AntigravityStartMarker, AntigravityEndMarker} {
+		if !strings.Contains(mem, marker) {
+			t.Errorf("agy AGENTS.md missing idempotency marker %q", marker)
+		}
 	}
 }

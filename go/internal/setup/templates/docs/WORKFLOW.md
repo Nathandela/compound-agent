@@ -160,7 +160,7 @@ The loop drives ready epics through the full pipeline. It can run any of four im
 ca loop --implementer claude   # default
 ca loop --implementer goose
 ca loop --implementer codex
-ca loop --implementer gemini
+ca loop --implementer agy
 ```
 
 Monitor it via the status and trace files under `.compound-agent/agent_logs/` (`.loop-status.json`, `loop-execution.jsonl`) or follow the live trace with `ca watch`.

@@ -83,7 +83,7 @@ ca init --skip-hooks       # Skip git hook installation
 ca init --skip-claude      # Skip Claude Code hooks
 ca init --json             # Output result as JSON
 ca setup                   # Full setup (init + hooks + templates)
-ca setup --harness claude  # Select coding harness (claude|codex|gemini|goose|antigravity)
+ca setup --harness claude  # Select coding harness (claude|codex|agy|goose)
 ca setup --update          # Regenerate templates (preserves user files)
 ca setup --uninstall       # Remove compound-agent integration
 ca setup --status          # Show installation status
@@ -96,14 +96,14 @@ ca download-model          # Download embedding model (~23MB)
 ca download-model --json   # Output result as JSON
 ```
 
-**`--harness`** (`claude` | `codex` | `gemini` | `goose` | `antigravity`): selects the coding harness to configure. `antigravity` is groundwork only -- it installs AGENTS.md for the `agy` CLI (the Gemini CLI successor) and provides no functional loop or reviewer yet.
+**`--harness`** (`claude` | `codex` | `agy` | `goose`): selects the coding harness to configure. The `agy` target installs AGENTS.md for the Antigravity CLI (`agy`), the functional loop engine that replaces the standalone gemini CLI. The deprecated `gemini` and `antigravity` aliases still resolve to `agy` with a warning.
 
 ## Reviewer commands
 
 ```bash
-ca reviewer enable gemini  # Enable Gemini as external reviewer
+ca reviewer enable agy     # Enable Antigravity (agy) as external reviewer
 ca reviewer enable codex   # Enable Codex as external reviewer
-ca reviewer disable gemini # Disable a reviewer
+ca reviewer disable agy    # Disable a reviewer
 ca reviewer list           # List enabled reviewers
 ```
 
@@ -118,21 +118,21 @@ ca loop --model claude-opus-4-7[1m]
 ca loop --implementer claude   # Default implementer (supports --backend bg|p)
 ca loop --implementer goose    # Open/local models, e.g. --model ollama/qwen2.5-coder:14b
 ca loop --implementer codex    # Default model gpt-5.5-codex (codex exec)
-ca loop --implementer gemini   # Default model gemini-3.1-pro (gemini -p --yolo)
+ca loop --implementer agy      # Default model gemini-3.1-pro (agy -p --dangerously-skip-permissions --model)
 ca loop --backend bg       # Default: claude --bg (subscription-billed)
 ca loop --backend p        # Legacy: claude -p (pay-per-token)
 ca loop --force            # Overwrite existing script
 # Env override (when --backend not set): CA_BACKEND=p ca loop
 ```
 
-**`--implementer`** (`claude` | `goose` | `codex` | `gemini`): selects the coding harness that runs the loop. Default is `claude`.
+**`--implementer`** (`claude` | `goose` | `codex` | `agy`): selects the coding harness that runs the loop. Default is `claude`.
 
 - **claude**: supports `--backend bg|p`.
 - **goose**: runs open and local models (for example `--model ollama/qwen2.5-coder:14b`); sets `GOOSE_TOOLSHIM=1` automatically for ollama models.
 - **codex**: default model `gpt-5.5-codex`, run via `codex exec`.
-- **gemini**: default model `gemini-3.1-pro`, run via `gemini -p --yolo`.
+- **agy**: default model `gemini-3.1-pro`, run via `agy -p --dangerously-skip-permissions --model` (OAuth auth, no API-key env var). The deprecated `gemini` and `antigravity` aliases still resolve to `agy` with a warning.
 
-For the `codex` and `gemini` implementers, valid `--reviewers` are `codex` and `gemini`.
+For the `codex` and `agy` implementers, valid `--reviewers` are `codex` and `agy`.
 
 **`--backend`** (`bg` | `p`): applies to the `claude` implementer. `bg` (default) runs `claude --bg` (subscription-billed); `p` runs `claude -p` (legacy, pay-per-token).
 
@@ -164,7 +164,7 @@ ca health                  # Check project health and dependencies
 ca polish                  # Generate polish loop script (default backend: bg = claude --bg)
 ca polish --spec-file "docs/specs/my-spec.md"
 ca polish --meta-epic "meta-epic-id"
-ca polish --reviewers "claude-sonnet,claude-opus,gemini,codex"
+ca polish --reviewers "claude-sonnet,claude-opus,agy,codex"
 ca polish --cycles 2
 ca polish --model claude-opus-4-7[1m]
 ca polish --backend bg     # Default: claude --bg (subscription-billed)

@@ -330,9 +330,9 @@ func extractPreflightFunc(t *testing.T, generatedScript string) string {
 // buildPreflightHarness builds a self-contained bash harness that:
 //   - Initialises a minimal git repo in a temp dir (for git worktree list calls).
 //   - Places a smart claude stub on PATH that:
-//       --bg invocation  => emits probeOutput (simulates probe dispatch).
-//       stop <id>        => appends "stop <id>" to callLog file, exits 0.
-//       rm <id>          => appends "rm <id>" to callLog file, exits 0.
+//     --bg invocation  => emits probeOutput (simulates probe dispatch).
+//     stop <id>        => appends "stop <id>" to callLog file, exits 0.
+//     rm <id>          => appends "rm <id>" to callLog file, exits 0.
 //   - Defines log() and runs bootstrap_preflight.
 //
 // callLogPath is a file where stop/rm invocations are recorded; the caller

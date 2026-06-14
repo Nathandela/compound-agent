@@ -96,9 +96,9 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 ## Detached loop and harness targets
 
-The architect Launch gate's detached mode runs `ca loop` in a `screen` session. `ca loop --implementer` selects which coding agent drives each epic: `claude` (default), `goose`, `codex`, or `gemini`. The `codex` implementer defaults to model `gpt-5.5-codex` and `gemini` defaults to `gemini-3.1-pro`.
+The architect Launch gate's detached mode runs `ca loop` in a `screen` session. `ca loop --implementer` selects which coding agent drives each epic: `claude` (default), `goose`, `codex`, or `agy`. The `codex` implementer defaults to model `gpt-5.5-codex` and `agy` defaults to `gemini-3.1-pro`.
 
-`ca setup --harness` installs the compound skills into a target harness. Supported values are `claude`, `codex`, `gemini`, and `goose`, plus `antigravity` (groundwork only -- not yet available as a `ca loop --implementer`).
+`ca setup --harness` installs the compound skills into a target harness. Supported values are `claude`, `codex`, `agy`, and `goose`. The `agy` target installs the Antigravity CLI memory file and is also a functional `ca loop --implementer`. The deprecated `gemini` and `antigravity` aliases still resolve to `agy` with a warning.
 
 ---
 

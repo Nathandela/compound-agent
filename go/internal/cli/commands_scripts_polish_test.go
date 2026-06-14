@@ -328,7 +328,7 @@ func TestPolishCommand_WithReviewers(t *testing.T) {
 	outPath := filepath.Join(dir, "test.sh")
 
 	_, err := executeCommand(root, "polish", "-o", outPath,
-		"--reviewers", "claude-sonnet,gemini",
+		"--reviewers", "claude-sonnet,agy",
 		"--spec-file", "docs/specs/my-spec.md",
 		"--meta-epic", "test-epic-123")
 	if err != nil {
@@ -341,8 +341,8 @@ func TestPolishCommand_WithReviewers(t *testing.T) {
 	if !strings.Contains(script, "claude-sonnet") {
 		t.Error("expected claude-sonnet in configured reviewers")
 	}
-	if !strings.Contains(script, "gemini") {
-		t.Error("expected gemini in configured reviewers")
+	if !strings.Contains(script, "agy") {
+		t.Error("expected agy in configured reviewers")
 	}
 }
 
@@ -900,7 +900,7 @@ func TestPolishCommand_AgentInvokeInAudit(t *testing.T) {
 
 	_, err := executeCommand(root, "polish", "-o", outPath,
 		"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1",
-		"--reviewers", "claude-sonnet,claude-opus,gemini,codex")
+		"--reviewers", "claude-sonnet,claude-opus,agy,codex")
 	if err != nil {
 		t.Fatalf("polish command failed: %v", err)
 	}
@@ -935,7 +935,7 @@ func TestPolishCommand_AgentInvokeInAudit(t *testing.T) {
 
 // TestPolishCommand_AuditFleetMixedBarrierBg verifies that when CA_BACKEND=bg,
 // the polish audit fleet dispatches claude reviewers as bg sessions with a
-// mixed-fleet barrier (poll bg handles + wait $pid for gemini/codex).
+// mixed-fleet barrier (poll bg handles + wait $pid for agy/codex).
 func TestPolishCommand_AuditFleetMixedBarrierBg(t *testing.T) {
 	t.Parallel()
 	audit := polishScriptRunAudit()
@@ -948,9 +948,9 @@ func TestPolishCommand_AuditFleetMixedBarrierBg(t *testing.T) {
 	if !strings.Contains(audit, "bg_handles") {
 		t.Error("polish audit fleet must track bg_handles for claude bg reviewers")
 	}
-	// Gemini/codex stay as sync & + wait
+	// Agy/codex stay as sync & + wait
 	if !strings.Contains(audit, "for pid in $pids") {
-		t.Error("polish audit fleet must use pid-wait barrier for gemini/codex")
+		t.Error("polish audit fleet must use pid-wait barrier for agy/codex")
 	}
 }
 
@@ -1024,7 +1024,7 @@ func TestPolishCommand_InnerLoopBashSyntaxWithBgSeam(t *testing.T) {
 
 	_, err := executeCommand(root, "polish", "-o", outPath,
 		"--spec-file", "docs/SPEC.md", "--meta-epic", "ME1",
-		"--reviewers", "claude-sonnet,gemini,codex")
+		"--reviewers", "claude-sonnet,agy,codex")
 	if err != nil {
 		t.Fatalf("polish command failed: %v", err)
 	}

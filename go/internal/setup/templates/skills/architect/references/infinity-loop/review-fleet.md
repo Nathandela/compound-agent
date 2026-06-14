@@ -30,7 +30,7 @@ detect_reviewers() {
     local cli_name
     case "$reviewer" in
       claude-sonnet|claude-opus) cli_name="claude" ;;
-      gemini)                    cli_name="gemini" ;;
+      agy)                       cli_name="agy" ;;
       codex)                     cli_name="codex" ;;
       *)                         log "Unknown reviewer: $reviewer"; continue ;;
     esac
@@ -85,16 +85,25 @@ portable_timeout "$REVIEW_TIMEOUT" claude --model "$model_name" \
 
 **`--output-format text`** is used (not `stream-json`) because review output is parsed for markers (`REVIEW_APPROVED`, `CHANGES_REQUESTED`), not streamed.
 
-### Gemini
+### Agy
 
 ```bash
-portable_timeout "$REVIEW_TIMEOUT" gemini \
-  --yolo \
-  -p "$review_prompt" \
+# Cycle 1: fresh conversation
+portable_timeout "$REVIEW_TIMEOUT" agy \
+  -p "$(cat "$prompt_file")" \
+  --dangerously-skip-permissions \
+  --model "$REVIEW_MODEL" \
+  --print-timeout 1h \
+  > "$review_report" 2>"$review_stderr"
+
+# Cycle 2+: continue the same conversation
+portable_timeout "$REVIEW_TIMEOUT" agy -c \
+  -p "$follow_up" \
+  --dangerously-skip-permissions \
   > "$review_report" 2>"$review_stderr"
 ```
 
-The `--yolo` flag enables autonomous execution (Gemini's equivalent of skip-permissions).
+The `--dangerously-skip-permissions` flag enables autonomous execution (agy's equivalent of skip-permissions). `agy` is the Antigravity CLI; auth is OAuth (no API-key env var). `--print-timeout 1h` raises the print-mode wait cap above its short default.
 
 ### Codex
 
@@ -138,8 +147,8 @@ init_review_sessions() {
 ```
 
 Session resume is used for all reviewers:
-- **Claude**: `--session-id "$sid"` (cycle 1) → `--resume "$sid"` (cycle 2+)
-- **Gemini**: `--resume latest` (cycle 2+)
+- **Claude**: `--session-id "$sid"` (cycle 1) -> `--resume "$sid"` (cycle 2+)
+- **Agy**: `agy -c` continues the most recent conversation (cycle 2+)
 - **Codex**: `codex exec resume --last` (cycle 2+)
 
 ## Result Parsing

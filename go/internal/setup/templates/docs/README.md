@@ -35,13 +35,13 @@ ca init
 ca setup
 
 # Install for specific harnesses (default is claude):
-ca setup --harness codex,gemini
+ca setup --harness codex,agy
 
 # Verify installation:
 ca doctor
 ```
 
-`setup --harness` accepts `claude`, `codex`, `gemini`, `goose`, and `antigravity` (comma-separated and/or repeatable). Antigravity is groundwork only -- it writes a compound protocol section to `AGENTS.md` for the `agy` CLI (the Gemini CLI successor) but is not yet a loop implementer.
+`setup --harness` accepts `claude`, `codex`, `agy`, and `goose` (comma-separated and/or repeatable). The `agy` target writes a compound protocol section to `AGENTS.md` for the Antigravity CLI (`agy`), the functional loop engine that replaces the standalone gemini CLI. The deprecated `gemini` and `antigravity` aliases still resolve to `agy` with a warning.
 
 ### What `init` does
 
@@ -64,7 +64,7 @@ Each epic's spec lives as a file at `docs/specs/<epic-id>-<slug>.md` -- the sing
 
 To build epics autonomously:
 
-- `ca loop --implementer <name>` runs an epic loop via `claude` (default), `goose` (open/local models), `codex` (gpt-5.5-codex), or `gemini` (gemini-3.1-pro).
+- `ca loop --implementer <name>` runs an epic loop via `claude` (default), `goose` (open/local models), `codex` (gpt-5.5-codex), or `agy` (gemini-3.1-pro).
 - The architect offers two implementation modes at its Launch gate: a detached infinity loop (`ca loop` in a `screen` session) for long unattended runs, or live orchestration (the architect drives epics through cook-it in-session, sequentially and autonomously).
 
 ---

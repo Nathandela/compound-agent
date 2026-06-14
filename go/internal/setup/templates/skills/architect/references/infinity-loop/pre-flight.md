@@ -17,7 +17,7 @@ Before launching, verify:
 
 ```bash
 ca loop --epics "E1,E2,E3" \
-  --reviewers "claude-sonnet,claude-opus,gemini,codex" \
+  --reviewers "claude-sonnet,claude-opus,agy,codex" \
   --max-retries 1 \
   --max-review-cycles 3 \
   --force

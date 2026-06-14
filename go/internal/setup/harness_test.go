@@ -22,7 +22,7 @@ func TestParseHarnessTargets_CommaRepeatDedupeUnknownEmpty(t *testing.T) {
 	t.Parallel()
 
 	// Empty input => no targets (caller defaults to claude full install).
-	got, err := ParseHarnessTargets(nil)
+	got, _, err := ParseHarnessTargets(nil)
 	if err != nil {
 		t.Fatalf("empty input errored: %v", err)
 	}
@@ -31,16 +31,16 @@ func TestParseHarnessTargets_CommaRepeatDedupeUnknownEmpty(t *testing.T) {
 	}
 
 	// Comma-separated single arg.
-	got, err = ParseHarnessTargets([]string{"claude,gemini"})
+	got, _, err = ParseHarnessTargets([]string{"claude,agy"})
 	if err != nil {
 		t.Fatalf("comma input errored: %v", err)
 	}
-	if len(got) != 2 || got[0] != HarnessClaude || got[1] != HarnessGemini {
-		t.Errorf("comma input expected [claude gemini], got %v", got)
+	if len(got) != 2 || got[0] != HarnessClaude || got[1] != HarnessAgy {
+		t.Errorf("comma input expected [claude agy], got %v", got)
 	}
 
 	// Repeated flags plus dedupe (claude appears twice).
-	got, err = ParseHarnessTargets([]string{"goose", "claude", "claude"})
+	got, _, err = ParseHarnessTargets([]string{"goose", "claude", "claude"})
 	if err != nil {
 		t.Fatalf("repeat input errored: %v", err)
 	}
@@ -49,35 +49,71 @@ func TestParseHarnessTargets_CommaRepeatDedupeUnknownEmpty(t *testing.T) {
 	}
 
 	// Whitespace tolerance.
-	got, err = ParseHarnessTargets([]string{" codex , gemini "})
+	got, _, err = ParseHarnessTargets([]string{" codex , agy "})
 	if err != nil {
 		t.Fatalf("whitespace input errored: %v", err)
 	}
-	if len(got) != 2 || got[0] != HarnessCodex || got[1] != HarnessGemini {
-		t.Errorf("whitespace input expected [codex gemini], got %v", got)
+	if len(got) != 2 || got[0] != HarnessCodex || got[1] != HarnessAgy {
+		t.Errorf("whitespace input expected [codex agy], got %v", got)
 	}
 
 	// Unknown target rejected with a clear, value-naming error.
-	_, err = ParseHarnessTargets([]string{"claude,bogus"})
+	_, _, err = ParseHarnessTargets([]string{"claude,bogus"})
 	if err == nil {
 		t.Fatal("unknown target should error")
 	}
 	if !strings.Contains(err.Error(), "bogus") {
 		t.Errorf("error should name the bad value, got: %v", err)
 	}
-	for _, valid := range []string{"claude", "codex", "gemini", "goose", "antigravity"} {
+	for _, valid := range []string{"claude", "codex", "agy", "goose"} {
 		if !strings.Contains(err.Error(), valid) {
 			t.Errorf("error should list valid value %q, got: %v", valid, err)
 		}
 	}
 
-	// Antigravity is a valid target (groundwork harness).
-	got, err = ParseHarnessTargets([]string{"antigravity"})
+	// agy is the canonical functional harness target.
+	got, _, err = ParseHarnessTargets([]string{"agy"})
 	if err != nil {
-		t.Fatalf("antigravity input errored: %v", err)
+		t.Fatalf("agy input errored: %v", err)
 	}
-	if len(got) != 1 || got[0] != HarnessAntigravity {
-		t.Errorf("antigravity input expected [antigravity], got %v", got)
+	if len(got) != 1 || got[0] != HarnessAgy {
+		t.Errorf("agy input expected [agy], got %v", got)
+	}
+}
+
+// TestParseHarnessTargets_DeprecatedAliases verifies that the legacy gemini and
+// antigravity names are still accepted but normalize to agy and emit a
+// deprecation warning each.
+func TestParseHarnessTargets_DeprecatedAliases(t *testing.T) {
+	t.Parallel()
+
+	for _, alias := range []string{"gemini", "antigravity"} {
+		got, warnings, err := ParseHarnessTargets([]string{alias})
+		if err != nil {
+			t.Fatalf("%s alias errored: %v", alias, err)
+		}
+		if len(got) != 1 || got[0] != HarnessAgy {
+			t.Errorf("%s alias expected to normalize to [agy], got %v", alias, got)
+		}
+		if len(warnings) == 0 {
+			t.Fatalf("%s alias expected a deprecation warning", alias)
+		}
+		joined := strings.Join(warnings, "\n")
+		if !strings.Contains(joined, alias) || !strings.Contains(joined, "agy") {
+			t.Errorf("%s deprecation warning should name the alias and agy, got: %v", alias, warnings)
+		}
+	}
+
+	// Both aliases plus the canonical name collapse to a single agy target.
+	got, warnings, err := ParseHarnessTargets([]string{"gemini,antigravity,agy"})
+	if err != nil {
+		t.Fatalf("mixed alias input errored: %v", err)
+	}
+	if len(got) != 1 || got[0] != HarnessAgy {
+		t.Errorf("mixed alias input expected dedupe to [agy], got %v", got)
+	}
+	if len(warnings) < 2 {
+		t.Errorf("mixed alias input expected a warning per deprecated alias, got: %v", warnings)
 	}
 }
 
@@ -386,82 +422,23 @@ func TestSetup_HarnessCodex_ConfigCarriesCompoundProtocol(t *testing.T) {
 	}
 }
 
-func TestSetup_HarnessGemini_InstallsGeminiOnly(t *testing.T) {
-	dir := newHarnessRepo(t)
-
-	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessGemini}}); err != nil {
-		t.Fatalf("--harness gemini InitRepo: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dir, "GEMINI.md")); err != nil {
-		t.Errorf("expected GEMINI.md for gemini target: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(dir, ".claude", "agents", "compound")); err == nil {
-		t.Error(".claude templates should not be installed for gemini-only target")
-	}
-}
-
-func TestSetup_HarnessGemini_WritesSingleFile(t *testing.T) {
-	// FIX-4: Gemini reads GEMINI.md from the repo root, so the redundant
-	// .gemini/GEMINI.md mirror is dropped. Only the single GEMINI.md is written.
-	dir := newHarnessRepo(t)
-
-	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessGemini}}); err != nil {
-		t.Fatalf("--harness gemini InitRepo: %v", err)
-	}
-
-	if _, err := os.Stat(filepath.Join(dir, "GEMINI.md")); err != nil {
-		t.Errorf("expected GEMINI.md at repo root: %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(dir, ".gemini", "GEMINI.md")); err == nil {
-		t.Error("redundant .gemini/GEMINI.md mirror must not be written")
-	}
-}
-
-// The GEMINI.md must carry the full soft phase-gate protocol so the in-prompt
-// gate works for the gemini loop implementer: mandatory recall, phase gates, the
-// verification contract, the completion markers, and the explicit-commit reminder
-// (gemini does not auto-commit). Mirrors TestSetup_HarnessCodex_ConfigCarriesCompoundProtocol.
-func TestSetup_HarnessGemini_MemoryCarriesCompoundProtocol(t *testing.T) {
-	dir := newHarnessRepo(t)
-
-	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessGemini}}); err != nil {
-		t.Fatalf("--harness gemini InitRepo: %v", err)
-	}
-	data, err := os.ReadFile(filepath.Join(dir, "GEMINI.md"))
-	if err != nil {
-		t.Fatalf("read installed GEMINI.md: %v", err)
-	}
-	got := string(data)
-	for _, want := range []string{
-		"Mandatory Recall",
-		"Phase Gate", "Verification Contract",
-		"EPIC_COMPLETE", "EPIC_FAILED", "HUMAN_REQUIRED",
-		"git add -A",
-	} {
-		if !strings.Contains(got, want) {
-			t.Errorf("installed GEMINI.md missing protocol element %q", want)
-		}
-	}
-}
-
 func TestSetup_HarnessMultiple_CommaSeparated(t *testing.T) {
 	dir := newHarnessRepo(t)
 
-	targets, err := ParseHarnessTargets([]string{"claude,gemini"})
+	targets, _, err := ParseHarnessTargets([]string{"claude,agy"})
 	if err != nil {
 		t.Fatalf("parse targets: %v", err)
 	}
 	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: targets}); err != nil {
-		t.Fatalf("--harness claude,gemini InitRepo: %v", err)
+		t.Fatalf("--harness claude,agy InitRepo: %v", err)
 	}
 
-	// Both claude and gemini installed.
+	// Both claude and agy installed (agy appends its protocol to AGENTS.md).
 	if _, err := os.Stat(filepath.Join(dir, ".claude", "agents", "compound")); err != nil {
 		t.Errorf("expected .claude templates: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, "GEMINI.md")); err != nil {
-		t.Errorf("expected GEMINI.md: %v", err)
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Errorf("expected AGENTS.md: %v", err)
 	}
 	// goose and codex NOT installed.
 	if _, err := os.Stat(filepath.Join(dir, ".codex", "config.toml")); err == nil {
@@ -500,26 +477,26 @@ func TestSetup_HarnessGoose_Idempotent(t *testing.T) {
 }
 
 func TestSetup_HarnessUnknown_RejectedBeforeWrites(t *testing.T) {
-	_, err := ParseHarnessTargets([]string{"frobnicate"})
+	_, _, err := ParseHarnessTargets([]string{"frobnicate"})
 	if err == nil {
 		t.Fatal("unknown harness target should be rejected")
 	}
 }
 
-// Antigravity is groundwork: it writes its protocol into AGENTS.md (its native
-// memory file) and nothing else. The AGENTS.md must carry the full soft
-// phase-gate protocol plus the gemini-CLI deprecation/sunset note. No codex,
-// goose, gemini, or .claude assets are written for an antigravity-only target.
-func TestSetup_HarnessAntigravity_InstallsAgentsOnly(t *testing.T) {
+// agy is the functional loop engine: it writes its protocol into AGENTS.md (its
+// native memory file) and nothing else. The AGENTS.md must carry the full soft
+// phase-gate protocol. No codex, goose, or .claude assets are written for an
+// agy-only target.
+func TestSetup_HarnessAgy_InstallsAgentsOnly(t *testing.T) {
 	dir := newHarnessRepo(t)
 
-	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessAntigravity}}); err != nil {
-		t.Fatalf("--harness antigravity InitRepo: %v", err)
+	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessAgy}}); err != nil {
+		t.Fatalf("--harness agy InitRepo: %v", err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
 	if err != nil {
-		t.Fatalf("expected AGENTS.md for antigravity target: %v", err)
+		t.Fatalf("expected AGENTS.md for agy target: %v", err)
 	}
 	got := string(data)
 	for _, want := range []string{
@@ -529,15 +506,11 @@ func TestSetup_HarnessAntigravity_InstallsAgentsOnly(t *testing.T) {
 		"git add -A", "git commit", "git push",
 	} {
 		if !strings.Contains(got, want) {
-			t.Errorf("installed antigravity AGENTS.md missing protocol element %q", want)
+			t.Errorf("installed agy AGENTS.md missing protocol element %q", want)
 		}
 	}
-	// Gemini deprecation/sunset note must be present.
-	if !strings.Contains(got, "2026-06-18") && !strings.Contains(got, "deprecat") {
-		t.Errorf("antigravity AGENTS.md missing gemini deprecation/sunset note")
-	}
 
-	// No other harness assets for an antigravity-only target.
+	// No other harness assets for an agy-only target.
 	for _, p := range []string{
 		filepath.Join(dir, ".codex", "config.toml"),
 		filepath.Join(dir, ".goosehints"),
@@ -545,17 +518,17 @@ func TestSetup_HarnessAntigravity_InstallsAgentsOnly(t *testing.T) {
 		filepath.Join(dir, ".claude", "agents", "compound"),
 	} {
 		if _, err := os.Stat(p); err == nil {
-			t.Errorf("antigravity-only target should not create %s", p)
+			t.Errorf("agy-only target should not create %s", p)
 		}
 	}
 }
 
-func TestSetup_HarnessAntigravity_Idempotent(t *testing.T) {
+func TestSetup_HarnessAgy_Idempotent(t *testing.T) {
 	dir := newHarnessRepo(t)
 
-	opts := InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessAntigravity}}
+	opts := InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessAgy}}
 	if _, err := InitRepo(dir, opts); err != nil {
-		t.Fatalf("first antigravity InitRepo: %v", err)
+		t.Fatalf("first agy InitRepo: %v", err)
 	}
 	agentsPath := filepath.Join(dir, "AGENTS.md")
 	first, err := os.ReadFile(agentsPath)
@@ -563,27 +536,27 @@ func TestSetup_HarnessAntigravity_Idempotent(t *testing.T) {
 		t.Fatalf("read AGENTS.md: %v", err)
 	}
 	if _, err := InitRepo(dir, opts); err != nil {
-		t.Fatalf("second antigravity InitRepo: %v", err)
+		t.Fatalf("second agy InitRepo: %v", err)
 	}
 	second, err := os.ReadFile(agentsPath)
 	if err != nil {
 		t.Fatalf("read AGENTS.md (2nd): %v", err)
 	}
 	if string(first) != string(second) {
-		t.Error("antigravity install is not idempotent: AGENTS.md changed on second run")
+		t.Error("agy install is not idempotent: AGENTS.md changed on second run")
 	}
 }
 
 // Co-install collision guard: codex (which appends the lesson section to
-// AGENTS.md) and antigravity (which appends its protocol section to AGENTS.md)
-// must coexist in one AGENTS.md, plus a separate codex config.toml, with no
-// install error and no section clobbering the other.
-func TestSetup_HarnessCodexAntigravity_NoConflict(t *testing.T) {
+// AGENTS.md) and agy (which appends its protocol section to AGENTS.md) must
+// coexist in one AGENTS.md, plus a separate codex config.toml, with no install
+// error and no section clobbering the other.
+func TestSetup_HarnessCodexAgy_NoConflict(t *testing.T) {
 	dir := newHarnessRepo(t)
 
-	targets := []HarnessTarget{HarnessCodex, HarnessAntigravity}
+	targets := []HarnessTarget{HarnessCodex, HarnessAgy}
 	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: targets}); err != nil {
-		t.Fatalf("--harness codex,antigravity InitRepo: %v", err)
+		t.Fatalf("--harness codex,agy InitRepo: %v", err)
 	}
 
 	data, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
@@ -591,19 +564,45 @@ func TestSetup_HarnessCodexAntigravity_NoConflict(t *testing.T) {
 		t.Fatalf("read AGENTS.md: %v", err)
 	}
 	got := string(data)
-	// Lesson section (from codex's UpdateAgentsMd) AND antigravity protocol.
+	// Lesson section (from codex's UpdateAgentsMd) AND agy protocol.
 	if !strings.Contains(got, "## Compound Agent Integration") {
 		t.Error("co-install AGENTS.md missing the codex lesson section header")
 	}
 	if !strings.Contains(got, "## Compound Agent Protocol (Antigravity)") {
-		t.Error("co-install AGENTS.md missing the antigravity protocol section header")
+		t.Error("co-install AGENTS.md missing the agy protocol section header")
 	}
 	if !strings.Contains(got, "EPIC_COMPLETE") {
-		t.Error("co-install AGENTS.md missing antigravity epic-completion marker")
+		t.Error("co-install AGENTS.md missing agy epic-completion marker")
 	}
 	// Codex config still written.
 	if _, err := os.Stat(filepath.Join(dir, ".codex", "config.toml")); err != nil {
 		t.Errorf("co-install expected .codex/config.toml: %v", err)
+	}
+}
+
+// TestSetup_HarnessAliases_InstallAsAgy verifies the deprecated gemini and
+// antigravity aliases still drive a full agy install (AGENTS.md protocol append)
+// when threaded through ParseHarnessTargets.
+func TestSetup_HarnessAliases_InstallAsAgy(t *testing.T) {
+	for _, alias := range []string{"gemini", "antigravity"} {
+		dir := newHarnessRepo(t)
+		targets, warnings, err := ParseHarnessTargets([]string{alias})
+		if err != nil {
+			t.Fatalf("%s parse: %v", alias, err)
+		}
+		if len(warnings) == 0 {
+			t.Errorf("%s alias should warn", alias)
+		}
+		if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: targets}); err != nil {
+			t.Fatalf("--harness %s InitRepo: %v", alias, err)
+		}
+		data, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+		if err != nil {
+			t.Fatalf("%s alias expected AGENTS.md: %v", alias, err)
+		}
+		if !strings.Contains(string(data), "## Compound Agent Protocol (Antigravity)") {
+			t.Errorf("%s alias AGENTS.md missing agy protocol section", alias)
+		}
 	}
 }
 

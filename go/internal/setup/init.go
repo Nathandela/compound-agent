@@ -332,10 +332,8 @@ func installHarnessTargets(repoRoot string, opts InitOptions, result *InitResult
 			err = installGoose(repoRoot, opts.BinaryPath, result)
 		case HarnessCodex:
 			err = installCodex(repoRoot, result)
-		case HarnessGemini:
-			err = installGemini(repoRoot, result)
-		case HarnessAntigravity:
-			err = installAntigravity(repoRoot, result)
+		case HarnessAgy:
+			err = installAgy(repoRoot, result)
 		default:
 			err = fmt.Errorf("unknown harness target %q", target)
 		}

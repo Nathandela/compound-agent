@@ -60,11 +60,8 @@ var gooseReviewQuality string
 //go:embed harness/codex/config.toml
 var codexConfig string
 
-//go:embed harness/gemini/GEMINI.md
-var geminiMemory string
-
-//go:embed harness/antigravity/AGENTS.md
-var antigravityMemory string
+//go:embed harness/agy/AGENTS.md
+var agyMemory string
 
 // Markers for idempotent section detection.
 const (
@@ -130,20 +127,16 @@ func CodexConfig() string {
 	return codexConfig
 }
 
-// GeminiMemory returns the GEMINI.md memory file.
-func GeminiMemory() string {
-	return geminiMemory
-}
-
-// AntigravityMemory returns the Antigravity AGENTS.md protocol section. It is
+// AgyMemory returns the Antigravity CLI (agy) AGENTS.md protocol section. It is
 // appended (not whole-file written) so it coexists with the shared lesson
 // section that codex/claude write to AGENTS.md.
-func AntigravityMemory() string {
-	return antigravityMemory
+func AgyMemory() string {
+	return agyMemory
 }
 
-// AntigravitySectionHeader marks the Antigravity protocol section for idempotent
-// append detection.
+// AntigravitySectionHeader marks the agy protocol section for idempotent append
+// detection. The header text is kept stable for install idempotency across
+// upgrades from the legacy antigravity groundwork target.
 const AntigravitySectionHeader = "## Compound Agent Protocol (Antigravity)"
 
 // AgentTemplates returns a map of filename -> content for agent .md files.

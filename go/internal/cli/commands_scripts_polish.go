@@ -36,7 +36,7 @@ func polishCmd() *cobra.Command {
 	cmd.Flags().StringVar(&o.model, "model", "claude-opus-4-7[1m]", "Claude model to use")
 	cmd.Flags().StringVar(&o.specFile, "spec-file", "", "Path to spec file for audit context (required)")
 	cmd.Flags().StringVar(&o.metaEpic, "meta-epic", "", "Parent meta-epic ID (required)")
-	cmd.Flags().StringVar(&o.reviewers, "reviewers", "claude-sonnet,claude-opus,gemini,codex", "Comma-separated reviewers")
+	cmd.Flags().StringVar(&o.reviewers, "reviewers", "claude-sonnet,claude-opus,agy,codex", "Comma-separated reviewers")
 	cmd.Flags().BoolVarP(&o.force, "force", "f", false, "Overwrite existing script")
 	cmd.Flags().IntVar(&o.compactPct, "compact-pct", 0, "Context auto-compaction threshold % (0=use Claude Code default, suggested: 50)")
 	cmd.Flags().StringVar(&o.backend, "backend", "bg", "Claude execution backend: bg (default) or p (legacy claude -p)")
@@ -458,7 +458,7 @@ detect_polish_reviewers() {
     local cli_name
     case "$reviewer" in
       (claude-sonnet|claude-opus) cli_name="claude" ;;
-      (gemini)                    cli_name="gemini" ;;
+      (agy)                       cli_name="agy" ;;
       (codex)                     cli_name="codex" ;;
       (*) log "WARN: unknown reviewer $reviewer"; continue ;;
     esac
@@ -673,7 +673,7 @@ AUDIT_PROMPT_EOF
 
 // polishScriptRunAudit returns the run_polish_audit function with PID tracking and timeouts.
 // Under bg backend: claude reviewers are dispatched as bg sessions (bg_dispatch_reviewer_polish),
-// collected via bg_poll_reviewer + bg_collect_reviewer. Gemini/codex remain sync PIDs.
+// collected via bg_poll_reviewer + bg_collect_reviewer. Agy/codex remain sync PIDs.
 // Mixed-fleet barrier waits both (R-FLEET).
 func polishScriptRunAudit() string { //nolint:funlen // bash template string
 	return `# --- Spawn Reviewers ---
@@ -727,9 +727,9 @@ run_polish_audit() {
           log "Spawned $reviewer (PID $!)"
         fi
         ;;
-      (gemini)
-        (portable_timeout "$REVIEW_TIMEOUT" gemini --yolo \
-          < "$prompt_file" \
+      (agy)
+        (portable_timeout "$REVIEW_TIMEOUT" agy \
+          -p "$(cat "$prompt_file")" --dangerously-skip-permissions --print-timeout 1h \
           > "$report" 2>"$cycle_dir/$reviewer.stderr" || true) &
         pids="$pids $!"
         log "Spawned $reviewer (PID $!)"
@@ -743,7 +743,7 @@ run_polish_audit() {
     esac
   done
 
-  # Mixed-fleet barrier: poll bg Claude handles + wait sync gemini/codex pids (R-FLEET).
+  # Mixed-fleet barrier: poll bg Claude handles + wait sync agy/codex pids (R-FLEET).
   if [ -n "$bg_handles" ]; then
     local elapsed=0
     while [ -n "$bg_handles" ] && [ "$elapsed" -lt "$REVIEW_TIMEOUT" ]; do

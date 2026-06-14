@@ -29,7 +29,7 @@ Do NOT autonomously decide to launch loops.
 ```bash
 ca loop --epics "id1,id2,id3" \
   --model "claude-opus-4-7[1m]" \
-  --reviewers "claude-sonnet,claude-opus,gemini,codex" \
+  --reviewers "claude-sonnet,claude-opus,agy,codex" \
   --review-every 1 \
   --max-review-cycles 3 \
   --max-retries 1 \
@@ -37,16 +37,16 @@ ca loop --epics "id1,id2,id3" \
 # Default backend is bg (claude --bg, subscription-billed). Use --backend p for legacy claude -p.
 # Default implementer is claude. Alternative engines (PID-based, in-tree, plain model names):
 #   ca loop --implementer codex --model gpt-5.5-codex     # codex exec; auth = ChatGPT login (codex login)
-#   ca loop --implementer gemini --model gemini-3.1-pro   # gemini -p --yolo; auth = GEMINI_API_KEY env var
-# codex/gemini take a PLAIN model name (no provider/ slash); only --implementer goose uses provider/model.
-# Antigravity (agy) is groundwork-only and not yet a functional loop engine; the gemini CLI sunsets 2026-06-18.
+#   ca loop --implementer agy --model gemini-3.1-pro      # agy -p --dangerously-skip-permissions --model; auth = OAuth (no API-key env)
+# codex/agy take a PLAIN model name (no provider/ slash); only --implementer goose uses provider/model.
+# agy is the Antigravity CLI, the engine that replaces the standalone gemini CLI (sunset 2026-06-18; its usage was removed).
 ```
 
 ### Polish Loop
 ```bash
 ca polish --spec-file "docs/specs/your-spec.md" \
   --meta-epic "meta-epic-id" \
-  --reviewers "claude-sonnet,claude-opus,gemini,codex" \
+  --reviewers "claude-sonnet,claude-opus,agy,codex" \
   --cycles 2 \
   --model "claude-opus-4-7[1m]" \
   --force
@@ -58,10 +58,10 @@ ca polish --spec-file "docs/specs/your-spec.md" \
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--epics` | (auto-discover) | Comma-separated epic IDs |
-| `--model` | `claude-opus-4-7[1m]` | Model for implementation sessions. Plain name for codex/gemini; `provider/model` for goose |
-| `--implementer` | `claude` | Implementer engine: `claude` \| `goose` \| `codex` \| `gemini`. codex/gemini are PID-based, in-tree, plain model names. `antigravity` is `ca setup --harness` groundwork only, not yet a loop engine; the gemini CLI sunsets 2026-06-18 (antigravity is its successor) |
+| `--model` | `claude-opus-4-7[1m]` | Model for implementation sessions. Plain name for codex/agy; `provider/model` for goose |
+| `--implementer` | `claude` | Implementer engine: `claude` \| `goose` \| `codex` \| `agy`. codex/agy are PID-based, in-tree, plain model names. `agy` is the Antigravity CLI that replaces the standalone gemini CLI (sunset 2026-06-18); the deprecated `gemini` and `antigravity` aliases still resolve to `agy` with a warning |
 | `--backend` | `bg` | Execution backend: `bg` (claude --bg, subscription-billed) or `p` (legacy claude -p) |
-| `--reviewers` | (none) | Comma-separated: `claude-sonnet,claude-opus,gemini,codex` |
+| `--reviewers` | (none) | Comma-separated: `claude-sonnet,claude-opus,agy,codex` |
 | `--review-every` | `0` (end-only) | Review after every N epics |
 | `--max-review-cycles` | `3` | Max review/fix iterations |
 | `--max-retries` | `1` | Retries per epic on failure |
@@ -79,7 +79,7 @@ ca polish --spec-file "docs/specs/your-spec.md" \
 | `--cycles` | `3` | Number of polish cycles |
 | `--model` | `claude-opus-4-7[1m]` | Model for polish architect sessions |
 | `--backend` | `bg` | Execution backend: `bg` (claude --bg, subscription-billed) or `p` (legacy claude -p) |
-| `--reviewers` | `claude-sonnet,claude-opus,gemini,codex` | Comma-separated audit fleet |
+| `--reviewers` | `claude-sonnet,claude-opus,agy,codex` | Comma-separated audit fleet |
 | `-o, --output` | `.compound-agent/polish-loop.sh` | Output script path |
 | `--force` | (off) | Overwrite existing script |
 
@@ -254,16 +254,16 @@ Present a structured report like this:
 | CLI | Non-interactive mode | Model flag |
 |-----|---------------------|------------|
 | `claude` | `-p "prompt"` | `--model <id>` |
-| `gemini` | `-p "prompt"` | `-m <model>` |
+| `agy` | `-p "prompt" --dangerously-skip-permissions --print-timeout 1h` | `--model <model>` |
 | `codex` | `codex exec "prompt"` | (default model) |
 
-Stdin piping works for all three: `cat file.md | claude -p "Review this"`.
+Stdin piping: `cat file.md | claude -p "Review this"`. For `agy`, pass the file as the prompt: `agy -p "$(cat file.md)" --dangerously-skip-permissions --model <model> --print-timeout 1h`.
 
 ### Other Gotchas
 - Run `ca loop` and `ca polish` from the directory containing `go.mod` (usually `go/`)
 - Use `--force` when regenerating scripts to overwrite existing ones
 - The polish loop is a separate script — chain via pipeline script, not `&&` in the terminal
-- Do not use `gemini --print`, `codex --print`, or `claude --print` — wrong flags
+- Do not use `agy --print`, `codex --print`, or `claude --print` -- wrong flags (agy uses `-p`)
 - Do not use `claude -m sonnet` — use `claude --model claude-sonnet-4-6`
 
 ## Windows Users

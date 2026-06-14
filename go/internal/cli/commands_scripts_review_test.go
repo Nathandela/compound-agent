@@ -66,7 +66,7 @@ func TestLoopCommand_WithReviewers(t *testing.T) {
 	outPath := filepath.Join(dir, "loop.sh")
 
 	_, err := executeCommand(root, "loop", "-o", outPath,
-		"--reviewers", "claude-sonnet,gemini",
+		"--reviewers", "claude-sonnet,agy",
 		"--max-review-cycles", "5",
 		"--review-every", "2",
 		"--review-blocking",
@@ -182,7 +182,7 @@ func TestLoopCommand_AllReviewersValid(t *testing.T) {
 	outPath := filepath.Join(dir, "loop.sh")
 
 	_, err := executeCommand(root, "loop", "-o", outPath,
-		"--reviewers", "claude-sonnet,claude-opus,gemini,codex",
+		"--reviewers", "claude-sonnet,claude-opus,agy,codex",
 	)
 	if err != nil {
 		t.Fatalf("loop with all reviewers failed: %v", err)
@@ -191,7 +191,7 @@ func TestLoopCommand_AllReviewersValid(t *testing.T) {
 	data, _ := os.ReadFile(outPath)
 	script := string(data)
 
-	if !strings.Contains(script, "claude-sonnet claude-opus gemini codex") {
+	if !strings.Contains(script, "claude-sonnet claude-opus agy codex") {
 		t.Error("expected all four reviewers in REVIEW_REVIEWERS")
 	}
 }
@@ -201,7 +201,7 @@ func TestLoopCommand_AllReviewersValid(t *testing.T) {
 func TestLoopScriptReviewConfig_SetsVariables(t *testing.T) {
 	t.Parallel()
 	config := loopScriptReviewConfig(loopReviewOptions{
-		reviewers:       []string{"claude-sonnet", "gemini"},
+		reviewers:       []string{"claude-sonnet", "agy"},
 		maxReviewCycles: 5,
 		reviewBlocking:  true,
 		reviewModel:     "claude-opus-4-7",
@@ -232,8 +232,8 @@ func TestLoopScriptReviewerDetection_ChecksCLIs(t *testing.T) {
 	if !strings.Contains(detection, "command -v claude") {
 		t.Error("expected claude CLI check")
 	}
-	if !strings.Contains(detection, "command -v gemini") {
-		t.Error("expected gemini CLI check")
+	if !strings.Contains(detection, "command -v agy") {
+		t.Error("expected agy CLI check")
 	}
 	if !strings.Contains(detection, "command -v codex") {
 		t.Error("expected codex CLI check")
@@ -286,8 +286,8 @@ func TestLoopScriptSpawnReviewers_SupportsAllModels(t *testing.T) {
 	if !strings.Contains(spawner, "--resume") {
 		t.Error("expected --resume for claude reviewers on cycle 2+")
 	}
-	if !strings.Contains(spawner, "--yolo") {
-		t.Error("expected --yolo for gemini reviewer")
+	if !strings.Contains(spawner, "--dangerously-skip-permissions") {
+		t.Error("expected --dangerously-skip-permissions for agy reviewer")
 	}
 	if !strings.Contains(spawner, "codex exec") {
 		t.Error("expected codex exec for codex reviewer")
@@ -341,7 +341,7 @@ func TestLoopScriptReviewLoop_FullCycleLogic(t *testing.T) {
 
 func TestValidateReviewers_AcceptsValid(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"claude-sonnet", "claude-opus", "gemini", "codex"} {
+	for _, name := range []string{"claude-sonnet", "claude-opus", "agy", "codex"} {
 		if err := validateReviewers([]string{name}); err != nil {
 			t.Errorf("expected %q to be valid, got: %v", name, err)
 		}
@@ -359,45 +359,55 @@ func TestValidateReviewers_RejectsInvalid(t *testing.T) {
 	}
 }
 
-// TestAntigravityReviewer_NotActive asserts antigravity is NOT a selectable loop
-// reviewer. agy -p drops stdout in non-TTY, so its report is always empty; the
-// review loop treats an empty report as a reviewer error, and a cycle where all
-// reviewers errored is "treated as approved" -> an antigravity-only run could
-// falsely report approval. The reviewer wiring is therefore removed: antigravity
-// is rejected by --reviewers and absent from the generated review bash. The
-// antigravity HARNESS setup target (installAntigravity / AGENTS.md template)
-// stays as groundwork and is covered by setup tests, not here.
-func TestAntigravityReviewer_NotActive(t *testing.T) {
+// TestAgyReviewer_Active asserts agy IS the functional CLI-direct loop reviewer
+// (replacing the removed gemini reviewer). The Antigravity CLI (agy) captures
+// stdout in non-TTY/pipe (confirmed), so its report is real and the false-approval
+// concern that kept the old groundwork target out no longer applies. The removed
+// names (gemini and the dead antigravity reviewer) must be rejected by --reviewers
+// and absent from the generated review bash. The agy HARNESS setup target
+// (installAgy / AGENTS.md template) is covered by setup tests, not here.
+func TestAgyReviewer_Active(t *testing.T) {
 	t.Parallel()
-	if validLoopReviewerSet()["antigravity"] {
-		t.Error("antigravity must NOT be a valid loop reviewer (false-approval risk)")
+	if !validLoopReviewerSet()["agy"] {
+		t.Error("agy must be a valid loop reviewer (functional, captures stdout)")
 	}
-	for _, n := range validLoopReviewerNames() {
-		if n == "antigravity" {
-			t.Error("antigravity must NOT appear in validLoopReviewerNames")
+	for _, removed := range []string{"gemini", "antigravity"} {
+		if validLoopReviewerSet()[removed] {
+			t.Errorf("%q must NOT be a valid loop reviewer (removed)", removed)
+		}
+		for _, n := range validLoopReviewerNames() {
+			if n == removed {
+				t.Errorf("%q must NOT appear in validLoopReviewerNames", removed)
+			}
+		}
+		if err := validateReviewers([]string{removed}); err == nil {
+			t.Errorf("expected --reviewers %q to be rejected", removed)
 		}
 	}
-	if err := validateReviewers([]string{"antigravity"}); err == nil {
-		t.Error("expected --reviewers antigravity to be rejected")
-	}
 	detection := loopScriptReviewerDetection()
-	if strings.Contains(detection, "agy") {
-		t.Error("antigravity detection case must be removed from reviewer detection")
+	if !strings.Contains(detection, "command -v agy") {
+		t.Error("agy detection case must be present in reviewer detection")
+	}
+	if strings.Contains(detection, "command -v gemini") {
+		t.Error("the removed gemini detection case must be gone from reviewer detection")
 	}
 	spawn := loopScriptSpawnReviewers()
-	if strings.Contains(spawn, "agy") {
-		t.Error("antigravity spawn case (agy -p) must be removed from spawn_reviewers")
+	if !strings.Contains(spawn, "(agy)") || !strings.Contains(spawn, "--dangerously-skip-permissions") {
+		t.Error("agy spawn case (agy --dangerously-skip-permissions) must be present in spawn_reviewers")
+	}
+	if strings.Contains(spawn, "gemini -p") || strings.Contains(spawn, "gemini --resume") {
+		t.Error("the removed gemini spawn case must be gone from spawn_reviewers")
 	}
 }
 
 // TestValidLoopReviewerSet_ExactMembers asserts the valid loop-reviewer set is
-// exactly {claude-sonnet, claude-opus, gemini, codex} — no more, no less.
+// exactly {claude-sonnet, claude-opus, agy, codex} -- no more, no less.
 func TestValidLoopReviewerSet_ExactMembers(t *testing.T) {
 	t.Parallel()
 	want := map[string]bool{
 		"claude-sonnet": true,
 		"claude-opus":   true,
-		"gemini":        true,
+		"agy":           true,
 		"codex":         true,
 	}
 	got := validLoopReviewerSet()
@@ -606,9 +616,9 @@ func TestLoopCommand_GeneratedScriptBashSyntax(t *testing.T) {
 	}{
 		{"basic", []string{"loop", "-o", filepath.Join(dir, "basic.sh")}},
 		{"with-reviewers", []string{"loop", "-o", filepath.Join(dir, "review.sh"),
-			"--reviewers", "claude-sonnet,gemini", "--review-every", "2"}},
+			"--reviewers", "claude-sonnet,agy", "--review-every", "2"}},
 		{"all-flags", []string{"loop", "-o", filepath.Join(dir, "all.sh"),
-			"--reviewers", "claude-sonnet,claude-opus,gemini,codex",
+			"--reviewers", "claude-sonnet,claude-opus,agy,codex",
 			"--review-every", "3", "--review-blocking"}},
 	}
 
@@ -631,7 +641,7 @@ func TestLoopCommand_GeneratedScriptBashSyntax(t *testing.T) {
 func TestLoopScriptReviewConfig_NonBlocking(t *testing.T) {
 	t.Parallel()
 	config := loopScriptReviewConfig(loopReviewOptions{
-		reviewers:       []string{"gemini"},
+		reviewers:       []string{"agy"},
 		maxReviewCycles: 3,
 		reviewBlocking:  false,
 		reviewModel:     "claude-opus-4-7",
@@ -1099,14 +1109,14 @@ func TestLoopScriptSpawnReviewers_BgCollectsOutput(t *testing.T) {
 }
 
 // TestLoopScriptSpawnReviewers_MixedFleetBarrier verifies that the barrier waits
-// both bg Claude handles (via polling) and gemini/codex PIDs (via wait $pid).
+// both bg Claude handles (via polling) and agy/codex PIDs (via wait $pid).
 func TestLoopScriptSpawnReviewers_MixedFleetBarrier(t *testing.T) {
 	t.Parallel()
 	spawner := loopScriptSpawnReviewers()
 
-	// Gemini/codex still use sync & + wait $pid
+	// Agy/codex still use sync & + wait $pid
 	if !strings.Contains(spawner, "for pid in $pids") {
-		t.Error("expected PID-based wait for gemini/codex in mixed-fleet barrier")
+		t.Error("expected PID-based wait for agy/codex in mixed-fleet barrier")
 	}
 	// Claude bg handles tracked separately and polled
 	if !strings.Contains(spawner, "bg_handles") {
@@ -1222,7 +1232,7 @@ func TestLoopCommand_ReviewerBashSyntaxWithBgSeam(t *testing.T) {
 	outPath := filepath.Join(dir, "loop-with-reviewers.sh")
 
 	_, err := executeCommand(root, "loop", "-o", outPath,
-		"--reviewers", "claude-sonnet,claude-opus,gemini,codex",
+		"--reviewers", "claude-sonnet,claude-opus,agy,codex",
 		"--review-every", "2")
 	if err != nil {
 		t.Fatalf("loop --reviewers failed: %v", err)

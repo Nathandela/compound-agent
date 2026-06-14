@@ -91,15 +91,15 @@ func setupCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&confirmPrune, "confirm-prune", false,
 		"Acknowledge that a lower profile will prune existing workflow templates from disk")
 	cmd.Flags().StringSliceVar(&harness, "harness", nil,
-		"Install only these harness targets (comma-separated and/or repeatable): claude, codex, gemini, goose, antigravity. "+
-			"The standalone gemini CLI tool sunsets 2026-06-18; antigravity is its successor (shipped as groundwork). "+
-			"Omit for the default Claude install.")
+		"Install only these harness targets (comma-separated and/or repeatable): claude, codex, agy, goose. "+
+			"agy is the Antigravity CLI that replaced the removed standalone gemini CLI; the legacy gemini and "+
+			"antigravity names are still accepted as deprecated aliases for agy. Omit for the default Claude install.")
 	return cmd
 }
 
 // runSetup performs the setup command logic.
 func runSetup(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool, profile string, confirmPrune bool, harness []string) error {
-	targets, err := setup.ParseHarnessTargets(harness)
+	targets, harnessWarnings, err := setup.ParseHarnessTargets(harness)
 	if err != nil {
 		return fmt.Errorf("setup: %w", err)
 	}
@@ -114,6 +114,9 @@ func runSetup(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool, prof
 	if err != nil {
 		return fmt.Errorf("setup: %w", err)
 	}
+	// Surface any deprecated-alias advisories (e.g. --harness gemini -> agy) ahead
+	// of the install warnings so the user sees them in both JSON and text output.
+	result.Warnings = append(harnessWarnings, result.Warnings...)
 
 	if jsonOut {
 		return printInitResultJSON(cmd, result)

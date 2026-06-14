@@ -1,14 +1,14 @@
 package cli
 
-// Reviewer-validation tests for the codex/gemini implementers (codex review P2).
+// Reviewer-validation tests for the codex/agy implementers (codex review P2).
 //
-// When --implementer is codex or gemini, the claude-sonnet/claude-opus reviewer
+// When --implementer is codex or agy, the claude-sonnet/claude-opus reviewer
 // branches in spawn_reviewers go through agent_invoke, which on those seams is
-// redefined to run codex/gemini (NOT claude). A claude reviewer would therefore
+// redefined to run codex/agy (NOT claude). A claude reviewer would therefore
 // run the wrong CLI with a claude-only model name, producing empty/error reports;
-// the review cycle could then "pass" without a real review. Only the gemini and
+// the review cycle could then "pass" without a real review. Only the agy and
 // codex reviewer branches invoke their own CLIs directly and are safe. So the
-// valid --reviewers for codex/gemini implementers is exactly {gemini, codex}.
+// valid --reviewers for codex/agy implementers is exactly {agy, codex}.
 
 import (
 	"path/filepath"
@@ -34,8 +34,8 @@ func loopRejectsReviewers(t *testing.T, impl, reviewers, badName string) {
 		t.Errorf("error for --implementer %s must name the offending reviewer %q, got: %v", impl, badName, err)
 	}
 	// The error must steer the user to the CLI-direct reviewers.
-	if !strings.Contains(err.Error(), "gemini") || !strings.Contains(err.Error(), "codex") {
-		t.Errorf("error should list the valid {gemini, codex} reviewers, got: %v", err)
+	if !strings.Contains(err.Error(), "agy") || !strings.Contains(err.Error(), "codex") {
+		t.Errorf("error should list the valid {agy, codex} reviewers, got: %v", err)
 	}
 }
 
@@ -52,7 +52,7 @@ func loopAcceptsReviewers(t *testing.T, impl, reviewers string) {
 	}
 }
 
-// --- RED: codex/gemini reject claude reviewers (agent_invoke runs the wrong CLI) ---
+// --- RED: codex/agy reject claude reviewers (agent_invoke runs the wrong CLI) ---
 
 func TestLoopCmd_CodexRejectsClaudeReviewers(t *testing.T) {
 	t.Parallel()
@@ -62,62 +62,62 @@ func TestLoopCmd_CodexRejectsClaudeReviewers(t *testing.T) {
 	loopRejectsReviewers(t, "codex", "codex,claude-sonnet", "claude-sonnet")
 }
 
-func TestLoopCmd_GeminiRejectsClaudeReviewers(t *testing.T) {
+func TestLoopCmd_AgyRejectsClaudeReviewers(t *testing.T) {
 	t.Parallel()
-	loopRejectsReviewers(t, "gemini", "claude-sonnet", "claude-sonnet")
-	loopRejectsReviewers(t, "gemini", "claude-opus", "claude-opus")
-	loopRejectsReviewers(t, "gemini", "gemini,claude-opus", "claude-opus")
+	loopRejectsReviewers(t, "agy", "claude-sonnet", "claude-sonnet")
+	loopRejectsReviewers(t, "agy", "claude-opus", "claude-opus")
+	loopRejectsReviewers(t, "agy", "agy,claude-opus", "claude-opus")
 }
 
-// --- GREEN: codex/gemini accept only the CLI-direct reviewers {gemini, codex} ---
+// --- GREEN: codex/agy accept only the CLI-direct reviewers {agy, codex} ---
 
 func TestLoopCmd_CodexAcceptsCliDirectReviewers(t *testing.T) {
 	t.Parallel()
 	loopAcceptsReviewers(t, "codex", "codex")
-	loopAcceptsReviewers(t, "codex", "gemini")
-	loopAcceptsReviewers(t, "codex", "codex,gemini")
+	loopAcceptsReviewers(t, "codex", "agy")
+	loopAcceptsReviewers(t, "codex", "codex,agy")
 }
 
-func TestLoopCmd_GeminiAcceptsCliDirectReviewers(t *testing.T) {
+func TestLoopCmd_AgyAcceptsCliDirectReviewers(t *testing.T) {
 	t.Parallel()
-	loopAcceptsReviewers(t, "gemini", "gemini")
-	loopAcceptsReviewers(t, "gemini", "codex")
-	loopAcceptsReviewers(t, "gemini", "gemini,codex")
+	loopAcceptsReviewers(t, "agy", "agy")
+	loopAcceptsReviewers(t, "agy", "codex")
+	loopAcceptsReviewers(t, "agy", "agy,codex")
 }
 
-// --- codex/gemini reject any other (non-CLI-direct) reviewer name ---
+// --- codex/agy reject any other (non-CLI-direct) reviewer name ---
 
-func TestLoopCmd_CodexGeminiRejectUnknownReviewer(t *testing.T) {
+func TestLoopCmd_CodexAgyRejectUnknownReviewer(t *testing.T) {
 	t.Parallel()
 	loopRejectsReviewers(t, "codex", "security", "security")
-	loopRejectsReviewers(t, "gemini", "bogus", "bogus")
+	loopRejectsReviewers(t, "agy", "bogus", "bogus")
 }
 
-// --- validateCodexGeminiReviewers unit behavior (mirrors validateGooseReviewers) ---
+// --- validateCodexAgyReviewers unit behavior (mirrors validateGooseReviewers) ---
 
-func TestValidateCodexGeminiReviewers(t *testing.T) {
+func TestValidateCodexAgyReviewers(t *testing.T) {
 	t.Parallel()
 	// Accepts the CLI-direct set.
-	for _, name := range []string{"codex", "gemini"} {
-		if err := validateCodexGeminiReviewers([]string{name}); err != nil {
-			t.Errorf("expected %q to be a valid codex/gemini reviewer, got: %v", name, err)
+	for _, name := range []string{"codex", "agy"} {
+		if err := validateCodexAgyReviewers([]string{name}); err != nil {
+			t.Errorf("expected %q to be a valid codex/agy reviewer, got: %v", name, err)
 		}
 	}
-	if err := validateCodexGeminiReviewers([]string{"codex", "gemini"}); err != nil {
-		t.Errorf("expected codex,gemini to be valid, got: %v", err)
+	if err := validateCodexAgyReviewers([]string{"codex", "agy"}); err != nil {
+		t.Errorf("expected codex,agy to be valid, got: %v", err)
 	}
 	// Rejects claude reviewers (agent_invoke runs the wrong CLI).
 	for _, name := range []string{"claude-sonnet", "claude-opus"} {
-		err := validateCodexGeminiReviewers([]string{name})
+		err := validateCodexAgyReviewers([]string{name})
 		if err == nil {
-			t.Errorf("expected %q to be rejected for codex/gemini implementers", name)
+			t.Errorf("expected %q to be rejected for codex/agy implementers", name)
 		}
 		if err != nil && !strings.Contains(err.Error(), name) {
 			t.Errorf("error must name the offending reviewer %q, got: %v", name, err)
 		}
 	}
 	// Rejects unknown names.
-	if err := validateCodexGeminiReviewers([]string{"nope"}); err == nil {
-		t.Error("expected unknown reviewer to be rejected for codex/gemini implementers")
+	if err := validateCodexAgyReviewers([]string{"nope"}); err == nil {
+		t.Error("expected unknown reviewer to be rejected for codex/agy implementers")
 	}
 }

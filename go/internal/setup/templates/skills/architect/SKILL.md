@@ -53,7 +53,7 @@ After steps 1-2, evaluate whether the domain is well-enough understood to decomp
 
 ### Advisory Fleet (Post-Spec)
 Before presenting the spec to the human, solicit external architectural perspectives. Read \`architect/references/advisory-fleet.md\` for the full protocol. In brief:
-1. **Detect** available advisor CLIs (\`claude\`, \`gemini\`, \`codex\`) with a health-check Bash call
+1. **Detect** available advisor CLIs (\`claude\`, \`agy\`, \`codex\`) with a health-check Bash call
 2. **Write** prompt files to \`/tmp/advisory/\` (one per lens, parallel Write calls)
 3. **Spawn** each advisor as a background Bash call (\`run_in_background: true\`, all in one message)
 4. **Collect** reports as each advisor finishes (Read tool), then **synthesize** into a structured brief

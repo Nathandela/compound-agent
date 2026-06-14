@@ -16,12 +16,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// --- Enum: --implementer now accepts codex and gemini (default still claude) ---
+// --- Enum: --implementer now accepts codex and agy (default still claude) ---
 
-func TestLoopCmd_ImplementerAcceptsCodexAndGemini(t *testing.T) {
+func TestLoopCmd_ImplementerAcceptsCodexAndAgy(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	for i, impl := range []string{"codex", "gemini"} {
+	for i, impl := range []string{"codex", "agy"} {
 		root := &cobra.Command{Use: "ca"}
 		root.AddCommand(loopCmd())
 		out := filepath.Join(dir, impl+".sh")
@@ -29,7 +29,7 @@ func TestLoopCmd_ImplementerAcceptsCodexAndGemini(t *testing.T) {
 		switch impl {
 		case "codex":
 			model = "gpt-5.5-codex"
-		case "gemini":
+		case "agy":
 			model = "gemini-3.1-pro"
 		}
 		_, err := executeCommand(root, "loop", "-o", out, "--implementer", impl, "--model", model)
@@ -55,21 +55,21 @@ func TestLoopCmd_InvalidImplementerStillRejected(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for invalid --implementer value 'foo'")
 	}
-	for _, valid := range []string{"claude", "goose", "codex", "gemini"} {
+	for _, valid := range []string{"claude", "goose", "codex", "agy"} {
 		if !strings.Contains(err.Error(), valid) {
 			t.Errorf("error message must list valid value %q, got: %v", valid, err)
 		}
 	}
 }
 
-// --- Gate bypass: codex/gemini accept a PLAIN model name (no provider/ slash) ---
+// --- Gate bypass: codex/agy accept a PLAIN model name (no provider/ slash) ---
 
-func TestLoopCmd_CodexGeminiAcceptPlainModel(t *testing.T) {
+func TestLoopCmd_CodexAgyAcceptPlainModel(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
 	cases := []struct{ impl, model string }{
 		{"codex", "gpt-5.5-codex"},
-		{"gemini", "gemini-3.1-pro"},
+		{"agy", "gemini-3.1-pro"},
 	}
 	for _, c := range cases {
 		root := &cobra.Command{Use: "ca"}
@@ -82,12 +82,12 @@ func TestLoopCmd_CodexGeminiAcceptPlainModel(t *testing.T) {
 	}
 }
 
-// --- Gate: --review-models stays goose-only (rejected for codex/gemini) ---
+// --- Gate: --review-models stays goose-only (rejected for codex/agy) ---
 
-func TestLoopCmd_CodexGeminiRejectReviewModels(t *testing.T) {
+func TestLoopCmd_CodexAgyRejectReviewModels(t *testing.T) {
 	t.Parallel()
 	dir := t.TempDir()
-	for _, impl := range []string{"codex", "gemini"} {
+	for _, impl := range []string{"codex", "agy"} {
 		var model string
 		if impl == "codex" {
 			model = "gpt-5.5-codex"
@@ -359,11 +359,11 @@ func TestLoopCmd_CodexMarkerFallsBackToBdState(t *testing.T) {
 
 func TestLoopCmd_CodexImplementerReviewUsesCliReviewers(t *testing.T) {
 	t.Parallel()
-	// codex/gemini are the only CLI-direct reviewers valid for the codex implementer:
+	// codex/agy are the only CLI-direct reviewers valid for the codex implementer:
 	// a claude reviewer would route through agent_invoke (which runs codex here), so
 	// it is rejected at flag-validation time (codex review P2).
 	script := generateLoopScriptViaCmd(t, "--implementer", "codex", "--model", "gpt-5.5-codex",
-		"--reviewers", "codex,gemini")
+		"--reviewers", "codex,agy")
 	// REVIEW_MODEL feeds the implementer fix-session (codex exec -m). Without an
 	// explicit --review-model it must default to the codex engine model, NOT a
 	// claude id that 'codex exec' would reject.
@@ -446,7 +446,7 @@ func TestLoopCmd_BashSyntax_Codex(t *testing.T) {
 	variants := [][]string{
 		{"--implementer", "codex", "--model", "gpt-5.5-codex"},
 		{"--implementer", "codex"}, // default model
-		{"--implementer", "codex", "--model", "gpt-5.5-codex", "--reviewers", "codex,gemini", "--review-every", "2"},
+		{"--implementer", "codex", "--model", "gpt-5.5-codex", "--reviewers", "codex,agy", "--review-every", "2"},
 	}
 	for i, flags := range variants {
 		root := &cobra.Command{Use: "ca"}
