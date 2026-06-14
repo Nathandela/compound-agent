@@ -29,6 +29,38 @@ type loopReviewOptions struct {
 	reviewBlocking  bool
 	reviewModel     string
 	reviewEvery     int
+	// reviewModels pins a goose fleet reviewer (security/correctness/quality) to
+	// its own provider/model ref, making the open-model fleet heterogeneous. An
+	// absent entry means the reviewer inherits the exported GOOSE_PROVIDER/MODEL.
+	reviewModels map[string]string
+}
+
+// parseGooseReviewModels parses a --review-models value of the form
+// "security=ollama/qwen2.5-coder:14b,quality=glm/glm-4-plus" into a
+// reviewer->provider/model map. Each reviewer must be a valid goose fleet
+// reviewer and each value must be a non-empty provider/model ref.
+func parseGooseReviewModels(raw string) (map[string]string, error) {
+	out := make(map[string]string)
+	for _, item := range strings.Split(raw, ",") {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		reviewer, ref, ok := strings.Cut(item, "=")
+		reviewer = strings.TrimSpace(reviewer)
+		ref = strings.TrimSpace(ref)
+		if !ok || reviewer == "" || ref == "" {
+			return nil, fmt.Errorf("invalid --review-models entry %q, expected reviewer=provider/model", item)
+		}
+		if _, valid := gooseReviewerRecipe[reviewer]; !valid {
+			return nil, fmt.Errorf("invalid goose reviewer %q in --review-models, valid: %s", reviewer, strings.Join(validGooseReviewerNames(), ", "))
+		}
+		if provider, model, slash := strings.Cut(ref, "/"); !slash || provider == "" || model == "" {
+			return nil, fmt.Errorf("--review-models %q requires a provider/model ref (e.g. ollama/qwen2.5-coder:14b), got %q", reviewer, ref)
+		}
+		out[reviewer] = ref
+	}
+	return out, nil
 }
 
 // validateReviewers checks that all reviewer names are valid.
@@ -37,6 +69,32 @@ func validateReviewers(reviewers []string) error {
 	for _, r := range reviewers {
 		if !valid[r] {
 			return fmt.Errorf("invalid reviewer %q, valid: %s", r, strings.Join(validLoopReviewerNames(), ", "))
+		}
+	}
+	return nil
+}
+
+// gooseReviewerRecipe maps a goose fleet reviewer specialty to its subrecipe
+// name (the .yaml installed under .goose/recipes/). The keys are also the valid
+// reviewer names for `--implementer goose --reviewers`.
+var gooseReviewerRecipe = map[string]string{
+	"security":    "review-security",
+	"correctness": "review-correctness",
+	"quality":     "review-quality",
+}
+
+// validGooseReviewerNames returns the valid goose fleet reviewer names in stable
+// order (matching the installed subrecipes).
+func validGooseReviewerNames() []string {
+	return []string{"security", "correctness", "quality"}
+}
+
+// validateGooseReviewers checks that all reviewer names map to an installed
+// open-model review-fleet subrecipe.
+func validateGooseReviewers(reviewers []string) error {
+	for _, r := range reviewers {
+		if _, ok := gooseReviewerRecipe[r]; !ok {
+			return fmt.Errorf("invalid goose reviewer %q, valid: %s", r, strings.Join(validGooseReviewerNames(), ", "))
 		}
 	}
 	return nil
@@ -753,6 +811,169 @@ IMPL_PROMPT_FOOTER
 // loopScriptReviewLoop returns the run_review_phase function (composed from sub-sections).
 func loopScriptReviewLoop() string {
 	return loopScriptReviewLoopInit() + loopScriptReviewLoopCycle()
+}
+
+// loopScriptGooseReviewerModel emits the goose_reviewer_model bash function: a
+// case statement echoing the pinned provider/model ref for each reviewer named
+// in reviewModels, or empty for any unpinned reviewer (inherit). Cases are
+// emitted in the stable fleet order so output is deterministic.
+func loopScriptGooseReviewerModel(reviewModels map[string]string) string {
+	var b strings.Builder
+	b.WriteString("# goose_reviewer_model <reviewer> -> pinned provider/model ref (echoed).\n")
+	b.WriteString("# Empty means inherit the loop's exported GOOSE_PROVIDER/GOOSE_MODEL.\n")
+	b.WriteString("goose_reviewer_model() {\n")
+	b.WriteString("  case \"$1\" in\n")
+	for _, reviewer := range validGooseReviewerNames() {
+		ref, ok := reviewModels[reviewer]
+		if !ok {
+			continue
+		}
+		fmt.Fprintf(&b, "    (%s) echo %s ;;\n", reviewer, util.ShellEscape(ref))
+	}
+	b.WriteString("    (*) echo \"\" ;;\n")
+	b.WriteString("  esac\n")
+	b.WriteString("}\n")
+	return b.String()
+}
+
+// loopScriptGooseReviewFleet returns the goose review-fleet bash functions:
+// detect_reviewers, init_review_sessions, spawn_reviewers, and feed_implementer.
+// They drive the open-model reviewer subrecipes (review-security /
+// review-correctness / review-quality) installed under .goose/recipes/, and
+// satisfy the same contract as the claude review helpers so the shared cycle
+// loop (loopScriptReviewLoopInit + loopScriptReviewLoopCycle) aggregates their
+// verdicts unchanged. The fleet is read-only: it only emits 'goose run --recipe'
+// and never claude/gemini/codex flags.
+//
+// reviewModels pins individual reviewers to their own provider/model ref so the
+// fleet is genuinely heterogeneous; spawn_reviewers exports a per-reviewer
+// GOOSE_PROVIDER/GOOSE_MODEL before each 'goose run'. An unpinned reviewer
+// inherits the loop's exported GOOSE_PROVIDER/GOOSE_MODEL.
+func loopScriptGooseReviewFleet(reviewModels map[string]string) string { //nolint:funlen // bash template string
+	return `
+# --- Goose review fleet (open-model subrecipes) ---
+GOOSE_RECIPE_DIR="${GOOSE_RECIPE_DIR:-.goose/recipes}"
+
+# goose_reviewer_recipe <reviewer> -> subrecipe path (echoed). Empty if unknown.
+goose_reviewer_recipe() {
+  case "$1" in
+    (security)    echo "$GOOSE_RECIPE_DIR/review-security.yaml" ;;
+    (correctness) echo "$GOOSE_RECIPE_DIR/review-correctness.yaml" ;;
+    (quality)     echo "$GOOSE_RECIPE_DIR/review-quality.yaml" ;;
+    (*)           echo "" ;;
+  esac
+}
+` + loopScriptGooseReviewerModel(reviewModels) + `
+
+# detect_reviewers - resolve configured specialties to installed subrecipes.
+# Sets AVAILABLE_REVIEWERS; returns 1 (skip review) if goose is missing or no
+# configured reviewer maps to an installed recipe.
+detect_reviewers() {
+  AVAILABLE_REVIEWERS=""
+  if ! command -v goose >/dev/null 2>&1; then
+    log "WARN: goose CLI not found, skipping review phase"
+    return 1
+  fi
+  for reviewer in $REVIEW_REVIEWERS; do
+    local recipe
+    recipe=$(goose_reviewer_recipe "$reviewer")
+    if [ -z "$recipe" ]; then
+      log "WARN: $reviewer is not a known goose fleet reviewer, skipping"
+    elif [ ! -f "$recipe" ]; then
+      log "WARN: subrecipe $recipe missing (run: ca setup --harness goose), skipping $reviewer"
+    else
+      AVAILABLE_REVIEWERS="$AVAILABLE_REVIEWERS $reviewer"
+    fi
+  done
+  AVAILABLE_REVIEWERS="${AVAILABLE_REVIEWERS# }"
+  log "Configured reviewers: $REVIEW_REVIEWERS"
+  if [ -z "$AVAILABLE_REVIEWERS" ]; then
+    log "WARN: No goose reviewer subrecipes available, skipping review phase"
+    return 1
+  fi
+  log "Available reviewers: $AVAILABLE_REVIEWERS"
+  return 0
+}
+
+# init_review_sessions - goose subrecipes are stateless (--no-session); just
+# ensure the cycle dir exists so the cycle loop's report paths are writable.
+init_review_sessions() {
+  mkdir -p "$1"
+}
+
+# spawn_reviewers <cycle> <cycle_dir> - run each reviewer subrecipe in parallel,
+# scoped to REVIEW_DIFF_RANGE, writing stdout to <cycle_dir>/<reviewer>.md. The
+# subrecipes are read-only reviews; the loop never commits on their behalf.
+spawn_reviewers() {
+  local cycle="$1" cycle_dir="$2"
+  local pids=""
+  for reviewer in $AVAILABLE_REVIEWERS; do
+    local report="$cycle_dir/$reviewer.md"
+    local recipe ref
+    recipe=$(goose_reviewer_recipe "$reviewer")
+    # Per-reviewer model pin (provider/model). Empty means inherit the loop's
+    # exported GOOSE_PROVIDER/GOOSE_MODEL, so the fleet is heterogeneous only
+    # where pinned and otherwise matches the prior single-model behavior.
+    ref=$(goose_reviewer_model "$reviewer")
+    (
+       if [ -n "$ref" ]; then
+         export GOOSE_PROVIDER="${ref%%/*}" GOOSE_MODEL="${ref#*/}"
+       fi
+       portable_timeout "$REVIEW_TIMEOUT" goose run --no-session \
+         --recipe "$recipe" \
+         --params epic="$EPIC_ID" diff_range="$REVIEW_DIFF_RANGE" \
+         > "$report" 2>&1 || true
+    ) &
+    pids="$pids $!"
+    log "Spawned $reviewer subrecipe $recipe (cycle $cycle) -> $report"
+  done
+  if [ -n "$pids" ]; then
+    for pid in $pids; do wait "$pid" 2>/dev/null || true; done
+  fi
+  log "All reviewers finished (cycle $cycle)"
+}
+
+# feed_implementer <cycle_dir> - assemble the reviewer findings into a fix prompt
+# and run the goose implementer to apply fixes. Goose does not auto-commit, so
+# the prompt asks it to commit explicitly. Outputs FIXES_APPLIED when done.
+feed_implementer() {
+  local cycle_dir="$1"
+  local implementer_report="$cycle_dir/implementer.md"
+  local prompt_file="$cycle_dir/implementer-prompt.md"
+  cat > "$prompt_file" <<'IMPL_PROMPT_HEADER'
+You received feedback from independent open-model reviewers. Analyze and
+implement all fixes for the changes under review.
+
+IMPL_PROMPT_HEADER
+
+  for reviewer in $AVAILABLE_REVIEWERS; do
+    local report="$cycle_dir/$reviewer.md"
+    if [ -s "$report" ]; then
+      printf '<%s-review>\n' "$reviewer" >> "$prompt_file"
+      cat "$report" >> "$prompt_file"
+      printf '</%s-review>\n\n' "$reviewer" >> "$prompt_file"
+    fi
+  done
+
+  cat >> "$prompt_file" <<'IMPL_PROMPT_FOOTER'
+
+Fix ALL P0 and P1 findings. Address P2 where reasonable. Run the tests to verify.
+Goose does not auto-commit, so commit your fixes explicitly:
+
+    git add -A && git commit -m "fix: address review findings"
+
+Output FIXES_APPLIED when done.
+IMPL_PROMPT_FOOTER
+
+  log "Running goose implementer session (prompt: $prompt_file)..."
+  local impl_start
+  impl_start=$(date +%s)
+  portable_timeout "$REVIEW_TIMEOUT" goose run --no-session -i "$prompt_file" \
+    > "$implementer_report" 2>&1 || true
+  local impl_duration=$(( $(date +%s) - impl_start ))
+  log "Implementer session complete (${impl_duration}s)"
+}
+`
 }
 
 func loopScriptReviewLoopInit() string {

@@ -76,10 +76,11 @@ func setupCmd() *cobra.Command {
 		repoRoot     string
 		profile      string
 		confirmPrune bool
+		harness      []string
 	)
 
 	cmd.RunE = func(cmd *cobra.Command, args []string) error {
-		return runSetup(cmd, resolveRoot(repoRoot), skipHooks, jsonOut, profile, confirmPrune)
+		return runSetup(cmd, resolveRoot(repoRoot), skipHooks, jsonOut, profile, confirmPrune, harness)
 	}
 
 	cmd.Flags().BoolVar(&skipHooks, "skip-hooks", false, "Skip installing hooks")
@@ -89,16 +90,24 @@ func setupCmd() *cobra.Command {
 		"Install profile: minimal (lesson capture only), workflow (+ cook-it), full (default, everything)")
 	cmd.Flags().BoolVar(&confirmPrune, "confirm-prune", false,
 		"Acknowledge that a lower profile will prune existing workflow templates from disk")
+	cmd.Flags().StringSliceVar(&harness, "harness", nil,
+		"Install only these harness targets (comma-separated and/or repeatable): claude, codex, gemini, goose. Omit for the default Claude install.")
 	return cmd
 }
 
 // runSetup performs the setup command logic.
-func runSetup(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool, profile string, confirmPrune bool) error {
+func runSetup(cmd *cobra.Command, repoRoot string, skipHooks, jsonOut bool, profile string, confirmPrune bool, harness []string) error {
+	targets, err := setup.ParseHarnessTargets(harness)
+	if err != nil {
+		return fmt.Errorf("setup: %w", err)
+	}
+
 	result, err := setup.InitRepo(repoRoot, setup.InitOptions{
 		SkipHooks:    skipHooks,
 		BinaryPath:   resolveBinaryPath(),
 		Profile:      setup.InitProfile(profile),
 		ConfirmPrune: confirmPrune,
+		Targets:      targets,
 	})
 	if err != nil {
 		return fmt.Errorf("setup: %w", err)
@@ -126,7 +135,7 @@ func resolveRoot(repoRoot string) string {
 
 // printInitResultJSON prints the InitResult as JSON (shared by init and setup).
 func printInitResultJSON(cmd *cobra.Command, result *setup.InitResult) error {
-	return writeJSON(cmd, map[string]any{
+	payload := map[string]any{
 		"success":             result.Success,
 		"hooksInstalled":      result.HooksInstalled,
 		"hooksUpgraded":       result.HooksUpgraded,
@@ -146,7 +155,21 @@ func printInitResultJSON(cmd *cobra.Command, result *setup.InitResult) error {
 		"researchInstalled":   result.ResearchInstalled,
 		"researchUpdated":     result.ResearchUpdated,
 		"templatesPruned":     result.TemplatesPruned,
-	})
+	}
+	// Only emit targets when harness targets were selected so the default
+	// init/setup JSON output stays unchanged.
+	if len(result.Targets) > 0 {
+		names := make([]string, len(result.Targets))
+		for i, t := range result.Targets {
+			names[i] = string(t)
+		}
+		payload["targets"] = names
+	}
+	// Only emit warnings when present so the default JSON shape is unchanged.
+	if len(result.Warnings) > 0 {
+		payload["warnings"] = result.Warnings
+	}
+	return writeJSON(cmd, payload)
 }
 
 // printInitResultText prints the text summary for the init command.
@@ -162,6 +185,7 @@ func printInitResultText(cmd *cobra.Command, result *setup.InitResult) {
 	cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
 	printTemplatesSummary(cmd, result)
 	printMdUpdates(cmd, result)
+	printWarnings(cmd, result)
 }
 
 // printSetupResultText prints the text summary for the setup command.
@@ -177,6 +201,14 @@ func printSetupResultText(cmd *cobra.Command, result *setup.InitResult) {
 	cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
 	printTemplatesSummary(cmd, result)
 	printMdUpdates(cmd, result)
+	printWarnings(cmd, result)
+}
+
+// printWarnings prints any non-fatal install advisories.
+func printWarnings(cmd *cobra.Command, result *setup.InitResult) {
+	for _, w := range result.Warnings {
+		cmd.Printf("  [warn] %s\n", w)
+	}
 }
 
 // printMdUpdates prints AGENTS.md and CLAUDE.md update status.

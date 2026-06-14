@@ -1,0 +1,69 @@
+# Compound Agent Integration
+
+This project uses compound-agent for session memory and structured epic execution
+via CLI commands. Goose reads this `.goosehints` file at session start.
+
+## CLI Commands (ALWAYS USE THESE)
+
+| Command | Purpose |
+|---------|---------|
+| `ca search "query"` | Search lessons before architectural decisions or complex planning |
+| `ca knowledge "query"` | Semantic search over project docs (keyword phrases, not questions) |
+| `ca learn "insight"` | Capture a lesson AFTER a correction or discovery |
+| `ca phase-check <init/start/gate> ...` | Track and gate the cook-it phases |
+| `ca verify-gates <epic>` | Verify the epic's required evidence before completion |
+| `ca list` | List all stored lessons |
+
+## Mandatory Recall
+
+Call `ca search` and `ca knowledge` BEFORE each phase, before every architectural
+decision, before re-implementing a known pattern, and after a user correction.
+Display the results before proceeding. Past mistakes repeat when search is skipped.
+
+## Capture Protocol
+
+Run `ca learn` AFTER a user corrects you, after a test fail -> fix -> pass cycle,
+or when you discover project-specific knowledge. Never edit
+`.claude/lessons/index.jsonl` directly.
+
+## Phase Gates
+
+Drive epics through the cook-it phases in order: plan -> work -> review -> compound.
+Do not skip a phase. At each transition:
+
+- Initialize once with `ca phase-check init <epic>`; start each phase with
+  `ca phase-check start <phase>`.
+- After plan, verify the epic description carries a `## Acceptance Criteria` table
+  and a `## Verification Contract` section. If either is missing, re-enter plan
+  before starting work. Then run `ca phase-check gate post-plan`.
+- After work, run `ca phase-check gate gate-3`; after review,
+  `ca phase-check gate gate-4`.
+- Before completion, run `ca verify-gates <epic>` plus the quality gates (test,
+  lint, build) and satisfy every required-evidence item in the Verification
+  Contract. Then run `ca phase-check gate final`.
+
+If a gate fails, DO NOT proceed. Fix the issue first.
+
+## Verification Contract
+
+The `## Verification Contract` written during plan is the epic-local source of
+truth for what "done" means: product profile, touched surfaces, principal risks,
+and required evidence. Do not invent "done" late in the cycle. If the contract is
+missing, go back to plan.
+
+## Epic Completion Protocol
+
+When driving an epic, you MUST print exactly one of these markers on its own line
+when the epic terminates:
+
+- `EPIC_COMPLETE` - the epic is implemented, tests pass, and work is committed.
+- `HUMAN_REQUIRED: <reason>` - a human decision is needed to proceed.
+- `EPIC_FAILED` - the epic could not be completed after retries.
+
+## Commit and Push Reminder
+
+Goose does NOT auto-commit. Before printing `EPIC_COMPLETE` you MUST run:
+
+    git add -A && git commit -m "<message>" && git push
+
+Run `bd close <epic>` for the epic in the main tree (not inside a worktree).

@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.9.0] - 2026-06-14
+
+This release adds an opt-in Goose harness so the infinity loop can run on
+open-weight models (local Ollama or API providers) alongside Claude. It is
+purely additive: the default `ca setup` (no `--harness`) and
+`ca loop --implementer claude` paths are byte-for-byte unchanged and guarded by
+regression tests.
+
+### Added
+
+- **`ca setup --harness {claude,codex,gemini,goose}`**: opt-in per-harness installer (comma-separated and/or repeatable). `--harness goose` installs only the Goose artifacts (global Open-Plugins hooks at `~/.agents/plugins/compound/hooks/hooks.json`, project `.goosehints`, and `.goose/recipes/`) without touching `.claude`. Omitting `--harness` installs the default Claude target unchanged. Codex (`config.toml`) and Gemini (`GEMINI.md`) install targets included.
+- **`ca loop --implementer goose`**: run the loop with Goose driving open-weight models. Provider and model are derived from `--model` (`ollama/<model>` for local, `<provider>/<model>` for API). A preflight verifies the goose CLI plus the provider API key (or local Ollama model presence) before the loop starts.
+- **Goose phase-gate (blocking PreToolUse hook)**: the compound phase-guard fires under real Goose. Verified live against Goose 1.37: Goose pipes a Claude-shaped `tool_name` payload and honors `exit 2` (deny reason read from stderr) to block out-of-phase edits on its `developer__text_editor` / `write` / `edit` tools. The matcher was corrected from the anchored Claude-only token set to match Goose's namespaced tool names.
+- **Compound primitives wired into the Goose loop**: the goose implementer prompt invokes `ca phase-check`, `ca search`, `ca knowledge`, `ca learn`, and `ca verify-gates`; `.goosehints` mirrors the mandatory-recall and phase-gate protocol; the `compound-cook-it.yaml` recipe ships the plan/work/review/compound workflow.
+- **Open-model review fleet (Goose subrecipes)**: `--reviewers security,correctness,quality` for the goose implementer dispatches self-contained `review-*.yaml` subrecipes (each declares the builtin developer extension and a response JSON-schema verdict). `--review-models security=ollama/qwen2.5-coder:14b,quality=glm/glm-4-plus` pins each reviewer to its own open model; unpinned reviewers inherit the loop model.
+
+### Fixed
+
+- Goose loop dispatch runs the goose child in its own process group (`set -m`) so the watchdog and `agent_stop` group-kill reach it instead of orphaning it (macOS lacks `setsid`).
+- Goose preflight API-key check uses bash indirect expansion (`${!key_var}`) instead of `eval`, closing a command-injection vector via a hostile `--model` provider half.
+- Marker detection on the goose path falls back to `bd` epic state when no completion-marker text is present.
+- `installGemini` writes a single root `GEMINI.md` (removed the redundant `.gemini/GEMINI.md` mirror).
+- `ca setup` surfaces a warning when no resolved binary path is available and the install falls back to `npx ca` (which requires npx on PATH).
+
+### Notes
+
+- The phase-gate is verified to block at the top level under real Goose; firing inside Goose subrecipes depends on the hook process working directory and is not yet empirically confirmed. A full end-to-end goose loop and review-fleet live run remains future verification. The recipe also enforces `ca phase-check` gates in-band as a fallback.
+
 ## [2.8.0] - 2026-05-17
 
 ### Upgrading (action required for the default path)

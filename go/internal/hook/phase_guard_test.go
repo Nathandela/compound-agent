@@ -37,9 +37,44 @@ func TestProcessPhaseGuard_NonEditTool(t *testing.T) {
 		StartedAt:    time.Now().Format(time.RFC3339),
 	})
 
-	result := ProcessPhaseGuard(dir, "Read", map[string]interface{}{})
-	if result.SpecificOutput != nil {
-		t.Error("Read tool should not trigger phase guard")
+	for _, tool := range []string{"Read", "Bash"} {
+		result := ProcessPhaseGuard(dir, tool, map[string]interface{}{})
+		if result.SpecificOutput != nil {
+			t.Errorf("%s tool should not trigger phase guard", tool)
+		}
+	}
+}
+
+// TestProcessPhaseGuard_GooseEditToolsGuarded verifies that Goose's native edit
+// tool names (str_replace, create_file, text_editor and friends) trigger the
+// phase gate under the same out-of-phase state that guards Edit/Write (FIX-1).
+// Claude never sends these names, so this only ADDS blocking for new tools.
+func TestProcessPhaseGuard_GooseEditToolsGuarded(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	writePhaseState(t, dir, PhaseState{
+		CookitActive: true,
+		EpicID:       "test",
+		CurrentPhase: "work",
+		PhaseIndex:   3,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	})
+
+	gooseTools := []string{
+		"str_replace", "create_file", "text_editor",
+		"developer__text_editor", "str_replace_editor",
+	}
+	for _, tool := range gooseTools {
+		result := ProcessPhaseGuard(dir, tool, map[string]interface{}{})
+		if result.SpecificOutput == nil {
+			t.Errorf("expected phase guard warning for goose edit tool %q", tool)
+			continue
+		}
+		if result.SpecificOutput.HookEventName != "PreToolUse" {
+			t.Errorf("tool %q: got event %q, want PreToolUse", tool, result.SpecificOutput.HookEventName)
+		}
 	}
 }
 

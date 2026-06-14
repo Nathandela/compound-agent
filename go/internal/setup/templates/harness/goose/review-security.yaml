@@ -1,0 +1,78 @@
+version: "1.0.0"
+title: review-security
+description: >
+  Security-focused reviewer subrecipe for the open-model Goose review fleet.
+  Pinned to its own provider/model so it can run on a different open model than
+  the implementer and the other reviewers.
+
+settings:
+  goose_provider: "{{REVIEW_PROVIDER}}"
+  goose_model: "{{REVIEW_MODEL}}"
+
+extensions:
+  - type: builtin
+    name: developer
+
+parameters:
+  - key: epic
+    input_type: string
+    requirement: optional
+    description: The epic id (bead) under review. Empty means the current diff.
+    default: ""
+  - key: diff_range
+    input_type: string
+    requirement: optional
+    description: A git diff range (e.g. BASE..HEAD) to scope the review.
+    default: "HEAD~1..HEAD"
+
+response:
+  json_schema:
+    type: object
+    required:
+      - verdict
+      - findings
+    properties:
+      verdict:
+        type: string
+        enum:
+          - REVIEW_APPROVED
+          - REVIEW_CHANGES_REQUESTED
+      findings:
+        type: array
+        items:
+          type: object
+          required:
+            - severity
+            - detail
+          properties:
+            severity:
+              type: string
+              enum:
+                - P0
+                - P1
+                - P2
+                - P3
+            detail:
+              type: string
+
+instructions: |
+  You are a calibrated security reviewer. Calibrate with past lessons before
+  reviewing. Classify every finding by severity P0-P3.
+
+prompt: |
+  Review the work for epic "{{ epic }}". Scope to the diff range
+  "{{ diff_range }}" (run `git diff {{ diff_range }}`).
+
+  Run `ca search "security review"` first, then review the diff for: injection,
+  secrets and credential handling, authentication and authorization, and unsafe
+  data exposure.
+
+  Read the epic's `## Acceptance Criteria` and `## Verification Contract`
+  (`bd show {{ epic }}`); missing required security evidence is a P1 finding.
+
+  Severity scale: P0 blocks merge, P1 critical, P2 important, P3 minor.
+
+  Emit the structured verdict object. Then print exactly one marker on its own
+  line so the fleet aggregator can detect it:
+  - `REVIEW_APPROVED` when no P0/P1 findings remain.
+  - `REVIEW_CHANGES_REQUESTED` followed by your findings otherwise.

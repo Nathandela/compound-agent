@@ -6,9 +6,66 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/nathandelacretaz/compound-agent/internal/storage"
 )
+
+// TestRunHook_PhaseGuard_GooseStrReplaceBlocked pipes a Goose str_replace tool
+// call through `ca hooks run phase-guard` and asserts the guarded payload is
+// emitted when an out-of-phase plan state is active (FIX-1, runner level).
+func TestRunHook_PhaseGuard_GooseStrReplaceBlocked(t *testing.T) {
+	dir := t.TempDir()
+	writePhaseState(t, dir, PhaseState{
+		CookitActive: true,
+		EpicID:       "test",
+		CurrentPhase: "work",
+		PhaseIndex:   3,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	})
+	t.Setenv("COMPOUND_AGENT_ROOT", dir)
+
+	var out bytes.Buffer
+	stdin := io.NopCloser(strings.NewReader(`{"tool_name":"str_replace","tool_input":{"path":"x.go"}}`))
+	if code := RunHook("phase-guard", stdin, &out); code != 0 {
+		t.Fatalf("phase-guard exit code = %d, want 0", code)
+	}
+	if !strings.Contains(out.String(), "PHASE GUARD") {
+		t.Errorf("expected PHASE GUARD payload for str_replace, got: %s", out.String())
+	}
+}
+
+// TestRunHook_PhaseGuard_RealGoosePreToolUseStdin pipes the exact PreToolUse
+// stdin a real Goose run sends (event, session_id, tool_name
+// developer__text_editor, tool_input, working_dir) through `ca hooks run
+// phase-guard` and asserts the guarded payload fires out-of-phase. This pins the
+// verified Goose stdin schema: the parser keys on tool_name/tool_input, which
+// Goose populates, so this passes immediately and guards against schema drift.
+func TestRunHook_PhaseGuard_RealGoosePreToolUseStdin(t *testing.T) {
+	dir := t.TempDir()
+	writePhaseState(t, dir, PhaseState{
+		CookitActive: true,
+		EpicID:       "test",
+		CurrentPhase: "work",
+		PhaseIndex:   3,
+		SkillsRead:   []string{},
+		GatesPassed:  []string{},
+		StartedAt:    time.Now().Format(time.RFC3339),
+	})
+	t.Setenv("COMPOUND_AGENT_ROOT", dir)
+
+	var out bytes.Buffer
+	payload := `{"event":"PreToolUse","session_id":"abc123","tool_name":"developer__text_editor","tool_input":{"command":"write","path":"x.go","file_text":"package x"},"working_dir":"` + dir + `"}`
+	stdin := io.NopCloser(strings.NewReader(payload))
+	if code := RunHook("phase-guard", stdin, &out); code != 0 {
+		t.Fatalf("phase-guard exit code = %d, want 0", code)
+	}
+	if !strings.Contains(out.String(), "PHASE GUARD") {
+		t.Errorf("expected PHASE GUARD payload for developer__text_editor, got: %s", out.String())
+	}
+}
 
 func TestRunHook_UnknownHook(t *testing.T) {
 	var out bytes.Buffer
