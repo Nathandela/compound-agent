@@ -123,11 +123,38 @@ func TestSetup_HarnessGoose_InstallsGooseOnly(t *testing.T) {
 	if _, err := os.Stat(hooksPath); err != nil {
 		t.Errorf("expected goose hooks.json at %s: %v", hooksPath, err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".goosehints")); err != nil {
+	hintsPath := filepath.Join(dir, ".goosehints")
+	if _, err := os.Stat(hintsPath); err != nil {
 		t.Errorf("expected .goosehints in repo: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(dir, ".goose", "recipes", "compound-cook-it.yaml")); err != nil {
+	recipePath := filepath.Join(dir, ".goose", "recipes", "compound-cook-it.yaml")
+	if _, err := os.Stat(recipePath); err != nil {
 		t.Errorf("expected compound-cook-it recipe: %v", err)
+	}
+	reviewPath := filepath.Join(dir, ".goose", "recipes", "compound-review.yaml")
+	if _, err := os.Stat(reviewPath); err != nil {
+		t.Errorf("expected compound-review subrecipe: %v", err)
+	}
+
+	// The installed (post-substitution) files must still reference the workflow
+	// primitives so the wiring cannot silently regress end-to-end.
+	hints, err := os.ReadFile(hintsPath)
+	if err != nil {
+		t.Fatalf("read installed .goosehints: %v", err)
+	}
+	for _, prim := range []string{"ca search", "ca phase-check", "EPIC_COMPLETE"} {
+		if !strings.Contains(string(hints), prim) {
+			t.Errorf("installed .goosehints missing primitive reference %q", prim)
+		}
+	}
+	recipe, err := os.ReadFile(recipePath)
+	if err != nil {
+		t.Fatalf("read installed compound-cook-it.yaml: %v", err)
+	}
+	for _, prim := range []string{"ca search", "ca phase-check", "EPIC_COMPLETE"} {
+		if !strings.Contains(string(recipe), prim) {
+			t.Errorf("installed compound-cook-it.yaml missing primitive reference %q", prim)
+		}
 	}
 
 	// .claude must NOT be installed when claude is not a target.
@@ -137,6 +164,74 @@ func TestSetup_HarnessGoose_InstallsGooseOnly(t *testing.T) {
 
 	if len(res.Targets) != 1 || res.Targets[0] != HarnessGoose {
 		t.Errorf("result Targets expected [goose], got %v", res.Targets)
+	}
+}
+
+func TestSetup_HarnessGoose_InstallsReviewFleetSubrecipes(t *testing.T) {
+	dir := newHarnessRepo(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessGoose}}); err != nil {
+		t.Fatalf("--harness goose InitRepo: %v", err)
+	}
+
+	recipeDir := filepath.Join(dir, ".goose", "recipes")
+	// Parent plus three reviewer subrecipes must be installed.
+	for _, name := range []string{
+		"compound-review.yaml",
+		"review-security.yaml",
+		"review-correctness.yaml",
+		"review-quality.yaml",
+	} {
+		p := filepath.Join(recipeDir, name)
+		data, err := os.ReadFile(p)
+		if err != nil {
+			t.Fatalf("expected installed recipe %s: %v", name, err)
+		}
+		// Install-time placeholders must be fully substituted.
+		for _, ph := range []string{"{{REVIEW_PROVIDER}}", "{{REVIEW_MODEL}}"} {
+			if strings.Contains(string(data), ph) {
+				t.Errorf("installed %s still has unsubstituted placeholder %s", name, ph)
+			}
+		}
+	}
+
+	// Subrecipes must retain their structured verdict and REVIEW markers post-install.
+	sec, err := os.ReadFile(filepath.Join(recipeDir, "review-security.yaml"))
+	if err != nil {
+		t.Fatalf("read installed review-security.yaml: %v", err)
+	}
+	for _, want := range []string{"json_schema", "REVIEW_APPROVED", "REVIEW_CHANGES_REQUESTED", "diff_range"} {
+		if !strings.Contains(string(sec), want) {
+			t.Errorf("installed review-security.yaml missing %q", want)
+		}
+	}
+}
+
+func TestSetup_HarnessGoose_ReviewFleetIdempotent(t *testing.T) {
+	dir := newHarnessRepo(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	opts := InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessGoose}}
+	if _, err := InitRepo(dir, opts); err != nil {
+		t.Fatalf("first goose InitRepo: %v", err)
+	}
+	secPath := filepath.Join(dir, ".goose", "recipes", "review-security.yaml")
+	first, err := os.ReadFile(secPath)
+	if err != nil {
+		t.Fatalf("read review-security.yaml: %v", err)
+	}
+	if _, err := InitRepo(dir, opts); err != nil {
+		t.Fatalf("second goose InitRepo: %v", err)
+	}
+	second, err := os.ReadFile(secPath)
+	if err != nil {
+		t.Fatalf("read review-security.yaml (2nd): %v", err)
+	}
+	if string(first) != string(second) {
+		t.Error("goose review-fleet install is not idempotent: review-security.yaml changed on second run")
 	}
 }
 
@@ -165,9 +260,11 @@ func TestSetup_HarnessGooseHooksJson_BlockingPhaseGate(t *testing.T) {
 	if !strings.Contains(content, "exit 2") && !strings.Contains(content, `"decision":"block"`) {
 		t.Error("goose PreToolUse must block via exit 2 or decision:block")
 	}
-	// FIX-4: anchored matcher including text_editor.
-	if !strings.Contains(content, `"matcher": "^(Edit|Write|str_replace|create_file|text_editor)$"`) {
-		t.Error("goose PreToolUse matcher must be anchored ^(Edit|Write|str_replace|create_file|text_editor)$")
+	// R5: the matcher must target Goose's namespaced edit tool
+	// developer__text_editor (the old Claude-only matcher would never fire under
+	// real Goose), staying an unanchored alternation for custom-MCP edit tools.
+	if !strings.Contains(content, `"matcher": "developer__text_editor|Edit|Write|str_replace|create_file|text_editor"`) {
+		t.Error("goose PreToolUse matcher must target developer__text_editor (namespaced) plus Claude-style alternates")
 	}
 	// FIX-2: the reason must be JSON-escaped before being printf'd into the payload.
 	// Decode the JSON so we assert against the shell that actually runs (the
@@ -190,6 +287,46 @@ func TestSetup_HarnessGooseHooksJson_BlockingPhaseGate(t *testing.T) {
 	cmd := manifest.Hooks.PreToolUse[0].Hooks[0].Command
 	if !strings.Contains(cmd, `s/\\/\\\\/g`) || !strings.Contains(cmd, `s/"/\\"/g`) {
 		t.Errorf("goose PreToolUse must JSON-escape the reason before printf, got: %s", cmd)
+	}
+}
+
+func TestSetup_HarnessGoose_WarnsNpxOnPathWhenNoBinary(t *testing.T) {
+	// Empty BinaryPath => goose hooks fall back to literal `npx ca`, which
+	// requires `ca` to be resolvable on PATH at hook time. That must surface a
+	// warning so the user is not silently left with a broken hook command.
+	dir := newHarnessRepo(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	res, err := InitRepo(dir, InitOptions{
+		SkipHooks: true,
+		Targets:   []HarnessTarget{HarnessGoose},
+	})
+	if err != nil {
+		t.Fatalf("--harness goose InitRepo (no binary): %v", err)
+	}
+	if len(res.Warnings) == 0 {
+		t.Fatal("expected a warning when goose installs with an empty BinaryPath")
+	}
+	joined := strings.Join(res.Warnings, "\n")
+	if !strings.Contains(joined, "npx") || !strings.Contains(joined, "PATH") {
+		t.Errorf("warning should mention the npx/PATH fallback, got: %v", res.Warnings)
+	}
+
+	// A resolved binary path must NOT warn.
+	dir2 := newHarnessRepo(t)
+	home2 := t.TempDir()
+	t.Setenv("HOME", home2)
+	res2, err := InitRepo(dir2, InitOptions{
+		SkipHooks:  true,
+		BinaryPath: "/usr/local/bin/ca",
+		Targets:    []HarnessTarget{HarnessGoose},
+	})
+	if err != nil {
+		t.Fatalf("--harness goose InitRepo (with binary): %v", err)
+	}
+	if len(res2.Warnings) != 0 {
+		t.Errorf("resolved BinaryPath must not warn, got: %v", res2.Warnings)
 	}
 }
 
@@ -225,6 +362,23 @@ func TestSetup_HarnessGemini_InstallsGeminiOnly(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(dir, ".claude", "agents", "compound")); err == nil {
 		t.Error(".claude templates should not be installed for gemini-only target")
+	}
+}
+
+func TestSetup_HarnessGemini_WritesSingleFile(t *testing.T) {
+	// FIX-4: Gemini reads GEMINI.md from the repo root, so the redundant
+	// .gemini/GEMINI.md mirror is dropped. Only the single GEMINI.md is written.
+	dir := newHarnessRepo(t)
+
+	if _, err := InitRepo(dir, InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessGemini}}); err != nil {
+		t.Fatalf("--harness gemini InitRepo: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(dir, "GEMINI.md")); err != nil {
+		t.Errorf("expected GEMINI.md at repo root: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".gemini", "GEMINI.md")); err == nil {
+		t.Error("redundant .gemini/GEMINI.md mirror must not be written")
 	}
 }
 

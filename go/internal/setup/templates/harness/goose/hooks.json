@@ -22,7 +22,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "^(Edit|Write|str_replace|create_file|text_editor)$",
+        "matcher": "developer__text_editor|Edit|Write|str_replace|create_file|text_editor",
         "hooks": [
           {
             "type": "command",
@@ -33,7 +33,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "Bash|Edit|Write|str_replace|create_file|shell",
+        "matcher": "Bash|Edit|Write|str_replace|create_file|shell|developer__text_editor|developer__shell",
         "hooks": [
           {
             "type": "command",

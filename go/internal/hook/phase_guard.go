@@ -10,6 +10,8 @@ type PhaseGuardResult struct {
 // phaseGuardedEditTools is the set of file-mutating tool names the phase gate
 // guards. Claude uses Edit/Write; the remaining names are Goose's native edit
 // tools, so guarding them only ADDS blocking for tools Claude never sends.
+// The Goose hooks.json PreToolUse matcher is unanchored, so the hook fires on
+// the developer__text_editor name Goose actually sends and reaches this gate.
 var phaseGuardedEditTools = map[string]bool{
 	"Edit":                   true,
 	"Write":                  true,

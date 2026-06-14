@@ -4,6 +4,10 @@ description: >
   Drive a single epic through the compound-agent workflow: plan, work, review,
   compound. Adapts the cook-it skill for Goose with open-model implementers.
 
+extensions:
+  - type: builtin
+    name: developer
+
 parameters:
   - key: epic
     input_type: string
@@ -13,18 +17,36 @@ parameters:
 
 instructions: |
   You are executing one epic through the four compound-agent phases. Do not skip
-  a phase. Call `ca search` and `ca knowledge` before deciding anything non-trivial.
+  a phase. Before each phase and before any non-trivial decision, call
+  `ca search` and `ca knowledge` for prior art and display the results. Gate every
+  phase transition with `ca phase-check`.
 
 prompt: |
-  Run the epic "{{ epic }}" through these phases in order:
+  Run the epic "{{ epic }}" through these phases in order. Initialize phase state
+  once with `ca phase-check init {{ epic }}`, then for each phase run
+  `ca phase-check start <phase>`, run `ca search "<goal>"` and
+  `ca knowledge "<goal>"` for prior art before doing the work, and gate the
+  transition before moving on.
 
-  1. plan: Read the spec and the plan. Call `ca search` and `ca knowledge` for
-     prior art. List the concrete changes and the verification contract.
-  2. work: Write the failing test(s) first, then the minimal code to pass them.
-     Keep changes lean and matching surrounding style.
-  3. review: Run the quality gates (tests, lint, build). Fix any failures. Do not
-     proceed until green.
-  4. compound: Run `ca learn` to capture any lesson worth keeping.
+  1. plan: Read the spec and the plan. Run `ca search` and `ca knowledge` for
+     prior art. Write the concrete changes, the `## Acceptance Criteria` table,
+     and the `## Verification Contract` (product profile, touched surfaces,
+     principal risks, required evidence) into the epic description.
+     GATE: verify the epic description has both a `## Acceptance Criteria` table
+     and a `## Verification Contract` section. If either is missing, redo plan.
+     Then run `ca phase-check gate post-plan`.
+  2. work: Run `ca search` and `ca knowledge` for prior art. Write the failing
+     test(s) first, then the minimal code to pass them. Keep changes lean and
+     matching surrounding style. GATE: `ca phase-check gate gate-3`.
+  3. review: Run `ca search` for known recurring issues. Run the quality gates
+     (test, lint, build) and fix any failures. Check every `## Acceptance
+     Criteria` row and every `## Verification Contract` required-evidence item;
+     missing evidence is a blocking finding. Do not proceed until green.
+     GATE: `ca phase-check gate gate-4`.
+  4. compound: Run `ca learn` to capture any lesson worth keeping (corrections,
+     test fail -> fix -> pass, project-specific discoveries).
+     FINAL GATE: run `ca verify-gates {{ epic }}` (must pass) and the quality
+     gates, then `ca phase-check gate final`.
 
   Goose does not auto-commit. When the epic is done you MUST:
 

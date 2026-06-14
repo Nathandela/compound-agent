@@ -45,6 +45,18 @@ var gooseHints string
 //go:embed harness/goose/compound-cook-it.yaml
 var gooseRecipe string
 
+//go:embed harness/goose/compound-review.yaml
+var gooseReviewRecipe string
+
+//go:embed harness/goose/review-security.yaml
+var gooseReviewSecurity string
+
+//go:embed harness/goose/review-correctness.yaml
+var gooseReviewCorrectness string
+
+//go:embed harness/goose/review-quality.yaml
+var gooseReviewQuality string
+
 //go:embed harness/codex/config.toml
 var codexConfig string
 
@@ -88,6 +100,24 @@ func GooseHints() string {
 // GooseRecipe returns the compound-cook-it Goose recipe YAML.
 func GooseRecipe() string {
 	return gooseRecipe
+}
+
+// GooseReviewRecipe returns the parent compound-review Goose recipe YAML, a
+// heterogeneous review-fleet that fans out to the reviewer subrecipes.
+func GooseReviewRecipe() string {
+	return gooseReviewRecipe
+}
+
+// GooseReviewSubrecipes returns a map of recipe-filename -> content for the
+// open-model review fleet's reviewer subrecipes (security, correctness,
+// quality). Each carries its own settings model pin and a response.json_schema
+// verdict so weak models still emit a structured, detectable result.
+func GooseReviewSubrecipes() map[string]string {
+	return map[string]string{
+		"review-security.yaml":    gooseReviewSecurity,
+		"review-correctness.yaml": gooseReviewCorrectness,
+		"review-quality.yaml":     gooseReviewQuality,
+	}
 }
 
 // CodexConfig returns the Codex config.toml with the {{VERSION}} placeholder.

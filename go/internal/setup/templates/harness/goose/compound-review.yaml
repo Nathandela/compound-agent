@@ -1,0 +1,67 @@
+version: "1.0.0"
+title: compound-review
+description: >
+  Parent review recipe for compound-agent's open-model Goose review fleet. Fans
+  out to security, correctness (test-coverage + architecture), and quality
+  (simplicity) reviewer subrecipes, each pinnable to its own open model, then
+  aggregates their verdicts. A heterogeneous review fleet that can run on
+  different open models than the implementer.
+
+settings:
+  goose_provider: ""
+  goose_model: ""
+
+extensions:
+  - type: builtin
+    name: developer
+
+parameters:
+  - key: epic
+    input_type: string
+    requirement: optional
+    description: The epic id (bead) under review. Empty means the current diff.
+    default: ""
+  - key: diff_range
+    input_type: string
+    requirement: optional
+    description: A git diff range (e.g. BASE..HEAD) to scope every reviewer.
+    default: "HEAD~1..HEAD"
+
+sub_recipes:
+  - name: security
+    path: review-security.yaml
+    values:
+      epic: "{{ epic }}"
+      diff_range: "{{ diff_range }}"
+  - name: correctness
+    path: review-correctness.yaml
+    values:
+      epic: "{{ epic }}"
+      diff_range: "{{ diff_range }}"
+  - name: quality
+    path: review-quality.yaml
+    values:
+      epic: "{{ epic }}"
+      diff_range: "{{ diff_range }}"
+
+instructions: |
+  You orchestrate a review fleet. Run each reviewer subrecipe and aggregate the
+  verdicts. The fleet covers security, test-coverage, simplicity, and
+  architecture across its subrecipes. Each reviewer calibrates itself with
+  `ca search` before reviewing.
+
+prompt: |
+  Review the work for epic "{{ epic }}" over the diff range "{{ diff_range }}".
+
+  Run all three reviewer subrecipes (security, correctness, quality). Each
+  reviewer first runs its own `ca search "<category> review"` calibration query,
+  reviews the scoped diff, and returns a structured verdict.
+
+  Aggregate the verdicts:
+  - If every reviewer returned `REVIEW_APPROVED`, print `REVIEW_APPROVED` on its
+    own line.
+  - Otherwise print `REVIEW_CHANGES_REQUESTED` on its own line, followed by the
+    combined findings grouped by reviewer and tagged with severity (P0-P3).
+
+  Fix all P0 and P1 findings, or escalate with `HUMAN_REQUIRED: <reason>` when a
+  human decision is needed.

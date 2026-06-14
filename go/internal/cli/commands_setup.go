@@ -165,6 +165,10 @@ func printInitResultJSON(cmd *cobra.Command, result *setup.InitResult) error {
 		}
 		payload["targets"] = names
 	}
+	// Only emit warnings when present so the default JSON shape is unchanged.
+	if len(result.Warnings) > 0 {
+		payload["warnings"] = result.Warnings
+	}
 	return writeJSON(cmd, payload)
 }
 
@@ -181,6 +185,7 @@ func printInitResultText(cmd *cobra.Command, result *setup.InitResult) {
 	cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
 	printTemplatesSummary(cmd, result)
 	printMdUpdates(cmd, result)
+	printWarnings(cmd, result)
 }
 
 // printSetupResultText prints the text summary for the setup command.
@@ -196,6 +201,14 @@ func printSetupResultText(cmd *cobra.Command, result *setup.InitResult) {
 	cmd.Printf("  Directories: %d created\n", len(result.DirsCreated))
 	printTemplatesSummary(cmd, result)
 	printMdUpdates(cmd, result)
+	printWarnings(cmd, result)
+}
+
+// printWarnings prints any non-fatal install advisories.
+func printWarnings(cmd *cobra.Command, result *setup.InitResult) {
+	for _, w := range result.Warnings {
+		cmd.Printf("  [warn] %s\n", w)
+	}
 }
 
 // printMdUpdates prints AGENTS.md and CLAUDE.md update status.

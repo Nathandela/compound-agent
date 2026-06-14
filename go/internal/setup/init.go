@@ -65,6 +65,10 @@ type InitResult struct {
 
 	// Targets reports which harness install targets were installed.
 	Targets []HarnessTarget
+
+	// Warnings collects non-fatal advisories raised during install (e.g. a
+	// harness was wired with an unresolved binary and falls back to npx).
+	Warnings []string
 }
 
 // initDirectories creates the .claude/ directory structure and index.jsonl.

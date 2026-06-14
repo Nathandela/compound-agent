@@ -88,6 +88,9 @@ func installGoose(repoRoot, binaryPath string, result *InitResult) error {
 	bin := binaryPath
 	if bin == "" {
 		bin = "npx ca"
+		result.Warnings = append(result.Warnings,
+			"goose hooks wired to 'npx ca' because no ca binary path was resolved; "+
+				"the hooks require 'ca' to be on PATH at hook time. Re-run after installing the ca binary to pin the absolute path.")
 	} else {
 		bin = util.ShellEscape(bin)
 	}
@@ -104,7 +107,31 @@ func installGoose(repoRoot, binaryPath string, result *InitResult) error {
 	if err := os.MkdirAll(recipeDir, 0755); err != nil {
 		return fmt.Errorf("mkdir goose recipes dir: %w", err)
 	}
-	return reconcileHarnessFile(filepath.Join(recipeDir, "compound-cook-it.yaml"), templates.GooseRecipe(), result)
+	if err := reconcileHarnessFile(filepath.Join(recipeDir, "compound-cook-it.yaml"), templates.GooseRecipe(), result); err != nil {
+		return err
+	}
+	if err := reconcileHarnessFile(filepath.Join(recipeDir, "compound-review.yaml"), templates.GooseReviewRecipe(), result); err != nil {
+		return err
+	}
+	// Reviewer subrecipes for the open-model review fleet. The per-recipe model
+	// pin placeholders default to empty at install (inherit from the parent
+	// recipe / env); the loop substitutes a concrete review model when wiring
+	// `--reviewers` for `--implementer goose`.
+	for name, body := range templates.GooseReviewSubrecipes() {
+		sub := substituteReviewModel(body, "", "")
+		if err := reconcileHarnessFile(filepath.Join(recipeDir, name), sub, result); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// substituteReviewModel replaces the reviewer subrecipe model-pin placeholders
+// with the given provider and model. Empty values mean "inherit" (the recipe
+// settings default to empty, like the parent's goose_provider/goose_model).
+func substituteReviewModel(body, provider, model string) string {
+	body = strings.ReplaceAll(body, "{{REVIEW_PROVIDER}}", provider)
+	return strings.ReplaceAll(body, "{{REVIEW_MODEL}}", model)
 }
 
 // installCodex installs the Codex target: AGENTS.md (shared lesson-capture
@@ -122,18 +149,11 @@ func installCodex(repoRoot string, result *InitResult) error {
 	return reconcileHarnessFile(filepath.Join(codexDir, "config.toml"), cfg, result)
 }
 
-// installGemini installs the Gemini target: GEMINI.md memory file plus a
-// .gemini mirror so Gemini is a real install target. Idempotent.
+// installGemini installs the Gemini target: a single GEMINI.md memory file at
+// the repo root, which Gemini reads directly (like installCodex's AGENTS.md).
+// Idempotent.
 func installGemini(repoRoot string, result *InitResult) error {
-	mem := templates.GeminiMemory()
-	if err := reconcileHarnessFile(filepath.Join(repoRoot, "GEMINI.md"), mem, result); err != nil {
-		return err
-	}
-	geminiDir := filepath.Join(repoRoot, ".gemini")
-	if err := os.MkdirAll(geminiDir, 0755); err != nil {
-		return fmt.Errorf("mkdir .gemini: %w", err)
-	}
-	return reconcileHarnessFile(filepath.Join(geminiDir, "GEMINI.md"), mem, result)
+	return reconcileHarnessFile(filepath.Join(repoRoot, "GEMINI.md"), templates.GeminiMemory(), result)
 }
 
 // reconcileHarnessFile writes content to path (creating or updating) and records
