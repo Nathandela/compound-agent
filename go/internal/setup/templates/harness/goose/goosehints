@@ -33,9 +33,11 @@ Do not skip a phase. At each transition:
 
 - Initialize once with `ca phase-check init <epic>`; start each phase with
   `ca phase-check start <phase>`.
-- After plan, verify the epic description carries a `## Acceptance Criteria` table
-  and a `## Verification Contract` section. If either is missing, re-enter plan
-  before starting work. Then run `ca phase-check gate post-plan`.
+- After plan, verify the spec file (resolve it from the epic's `Spec:` pointer via
+  `bd show <epic>`; legacy fallback to the epic description) carries a
+  `## Acceptance Criteria` table and a `## Verification Contract` section. If either
+  is missing, re-enter plan before starting work. Then run
+  `ca phase-check gate post-plan`.
 - After work, run `ca phase-check gate gate-3`; after review,
   `ca phase-check gate gate-4`.
 - Before completion, run `ca verify-gates <epic>` plus the quality gates (test,
@@ -46,10 +48,11 @@ If a gate fails, DO NOT proceed. Fix the issue first.
 
 ## Verification Contract
 
-The `## Verification Contract` written during plan is the epic-local source of
-truth for what "done" means: product profile, touched surfaces, principal risks,
-and required evidence. Do not invent "done" late in the cycle. If the contract is
-missing, go back to plan.
+The `## Verification Contract` written during plan is the source of truth for what
+"done" means: product profile, touched surfaces, principal risks, and required
+evidence. It now lives in the spec file (docs/specs/<epic-id>-<slug>.md), resolved
+from the epic's `Spec:` pointer (legacy fallback to the epic description). Do not
+invent "done" late in the cycle. If the contract is missing, go back to plan.
 
 ## Epic Completion Protocol
 

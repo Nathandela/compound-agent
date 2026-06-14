@@ -12,9 +12,9 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 ## Methodology
 1. Pick tasks from `bd ready` or `$ARGUMENTS`
 2. Mark tasks in progress: `bd update <id> --status=in_progress`
-3. Read the epic description (`bd show <epic>`) for spec context -- EARS requirements guide what "done" looks like
-4. **Read Acceptance Criteria**: Locate the `## Acceptance Criteria` table in the parent epic description. Each AC row defines a testable criterion that the implementation must satisfy. If no AC section exists, flag as a process gap and proceed using EARS requirements directly.
-5. **Read Verification Contract**: Locate the `## Verification Contract` section in the parent epic description.
+3. Resolve the spec file: read the Spec: pointer in the epic stub (bd show <epic>) or the Spec: bead note, and open that docs/specs/ file as the source of truth. If no spec-file pointer exists (legacy epic), fall back to reading the spec from the epic description. EARS requirements in the spec guide what "done" looks like.
+4. **Read Acceptance Criteria**: Locate the `## Acceptance Criteria` table in the resolved spec file (legacy fallback: the parent epic description). Each AC row defines a testable criterion that the implementation must satisfy. If no AC section exists, flag as a process gap and proceed using EARS requirements directly.
+5. **Read Verification Contract**: Locate the `## Verification Contract` section in the resolved spec file (legacy fallback: the parent epic description).
    - Treat `Required evidence` as the epic's definition of done.
    - Use `Profile`, `Surfaces`, and `Risks` to decide what evidence must be produced during implementation, not just at review time.
    - If the contract is **missing**: flag it as a process gap and fall back to the acceptance criteria, EARS requirements, and legacy `test` + `lint` gates.
@@ -39,7 +39,7 @@ Execute implementation through an AgentTeam using adaptive TDD. The lead coordin
 
 ## MANDATORY VERIFICATION -- DO NOT CLOSE TASK WITHOUT THIS
 Before `bd close`, you MUST:
-1. Read the parent epic's `Required evidence` list and satisfy every listed item. The minimum legacy floor is `test` and `lint`.
+1. Read the Verification Contract's `Required evidence` list from the resolved spec file (legacy fallback: the parent epic description) and satisfy every listed item. The minimum legacy floor is `test` and `lint`.
 2. Run `{{QUALITY_GATE_TEST}}` then `{{QUALITY_GATE_LINT}}`
 3. If `Required evidence` includes `build`, run `{{QUALITY_GATE_BUILD}}`
 4. Produce the contract-specific evidence needed for the touched surfaces:

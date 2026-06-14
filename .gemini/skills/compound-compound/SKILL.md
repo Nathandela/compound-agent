@@ -1,6 +1,7 @@
 ---
 name: compound-compound
 description: Reflect on the cycle and capture high-quality lessons for future sessions
+phase: compound
 ---
 
 # Compound Skill
@@ -13,27 +14,26 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
-2. Detect spec drift: compare final implementation against original EARS requirements in the epic description (`bd show <epic>`). Note any divergences -- what changed, why, was it justified. If drift reveals a spec was wrong or incomplete, flag that for lesson extraction.
-3. **Decomposition quality assessment**: compare actual implementation against predicted boundaries from architect. Did files cluster as predicted? Were assumptions valid? Rate boundary quality: "This boundary [succeeded/failed] because..." Record findings for the pipeline.
-4. **Assumption tracking**: for each assumption from architect phase, record predicted vs actual volatility. Note findings for the pipeline.
-5. **Emergence analysis**: if unexpected system behaviors occurred, classify root cause: incomplete interface contract (Garlan), control structure inadequacy (STPA), or scale-induced phase transition. Note preventive insight for the pipeline.
-3. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with `team_name`):
+2. Detect spec drift: resolve the spec file -- read the `Spec:` pointer in the epic stub (`bd show <epic>`) or the `Spec:` bead note, and open that `docs/specs/` file as the source of truth. If no spec-file pointer exists (legacy epic), fall back to reading the spec from the epic description. Compare the final implementation against the spec file's `## EARS Requirements`. Note any divergences -- what changed, why, was it justified. If drift reveals a spec was wrong or incomplete, flag that for lesson extraction. If reconciliation updates the spec, append an entry to the spec file's `## Amendments` section (phase = compound) describing what changed and why.
+3. Detect **verification drift**: compare the work and review evidence against the spec file's `## Verification Contract`. If review had to escalate the contract, or if planned evidence was too weak/too strong, capture that as a workflow-quality lesson.
+4. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with `team_name`):
    - Role skills: `.claude/skills/compound/agents/{context-analyzer,lesson-extractor,pattern-matcher,solution-writer,compounding}/SKILL.md`
    - For large diffs, deploy MULTIPLE context-analyzers and lesson-extractors
    - Pipeline: context-analyzers -> lesson-extractors -> pattern-matcher + solution-writer -> compounding
    - Agents coordinate via SendMessage throughout the pipeline
-4. Agents pass results through the pipeline via `SendMessage`. The lead coordinates: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
-5. Apply quality filters: novelty check (>0.98 cosine similarity = skip), specificity check
-6. Classify each item by type: lesson, solution, pattern, or preference
-7. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
-8. Store via `ca learn` with supersedes/related links where applicable.
+5. Agents pass results through the pipeline via `SendMessage`. The lead coordinates: context-analyzer and lesson-extractor feed pattern-matcher and solution-writer, which feed compounding.
+6. Apply quality filters: novelty check (>0.98 cosine similarity = skip), specificity check
+7. Classify each item by type: lesson, solution, pattern, or preference
+8. Classify severity: high (data loss/security/contradictions), medium (workflow/patterns), low (style/optimizations)
+9. Use `AskUserQuestion` to confirm high-severity items with the user before storing; medium/low items are auto-stored
+10. Store via `ca learn` with supersedes/related links where applicable.
    At minimum, capture 1 lesson per significant decision made during this cycle
-9. Delegate to the `compounding` subagent to run synthesis: cluster accumulated lessons by similarity and write CCT patterns to `.claude/lessons/cct-patterns.jsonl`
-10. Update outdated docs and deprecate superseded ADRs (set status to `deprecated`)
-11. Use `AskUserQuestion` to confirm high-severity items with the user before storing; medium/low items are auto-stored
+11. **Lint graduation**: Spawn the `lint-classifier` subagent (`.claude/agents/compound/lint-classifier.md`). Pass it the list of newly captured insights from step 10 via SendMessage (each with id, insight text, and severity). The subagent classifies each as LINTABLE, PARTIAL, or NOT_LINTABLE. For LINTABLE + HIGH confidence items, it detects the project's linter and creates beads tasks under a "Linting Improvement" epic. All insights remain stored as lessons regardless of classification.
+12. Delegate to the `compounding` subagent to run synthesis: cluster accumulated lessons by similarity and write CCT patterns to `.claude/lessons/cct-patterns.jsonl`
+13. Update outdated docs and deprecate superseded ADRs (set status to `deprecated`)
 
 ## Docs Integration
-- docs-reviewer checks if `docs/` content is outdated after the cycle
+- doc-gardener checks if `docs/` content is outdated after the cycle
 - Check `docs/decisions/` for ADRs contradicted by the work done
 - Set ADR status to `deprecated` if a decision was reversed, referencing the new ADR
 
@@ -50,8 +50,7 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 - Requiring user confirmation for every item (only high-severity needs it)
 - Not classifying items by type (lesson/solution/pattern/preference)
 - Capturing vague lessons ("be careful with X") -- be specific and concrete
-- Not assessing decomposition boundary quality against architect predictions
-- Not tracking assumption accuracy for future calibration
+- Not capturing when the Verification Contract was too weak or over-specified for the actual work
 
 ## Quality Criteria
 - Analysis team was spawned and agents coordinated via pipeline
@@ -64,14 +63,12 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 - Beads checked for related issues (`bd`)
 - Each item gives clear, concrete guidance for future sessions
 - Spec drift analyzed and captured
-- Decomposition boundary quality assessed
-- Architect assumptions tracked (predicted vs actual)
-- Emergent failures classified by root cause if any occurred
+- Verification drift analyzed and captured when the contract needed adjustment
 
 ## FINAL GATE -- EPIC CLOSURE
 Before closing the epic:
 - Run `ca verify-gates <epic-id>` -- must return PASS for both gates
 - Run `pnpm test` and `pnpm lint` -- must pass
+- Read the `## Verification Contract` from the spec file (resolve via the `Spec:` pointer; legacy fallback to the epic description) and run every required evidence item that remains applicable. If `build` is required, run `pnpm build`
 If verify-gates fails, the missing phase was SKIPPED. Go back and complete it.
 CRITICAL: 3/5 phases is NOT success. All 5 phases are required.
-

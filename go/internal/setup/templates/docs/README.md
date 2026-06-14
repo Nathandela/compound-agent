@@ -34,9 +34,14 @@ ca init
 # Full setup (includes embedding model download):
 ca setup
 
+# Install for specific harnesses (default is claude):
+ca setup --harness codex,gemini
+
 # Verify installation:
 ca doctor
 ```
+
+`setup --harness` accepts `claude`, `codex`, `gemini`, `goose`, and `antigravity` (comma-separated and/or repeatable). Antigravity is groundwork only -- it writes a compound protocol section to `AGENTS.md` for the `agy` CLI (the Gemini CLI successor) but is not yet a loop implementer.
 
 ### What `init` does
 
@@ -50,6 +55,17 @@ ca doctor
 8. For pnpm projects: auto-configures `onlyBuiltDependencies` for native addons
 
 `setup` does everything `init` does. The embedding model is managed separately by the embed daemon.
+
+---
+
+## Running epics
+
+Each epic's spec lives as a file at `docs/specs/<epic-id>-<slug>.md` -- the single source of truth that every workflow phase reads. The beads epic description holds only a pointer stub to that file.
+
+To build epics autonomously:
+
+- `ca loop --implementer <name>` runs an epic loop via `claude` (default), `goose` (open/local models), `codex` (gpt-5.5-codex), or `gemini` (gemini-3.1-pro).
+- The architect offers two implementation modes at its Launch gate: a detached infinity loop (`ca loop` in a `screen` session) for long unattended runs, or live orchestration (the architect drives epics through cook-it in-session, sequentially and autonomously).
 
 ---
 

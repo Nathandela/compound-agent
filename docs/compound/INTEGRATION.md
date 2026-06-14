@@ -90,6 +90,29 @@ ca compound
 
 ---
 
+## Coding harnesses
+
+Compound-agent integrates with multiple coding harnesses. Select one at setup with `ca setup --harness <name>`:
+
+| Harness | Status | Notes |
+|---------|--------|-------|
+| **Claude Code** | Full loop + reviewers | Default implementer for `ca loop`. |
+| **goose** | Full loop | Runs open and local models (for example `--model ollama/qwen2.5-coder:14b`). Sets `GOOSE_TOOLSHIM=1` automatically for ollama models. |
+| **codex** | Full loop | Default model `gpt-5.5-codex`, driven via `codex exec`. Valid reviewers are codex and gemini. |
+| **gemini** | Full loop | Default model `gemini-3.1-pro`, driven via `gemini -p --yolo`. Valid reviewers are codex and gemini. The Gemini CLI is being migrated to its successor, the `agy` CLI (see antigravity). |
+| **antigravity** | Groundwork only | Installs AGENTS.md for the `agy` CLI, the Gemini CLI successor. No functional loop or reviewer yet. |
+
+Implementers are selected per loop with `ca loop --implementer <name>`. See CLI_REFERENCE.md for the full flag matrix.
+
+### Implementation modes
+
+Two modes drive implementation:
+
+- **Detached loop** (`ca loop`): work runs unattended in a screen session, using the selected implementer and backend.
+- **Architect live orchestration**: a second, in-conversation mode entered via architect Phase 5, where the architect drives implementation directly inside the current session rather than detaching.
+
+---
+
 ## Beads integration
 
 Compound-agent works with beads (`bd`) for issue tracking:
@@ -104,6 +127,10 @@ bd sync                           # Sync with git remote
 ```
 
 The plan phase creates Review and Compound blocking tasks that depend on work tasks. This ensures these phases surface via `bd ready` after work completes, surviving context compaction.
+
+### Spec storage
+
+Specs are the single source of truth and live as files at `docs/specs/<epic-id>-<slug>.md`. Acceptance criteria and contracts are recorded there. The epic description holds only a pointer stub to the spec file (legacy epics may still carry the full spec in the description as a fallback).
 
 ### Verification gates
 

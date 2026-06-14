@@ -20,19 +20,7 @@ Before starting EACH phase, you MUST use the Read tool to open its skill file:
 Do NOT proceed from memory. Read the skill, then follow it exactly.
 
 ## Session Start
-When a cooking session begins, IMMEDIATELY print the banner below (copy it verbatim):
-
-[36m         o
-        /|\
-       o-o-o
-      /|\ /|\
-     o-o-o-o-o
-      \|/ \|/
-       o-o-o
-        \|/
-         o[0m
-
-Then proceed with the protocol below.
+When a cooking session begins, proceed with the protocol below.
 
 ## Phase Execution Protocol
 0. Initialize state: `ca phase-check init <epic-id>`
@@ -47,9 +35,11 @@ For each phase:
 
 ## Phase Gates (MANDATORY)
 - **After Plan**: Run `bd list --status=open` and verify Review + Compound tasks exist, then run `ca phase-check gate post-plan`
+- **After Plan (AC Gate)**: Resolve the spec file: read the `Spec:` pointer in the epic stub (`bd show <epic-id>`) or the `Spec:` bead note, and open that `docs/specs/` file as the source of truth. If no spec-file pointer exists (legacy epic), fall back to reading the spec from the epic description. Verify the `## Acceptance Criteria` section exists in that spec file. If missing, the plan phase MUST be re-entered to generate the AC table before proceeding to Work. This gate ensures the contract between plan and work is fulfilled.
+- **After Plan (Verification Contract Gate)**: Resolve the spec file: read the `Spec:` pointer in the epic stub (`bd show <epic-id>`) or the `Spec:` bead note, and open that `docs/specs/` file as the source of truth. If no spec-file pointer exists (legacy epic), fall back to reading the spec from the epic description. Verify the `## Verification Contract` section exists in that spec file. If missing, the plan phase MUST be re-entered to define the epic-local proof of done before proceeding to Work.
 - **After Work (GATE 3)**: `bd list --status=in_progress` must be empty. Then run `ca phase-check gate gate-3`
 - **After Review (GATE 4)**: /implementation-reviewer must have returned APPROVED. Then run `ca phase-check gate gate-4`
-- **After Compound (FINAL GATE)**: Run `ca verify-gates <epic-id>` (must PASS), `pnpm test`, and `pnpm lint`, then run `ca phase-check gate final` (auto-cleans phase state)
+- **After Compound (FINAL GATE)**: Run `ca verify-gates <epic-id>` (must PASS), `pnpm test`, and `pnpm lint`. Then resolve the spec file (via the epic `Spec:` pointer, falling back to the epic description for legacy epics), read its `## Verification Contract`, and run every required evidence item that remains open, including `pnpm build` when `build` is required, before running `ca phase-check gate final` (auto-cleans phase state)
 
 If a gate fails, DO NOT proceed. Fix the issue first.
 
@@ -71,16 +61,28 @@ If a gate fails, DO NOT proceed. Fix the issue first.
 - Proceeding after a failed gate
 - Not updating epic notes with phase state (loses resume ability)
 - Batching all commits to the end instead of committing incrementally
+- Not verifying AC table exists after plan phase before starting work
+- Not verifying the Verification Contract exists after plan phase before starting work
 
 ## Quality Criteria
 - All 5 phases were executed (3/5 is NOT success)
 - Each phase skill was Read before execution
 - Phase gates verified between each transition
+- **AC table verified present after plan phase**
+- **Verification Contract verified present after plan phase**
 - Epic notes updated after each phase
 - Memory searched at the start of each phase
 - `ca verify-gates` passed at the end
 
+## Verification Contract
+Cook-it does not invent "done" late in the cycle. The `## Verification Contract` written during plan is the epic-local source of truth for:
+- product profile (`webapp`, `api`, `cli`, `library`, `service`, or `mixed`)
+- touched surfaces
+- principal risks
+- required evidence
+
+If the contract is missing, stop and go back to plan. The fallback to legacy `test` + `lint` exists for older epics, not for newly planned work.
+
 ## SESSION CLOSE -- INVIOLABLE
 Before saying "done": git status, git add, bd sync, git commit, bd sync, git push.
 If phase state gets stuck, use the escape hatch: `ca phase-check clean` (or `ca phase-clean`).
-

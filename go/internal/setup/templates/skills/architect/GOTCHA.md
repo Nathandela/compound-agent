@@ -31,6 +31,26 @@ Things to do and not do when running the Architect skill. For loop-specific gotc
 - **Do NOT add telemetry I/O to the stdin read path in hooks.** Instrument at the hook OUTPUT boundary to avoid the 30-second stdin timeout.
 - **Do NOT add skill metadata fields without a runtime consumer.** Start with `phase` only.
 
+## Live Orchestration
+
+In-conversation alternative to the detached loop (Phase 5, mode B). The architect model stays live and orchestrates the materialized epics itself. Full protocol: `architect/references/live-orchestration.md`.
+
+### DO
+
+- **Process epics SEQUENTIALLY, one fully at a time, in dependency order.** Parallel epics would clobber the shared `.compound-agent/.ca-phase-state.json` and produce colliding git commits. Parallelism happens INSIDE each epic via cook-it's work-phase teams, never at the epic level.
+- **Run `ca phase-check clean` between epics.** Defensively clear stale phase state before each epic enters cook-it.
+- **Reuse `/compound:cook-it <epic-id>` for every epic.** It runs all five phases and gates (post-plan, gate-3, gate-4, final). Do NOT re-implement the phases.
+- **Verify completion before marking an epic done.** `ca verify-gates <epic-id>` must PASS and the epic must be status=closed.
+- **Skip dependents of a failed epic** transitively, mark them blocked with a reason, and continue with independent epics.
+- **Resume from the meta-epic checklist note.** On re-entry, skip already-closed epics and rebuild the worklist from the remaining `[ ]`/`[!]` lines.
+
+### DO NOT
+
+- **Do NOT run epics in parallel in the shared working tree.** This is the cardinal sin -- phase state and commits collide.
+- **Do NOT use `ca loop` or a screen session for live orchestration.** Those belong to mode A (the detached loop). Live orchestration runs entirely in the current conversation.
+- **Do NOT stop the run on a single epic failure or a `HUMAN_REQUIRED` marker.** Record the block, skip dependents, keep going.
+- **Do NOT re-run epics that are already status=closed on resume.**
+
 ## Advisory Fleet CLI Flags
 
 | CLI | Non-interactive mode | Model flag | Example |

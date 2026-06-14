@@ -49,10 +49,12 @@ If a gate fails, DO NOT proceed. Fix the issue first.
 
 ### Verification Contract
 
-The `## Verification Contract` written during plan is the epic-local source of truth
-for what "done" means: product profile, touched surfaces, principal risks, and
-required evidence. Do not invent "done" late in the cycle. If the contract is
-missing, go back to plan.
+The per-epic spec is a FILE at docs/specs/<epic-id>-<slug>.md and is the single
+source of truth. Resolve it from the epic's `Spec:` pointer via `bd show <epic>`
+(legacy fallback: the epic description for older epics). The `## Verification
+Contract` appended to the spec file during plan defines what "done" means: product
+profile, touched surfaces, principal risks, and required evidence. Do not invent
+"done" late in the cycle. If the contract is missing, go back to plan.
 
 ### Epic Completion Protocol
 

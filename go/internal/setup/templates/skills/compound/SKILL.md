@@ -14,8 +14,8 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 
 ## Methodology
 1. Review what happened during this cycle (git diff, test results, plan context)
-2. Detect spec drift: compare final implementation against original EARS requirements in the epic description (`bd show <epic>`). Note any divergences -- what changed, why, was it justified. If drift reveals a spec was wrong or incomplete, flag that for lesson extraction.
-3. Detect **verification drift**: compare the work and review evidence against the epic's `## Verification Contract`. If review had to escalate the contract, or if planned evidence was too weak/too strong, capture that as a workflow-quality lesson.
+2. Detect spec drift: resolve the spec file -- read the `Spec:` pointer in the epic stub (`bd show <epic>`) or the `Spec:` bead note, and open that `docs/specs/` file as the source of truth. If no spec-file pointer exists (legacy epic), fall back to reading the spec from the epic description. Compare the final implementation against the spec file's `## EARS Requirements`. Note any divergences -- what changed, why, was it justified. If drift reveals a spec was wrong or incomplete, flag that for lesson extraction. If reconciliation updates the spec, append an entry to the spec file's `## Amendments` section (phase = compound) describing what changed and why.
+3. Detect **verification drift**: compare the work and review evidence against the spec file's `## Verification Contract`. If review had to escalate the contract, or if planned evidence was too weak/too strong, capture that as a workflow-quality lesson.
 4. Spawn the analysis pipeline in an **AgentTeam** (TeamCreate + Task with `team_name`):
    - Role skills: `.claude/skills/compound/agents/{context-analyzer,lesson-extractor,pattern-matcher,solution-writer,compounding}/SKILL.md`
    - For large diffs, deploy MULTIPLE context-analyzers and lesson-extractors
@@ -69,6 +69,6 @@ Lessons go to `.claude/lessons/index.jsonl` through the CLI. MEMORY.md is a diff
 Before closing the epic:
 - Run `ca verify-gates <epic-id>` -- must return PASS for both gates
 - Run `{{QUALITY_GATE_TEST}}` and `{{QUALITY_GATE_LINT}}` -- must pass
-- Read the epic's `## Verification Contract` and run every required evidence item that remains applicable. If `build` is required, run `{{QUALITY_GATE_BUILD}}`
+- Read the `## Verification Contract` from the spec file (resolve via the `Spec:` pointer; legacy fallback to the epic description) and run every required evidence item that remains applicable. If `build` is required, run `{{QUALITY_GATE_BUILD}}`
 If verify-gates fails, the missing phase was SKIPPED. Go back and complete it.
 CRITICAL: 3/5 phases is NOT success. All 5 phases are required.

@@ -1,6 +1,7 @@
 ---
 name: compound-plan
 description: Decompose work into small testable tasks with clear dependencies
+phase: plan
 ---
 
 # Plan Skill
@@ -9,7 +10,7 @@ description: Decompose work into small testable tasks with clear dependencies
 Create a concrete implementation plan by decomposing work into small, testable tasks with dependencies and acceptance criteria.
 
 ## Methodology
-1. Read the spec from the epic description (`bd show <epic>`) for EARS requirements, decisions, and open questions. Verify its type is `epic` -- if it was created as `task`, fix with `bd update <id> --type=epic`
+1. Resolve the spec file: read the Spec: pointer in the epic stub (`bd show <epic>`) or the Spec: bead note, and open that `docs/specs/` file as the source of truth. If no spec-file pointer exists (legacy epic, or the epic was entered directly at plan), CREATE `docs/specs/<epic-id>-<slug>.md` now: write the frontmatter and the spec content from the epic description (or a brief stub if the description has none) through an empty `## Amendments` section, set the epic description to the pointer stub, add the `Spec:` bead note, and register the file in `docs/specs/index.md`. This guarantees a writable spec file for the Acceptance Criteria and Verification Contract sections below. Read the spec for EARS requirements, decisions, and open questions. Verify the epic's type is `epic` -- if it was created as `task`, fix with `bd update <id> --type=epic`
 2. Search memory with `ca search` and docs with `ca knowledge "relevant topic"` for architectural patterns and past mistakes
 3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
    - Available agents: `.claude/agents/compound/repo-analyst.md`, `memory-analyst.md`
@@ -19,14 +20,64 @@ Create a concrete implementation plan by decomposing work into small, testable t
 5. Synthesize research findings into a coherent approach. Flag conflicts between ADRs and proposed plan.
 6. Use `AskUserQuestion` to resolve ambiguities, conflicting constraints, or priority trade-offs before decomposing
 7. Decompose into tasks small enough to verify individually
-8. **Boundary stability check**: verify each task stays within its epic's scope boundary. If a task crosses epic boundaries, split it or expand scope.
-9. **Last Responsible Moment**: for each task, assess if it can be deferred for information gain. Mark deferrable tasks with rationale: "defer until <milestone> because <information needed>".
-10. **Change coupling check**: if files A and B change together >50% of the time (git log), they should be in the same task, not separate ones.
-11. Define acceptance criteria for each task
-12. Ensure each task traces back to a spec requirement for traceability
-13. Map dependencies between tasks
-14. Create beads issues: `bd create --title="..." --type=task`
-15. Create review and compound blocking tasks (`bd create` + `bd dep add`) that depend on work tasks — these survive compaction and surface via `bd ready` after work completes
+8. Define acceptance criteria for each task
+9. Ensure each task traces back to a spec requirement for traceability
+10. **Generate Acceptance Criteria table**: Extract testable criteria from EARS requirements and append them to the resolved spec FILE (`docs/specs/<epic-id>-<slug>.md`), inserting the section just before the `## Amendments` section. Use this format:
+
+    ```markdown
+    ## Acceptance Criteria
+    | ID | Source Req | Criterion | Verification Method |
+    |----|-----------|-----------|---------------------|
+    | AC-1 | EARS-N | When X, system shall Y within Z | unit test / manual / integration |
+    ```
+
+    Rules:
+    - Each EARS requirement MUST map to at least one AC row
+    - Criteria MUST be testable (no vague adjectives like "fast" or "good")
+    - Verification method MUST be specified
+    - Edit the spec FILE to insert the `## Acceptance Criteria` section immediately before `## Amendments`. Do NOT write it to the epic description.
+    - This is a first-time section addition, so per the Amendments policy it does NOT get an Amendments log entry.
+    - The AC section is **append-only** after plan phase; review annotates pass/fail
+11. **Generate Verification Contract**: Derive a minimal, per-epic definition of done and append it to the resolved spec FILE (`docs/specs/<epic-id>-<slug>.md`), inserting the `## Verification Contract` section just before the `## Amendments` section (after the Acceptance Criteria section). Use this format:
+
+    ```markdown
+    ## Verification Contract
+    Profile: webapp | api | cli | library | service | mixed
+    Surfaces:
+    - ui_surface
+    Risks:
+    - user_visible_quality
+    Required evidence:
+    - test
+    - lint
+    - build
+    ```
+
+    Rules:
+    - Detect the profile from repo signals plus the epic's actual scope. If architect/spec work noted a default profile, use it as advisory input only.
+    - Keep the contract **local to this epic**. Do NOT create repo-global config for this.
+    - Start from a baseline and then tailor:
+      - `webapp` -> `test`, `lint`, `build`, `runtime_startup`, `browser_evidence`
+      - `api` -> `test`, `lint`, `build`, `runtime_startup`, `contract_checks`
+      - `cli` -> `test`, `lint`, `build`, `help_version_check`, `command_transcript`
+      - `library` -> `test`, `lint`, `build`, `examples_run`, `public_api_review`
+      - `service` -> `test`, `lint`, `build`, `runtime_startup`, `config_validation`
+    - Add contract-specific evidence from touched surfaces and risks:
+      - `ui_surface` -> `responsive_check`, `edge_states_check`, `console_network_clean`, `a11y_smoke`, `design_craft_check`
+      - `public_api` -> `contract_examples`, `backward_compat_review`
+      - `persistence_schema` -> `roundtrip_test`, `migration_check`, `backcompat_check`
+      - `packaging_or_distribution` -> `package_build`, `install_smoke`
+      - `docs_or_examples` -> `docs_examples_sync`
+      - `auth_or_security` -> `auth_failure_paths`
+      - `performance_sensitive` -> `performance_budget_check`
+    - Use a small, explicit vocabulary for `Surfaces` and `Risks`; prefer consistency over novelty.
+    - If the profile is ambiguous **and** the choice materially changes required evidence, resolve it with `AskUserQuestion` once before finalizing the plan.
+    - Edit the spec FILE to insert the `## Verification Contract` section immediately before `## Amendments`. Do NOT write it to the epic description.
+    - This is a first-time section addition, so per the Amendments policy it does NOT get an Amendments log entry.
+    - The Verification Contract is **append-only** after plan; review may escalate it explicitly if risk was underestimated.
+12. Map dependencies between tasks
+13. Create beads issues: `bd create --title="..." --type=task`
+14. Create review and compound blocking tasks (`bd create` + `bd dep add`) that depend on work tasks — these survive compaction and surface via `bd ready` after work completes
 
 ## Memory Integration
 - Run `ca search` and `ca knowledge "relevant topic"` for patterns related to the feature area
@@ -46,8 +97,8 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Not reviewing existing ADRs and docs for constraints
 - Making architectural decisions without research backing (use the researcher skill for complex domains)
 - Planning implementation details too early (stay at task level)
-- Not checking tasks against epic boundaries (boundary drift)
-- Splitting change-coupled files into separate tasks
+- Not generating Acceptance Criteria table from EARS requirements
+- Not generating a Verification Contract, leaving later phases to guess what evidence is required
 
 ## Quality Criteria
 - Each task has clear acceptance criteria
@@ -58,11 +109,12 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Ambiguities resolved via `AskUserQuestion` before decomposing
 - Complexity estimates are realistic (no "should be quick")
 - Each task traces back to a spec requirement
-- Tasks respect epic scope boundaries (no cross-boundary work)
-- Change-coupled files grouped together
+- **Acceptance Criteria table generated and appended to the spec file before `## Amendments`**
+- **Verification Contract generated and appended to the spec file before `## Amendments`**
 
 ## POST-PLAN VERIFICATION -- MANDATORY
 After creating all tasks, verify review and compound tasks exist:
 - Run `bd list --status=open` and check for a "Review:" task and a "Compound:" task
 - If either is missing, CREATE THEM NOW. The plan is NOT complete without these gates.
-
+- **Verify AC table**: Open the spec file (`docs/specs/<epic-id>-<slug>.md`) and confirm the `## Acceptance Criteria` section exists before `## Amendments`. If missing, the plan is NOT complete.
+- **Verify contract**: Open the spec file (`docs/specs/<epic-id>-<slug>.md`) and confirm the `## Verification Contract` section exists before `## Amendments`. If missing, the plan is NOT complete.

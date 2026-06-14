@@ -8,6 +8,7 @@
 2. [Mermaid Diagram Selection](#mermaid-diagram-selection)
 3. [NL Ambiguity Detection](#nl-ambiguity-detection)
 4. [Trade-off Documentation](#trade-off-documentation)
+5. [Per-epic Spec File Template](#per-epic-spec-file-template)
 
 ---
 
@@ -55,7 +56,7 @@ Kiro's Structured Design Documents use EARS for requirements. Map phases:
 | Explore | Requirements gathering | User stories |
 | Understand | EARS requirements | Structured requirements |
 | Specify | Design document | Technical design |
-| Hand off | Implementation tasks | Beads epic |
+| Hand off | Implementation tasks | Spec file + pointer-stub epic |
 
 ---
 
@@ -263,3 +264,60 @@ Options plotted on [Criterion 1] vs [Criterion 2]:
 3. **Rank** remaining options (MCDA)
 
 This three-step flow prevents wasting time scoring options that fail hard constraints or are objectively worse on all dimensions.
+
+---
+
+## Per-epic Spec File Template
+
+The spec FILE at `docs/specs/<epic-id>-<slug>.md` is the single source of truth; the beads epic description is a pointer stub. `<slug>` = epic title kebab-cased (lowercase, spaces to hyphen, strip chars that are not alphanumeric or hyphen, collapse repeats, max 50 chars).
+
+spec-dev writes the frontmatter and sections through the empty `## Amendments` section. The plan phase later INSERTS Acceptance Criteria and Verification Contract sections BEFORE `## Amendments`. Stay close to `docs/specs/TEMPLATE.md` for markdown style.
+
+```markdown
+---
+epic: <epic-id>
+title: <title>
+status: draft
+created: <YYYY-MM-DD>
+---
+
+# <title>
+
+## Overview
+
+One or two sentences describing the end state and why it matters.
+
+## EARS Requirements
+
+- R1: When <trigger>, the system shall <action>.
+- R2: If <condition>, then the system shall <action>.
+
+## Scenario Table
+
+| ID | Source | Category | Precondition | Trigger | Expected Outcome |
+|----|--------|----------|--------------|---------|------------------|
+| S1 | R1 | happy | precondition | action | assertion |
+
+## Diagrams
+
+Mermaid diagrams used as thinking tools (sequence, state, ER, flowchart).
+
+## Open Questions
+
+- Question 1
+- Question 2
+
+## Amendments
+
+<!-- Append-only. MAJOR/MATERIAL changes only. Entry format:
+### <YYYY-MM-DD> -- <phase>: <short title>
+<what changed and why> -->
+```
+
+### Index registration
+
+If `docs/specs/` or `docs/specs/index.md` is missing, create them first (`mkdir -p docs/specs`, write a `# Specs Index` header table). Then append a row:
+
+```markdown
+| [<epic-id>-<slug>.md](<epic-id>-<slug>.md) | <title> (epic <epic-id>) |
+```

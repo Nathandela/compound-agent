@@ -67,8 +67,9 @@ prompt: |
   over-engineering, duplicated logic, dead code, and readability. Flag any
   change that is more complex than the problem requires.
 
-  Read the epic's `## Acceptance Criteria` and `## Verification Contract`
-  (`bd show {{ epic }}`); missing required evidence is a P1 finding.
+  Read the `## Acceptance Criteria` and `## Verification Contract` from the spec
+  file (resolve via the epic's `Spec:` pointer from `bd show {{ epic }}`; legacy
+  fallback to the epic description); missing required evidence is a P1 finding.
 
   Severity scale: P0 blocks merge, P1 critical, P2 important, P3 minor.
 

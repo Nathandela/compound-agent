@@ -118,6 +118,8 @@ Run phases individually when you want more control:
 /compound:compound                        # Capture what was learned
 ```
 
+spec-dev writes each per-epic spec to `docs/specs/<epic-id>-<slug>.md` as the single source of truth; the beads epic description holds only a pointer stub. plan appends the Acceptance Criteria and Verification Contract to that file, and work, review, and compound read from it (falling back to the legacy epic-description spec when no file exists). Material changes are logged in an `## Amendments` section. Specs stay readable and usable even outside the beads tooling.
+
 ### Level 3 — Factory mode
 
 For systems too large for a single feature cycle. `/compound:architect` decomposes the system; `ca loop` processes the resulting epics autonomously.
@@ -143,7 +145,7 @@ ca loop --reviewers claude-sonnet --review-every 3
 
 `ca loop` generates a bash script that processes your beads epics sequentially, running the full cook-it cycle on each one. No human intervention required between epics.
 
-The default backend is `claude --bg` (subscription-billed; requires accepting the bypass-permissions disclaimer once: `claude --dangerously-skip-permissions`). Use `--backend p` or `CA_BACKEND=p` for the legacy `claude -p` (pay-per-token) path.
+`--implementer` selects the engine that runs each epic: **claude** (default), **goose**, **codex**, or **gemini**. With the default claude implementer, the backend is `claude --bg` (subscription-billed; requires accepting the bypass-permissions disclaimer once: `claude --dangerously-skip-permissions`); use `--backend p` or `CA_BACKEND=p` for the legacy `claude -p` (pay-per-token) path. **goose** runs open/local models via Goose (e.g. `--model ollama/qwen2.5-coder:14b` or `deepseek/deepseek-chat`; for the ollama provider the loop auto-exports `GOOSE_TOOLSHIM=1`). **codex** drives the OpenAI Codex CLI (default model `gpt-5.5-codex`, dispatched via `codex exec`). **gemini** drives the Gemini CLI (default model `gemini-3.1-pro`, dispatched via `gemini -p --yolo`). For the codex and gemini implementers, valid `--reviewers` are `codex` and `gemini`.
 
 ```bash
 # Generate script for all ready epics (bg backend by default)
@@ -195,8 +197,9 @@ AI agents work best on well-scoped problems. When a task exceeds what fits comfo
 2. **Spec** — produces system-level EARS requirements, C4 architecture diagrams, and a scenario table
 3. **Decompose** — runs 6 parallel subagents (bounded context mapping, dependency analysis, scope sizing, interface design, STPA hazard analysis, structural-semantic gap analysis) then synthesises into a proposed epic structure
 4. **Materialise** — creates beads epics with scope boundaries, interface contracts, and wired dependencies
+5. **Orchestrate** — two implementation modes for driving the materialised epics through cook-it. **(A) Detached infinity loop**: the `ca loop` script run in a `screen` session, processing epics autonomously with no in-session involvement. **(B) Live orchestration**: the architect model stays in the conversation and autonomously drives each epic through `/compound:cook-it` sequentially in dependency order, tracking progress via a beads-backed checklist note (resumable) and reporting at the end. Polish is a separate opt-in post-loop phase, not an implementation mode.
 
-Three human approval gates separate the phases. Each output epic is sized for one cook-it cycle and includes an EARS subset for traceability back to the system spec.
+Three human approval gates separate the phases. Each output epic is sized for one cook-it cycle and includes an EARS subset for traceability back to the system spec. Live orchestration is entered through Phase 5 — there is no separate slash command.
 
 ```bash
 /compound:architect "Build a data pipeline: ingestion, transformation, storage, and API layer"
@@ -281,6 +284,8 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | Command | Description |
 |---------|-------------|
 | `ca loop` | Generate infinity loop script (default: `claude --bg`, subscription-billed) |
+| `ca loop --implementer <name>` | Engine that runs each epic: `claude` (default), `goose`, `codex`, `gemini` |
+| `ca loop --model <model>` | Implementer model (e.g. `ollama/qwen2.5-coder:14b`, `gpt-5.5-codex`, `gemini-3.1-pro`) |
 | `ca loop --backend bg` | Default bg backend: `claude --bg` (subscription-billed) |
 | `ca loop --backend p` | Legacy p backend: `claude -p` (pay-per-token) |
 | `ca loop --epics "id1,id2,id3"` | Target specific epic IDs (comma-separated) |
@@ -320,6 +325,7 @@ The CLI binary is `ca` (alias: `compound-agent`).
 | Command | Description |
 |---------|-------------|
 | `ca setup` | One-shot setup (hooks + templates) |
+| `ca setup --harness antigravity` | Groundwork: install an `AGENTS.md` for the `agy` CLI (the Gemini CLI successor); no functional antigravity loop/reviewer yet |
 | `ca setup --skip-hooks` | Setup without installing hooks |
 | `ca setup --json` | Output result as JSON |
 | `ca setup claude` | Install Claude Code hooks only |
@@ -366,7 +372,7 @@ A: Yes, completely. Embeddings run locally via the `ca-embed` Rust daemon (nomic
 A: ~278MB for the embedding model (one-time download, shared across projects) plus negligible space for lessons.
 
 **Q: Can I use it with other AI coding tools?**
-A: The CLI (`ca`) works standalone with any tool. Full hook integration is available for Claude Code and Gemini CLI.
+A: The CLI (`ca`) works standalone with any tool. Full hook integration is available for Claude Code and Gemini CLI. The Gemini CLI is being sunset (~2026-06-18) in favor of Antigravity; `ca setup --harness antigravity` installs groundwork (an `AGENTS.md` for the `agy` CLI) ahead of that migration.
 
 **Q: What happens if the embedding model isn't available?**
 A: Search gracefully falls back to keyword-only mode. Other commands that require embeddings will tell you what's missing. Run `ca doctor` to diagnose issues.

@@ -67,8 +67,10 @@ prompt: |
   secrets and credential handling, authentication and authorization, and unsafe
   data exposure.
 
-  Read the epic's `## Acceptance Criteria` and `## Verification Contract`
-  (`bd show {{ epic }}`); missing required security evidence is a P1 finding.
+  Read the `## Acceptance Criteria` and `## Verification Contract` from the spec
+  file (resolve via the epic's `Spec:` pointer from `bd show {{ epic }}`; legacy
+  fallback to the epic description); missing required security evidence is a P1
+  finding.
 
   Severity scale: P0 blocks merge, P1 critical, P2 important, P3 minor.
 

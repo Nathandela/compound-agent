@@ -138,7 +138,18 @@ This phase is OPT-IN. After Phase 4:
 
 **Gate 4** (launch consent received):
 
+Offer a **MODE CHOICE** via \`AskUserQuestion\`:
+
+- **(A) Detached infinity loop** -- launch an autonomous loop in a background screen session, then disconnect. Choose this for long unattended runs.
+- **(B) Live orchestration** -- drive the build to completion in this conversation, sequentially, one epic at a time. Choose this for an in-session, observable, autonomous run.
+
+**Mode A -- Detached infinity loop:**
+
 **Invoke \`/compound:launch-loop\` now.** Do NOT attempt to run \`ca loop\` or \`ca polish\` directly. The launch-loop command enforces mandatory skill reading, authorization gates, CLI flag syntax, and critical gotchas. It is the ONLY supported entry point for loop launching.
+
+**Mode B -- Live orchestration:**
+
+Read \`architect/references/live-orchestration.md\` and run its protocol in THIS session. The architect model itself acts as the orchestrator: it walks the epics SEQUENTIALLY in dependency order (never in parallel -- the shared phase-state file and working tree would collide), runs each via the existing \`/compound:cook-it <epic-id>\` end-to-end (do NOT re-implement the phases), and on any failure or \`HUMAN_REQUIRED\` marker marks that epic blocked, skips its dependents, and continues. Progress is beads-backed via the meta-epic checklist note; the run is resumable from that note. This mode does NOT use \`ca loop\` or a screen session.
 
 ### Phase 6: Polish (Opt-in, post-loop)
 
@@ -172,6 +183,10 @@ After the infinity loop completes, ask the user if they want polish cycles. If y
 - Skipping dry-run (catches configuration errors before live execution)
 - Running polish loop without specifying cycle count upfront (N must be decided before launch)
 - Using polish loop for correctness fixes (it is craft-focused; use review fleet for correctness)
+- **Live orchestration: running epics in parallel in the shared tree** -- never do this; the shared `.compound-agent/.ca-phase-state.json` and git commits collide. Sequential only.
+- **Live orchestration: re-implementing the phases** instead of reusing `/compound:cook-it` for each epic
+- **Live orchestration: running dependents of a failed epic** -- skip them transitively when their blocker is blocked
+- **Live orchestration: not resuming from the meta-epic checklist note** -- re-running already-closed epics on re-entry
 
 ## Quality Criteria
 - [ ] Socratic phase completed with domain glossary and mindmap
@@ -196,3 +211,8 @@ After the infinity loop completes, ask the user if they want polish cycles. If y
 - [ ] Polish cycle count specified upfront by user
 - [ ] Polish dry-run offered and reviewed (if polish activated)
 - [ ] Polish loop launched in separate screen session (if user approved)
+- [ ] Gate 4 mode choice offered (detached infinity loop vs live orchestration) when launch consent received
+- [ ] Live orchestration: epics processed sequentially in dependency order, never in parallel in the shared tree (if mode B chosen)
+- [ ] Live orchestration: each epic run via `/compound:cook-it` (phases not re-implemented)
+- [ ] Live orchestration: failed/blocked epics skip their dependents transitively; run continues autonomously
+- [ ] Live orchestration: progress tracked in the meta-epic checklist note; resumable from it

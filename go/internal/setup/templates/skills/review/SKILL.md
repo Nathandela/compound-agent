@@ -10,13 +10,13 @@ phase: review
 Perform thorough code review by spawning specialized reviewers in parallel, consolidating findings with severity classification (P0/P1/P2/P3), and gating completion on implementation-reviewer approval. Reviewers are calibrated with past lessons and relevant research before reviewing.
 
 ## Methodology
-1. Read the epic description (`bd show <epic>`) for EARS requirements -- reviewers verify each requirement is met
-2. **Check Acceptance Criteria**: Locate the `## Acceptance Criteria` table in the epic description. For each AC row, verify the implementation satisfies the criterion using the specified verification method.
-   - If the AC section is **missing**: flag as **P1 process finding** ("No Acceptance Criteria section found in epic description — plan phase did not generate AC table")
+1. Resolve the spec file: read the Spec: pointer in the epic stub (`bd show <epic>`) or the Spec: bead note, and open that `docs/specs/` file as the source of truth. If no spec-file pointer exists (legacy epic), fall back to reading the spec from the epic description. Read the `## EARS Requirements` for EARS requirements -- reviewers verify each requirement is met
+2. **Check Acceptance Criteria**: Locate the `## Acceptance Criteria` table in the spec file (same file resolved in step 1; fall back to the epic description for legacy epics). For each AC row, verify the implementation satisfies the criterion using the specified verification method.
+   - If the AC section is **missing**: flag as **P1 process finding** ("No Acceptance Criteria section found in spec file — plan phase did not generate AC table")
    - If an AC criterion is **not met**: flag as **P1 defect** ("AC-N not satisfied: <details>")
    - If an AC criterion is **met**: annotate the AC row as PASS in the review report
-3. **Check Verification Contract**: Locate the `## Verification Contract` section in the epic description.
-   - If the contract is **missing**: flag as **P1 process finding** ("No Verification Contract section found in epic description — plan phase did not define required evidence")
+3. **Check Verification Contract**: Locate the `## Verification Contract` section in the spec file (same file resolved in step 1; fall back to the epic description for legacy epics).
+   - If the contract is **missing**: flag as **P1 process finding** ("No Verification Contract section found in spec file — plan phase did not define required evidence")
    - If the contract exists: verify each item in `Required evidence` explicitly. Missing evidence is a **P1 process or execution defect**, not an optional note.
    - Use `Profile`, `Surfaces`, and `Risks` to decide which verification specialists must run during this review.
 4. Run baseline quality gates: `{{QUALITY_GATE_TEST}}` and `{{QUALITY_GATE_LINT}}`
@@ -97,6 +97,12 @@ When checking the Verification Contract, produce a second summary table in the r
 Rules:
 - Every item in `Required evidence` must be marked PASS, FAIL, or ESCALATED
 - `ESCALATED` means review strengthened the contract because the planned evidence was too weak for the actual risk
+- **When review escalates (strengthens) the contract**: append the strengthened evidence to the `## Verification Contract` section of the spec file resolved in Methodology step 1, AND add an Amendments entry to that spec file (contract escalation is a MAJOR change per the Amendments policy). Use this entry format under the spec file's `## Amendments` section:
+  ```
+  ### <YYYY-MM-DD> -- review: <short title>
+  <what changed and why>
+  ```
+  For legacy epics with no spec file, record the strengthened evidence in the epic description instead.
 - Missing runtime/browser/UI evidence is a blocking review outcome, not a polish suggestion
 - If the contract is absent, record a P1 process finding and review against the legacy floor (`test`, `lint`) plus obvious risk-based evidence
 
@@ -161,8 +167,9 @@ When the runtime-verifier is triggered by the Verification Contract:
 - Skipping quality gates before review
 - Bypassing the implementation-reviewer gate
 - Not checking CCT patterns for known Claude mistakes
-- Not checking acceptance criteria from the epic description
-- Not checking the Verification Contract from the epic description
+- Not checking acceptance criteria from the spec file
+- Not checking the Verification Contract from the spec file
+- Escalating the Verification Contract but not recording the strengthened evidence + an Amendments entry in the spec file
 - Not calibrating reviewers with past lessons (LCR skip)
 - Running runtime-verifier when the Verification Contract does not require runtime proof
 - Skipping runtime-verifier when the Verification Contract does require runtime proof

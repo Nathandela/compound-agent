@@ -8,6 +8,8 @@ phase: architect
 
 Reference skill for launching and monitoring autonomous loop pipelines. This skill is NOT auto-loaded — it is read on-demand when launching loops.
 
+> **Two launch styles.** This skill documents the **detached `ca loop` / screen loop** -- an autonomous pipeline that runs in a background screen session. There is also an in-conversation **LIVE ORCHESTRATION** alternative documented in `architect/references/live-orchestration.md`, where the architect model itself orchestrates the epics sequentially in the current conversation. Live orchestration does NOT use `ca loop` or a screen session. The two are the mode A / mode B choice at the architect's Phase 5 launch gate.
+
 ## Authorization Gate
 
 Before launching any loop, you MUST have authorization:

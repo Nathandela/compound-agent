@@ -10,7 +10,7 @@ phase: plan
 Create a concrete implementation plan by decomposing work into small, testable tasks with dependencies and acceptance criteria.
 
 ## Methodology
-1. Read the spec from the epic description (`bd show <epic>`) for EARS requirements, decisions, and open questions. Verify its type is `epic` -- if it was created as `task`, fix with `bd update <id> --type=epic`
+1. Resolve the spec file: read the Spec: pointer in the epic stub (`bd show <epic>`) or the Spec: bead note, and open that `docs/specs/` file as the source of truth. If no spec-file pointer exists (legacy epic, or the epic was entered directly at plan), CREATE `docs/specs/<epic-id>-<slug>.md` now: write the frontmatter and the spec content from the epic description (or a brief stub if the description has none) through an empty `## Amendments` section, set the epic description to the pointer stub, add the `Spec:` bead note, and register the file in `docs/specs/index.md`. This guarantees a writable spec file for the Acceptance Criteria and Verification Contract sections below. Read the spec for EARS requirements, decisions, and open questions. Verify the epic's type is `epic` -- if it was created as `task`, fix with `bd update <id> --type=epic`
 2. Search memory with `ca search` and docs with `ca knowledge "relevant topic"` for architectural patterns and past mistakes
 3. Spawn **subagents** via Task tool in parallel for research (lightweight, no inter-agent coordination):
    - Available agents: `.claude/agents/compound/repo-analyst.md`, `memory-analyst.md`
@@ -22,7 +22,7 @@ Create a concrete implementation plan by decomposing work into small, testable t
 7. Decompose into tasks small enough to verify individually
 8. Define acceptance criteria for each task
 9. Ensure each task traces back to a spec requirement for traceability
-10. **Generate Acceptance Criteria table**: Extract testable criteria from EARS requirements and append to the epic description. Use this format:
+10. **Generate Acceptance Criteria table**: Extract testable criteria from EARS requirements and append them to the resolved spec FILE (`docs/specs/<epic-id>-<slug>.md`), inserting the section just before the `## Amendments` section. Use this format:
 
     ```markdown
     ## Acceptance Criteria
@@ -35,9 +35,10 @@ Create a concrete implementation plan by decomposing work into small, testable t
     - Each EARS requirement MUST map to at least one AC row
     - Criteria MUST be testable (no vague adjectives like "fast" or "good")
     - Verification method MUST be specified
-    - Write the AC table to the epic via `bd update <epic-id> --description="<existing desc + AC section>"`
+    - Edit the spec FILE to insert the `## Acceptance Criteria` section immediately before `## Amendments`. Do NOT write it to the epic description.
+    - This is a first-time section addition, so per the Amendments policy it does NOT get an Amendments log entry.
     - The AC section is **append-only** after plan phase; review annotates pass/fail
-11. **Generate Verification Contract**: Derive a minimal, per-epic definition of done and append it to the epic description after the Acceptance Criteria section. Use this format:
+11. **Generate Verification Contract**: Derive a minimal, per-epic definition of done and append it to the resolved spec FILE (`docs/specs/<epic-id>-<slug>.md`), inserting the `## Verification Contract` section just before the `## Amendments` section (after the Acceptance Criteria section). Use this format:
 
     ```markdown
     ## Verification Contract
@@ -71,7 +72,8 @@ Create a concrete implementation plan by decomposing work into small, testable t
       - `performance_sensitive` -> `performance_budget_check`
     - Use a small, explicit vocabulary for `Surfaces` and `Risks`; prefer consistency over novelty.
     - If the profile is ambiguous **and** the choice materially changes required evidence, resolve it with `AskUserQuestion` once before finalizing the plan.
-    - Write the Verification Contract to the epic via `bd update <epic-id> --description="<existing desc + AC section + Verification Contract section>"`
+    - Edit the spec FILE to insert the `## Verification Contract` section immediately before `## Amendments`. Do NOT write it to the epic description.
+    - This is a first-time section addition, so per the Amendments policy it does NOT get an Amendments log entry.
     - The Verification Contract is **append-only** after plan; review may escalate it explicitly if risk was underestimated.
 12. Map dependencies between tasks
 13. Create beads issues: `bd create --title="..." --type=task`
@@ -107,12 +109,12 @@ Create a concrete implementation plan by decomposing work into small, testable t
 - Ambiguities resolved via `AskUserQuestion` before decomposing
 - Complexity estimates are realistic (no "should be quick")
 - Each task traces back to a spec requirement
-- **Acceptance Criteria table generated and appended to epic description**
-- **Verification Contract generated and appended to epic description**
+- **Acceptance Criteria table generated and appended to the spec file before `## Amendments`**
+- **Verification Contract generated and appended to the spec file before `## Amendments`**
 
 ## POST-PLAN VERIFICATION -- MANDATORY
 After creating all tasks, verify review and compound tasks exist:
 - Run `bd list --status=open` and check for a "Review:" task and a "Compound:" task
 - If either is missing, CREATE THEM NOW. The plan is NOT complete without these gates.
-- **Verify AC table**: Run `bd show <epic-id>` and confirm the `## Acceptance Criteria` section exists in the description. If missing, the plan is NOT complete.
-- **Verify contract**: Run `bd show <epic-id>` and confirm the `## Verification Contract` section exists in the description. If missing, the plan is NOT complete.
+- **Verify AC table**: Open the spec file (`docs/specs/<epic-id>-<slug>.md`) and confirm the `## Acceptance Criteria` section exists before `## Amendments`. If missing, the plan is NOT complete.
+- **Verify contract**: Open the spec file (`docs/specs/<epic-id>-<slug>.md`) and confirm the `## Verification Contract` section exists before `## Amendments`. If missing, the plan is NOT complete.

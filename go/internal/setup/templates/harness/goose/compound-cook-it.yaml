@@ -28,13 +28,17 @@ prompt: |
   `ca knowledge "<goal>"` for prior art before doing the work, and gate the
   transition before moving on.
 
-  1. plan: Read the spec and the plan. Run `ca search` and `ca knowledge` for
-     prior art. Write the concrete changes, the `## Acceptance Criteria` table,
-     and the `## Verification Contract` (product profile, touched surfaces,
-     principal risks, required evidence) into the epic description.
-     GATE: verify the epic description has both a `## Acceptance Criteria` table
-     and a `## Verification Contract` section. If either is missing, redo plan.
-     Then run `ca phase-check gate post-plan`.
+  1. plan: Read the spec from the spec file (resolve via the epic's `Spec:`
+     pointer; fallback to the epic description) and the plan. Run `ca search` and
+     `ca knowledge` for prior art. Write the concrete changes, the
+     `## Acceptance Criteria` table, and the `## Verification Contract` (product
+     profile, touched surfaces, principal risks, required evidence) into the spec
+     file (docs/specs/<epic-id>-<slug>.md), inserted before the `## Amendments`
+     section.
+     GATE: verify the spec file (resolve it from the epic's `Spec:` pointer via
+     `bd show <epic>`; legacy fallback to the epic description) has both a
+     `## Acceptance Criteria` table and a `## Verification Contract` section. If
+     either is missing, redo plan. Then run `ca phase-check gate post-plan`.
   2. work: Run `ca search` and `ca knowledge` for prior art. Write the failing
      test(s) first, then the minimal code to pass them. Keep changes lean and
      matching surrounding style. GATE: `ca phase-check gate gate-3`.

@@ -9,6 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-06-14
+
+Two additive workflow changes: per-epic specs become file-backed (the spec file
+is the single source of truth, the beads epic is a pointer stub), and the
+architect gains a third implementation mode (in-conversation live orchestration)
+alongside the existing detached infinity loop. No Go/CLI behavior changes; the
+loop generators and `ca` commands are untouched. `go build/vet/test` all green.
+
+### Added
+- **Spec-as-file source of truth**: `/compound:spec-dev` now writes each per-epic
+  spec to `docs/specs/<epic-id>-<slug>.md` (EARS requirements, scenario table,
+  diagrams, open questions, and an append-only `## Amendments` section). The beads
+  epic description becomes a short pointer stub (`Spec: docs/specs/...`) plus a
+  matching `Spec:` bead note, and the spec is registered in `docs/specs/index.md`
+  (created if missing). Benefit: specs stay readable and usable outside the beads
+  tooling.
+- **Architect live orchestration**: `/compound:architect` Phase 5 now offers a
+  mode choice -- (A) the existing detached infinity loop via `/compound:launch-loop`,
+  or (B) a new in-conversation orchestrator that stays live in the session and
+  drives each materialized epic through `/compound:cook-it` sequentially in
+  dependency order. It is harness-adaptive (uses the Workflow/ultracode tool when
+  available, else Task + AgentTeam + subagents), fully autonomous (a failed epic is
+  marked blocked, its dependents are skipped, the run continues), tracks progress
+  via a meta-epic checklist note (resumable), and emits one consolidated report.
+  Documented in `architect/references/live-orchestration.md` (new) with gotchas in
+  `architect/GOTCHA.md`.
+
+### Changed
+- **plan** now appends the `## Acceptance Criteria` table and `## Verification
+  Contract` to the spec file (before `## Amendments`) instead of the epic
+  description.
+- **work**, **review**, **compound**, and **cook-it** gates now read the spec, AC,
+  and Verification Contract from the resolved spec file, with a legacy fallback to
+  the epic description for pre-existing epics. **review** records contract
+  escalations in the file's Verification Contract section plus an `## Amendments`
+  entry; **compound** logs spec-drift reconciliations as amendments.
+- `.gemini/skills` mirror synced to canonical for all seven affected phase skills
+  (also fixing the pre-existing architect 4-phase mirror drift to the canonical
+  6-phase version).
+
+### Notes
+- Backward compatible: every downstream reader falls back to the epic description
+  when no spec-file pointer is present, so legacy epics keep working.
+- Live orchestration is entered via architect Phase 5 (no new slash command) and
+  does not use `ca loop` or a screen session.
+
 ## [2.10.0] - 2026-06-14
 
 Adds `codex` and `gemini` as full loop implementers alongside `claude` (default)

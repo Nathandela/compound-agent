@@ -35,11 +35,11 @@ For each phase:
 
 ## Phase Gates (MANDATORY)
 - **After Plan**: Run `bd list --status=open` and verify Review + Compound tasks exist, then run `ca phase-check gate post-plan`
-- **After Plan (AC Gate)**: Run `bd show <epic-id>` and verify the `## Acceptance Criteria` section exists in the epic description. If missing, the plan phase MUST be re-entered to generate the AC table before proceeding to Work. This gate ensures the contract between plan and work is fulfilled.
-- **After Plan (Verification Contract Gate)**: Run `bd show <epic-id>` and verify the `## Verification Contract` section exists in the epic description. If missing, the plan phase MUST be re-entered to define the epic-local proof of done before proceeding to Work.
+- **After Plan (AC Gate)**: Resolve the spec file: read the `Spec:` pointer in the epic stub (`bd show <epic-id>`) or the `Spec:` bead note, and open that `docs/specs/` file as the source of truth. If no spec-file pointer exists (legacy epic), fall back to reading the spec from the epic description. Verify the `## Acceptance Criteria` section exists in that spec file. If missing, the plan phase MUST be re-entered to generate the AC table before proceeding to Work. This gate ensures the contract between plan and work is fulfilled.
+- **After Plan (Verification Contract Gate)**: Resolve the spec file: read the `Spec:` pointer in the epic stub (`bd show <epic-id>`) or the `Spec:` bead note, and open that `docs/specs/` file as the source of truth. If no spec-file pointer exists (legacy epic), fall back to reading the spec from the epic description. Verify the `## Verification Contract` section exists in that spec file. If missing, the plan phase MUST be re-entered to define the epic-local proof of done before proceeding to Work.
 - **After Work (GATE 3)**: `bd list --status=in_progress` must be empty. Then run `ca phase-check gate gate-3`
 - **After Review (GATE 4)**: /implementation-reviewer must have returned APPROVED. Then run `ca phase-check gate gate-4`
-- **After Compound (FINAL GATE)**: Run `ca verify-gates <epic-id>` (must PASS), `{{QUALITY_GATE_TEST}}`, and `{{QUALITY_GATE_LINT}}`. Then read the epic's `## Verification Contract` and run every required evidence item that remains open, including `{{QUALITY_GATE_BUILD}}` when `build` is required, before running `ca phase-check gate final` (auto-cleans phase state)
+- **After Compound (FINAL GATE)**: Run `ca verify-gates <epic-id>` (must PASS), `{{QUALITY_GATE_TEST}}`, and `{{QUALITY_GATE_LINT}}`. Then resolve the spec file (via the epic `Spec:` pointer, falling back to the epic description for legacy epics), read its `## Verification Contract`, and run every required evidence item that remains open, including `{{QUALITY_GATE_BUILD}}` when `build` is required, before running `ca phase-check gate final` (auto-cleans phase state)
 
 If a gate fails, DO NOT proceed. Fix the issue first.
 

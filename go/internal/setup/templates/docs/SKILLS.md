@@ -18,7 +18,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: At the start of a new feature or epic, before any planning.
 
-**What it does**: Guides the user through 4 phases (Explore, Understand, Specify, Hand off) to produce a rigorous spec. Spawns research subagents, uses Mermaid diagrams as thinking tools, detects NL ambiguity, writes EARS-notation requirements, and stores the consolidated spec in the beads epic description.
+**What it does**: Guides the user through 4 phases (Explore, Understand, Specify, Hand off) to produce a rigorous spec. Spawns research subagents, uses Mermaid diagrams as thinking tools, detects NL ambiguity, writes EARS-notation requirements, and writes the consolidated spec to a `docs/specs/<epic-id>-<slug>.md` file (the single source of truth), leaving a pointer stub in the beads epic.
 
 ### `/compound:plan`
 
@@ -26,7 +26,7 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: After spec-dev, before any implementation.
 
-**What it does**: Reviews spec-dev output, spawns analysts, decomposes into tasks with acceptance criteria, writes an epic-local Verification Contract, creates beads issues, and creates Review + Compound blocking tasks.
+**What it does**: Reviews spec-dev output, spawns analysts, decomposes into tasks, appends the Acceptance Criteria table and an epic-local Verification Contract to the spec file, creates beads issues, and creates Review + Compound blocking tasks.
 
 ### `/compound:work`
 
@@ -98,7 +98,15 @@ Skills are instructions that Claude reads before executing each phase. They live
 
 **When invoked**: When a large system needs to be broken down into naturally-scoped epics before implementation.
 
-**What it does**: Runs 5 phases (Socratic → Spec → Decompose → Materialize → Launch) with human gates. Uses DDD bounded contexts, STPA analysis, and a 6-angle decomposition convoy. Optionally configures and launches the infinity loop with improvement programs.
+**What it does**: Runs six phases (Socratic → Spec → Decompose → Materialize → Launch → Polish) with human gates. Uses DDD bounded contexts, STPA analysis, and a 6-angle decomposition convoy. At the Launch gate it offers two implementation modes: a detached infinity loop (background `ca loop` in a screen session) or live orchestration (the architect stays in the session and autonomously drives each materialised epic through `/compound:cook-it` sequentially in dependency order, tracking progress via a beads-backed checklist note and resuming after interruption).
+
+---
+
+## Detached loop and harness targets
+
+The architect Launch gate's detached mode runs `ca loop` in a `screen` session. `ca loop --implementer` selects the coding agent: `claude` (default), `goose`, `codex`, or `gemini`. The `codex` implementer defaults to model `gpt-5.5-codex` and `gemini` defaults to `gemini-3.1-pro`.
+
+`ca setup --harness` installs the compound skills into a target harness. Supported values are `claude`, `codex`, `gemini`, and `goose`, plus `antigravity` (groundwork only -- not yet available as a `ca loop --implementer`).
 
 ---
 
