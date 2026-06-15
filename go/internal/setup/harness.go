@@ -168,22 +168,33 @@ func installCodex(repoRoot string, result *InitResult) error {
 	return reconcileHarnessFile(filepath.Join(codexDir, "config.toml"), cfg, result)
 }
 
-// installAgy installs the agy (Antigravity CLI) target: it appends the compound
-// protocol section to AGENTS.md (agy's native memory file). The section uses its
-// own header so it coexists with the shared lesson section that codex/claude
-// write to AGENTS.md, and re-runs are idempotent via the header guard. agy is
-// the functional loop engine that replaces the removed standalone gemini CLI.
+// installAgy installs the agy (Antigravity CLI) target: it writes the compound
+// protocol section into AGENTS.md (agy's native memory file). The section carries
+// its own marker block so it coexists with the shared lesson section that
+// codex/claude write to AGENTS.md. Re-runs reconcile the managed block: when it is
+// already present it is replaced if the template changed (so repos upgrading from
+// the old antigravity groundwork section pick up the current protocol) and left
+// untouched when identical. agy is the functional loop engine that replaces the
+// removed standalone gemini CLI.
 func installAgy(repoRoot string, result *InitResult) error {
 	agentsPath := filepath.Join(repoRoot, "AGENTS.md")
 	section := templates.AgyMemory()
 
 	existing, err := os.ReadFile(agentsPath)
 	if err == nil {
-		if strings.Contains(string(existing), templates.AntigravitySectionHeader) {
-			return nil // Already installed.
+		content := string(existing)
+		start := strings.Index(content, templates.AntigravityStartMarker)
+		end := strings.Index(content, templates.AntigravityEndMarker)
+		if start != -1 && end != -1 && end > start {
+			end += len(templates.AntigravityEndMarker)
+			updated := content[:start] + strings.TrimSpace(section) + content[end:]
+			if updated == content {
+				return nil // Managed block already current.
+			}
+			return os.WriteFile(agentsPath, []byte(updated), 0644)
 		}
-		content := strings.TrimRight(string(existing), "\n") + "\n\n" + section
-		return os.WriteFile(agentsPath, []byte(content), 0644)
+		updated := strings.TrimRight(content, "\n") + "\n\n" + section
+		return os.WriteFile(agentsPath, []byte(updated), 0644)
 	}
 	if !os.IsNotExist(err) {
 		return fmt.Errorf("read AGENTS.md: %w", err)

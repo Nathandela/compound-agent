@@ -728,9 +728,12 @@ spawn_reviewers() {
         fi
         ;;
       (agy)
+        # agy runs on its own configured default model. Do NOT pass the implementer
+        # REVIEW_MODEL here: under non-agy implementers that is a claude/codex model
+        # name agy cannot serve. Symmetric with the codex reviewer (no model flag).
         if [ "$cycle" -eq 1 ]; then
           (portable_timeout "$REVIEW_TIMEOUT" agy \
-            -p "$(cat "$prompt_file")" --dangerously-skip-permissions --model "$REVIEW_MODEL" --print-timeout 1h > "$report" 2>&1 || true) &
+            -p "$(cat "$prompt_file")" --dangerously-skip-permissions --print-timeout 1h > "$report" 2>&1 || true) &
         else
           (portable_timeout "$REVIEW_TIMEOUT" agy -c \
             -p "$follow_up" --dangerously-skip-permissions > "$report" 2>&1 || true) &

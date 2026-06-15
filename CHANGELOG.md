@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-06-15
+
+Patch release addressing two issues found by an external codex review of 2.12.0.
+
+### Fixed
+- The agy loop reviewer no longer passes the implementer's `REVIEW_MODEL` to
+  `agy --model`. Under a non-agy implementer that value is a claude/codex model
+  name agy cannot serve, so the agy reviewer now runs on agy's own configured
+  default, symmetric with the codex reviewer.
+- `ca setup --harness agy` now migrates repos that still carry the old antigravity
+  groundwork section in AGENTS.md: it replaces the managed marker block when the
+  template changed instead of skipping on the header match and leaving stale
+  "groundwork only" text.
+
 ## [2.12.0] - 2026-06-14
 
 Replaces the standalone Google gemini CLI with the Antigravity CLI (`agy`) as the

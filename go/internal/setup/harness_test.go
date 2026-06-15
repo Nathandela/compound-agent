@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/nathandelacretaz/compound-agent/internal/setup/templates"
 )
 
 // newHarnessRepo creates a tempdir repo with a .git marker and returns its path.
@@ -544,6 +546,41 @@ func TestSetup_HarnessAgy_Idempotent(t *testing.T) {
 	}
 	if string(first) != string(second) {
 		t.Error("agy install is not idempotent: AGENTS.md changed on second run")
+	}
+}
+
+// TestSetup_HarnessAgy_UpgradesStaleAntigravityBlock verifies the upgrade path: a
+// repo carrying the old antigravity groundwork section in AGENTS.md is migrated.
+// ca setup --harness agy must replace the managed marker block with the current
+// agy protocol instead of skipping on the header match and leaving stale text.
+func TestSetup_HarnessAgy_UpgradesStaleAntigravityBlock(t *testing.T) {
+	dir := newHarnessRepo(t)
+	stale := templates.AntigravityStartMarker + "\n" +
+		"## Compound Agent Protocol (Antigravity)\n\n" +
+		"> antigravity is groundwork only and is not yet a functional loop engine.\n" +
+		templates.AntigravityEndMarker + "\n"
+	agentsPath := filepath.Join(dir, "AGENTS.md")
+	if err := os.WriteFile(agentsPath, []byte(stale), 0644); err != nil {
+		t.Fatalf("seed stale AGENTS.md: %v", err)
+	}
+
+	opts := InitOptions{SkipHooks: true, Targets: []HarnessTarget{HarnessAgy}}
+	if _, err := InitRepo(dir, opts); err != nil {
+		t.Fatalf("agy InitRepo over stale block: %v", err)
+	}
+	got, err := os.ReadFile(agentsPath)
+	if err != nil {
+		t.Fatalf("read AGENTS.md: %v", err)
+	}
+	s := string(got)
+	if strings.Contains(s, "groundwork only") {
+		t.Error("stale antigravity groundwork text must be replaced on agy upgrade")
+	}
+	if !strings.Contains(s, "functional loop engine") {
+		t.Error("agy upgrade must install the current agy protocol section")
+	}
+	if n := strings.Count(s, templates.AntigravityStartMarker); n != 1 {
+		t.Errorf("expected exactly one managed block after upgrade, got %d", n)
 	}
 }
 

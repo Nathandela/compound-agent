@@ -295,6 +295,12 @@ func TestLoopScriptSpawnReviewers_SupportsAllModels(t *testing.T) {
 	if !strings.Contains(spawner, "portable_timeout") {
 		t.Error("expected portable_timeout wrapping reviewer commands")
 	}
+	// Regression (codex P1): the agy reviewer must never be handed the implementer
+	// REVIEW_MODEL; under non-agy implementers that is a claude/codex model name agy
+	// cannot serve. It runs on agy's own default, symmetric with the codex reviewer.
+	if strings.Contains(spawner, `--model "$REVIEW_MODEL"`) {
+		t.Error("agy reviewer must not pass --model \"$REVIEW_MODEL\" (not agy-compatible)")
+	}
 }
 
 func TestLoopScriptImplementerPhase_ContainsFixesMarker(t *testing.T) {
