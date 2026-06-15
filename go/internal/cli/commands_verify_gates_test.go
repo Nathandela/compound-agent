@@ -66,6 +66,19 @@ func TestParseBdShowDeps(t *testing.T) {
 			},
 		},
 		{
+			// bd 0.63.x exposes an epic's child tasks (created via --parent)
+			// under "dependents" with dependency_type "parent-child".
+			name: "json with dependents array (bd 0.63.x parent-child)",
+			input: `[{"id":"epic-1","title":"Parent","dependents":[
+				{"id":"epic-1.1","title":"Review: Code review","status":"closed"},
+				{"id":"epic-1.2","title":"Compound: Synthesize patterns","status":"open"}
+			]}]`,
+			want: []bdDep{
+				{ID: "epic-1.1", Title: "Review: Code review", Status: "closed"},
+				{ID: "epic-1.2", Title: "Compound: Synthesize patterns", Status: "open"},
+			},
+		},
+		{
 			name:    "empty deps",
 			input:   `[{"id":"epic-1","title":"Parent"}]`,
 			want:    []bdDep{},
@@ -124,6 +137,20 @@ DEPENDS ON
   → ✓ task-1: Review: Code review ● closed
   → ○ task-2: Compound: Synthesize patterns ● open
 BLOCKED BY
+`,
+			want: []bdDep{
+				{Title: "Review: Code review", Status: "closed"},
+				{Title: "Compound: Synthesize patterns", Status: "open"},
+			},
+		},
+		{
+			// bd 0.63.x lists child tasks under a "CHILDREN" header using the
+			// "↳" glyph instead of the old "DEPENDS ON" / "→" layout.
+			name: "bd 0.63.x CHILDREN section with ↳ glyph",
+			input: `○ epic-1 [EPIC] · Parent epic
+CHILDREN
+  ↳ ✓ epic-1.1: Review: Code review ● P3
+  ↳ ○ epic-1.2: Compound: Synthesize patterns ● P3
 `,
 			want: []bdDep{
 				{Title: "Review: Code review", Status: "closed"},
