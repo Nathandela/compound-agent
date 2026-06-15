@@ -57,11 +57,16 @@ func parseBdShowDeps(raw string) ([]bdDep, error) {
 
 	issue := issues[0]
 
-	// Try depends_on, then dependencies
+	// Try depends_on, then dependencies, then dependents.
+	// bd 0.63.x exposes an epic's child tasks (incl. the Review/Compound
+	// gate tasks created via --parent) under "dependents" with
+	// dependency_type "parent-child"; older schemas used depends_on/dependencies.
 	var depsRaw interface{}
 	if d, ok := issue["depends_on"]; ok {
 		depsRaw = d
 	} else if d, ok := issue["dependencies"]; ok {
+		depsRaw = d
+	} else if d, ok := issue["dependents"]; ok {
 		depsRaw = d
 	}
 
@@ -83,8 +88,10 @@ func parseBdShowDeps(raw string) ([]bdDep, error) {
 	return deps, nil
 }
 
-// depsTextPattern matches lines like: → ✓ task-1: Review: Code review ● closed
-var depsTextPattern = regexp.MustCompile(`^\s+→\s+(✓|○)\s+\S+:\s+(.+?)\s+●`)
+// depsTextPattern matches dependency/child lines in `bd show` plain output.
+// bd <0.63 used "→ ✓ task-1: Review: … ●"; bd 0.63.x uses "↳ ○ id: Review: … ●"
+// (different arrow glyph, and an extra status glyph like ◐). Accept both.
+var depsTextPattern = regexp.MustCompile(`^\s+(?:→|↳)\s+(✓|○|◐|●)\s+\S+:\s+(.+?)\s+●`)
 
 // parseBdShowDepsText parses the plain text output of `bd show <id>` into dependencies.
 func parseBdShowDepsText(output string) []bdDep {
@@ -94,7 +101,8 @@ func parseBdShowDepsText(output string) []bdDep {
 
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "DEPENDS ON" {
+		// bd <0.63 header was "DEPENDS ON"; bd 0.63.x lists child tasks under "CHILDREN".
+		if trimmed == "DEPENDS ON" || trimmed == "CHILDREN" {
 			inDeps = true
 			continue
 		}
@@ -196,8 +204,12 @@ func fetchDeps(epicID string) ([]bdDep, error) {
 		return nil, fmt.Errorf("bd CLI not found; install with: ca install-beads")
 	}
 
-	// Use "--" to prevent epicID from being interpreted as a flag
-	out, err := exec.Command("bd", "show", "--", epicID, "--json").Output()
+	// Use "--" to prevent epicID from being interpreted as a flag.
+	// NOTE: --json MUST come before "--": in bd 0.63.x, "--" terminates flag
+	// parsing, so "bd show -- <id> --json" treats --json as a positional id
+	// (bd errors "no issue found matching --json") and emits the human tree,
+	// which then fails JSON parsing.
+	out, err := exec.Command("bd", "show", "--json", "--", epicID).Output()
 	if err == nil {
 		deps, parseErr := parseBdShowDeps(string(out))
 		if parseErr == nil {
