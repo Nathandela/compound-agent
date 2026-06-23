@@ -86,19 +86,25 @@ func startDaemon(socketPath, modelPath, tokenizerPath string) error {
 		return err
 	}
 
-	devNull, err := os.Open(os.DevNull)
+	devNullR, err := os.Open(os.DevNull)
 	if err != nil {
 		return fmt.Errorf("open %s: %w", os.DevNull, err)
 	}
-	defer devNull.Close()
+	defer devNullR.Close()
+
+	devNullW, err := os.OpenFile(os.DevNull, os.O_WRONLY, 0)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", os.DevNull, err)
+	}
+	defer devNullW.Close()
 
 	attr := &os.ProcAttr{
 		Dir: filepath.Dir(socketPath),
 		Env: os.Environ(),
 		Files: []*os.File{
-			devNull, // stdin from /dev/null
-			nil,     // stdout discarded
-			os.Stderr,
+			devNullR, // stdin
+			nil,      // stdout discarded
+			devNullW, // stderr: /dev/null, not inherited pipe — fixes pipe-blocking bug
 		},
 	}
 
