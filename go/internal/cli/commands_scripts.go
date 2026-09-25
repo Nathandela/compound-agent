@@ -224,7 +224,7 @@ type loopGenerateOptions struct {
 	review          *loopReviewOptions
 }
 
-func generateLoopScript(opts loopGenerateOptions) string {
+func generateLoopScript(opts loopGenerateOptions) string { //nolint:funlen // generated shell assembly
 	escapedModel := util.ShellEscape(opts.model)
 	// Replace commas with spaces so bash `for` loop iterates correctly.
 	escapedEpicIDs := util.ShellEscape(strings.ReplaceAll(opts.epics, ",", " "))
@@ -1034,7 +1034,7 @@ detect_marker() {
 
 // The foreground CLI has a terminal root result. Earlier prompts, tool output,
 // and assistant events are progress only, even if they contain a marker.
-func loopScriptForegroundMarkerDetector() string {
+func loopScriptForegroundMarkerDetector() string { //nolint:funlen // bash template string
 	return `# --- Marker Detection ---
 command -v python3 >/dev/null || die "python3 required for foreground result validation"
 detect_marker() {
