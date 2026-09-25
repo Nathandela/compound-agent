@@ -57,8 +57,8 @@ func TestLoopCommand_UsesCompoundAgentLogDir(t *testing.T) {
 
 	data, _ := os.ReadFile(outPath)
 	script := string(data)
-	if !strings.Contains(script, `LOG_DIR=".compound-agent/agent_logs"`) {
-		t.Error("expected LOG_DIR to use .compound-agent/agent_logs")
+	if !strings.Contains(script, `LOG_DIR="${CA_LOOP_LOG_DIR:-.compound-agent/agent_logs}"`) {
+		t.Error("expected LOG_DIR override with .compound-agent/agent_logs default")
 	}
 }
 

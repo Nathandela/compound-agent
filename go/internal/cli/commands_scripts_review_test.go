@@ -802,12 +802,12 @@ func TestLoopCommand_DualFileMarkerDetection(t *testing.T) {
   local logfile="$1" tracefile="$2"`) {
 		t.Error("detect_marker should take two file arguments (logfile + tracefile)")
 	}
-	// Uses anchored grep for primary detection
-	if !strings.Contains(script, `"^EPIC_COMPLETE$"`) {
-		t.Error("missing anchored EPIC_COMPLETE grep")
+	// Claude accepts a marker only from one successful terminal root result.
+	if !strings.Contains(script, `result_count == 1`) || !strings.Contains(script, `result['result'].strip()`) {
+		t.Error("missing terminal root result validation")
 	}
-	// Extracts HUMAN_REQUIRED reason
-	if !strings.Contains(script, `"^HUMAN_REQUIRED:"`) {
+	// Extracts HUMAN_REQUIRED reason from that result.
+	if !strings.Contains(script, `text.startswith('HUMAN_REQUIRED:')`) {
 		t.Error("missing HUMAN_REQUIRED reason extraction")
 	}
 	// Call site passes both files
@@ -832,15 +832,15 @@ func TestLoopCommand_GitStatusCheckAfterEpic(t *testing.T) {
 	data, _ := os.ReadFile(outPath)
 	script := string(data)
 
-	if !strings.Contains(script, "git diff --quiet") {
-		t.Error("missing git status check after epic completion")
+	if !strings.Contains(script, "FATAL: Working tree dirty after epic completion") || !strings.Contains(script, "exit 1") {
+		t.Error("dirty worktree after an epic must fail the loop")
 	}
-	if !strings.Contains(script, "auto-committing") {
-		t.Error("missing auto-commit for dirty working tree")
+	if strings.Contains(script, "git add -A && git commit") {
+		t.Error("loop must not auto-commit arbitrary dirty worktree content")
 	}
 }
 
-func TestLoopCommand_GitPushAtEnd(t *testing.T) {
+func TestLoopCommand_DoesNotPushAtEnd(t *testing.T) {
 	t.Parallel()
 	root := &cobra.Command{Use: "ca"}
 	root.AddCommand(loopCmd())
@@ -856,11 +856,11 @@ func TestLoopCommand_GitPushAtEnd(t *testing.T) {
 	data, _ := os.ReadFile(outPath)
 	script := string(data)
 
-	if !strings.Contains(script, "git push") {
-		t.Error("missing git push at loop end")
+	if strings.Contains(script, "git push") {
+		t.Error("loop must leave publication to its caller")
 	}
-	if !strings.Contains(script, "git remote get-url origin") {
-		t.Error("missing remote availability check before push")
+	if !strings.Contains(script, "Completed: $COMPLETED") || !strings.Contains(script, "Failed:    $FAILED_COUNT") {
+		t.Error("loop summary must remain available after removing implicit publication")
 	}
 }
 

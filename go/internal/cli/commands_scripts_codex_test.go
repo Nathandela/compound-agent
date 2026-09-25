@@ -327,8 +327,8 @@ func TestLoopCmd_CodexDetectMarkerUnchanged(t *testing.T) {
 		}
 		return s[start : start+end+3]
 	}
-	if extract(claude) != extract(codex) {
-		t.Error("detect_marker must be byte-identical between claude and codex")
+	if extract(claude) == extract(codex) || extract(codex) != extract(loopScriptHelpers()) {
+		t.Error("Claude needs terminal-result validation; Codex retains its plain-text detector")
 	}
 }
 
