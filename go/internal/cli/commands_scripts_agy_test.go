@@ -248,8 +248,8 @@ func TestLoopCmd_AgyDetectMarkerUnchanged(t *testing.T) {
 		}
 		return s[start : start+end+3]
 	}
-	if extract(claude) != extract(agy) {
-		t.Error("detect_marker must be byte-identical between claude and agy")
+	if extract(claude) == extract(agy) || extract(agy) != extract(loopScriptHelpers()) {
+		t.Error("Claude needs terminal-result validation; Agy retains its plain-text detector")
 	}
 }
 

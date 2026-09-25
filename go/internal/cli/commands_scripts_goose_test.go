@@ -688,8 +688,8 @@ func TestLoopCmd_GooseDetectMarkerUnchanged(t *testing.T) {
 		}
 		return s[start : start+end+3]
 	}
-	if extract(claude) != extract(goose) {
-		t.Error("detect_marker must be byte-identical between claude and goose (R2)")
+	if extract(claude) == extract(goose) || extract(goose) != extract(loopScriptHelpers()) {
+		t.Error("Claude needs terminal-result validation; Goose retains its plain-text detector")
 	}
 }
 

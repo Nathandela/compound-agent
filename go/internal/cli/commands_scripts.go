@@ -224,7 +224,7 @@ type loopGenerateOptions struct {
 	review          *loopReviewOptions
 }
 
-func generateLoopScript(opts loopGenerateOptions) string {
+func generateLoopScript(opts loopGenerateOptions) string { //nolint:funlen // generated shell assembly
 	escapedModel := util.ShellEscape(opts.model)
 	// Replace commas with spaces so bash `for` loop iterates correctly.
 	escapedEpicIDs := util.ShellEscape(strings.ReplaceAll(opts.epics, ",", " "))
@@ -261,6 +261,9 @@ func generateLoopScript(opts loopGenerateOptions) string {
 	}
 
 	helpers := loopScriptHelpers()
+	if impl == "claude" {
+		helpers = loopScriptHelpersWithDetector(loopScriptForegroundMarkerDetector())
+	}
 	seam := loopScriptSeamImpl(impl, opts.backend, opts.backendExplicit)
 	preLoop := loopScriptPreLoop()
 	whileHeader := loopScriptWhileHeader()
@@ -317,7 +320,7 @@ func loopScriptConfig(maxRetries int, escapedModel, escapedEpicIDs string, compa
 	fmt.Fprintf(&b, "MAX_RETRIES=%d\n", maxRetries)
 	fmt.Fprintf(&b, "MODEL=%s\n", escapedModel)
 	fmt.Fprintf(&b, "EPIC_IDS=%s\n", escapedEpicIDs)
-	fmt.Fprintf(&b, "LOG_DIR=\".compound-agent/agent_logs\"\n")
+	fmt.Fprintf(&b, "LOG_DIR=\"${CA_LOOP_LOG_DIR:-.compound-agent/agent_logs}\"\n")
 	fmt.Fprintf(&b, "MIN_FREE_MEMORY_PCT=${MIN_FREE_MEMORY_PCT:-20}  # Stop loop if free memory drops below this %%\n")
 	fmt.Fprintf(&b, "WATCHDOG_THRESHOLD=${WATCHDOG_THRESHOLD:-15}     # Kill session if free memory drops below this %%\n")
 	fmt.Fprintf(&b, "WATCHDOG_INTERVAL=${WATCHDOG_INTERVAL:-30}       # Seconds between watchdog checks\n")
@@ -585,7 +588,7 @@ start_memory_watchdog() {
       fi
       sleep "$WATCHDOG_INTERVAL"
     done
-  ) &
+  ) >/dev/null 2>&1 &
   WATCHDOG_PID=$!
 }
 
@@ -625,7 +628,7 @@ start_stale_watchdog() {
       fi
       last_size=$cur_size
     done
-  ) &
+  ) >/dev/null 2>&1 &
   STALE_WATCHDOG_PID=$!
 }
 
@@ -900,8 +903,8 @@ func loopScriptPromptBuilder(bt, implementer string) string { //nolint:funlen //
 	fmt.Fprintf(&b, "## Step 3: On completion\n")
 	fmt.Fprintf(&b, "When all work is done and tests pass:\n")
 	fmt.Fprintf(&b, "1. Close the epic: \\%sbd close $epic_id\\%s\n", bt, bt)
-	fmt.Fprintf(&b, "2. Commit and push all changes\n")
-	fmt.Fprintf(&b, "3. Output this exact marker on its own line:\n\n")
+	fmt.Fprintf(&b, "2. Commit the intended epic changes; leave publication to the caller\n")
+	fmt.Fprintf(&b, "3. Make your final response consist solely of this exact marker:\n\n")
 	fmt.Fprintf(&b, "EPIC_COMPLETE\n\n")
 	fmt.Fprintf(&b, "## Step 4: On failure\n")
 	fmt.Fprintf(&b, "If you cannot complete the epic after reasonable effort:\n")
@@ -931,6 +934,10 @@ func loopScriptPromptBuilder(bt, implementer string) string { //nolint:funlen //
 }
 
 func loopScriptHelpers() string { //nolint:funlen // bash template string
+	return loopScriptHelpersWithDetector(loopScriptLegacyMarkerDetector())
+}
+
+func loopScriptHelpersWithDetector(detector string) string { //nolint:funlen // bash template string
 	return `# --- Text Extractor ---
 # extract_text() - Extract assistant text from stream-json events on stdin
 # Claude Code stream-json: {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
@@ -963,7 +970,32 @@ for line in sys.stdin:
   fi
 }
 
-# --- Marker Detection ---
+` + detector + `
+# --- Observability ---
+STATUS_FILE="$LOG_DIR/.loop-status.json"
+EXEC_LOG="$LOG_DIR/loop-execution.jsonl"
+
+write_status() {
+  local status="$1"
+  local epic_id="${2:-}"
+  local attempt="${3:-0}"
+  if [ "$status" = "idle" ]; then
+    echo "{\"status\":\"idle\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$STATUS_FILE"
+  else
+    echo "{\"epic_id\":\"$epic_id\",\"attempt\":$attempt,\"started_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"status\":\"$status\"}" > "$STATUS_FILE"
+  fi
+}
+
+log_result() {
+  local epic_id="$1" result="$2" attempts="$3" duration="$4"
+  echo "{\"epic_id\":\"$epic_id\",\"result\":\"$result\",\"attempts\":$attempts,\"duration_s\":$duration,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" >> "$EXEC_LOG"
+}
+
+`
+}
+
+func loopScriptLegacyMarkerDetector() string {
+	return `# --- Marker Detection ---
 # detect_marker() - Check for completion markers in log and trace
 # Primary: macro log (anchored patterns). Fallback: trace JSONL (unanchored).
 # Returns: "complete", "failed", "human:<reason>", or "none"
@@ -997,24 +1029,110 @@ detect_marker() {
   echo "none"
 }
 
-# --- Observability ---
-STATUS_FILE="$LOG_DIR/.loop-status.json"
-EXEC_LOG="$LOG_DIR/loop-execution.jsonl"
-
-write_status() {
-  local status="$1"
-  local epic_id="${2:-}"
-  local attempt="${3:-0}"
-  if [ "$status" = "idle" ]; then
-    echo "{\"status\":\"idle\",\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > "$STATUS_FILE"
-  else
-    echo "{\"epic_id\":\"$epic_id\",\"attempt\":$attempt,\"started_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"status\":\"$status\"}" > "$STATUS_FILE"
-  fi
+`
 }
 
-log_result() {
-  local epic_id="$1" result="$2" attempts="$3" duration="$4"
-  echo "{\"epic_id\":\"$epic_id\",\"result\":\"$result\",\"attempts\":$attempts,\"duration_s\":$duration,\"timestamp\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" >> "$EXEC_LOG"
+// The foreground CLI has a terminal root result. Earlier prompts, tool output,
+// and assistant events are progress only, even if they contain a marker.
+func loopScriptForegroundMarkerDetector() string { //nolint:funlen // bash template string
+	return `# --- Marker Detection ---
+command -v python3 >/dev/null || die "python3 required for foreground result validation"
+detect_marker() {
+  local logfile="$1" tracefile="$2"
+  python3 - "$tracefile" "${3:-0}" "${4:-}" "${CA_LOOP_RESULT_FILE:-}" <<'PY'
+import json
+import os
+import sys
+import tempfile
+
+last_root = None
+result_count = 0
+auth_failed = False
+valid = True
+session_id = ''
+provider_error = ''
+error_excerpt = ''
+try:
+    with open(sys.argv[1], encoding='utf-8') as trace:
+        for line in trace:
+            if not line.strip():
+                valid = False
+                break
+            event = json.loads(line)
+            if not isinstance(event, dict):
+                valid = False
+                break
+            if event.get('parent_tool_use_id') or event.get('isSidechain'):
+                continue
+            last_root = event
+            if isinstance(event.get('session_id'), str):
+                session_id = event['session_id'][:128]
+            if event.get('type') == 'result':
+                result_count += 1
+            if event.get('error') == 'authentication_failed':
+                auth_failed = True
+            if isinstance(event.get('error'), str):
+                provider_error = event['error'][:128]
+                message = event.get('message')
+                content = message.get('content', []) if isinstance(message, dict) else []
+                if isinstance(content, list):
+                    error_excerpt = ''.join(
+                        block.get('text', '') for block in content
+                        if isinstance(block, dict) and isinstance(block.get('text'), str)
+                    )[:1024]
+except (OSError, UnicodeError, ValueError):
+    valid = False
+
+result = last_root if last_root and last_root.get('type') == 'result' and result_count == 1 else None
+child_exit = int(sys.argv[2])
+forced_reason = sys.argv[3]
+if auth_failed:
+    marker = 'auth_failed'
+elif provider_error:
+    marker = 'failed'
+elif child_exit != 0 or forced_reason:
+    marker = 'failed'
+elif not valid or result is None:
+    marker = 'none'
+elif result.get('is_error') is not False or result.get('subtype') != 'success':
+    marker = 'failed'
+elif not isinstance(result.get('result'), str):
+    marker = 'none'
+else:
+    text = result['result'].strip()
+    if text == 'EPIC_COMPLETE':
+        marker = 'complete'
+    elif text == 'EPIC_FAILED':
+        marker = 'failed'
+    elif text.startswith('HUMAN_REQUIRED:'):
+        marker = 'human:' + text[len('HUMAN_REQUIRED:'):].strip()
+    else:
+        marker = 'none'
+
+if sys.argv[4]:
+    record = {
+        'classification': marker.split(':', 1)[0],
+        'child_exit': child_exit,
+        'forced_reason': forced_reason,
+        'root_result_seen': result is not None,
+        'session_id': session_id,
+        'subtype': str(result.get('subtype', ''))[:128] if result else '',
+        'is_error': result.get('is_error') if result else None,
+        'error': 'authentication_failed' if auth_failed else provider_error,
+        'error_excerpt': error_excerpt,
+        'result_excerpt': str(result.get('result', ''))[:1024] if result else '',
+    }
+    path = sys.argv[4]
+    fd, temporary = tempfile.mkstemp(prefix='.terminal-result-', dir=os.path.dirname(path))
+    try:
+        with os.fdopen(fd, 'w', encoding='utf-8') as out:
+            json.dump(record, out, ensure_ascii=False)
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+print(marker)
+PY
 }
 
 `
@@ -1217,6 +1335,7 @@ func loopScriptSeamClaude(backend string, explicit bool) string { //nolint:funle
 # "p"  = claude -p streaming subshell (legacy, R-PLEGACY)
 # "bg" = claude --bg background session polled via state.json (R-BG)
 ` + caBackendLine + `
+command -v python3 >/dev/null || die "python3 required for Claude result validation"
 ` + preflight + `
 # BG_POLL_INTERVAL: seconds between state.json polls for the bg backend.
 BG_POLL_INTERVAL=${BG_POLL_INTERVAL:-15}
@@ -1442,6 +1561,44 @@ print(''.join(lines)[-4096:])
       printf '%s\n' "$marker_text" > "$logfile"
       ;;
   esac
+}
+
+# bg completion is accepted only from the terminal state payload. Transcript
+# text may include the user prompt or an earlier assistant claim.
+detect_bg_marker() {
+  python3 - "$1" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], encoding='utf-8') as source:
+        state = json.load(source)
+    output = state.get('output')
+    if not isinstance(output, dict):
+        output = {}
+    if state.get('error') == 'authentication_failed' or output.get('error') == 'authentication_failed':
+        print('auth_failed')
+    elif state.get('error') or output.get('error'):
+        print('failed')
+    elif state.get('state') != 'done' or state.get('inFlight', {}).get('tasks') != 0:
+        print('failed')
+    elif output.get('is_error') is True:
+        print('failed')
+    else:
+        result = output.get('result')
+        if not isinstance(result, str):
+            print('none')
+        elif result.strip() == 'EPIC_COMPLETE':
+            print('complete')
+        elif result.strip() == 'EPIC_FAILED':
+            print('failed')
+        elif result.strip().startswith('HUMAN_REQUIRED:'):
+            print('human:' + result.strip()[len('HUMAN_REQUIRED:'):].strip())
+        else:
+            print('none')
+except (OSError, UnicodeError, ValueError, TypeError, AttributeError):
+    print('none')
+PY
 }
 
 # agent_stop <handle>
@@ -2397,15 +2554,22 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
       # p backend: block until the streaming subshell exits, using watchdogs for safety.
       start_memory_watchdog "$AGENT_HANDLE" "$MEM_LOG"
       start_stale_watchdog "$AGENT_HANDLE" "$TRACEFILE" "$MEM_LOG"
-      wait "$AGENT_HANDLE" 2>/dev/null || true
+      AGENT_EXIT_CODE=0
+      wait "$AGENT_HANDLE" 2>/dev/null || AGENT_EXIT_CODE=$?
       stop_stale_watchdog
       stop_memory_watchdog
 
       # Detect if watchdog killed the session
+      AGENT_TERMINATED=false
+      AGENT_FORCED_REASON=""
       if [ -f "$MEM_LOG" ] && grep -q "STALE_WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
+        AGENT_TERMINATED=true
+        AGENT_FORCED_REASON=stale_watchdog
         log "WARN: Session killed by stale output watchdog (see $MEM_LOG)"
         cleanup_orphans
       elif [ -f "$MEM_LOG" ] && grep -q "WATCHDOG:" "$MEM_LOG" 2>/dev/null; then
+        AGENT_TERMINATED=true
+        AGENT_FORCED_REASON=memory_watchdog
         log "WARN: Session killed by memory watchdog (see $MEM_LOG)"
         cleanup_orphans
       fi
@@ -2500,12 +2664,48 @@ func loopScriptAttemptSetup() string { //nolint:funlen // bash template string
       agent_collect "$AGENT_HANDLE" "$LOGFILE" "$TRACEFILE"
     fi
 
-    MARKER=$(detect_marker "$LOGFILE" "$TRACEFILE")
+    if [ "$CA_BACKEND" = bg ]; then
+      MARKER=$(detect_bg_marker "$bg_state_file")
+      BG_FORCED_FAILURE=${bg_killed:-false}
+      BG_AUTH_FAILED=false
+      if [ "$MARKER" = auth_failed ]; then BG_AUTH_FAILED=true; fi
+      if [ "$BG_FORCED_FAILURE" = true ] && [ "$BG_AUTH_FAILED" = false ]; then MARKER=failed; fi
+    else
+      MARKER=$(detect_marker "$LOGFILE" "$TRACEFILE" "$AGENT_EXIT_CODE" "$AGENT_FORCED_REASON")
+    fi
+    if [ "$CA_BACKEND" = p ]; then
+      if [ "$MARKER" = auth_failed ]; then
+        log "FATAL: Claude authentication_failed; stopping without retry"
+        exit 1
+      fi
+      if [ "$AGENT_TERMINATED" = true ] || [ "$AGENT_EXIT_CODE" -ne 0 ]; then
+        log "WARN: foreground Claude failed (exit=$AGENT_EXIT_CODE watchdog=$AGENT_TERMINATED)"
+        MARKER=failed
+      fi
+      if [ "$MARKER" = failed ] || [ "$MARKER" = none ]; then
+        log "FATAL: foreground Claude did not complete; stopping without retry"
+        exit 1
+      fi
+    fi
 
     # bg backend: harvest worktree and tear down session now that the marker is known.
     # The cleanup is marker-aware: success -> merge + teardown; failure -> keep worktree.
     # p backend: agent_cleanup is a noop.
     agent_cleanup "$AGENT_HANDLE" "$MARKER"
+    if [ "$CA_BACKEND" = bg ]; then
+      if [ "$BG_AUTH_FAILED" = true ]; then
+        log "FATAL: Claude authentication_failed; stopping without retry"
+        exit 1
+      fi
+      if [ "$BG_FORCED_FAILURE" = true ]; then
+        log "FATAL: background Claude was forcibly stopped; stopping without retry"
+        exit 1
+      fi
+      if [ "$MARKER" = failed ] || [ "$MARKER" = none ]; then
+        log "FATAL: background Claude did not complete; stopping without retry"
+        exit 1
+      fi
+    fi
 `
 }
 
@@ -2548,10 +2748,10 @@ func loopScriptEpicResult(periodicTrigger string) string { //nolint:funlen // ba
 
   if [ "$SUCCESS" = true ]; then
     if [ -z "${LOOP_DRY_RUN:-}" ]; then
-    # Verify working tree is clean after epic completion
+    # Publication is owned by the caller; a dirty worktree is not completion.
     if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
-      log "WARN: Working tree dirty after epic completion, auto-committing"
-      git add -A && git commit -m "chore: auto-commit uncommitted changes from $EPIC_ID" 2>/dev/null || true
+      log "FATAL: Working tree dirty after epic completion"
+      exit 1
     fi
     COMPLETED=$((COMPLETED + 1))
     log_result "$EPIC_ID" "complete" "$ATTEMPT" "$EPIC_DURATION"
@@ -2576,9 +2776,14 @@ done
 `
 }
 
-// loopScriptPostLoop returns the post-loop section: final review trigger, summary, git push.
+// loopScriptPostLoop returns the post-loop section: final review trigger and summary.
 func loopScriptPostLoop(finalTrigger string) string {
-	exit := `# Zero-work detection: exit 2 if no epics completed and none failed
+	exit := `# A skipped epic leaves the requested batch incomplete.
+if [ "$SKIPPED" -gt 0 ]; then
+  log "WARN: One or more epics require human action"
+  exit 2
+fi
+# Zero-work detection: exit 2 if no epics completed and none failed
 if [ "$COMPLETED" -eq 0 ] && [ "$FAILED_COUNT" -eq 0 ]; then
   log "WARN: Zero epics completed -- all may be blocked or skipped"
   exit 2
@@ -2593,11 +2798,6 @@ if [ -z "${LOOP_DRY_RUN:-}" ]; then
 echo "{\"type\":\"summary\",\"completed\":$COMPLETED,\"failed\":$FAILED_COUNT,\"skipped\":$SKIPPED,\"total_duration_s\":$TOTAL_DURATION}" >> "$EXEC_LOG"
 write_status "idle"
 
-# Push to remote if available
-if git remote get-url origin >/dev/null 2>&1; then
-  log "Pushing to remote..."
-  git push 2>&1 || log "WARN: git push failed (check SSH/auth)"
-fi
 fi
 
 log "=========================================="
